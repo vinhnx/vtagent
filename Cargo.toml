@@ -1,0 +1,33 @@
+[package]
+name = "vtagent"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.37", features = ["macros", "rt-multi-thread", "io-util"] }
+tokio-stream = { version = "0.1", features = ["io-util"] }
+futures = "0.3"
+walkdir = "2.5"
+glob = "0.3"
+thiserror = "1.0"
+console = "0.15"
+owo-colors = "4.0"
+termimad = "0.31"
+regex = "1.10"
+tree-sitter = "0.20"
+tree-sitter-rust = "0.20"
+tree-sitter-python = "0.20"
+tree-sitter-javascript = "0.20"
+tree-sitter-typescript = "0.20"
+tree-sitter-go = "0.20"
+tree-sitter-java = "0.20"
+
+[profile.release]
+codegen-units = 1
+opt-level = 3
+lto = true

@@ -1,0 +1,746 @@
+# Rust Build Artifacts
+target/
+Cargo.lock
+
+# IDE and Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Gemini API Keys
+GEMINI_API_KEY
+GOOGLE_API_KEY
+*.key
+*.pem
+
+# Log Files
+*.log
+logs/
+*.log.*
+
+# Temporary Files
+*.tmp
+*.temp
+.cache/
+.tmp/
+
+# Documentation Build
+docs/build/
+docs/.vuepress/dist/
+*.pdf
+*.docx
+
+# Performance Benchmarks
+benches/results/
+criterion/
+*.profraw
+
+# Testing Artifacts
+coverage/
+*.profraw
+*.profdata
+test_results/
+*.test
+
+# Database Files
+*.db
+*.sqlite
+*.sqlite3
+
+# Node.js (if used for docs/tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Python (if used for scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Backup Files
+*.bak
+*.backup
+*.orig
+*.rej
+
+# Archive Files
+*.tar.gz
+*.zip
+*.rar
+*.7z
+
+# Docker
+.dockerignore
+
+# CI/CD
+.github/workflows/*.yml.bak
+.gitlab-ci.yml
+
+# Local Configuration
+config.local.*
+settings.local.*
+*.local
+
+# Secrets and Sensitive Data
+secrets/
+*.secret
+*.p12
+*.pfx
+
+# Debug and Profiling
+debug/
+*.dSYM/
+*.dwarf
+
+# Build Cache
+.cargo/
+.cargo/registry/
+.cargo/git/
+
+# Rust Analyzer
+rust-project.json
+
+# Flamegraphs (performance profiling)
+flamegraph.svg
+*.svg
+
+# Test Coverage
+tarpaulin-report.html
+cobertura.xml
+lcov.info
+
+# Documentation
+docs/api/
+docs/build/
+docs/.vuepress/
+docs/.docusaurus/
+
+# Local Development
+.local
+*.local.json
+*.local.yml
+*.local.yaml
+*.local.toml
+
+# Backup and Recovery
+*.bak
+*.old
+*.orig
+*.backup
+
+# System Files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Temporary Directories
+tmp/
+temp/
+.cache/
+
+# Lock Files
+*.lock
+yarn.lock
+package-lock.json
+Pipfile.lock
+
+# IDE Specific
+.vscode/settings.json
+.vscode/launch.json
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Vim/Emacs
+*.swp
+*.swo
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.tmlanguage.cache
+*.tmPreferences.cache
+*.stTheme.cache
+*.sublime-workspace
+*.sublime-project
+
+# VS Code
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+
+# JetBrains IDEs
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+.idea_modules/
+
+# Eclipse
+.metadata
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.loadpath
+.recommenders
+
+# NetBeans
+nb-configuration.xml
+nbactions.xml
+nb-project.xml
+.manifest.mf
+nbproject/private/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.aps
+*.pch
+*.vspscc
+*_i.c
+*_p.c
+*.ncb
+*.suo
+*.tlb
+*.tlh
+*.tmp
+*.tmp_proj
+*_wpftmp.csproj
+*.log
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.log
+*.svclog
+*.ccr
+*.cache
+*.internal
+*.scc
+*.vssscc
+*.vspscc
+*_i.h
+*.suo
+*.suo
+*.user
+*.user
+*.aps
+*.pch
+*.vspscc
+*_i.c
+*_p.c
+*.ncb
+*.suo
+*.tlb
+*.tlh
+*.tmp
+*.tmp_proj
+*_wpftmp.csproj
+*.log
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.log
+*.svclog
+*.ccr
+*.cache
+*.internal
+*.scc
+*.vssscc
+*.vspscc
+*_i.h
+*.suo
+
+# Xcode
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+*.moved-aside
+*.xccheckout
+*.xcscmblueprint
+
+# Android
+*.apk
+*.ap_
+*.dex
+bin/
+gen/
+.gradle/
+local.properties
+proguard/
+*.log
+.navigation/
+captures/
+
+# Gradle
+.gradle/
+build/
+gradle-app.setting
+!gradle-wrapper.jar
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
+
+# Meson
+build/
+builddir/
+
+# Ninja
+.ninja_deps
+.ninja_log
+
+# Bazel
+bazel-*
+.bazelrc
+.bazelversion
+
+# Cargo
+Cargo.lock
+target/
+
+# Go
+vendor/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Haskell
+dist/
+dist-newstyle/
+cabal.project.local
+.ghc.environment.*
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+.gradle/
+build/
+gradle-app.setting
+!gradle-wrapper.jar
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Kotlin
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+
+# Scala
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Clojure
+pom.xml.asc
+target/
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+
+# Groovy
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+
+# Lisp
+*.fasl
+*.fas
+*.lsp
+*.fasl
+*.fas
+*.lsp
+
+# Erlang
+ebin/
+*.beam
+*.plt
+*.app.src
+.erlang.cookie
+.ctex
+edoc-info
+*.dump
+
+# Elixir
+_build/
+deps/
+*.ez
+*.beam
+config/*.secret.exs
+.elixir_ls/
+
+# Elm
+elm-stuff/
+*.elmi
+*.elmo
+
+# Haskell
+dist/
+dist-newstyle/
+cabal.project.local
+.ghc.environment.*
+
+# Julia
+Manifest.toml
+deps/
+
+# Lua
+*.luac
+*.out
+
+# Nim
+nimcache/
+*.nimble
+
+# OCaml
+_build/
+*.byte
+*.native
+*.cmx
+*.cmi
+*.cmxa
+*.cmxs
+*.cmt
+*.cmti
+*.annot
+*.cmo
+*.cma
+*.cmx
+*.cmxa
+*.cmxs
+*.cmt
+*.cmti
+*.annot
+*.ml~
+*.mli~
+*.byte
+*.native
+*.cmx
+*.cmi
+*.cmxa
+*.cmxs
+*.cmt
+*.cmti
+*.annot
+
+# Perl
+MYMETA.json
+MYMETA.yml
+Makefile
+Makefile.old
+pm_to_blib
+blib/
+*.bs
+*.o
+*.c
+*.so
+*.dylib
+*.bundle
+*.dSYM
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# PHP
+vendor/
+composer.lock
+composer.phar
+.phpunit.result.cache
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# R
+.RData
+.Rhistory
+.Rapp.history
+.Rproj.user/
+.Ruserdata
+.Rprofile
+*.Rproj
+.Rproj.user
+.Rhistory
+.RData
+*.Rda
+*.rds
+*.Rds
+*.Rout
+*.Rproj
+*.Rproj.user
+*.Rhistory
+*.RData
+*.Rda
+*.rds
+*.Rds
+*.Rout
+
+# Ruby
+.bundle/
+.byebug_history
+.gem
+*.gem
+*.rbc
+.config/
+coverage/
+InstalledFiles
+lib/bundler/man/
+pkg/
+rdoc/
+spec/reports/
+test/tmp/
+test/version_tmp/
+tmp/
+
+# Rust
+target/
+Cargo.lock
+.cargo/
+.cargo/registry/
+.cargo/git/
+
+# Swift
+.build/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcscmblueprint
+*.xcscheme
+*.xcscmblueprint
+*.xcscheme
+
+# TypeScript
+*.tsbuildinfo
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Vagrant
+.vagrant/
+
+# Vim
+[._]*.s[a-v][a-z]
+!*.svg
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+Session.vim
+Sessionx.vim
+.netrwhist
+*~
+tags
+[._]*.un~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# OS X
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# FreeBSD
+.svn/
+.svnignore
+
+# Solaris
+.svn/
+.svnignore
+
+# AIX
+.svn/
+.svnignore
+
+# HP-UX
+.svn/
+.svnignore
+
+# Other
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.cache/
+.tmp/
+.temp/
+
+# Custom ignores for vtagent
+*.session
+*.conversation
+*.context
+benchmark_results/
+analysis_reports/
+debug_logs/
+performance_data/
+test_artifacts/
+build_artifacts/

@@ -1,0 +1,135 @@
+name: Code Quality
+
+on:
+    push:
+        branches: [main, master]
+    pull_request:
+        branches: [main, master]
+
+jobs:
+    # Comprehensive rustfmt check
+    rustfmt:
+        name: Format Check (rustfmt)
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  components: rustfmt
+
+            - name: Check formatting
+              run: |
+                  echo "🔍 Checking code formatting with rustfmt..."
+                  cargo fmt --all -- --check
+                  echo "✅ All code is properly formatted!"
+
+    # Comprehensive clippy linting
+    clippy:
+        name: Lint Check (clippy)
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  components: clippy
+
+            - name: Cache dependencies
+              uses: actions/cache@v3
+              with:
+                  path: |
+                      ~/.cargo/registry
+                      ~/.cargo/git
+                      target
+                  key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
+
+            - name: Run clippy
+              run: |
+                  echo "🔍 Running clippy lints..."
+                  cargo clippy --workspace --all-targets --all-features -- -D warnings
+                  echo "✅ No clippy warnings found!"
+
+    # Check for unused dependencies
+    unused-deps:
+        name: Unused Dependencies
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+
+            - name: Install cargo-udeps
+              run: cargo install cargo-udeps --locked
+
+            - name: Check for unused dependencies
+              run: |
+                  echo "🔍 Checking for unused dependencies..."
+                  cargo +nightly udeps --workspace
+                  echo "✅ No unused dependencies found!"
+
+    # Check for outdated dependencies
+    outdated:
+        name: Outdated Dependencies
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+
+            - name: Install cargo-outdated
+              run: cargo install cargo-outdated
+
+            - name: Check for outdated dependencies
+              run: |
+                  echo "🔍 Checking for outdated dependencies..."
+                  cargo outdated --workspace --exit-code 1 || echo "⚠️  Some dependencies are outdated (non-blocking)"
+
+    # Minimum supported Rust version check
+    msrv:
+        name: Minimum Supported Rust Version
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+
+            - name: Install cargo-msrv
+              run: cargo install cargo-msrv
+
+            - name: Check MSRV
+              run: |
+                  echo "🔍 Checking minimum supported Rust version..."
+                  cargo msrv --workspace verify || echo "⚠️  MSRV check failed (non-blocking)"
+
+    # License check
+    license:
+        name: License Check
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+
+            - name: Install cargo-license
+              run: cargo install cargo-license
+
+            - name: Check licenses
+              run: |
+                  echo "🔍 Checking dependency licenses..."
+                  cargo license --workspace --tsv | tee licenses.tsv
+                  echo "✅ License check completed!"
+                  echo "📋 License summary:"
+                  cut -f2 licenses.tsv | sort | uniq -c | sort -nr

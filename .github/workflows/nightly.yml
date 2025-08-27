@@ -1,0 +1,90 @@
+name: Nightly Build
+
+on:
+    schedule:
+        # Run nightly at 3 AM UTC
+        - cron: "0 3 * * *"
+    workflow_dispatch:
+        inputs:
+            reason:
+                description: "Reason for manual nightly run"
+                required: false
+                default: "Manual trigger"
+
+jobs:
+    # Test with latest nightly Rust
+    nightly-test:
+        name: Nightly Test
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install nightly Rust
+              uses: dtolnay/rust-toolchain@nightly
+              with:
+                  components: rustfmt, clippy
+
+            - name: Cache dependencies
+              uses: actions/cache@v3
+              with:
+                  path: |
+                      ~/.cargo/registry
+                      ~/.cargo/git
+                      target
+                  key: ${{ runner.os }}-cargo-nightly-${{ hashFiles('**/Cargo.lock') }}
+
+            - name: Check formatting with nightly
+              run: cargo fmt --all -- --check
+
+            - name: Run clippy with nightly
+              run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+            - name: Build with nightly
+              run: cargo build --workspace
+
+            - name: Test with nightly
+              run: cargo test --workspace
+
+            - name: Run benchmarks with nightly
+              run: cargo bench --workspace
+
+    # Test minimum supported Rust version
+    msrv-test:
+        name: MSRV Test
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install cargo-msrv
+              run: cargo install cargo-msrv
+
+            - name: Find minimum supported Rust version
+              run: cargo msrv --workspace
+
+            - name: Test with MSRV
+              run: cargo msrv --workspace test
+
+    # Test with different feature combinations
+    feature-test:
+        name: Feature Matrix Test
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                features:
+                    - ""
+                    - "--all-features"
+                    - "--features tree-sitter"
+                    - "--features markdown"
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Install Rust
+              uses: dtolnay/rust-toolchain@stable
+
+            - name: Test with features ${{ matrix.features }}
+              run: |
+                  cargo build ${{ matrix.features }}
+                  cargo test ${{ matrix.features }}

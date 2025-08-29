@@ -1,4 +1,17 @@
-//! # Vtagent - Advanced Rust Coding Agent
+#![doc = r#"
+# Vtagent - Advanced Rust Coding Agent
+
+A sophisticated terminal-based coding agent that implements state-of-the-art agent
+architecture patterns, inspired by Anthropic's SWE-bench breakthroughs.
+
+## Architecture
+
+The agent follows proven patterns for reliable, long-running coding assistance:
+- **Model-Driven Control**: Maximum autonomy given to language models
+- **Decision Transparency**: Complete audit trail of all agent actions
+- **Error Recovery**: Intelligent error handling with context preservation
+- **Conversation Summarization**: Automatic compression for long sessions
+"#]
 //!
 //! A sophisticated terminal-based coding agent that implements state-of-the-art agent
 //! architecture patterns, inspired by Anthropic's SWE-bench breakthroughs.
@@ -13,11 +26,15 @@
 
 pub mod agent;
 pub mod cli;
+pub mod code_completion;
 pub mod commands;
+pub mod context_analyzer;
 pub mod conversation_summarizer;
 pub mod decision_tracker;
+pub mod enhanced_tools;
 pub mod error_recovery;
 pub mod gemini;
+pub mod performance_monitor;
 pub mod prompts;
 pub mod tools;
 pub mod tree_sitter;
@@ -26,6 +43,7 @@ pub mod types;
 // Re-export commonly used types for convenience
 pub use agent::{Agent, AgentBuilder};
 pub use cli::{Cli, Commands};
+pub use code_completion::{CodeCompletionEngine, COMPLETION_ENGINE, CompletionSuggestion, CompletionContext};
 pub use conversation_summarizer::ConversationSummarizer;
 pub use decision_tracker::{Action, DecisionOutcome, DecisionTracker, ResponseType};
 pub use error_recovery::{ErrorContext, ErrorRecoveryManager, ErrorType};
@@ -33,6 +51,7 @@ pub use gemini::{
     Candidate, Client, Content, FunctionCall, FunctionResponse, GenerateContentRequest, Part, Tool,
     ToolConfig,
 };
+pub use performance_monitor::{PerformanceMetrics, PerformanceMonitor, PERFORMANCE_MONITOR};
 pub use tools::{build_function_declarations, ToolError, ToolRegistry};
 pub use tree_sitter::{
     CodeAnalysis, LanguageSupport, SyntaxTree, TreeSitterAnalyzer, TreeSitterError,

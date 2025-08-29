@@ -95,12 +95,12 @@ async fn check_filesystem_permissions(config: &AgentConfig) -> Result<()> {
 
     // Try to list files in the workspace
     registry
-        .execute("list_files", json!({"path": ".", "max_items": 5}))
+        .execute_tool("list_files", json!({"path": ".", "max_items": 5}))
         .await?;
 
     // Try to create a test file
     registry
-        .execute(
+        .execute_tool(
             "write_file",
             json!({
                 "path": ".vtagent_test",

@@ -40,7 +40,7 @@ pub async fn handle_analyze_command(
     // Step 1: Get high-level directory structure
     println!("{}", style("1. Getting workspace structure...").dim());
     let root_files = registry
-        .execute("list_files", json!({"path": ".", "max_items": 50}))
+        .execute_tool("list_files", json!({"path": ".", "max_items": 50}))
         .await;
 
     match root_files {
@@ -69,7 +69,7 @@ pub async fn handle_analyze_command(
 
     for file in important_files {
         let check_file = registry
-            .execute("list_files", json!({"path": ".", "include_hidden": false}))
+            .execute_tool("list_files", json!({"path": ".", "include_hidden": false}))
             .await;
         if let Ok(result) = check_file {
             if let Some(files) = result.get("files") {
@@ -93,7 +93,7 @@ pub async fn handle_analyze_command(
 
     for config_file in config_files {
         let read_result = registry
-            .execute("read_file", json!({"path": config_file, "max_bytes": 2000}))
+            .execute_tool("read_file", json!({"path": config_file, "max_bytes": 2000}))
             .await;
         match read_result {
             Ok(result) => {
@@ -118,7 +118,7 @@ pub async fn handle_analyze_command(
     let src_dirs = vec!["src", "lib", "pkg", "internal", "cmd"];
     for dir in src_dirs {
         let check_dir = registry
-            .execute("list_files", json!({"path": ".", "include_hidden": false}))
+            .execute_tool("list_files", json!({"path": ".", "include_hidden": false}))
             .await;
         if let Ok(result) = check_dir {
             if let Some(files) = result.get("files") {
@@ -181,7 +181,7 @@ async fn perform_tree_sitter_analysis(config: &AgentConfig) -> Result<()> {
     // Find code files to analyze
     let mut registry = ToolRegistry::new(config.workspace.clone());
     let list_result = registry
-        .execute("list_files", json!({"path": ".", "recursive": true}))
+        .execute_tool("list_files", json!({"path": ".", "recursive": true}))
         .await?;
 
     if let Some(files) = list_result.get("files") {

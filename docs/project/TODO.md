@@ -985,10 +985,10 @@ Input schema: {'type': 'object', 'properties': {'todos': {'type': 'array', 'item
 Tool name: WebSearch
 Tool description:
 
-- Allows Claude to search the web and use the results to inform responses
+- Allows model to search the web and use the results to inform responses
 - Provides up-to-date information for current events and recent data
 - Returns search result information formatted as search result blocks
-- Use this tool for accessing information beyond Claude's knowledge cutoff
+- Use this tool for accessing information beyond model's knowledge cutoff
 - Searches are performed automatically within a single API call
 
 Usage notes:
@@ -1026,16 +1026,11 @@ TUI
 
 --
 
-run some swe-bench agent benchmark to test agent capability. then update the the report in readme. checking for existing benchs
-
-<https://claude.ai/chat/ab74dfea-2036-41d4-a5e1-6a6c46f65288>
-SWE-bench Lite
-
-/Users/vinh.nguyenxuan/Developer/learn-by-doing/vtagent/benches
+run some lt-bench agent benchmark to test agent capability. then update the the report in readme. checking for existing benchs
 
 --
 
-build ruler
+<https://app.primeintellect.ai/dashboard/environments>
 
 --
 
@@ -1077,10 +1072,6 @@ build a tool to generate a todo list for a given task
 
 --
 
-conforms <https://agents.md> spec
-
---
-
 - [ ] Refactor agent to support multiple LLM backends (model-agnostic design)
 
 --
@@ -1089,56 +1080,17 @@ use ai-gateway or litellm
 
 --
 
-Usage: vtagent [OPTIONS] [COMMAND]
-
-Commands:
-  chat              Interactive AI coding assistant with advanced tool-calling capabilities
-  ask               Single prompt; prints model reply without tools
-  chat-verbose      Interactive chat with enhanced transparency features
-  analyze           Analyze workspace and provide project overview
-  create-project    Create a complete Rust project with specified features (demonstrates prompt chaining)
-  compress-context  Compress conversation context (demonstrates context engineering)
-  help              Print this message or the help of the given subcommand(s)
-
-Options:
-      --model <MODEL>              Gemini model ID, e.g. gemini-2.5-flash [default: gemini-2.5-flash]
-      --api-key-env <API_KEY_ENV>  API key env var to read (checks this, then GOOGLE_API_KEY) [default: GEMINI_API_KEY]
-      --workspace <WORKSPACE>      Workspace root; defaults to current directory
-  -h, --help                       Print help
-  -V, --version                    Print version
-
-- [ ] Implement `/` slash commands for quick agent actions (e.g., `/read`, `/write`, `/edit`, `/todo`)
-- [ ] Add support for multiple operational modes (e.g., "edit", "review", "test", "chat")
-- [ ] Design a flexible prompt system inspired by leading coding agents (clear instructions, context blocks, and user intent parsing)
+- [ ] Implement `/` slash commands for quick agent actions tools and tasks (e.g., `/read`, `/write`, `/edit`, `/todo`... etc)
 
 --
-
-- [ ] Implement a flexible control loop for agent actions (e.g., `while True:`, `if condition:`, `else:`, `break`)
-- [ ] Add support for user feedback and iterative improvements (e.g., `user_feedback = input("Did you like this suggestion? (y/n): ")`)
-- [ ] Design a modular architecture for easy extension and customization (e.g., `class Agent:`, `class Tool:`, `class Prompt:`)
-
---
-
-- [ ] Implement a flexible control loop for agent actions (e.g., `while True:`, `if condition:`, `else:`, `break`)
-- [ ] Add support for user feedback and iterative improvements (e.g., `user_feedback = input("Did you like this suggestion? (y/n): ")`)
-- [ ] Design a modular architecture for easy extension and customization (e.g., `class Agent:`, `class Tool:`, `class Prompt:`)
-
 --
 
 - [ ] Ensure human-in-the-loop review for all critical agent actions
-- [ ] allow list
-- [ ] sandbox
-- [ ] code terminal sandbox
-- [ ] build a tool to generate a todo list for a given task
 
 --
 
-- [ ] Refactor `main.rs` to improve modularity and readability:
-  - [ ] Move command implementations (e.g., `analyze_workspace`, `create_project_workflow`) into a separate `commands.rs` module.
-  - [ ] Extract CLI argument parsing and struct definitions into `cli.rs`.
-  - [ ] Move utility functions (e.g., spinner, status messages) into `utils.rs`.
-  - [ ] Keep `main.rs` focused on high-level orchestration and entrypoint logic.
-  - [ ] Ensure all modules are properly documented and tested.
-  - [ ] Remove duplicated or dead code during refactor.
-  - [ ] Update imports and module paths accordingly.
-  - [ ] Add integration tests for main command flows.
+- [ ] allow list
+
+--
+
+- [ ] todo list for a given task

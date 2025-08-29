@@ -8,7 +8,10 @@ default_agents = [
     "cursor",
     "codex",
     "kilocode",
-    "agentsmd"
+    "agentsmd",
+    "qwen",
+    "gemini",
+    "kiro",
 ]
 
 [mcp]

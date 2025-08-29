@@ -1,0 +1,227 @@
+# Cursor Ignore File for vtagent
+
+# Build artifacts and dependencies
+target/
+Cargo.lock
+.cargo/
+.cargo/registry/
+.cargo/git/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Environment and configuration
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+config.local.*
+settings.local.*
+*.local
+
+# Log files and debugging
+*.log
+logs/
+*.log.*
+debug_logs/
+debug/
+*.dSYM/
+*.dwarf
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+.tmp/
+temp/
+tmp/
+
+# Performance and profiling
+benches/results/
+criterion/
+*.profraw
+*.profdata
+flamegraph.svg
+performance_data/
+analysis_reports/
+
+# Testing artifacts
+coverage/
+test_results/
+*.test
+test_artifacts/
+tarpaulin-report.html
+cobertura.xml
+lcov.info
+
+# Documentation build
+docs/build/
+docs/.vuepress/dist/
+docs/.vuepress/
+docs/.docusaurus/
+docs/api/
+*.pdf
+*.docx
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Node.js (if used for docs/tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Python (if used for scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Backup files
+*.bak
+*.backup
+*.orig
+*.rej
+*.old
+
+# Archive files
+*.tar.gz
+*.zip
+*.rar
+*.7z
+
+# Docker
+.dockerignore
+
+# CI/CD
+.github/workflows/*.yml.bak
+.gitlab-ci.yml
+
+# Secrets and sensitive data
+secrets/
+*.secret
+*.p12
+*.pfx
+
+# Rust specific
+rust-project.json
+*.session
+*.conversation
+*.context
+
+# Build cache and artifacts
+build_artifacts/
+benchmark_results/
+
+# Lock files
+*.lock
+Pipfile.lock
+
+# IDE specific files
+*.iws
+*.iml
+*.ipr
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+out/
+.idea_modules/
+
+# Sublime Text
+*.tmlanguage.cache
+*.tmPreferences.cache
+*.stTheme.cache
+*.sublime-workspace
+*.sublime-project
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.aps
+*.pch
+*.vspscc
+*_i.c
+*_p.c
+*.ncb
+*.tlb
+*.tlh
+*.tmp
+*.tmp_proj
+*_wpftmp.csproj
+*.log
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.svclog
+*.ccr
+*.internal
+*.scc
+*_i.h
+
+# Xcode
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+*.moved-aside
+*.xccheckout
+*.xcscmblueprint
+
+# System files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Local development
+.local
+*.local.json
+*.local.yml
+*.local.yaml
+*.local.toml

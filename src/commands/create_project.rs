@@ -36,7 +36,7 @@ pub async fn handle_create_project_command(
         style("Step 1: Creating project directory structure...").yellow()
     );
     let create_dir_result = registry
-        .execute(
+        .execute_tool(
             "write_file",
             json!({
                 "path": format!("{}/.gitkeep", name),
@@ -74,7 +74,7 @@ edition = "2021"
     );
 
     let cargo_result = registry
-        .execute(
+        .execute_tool(
             "write_file",
             json!({
                 "path": format!("{}/Cargo.toml", name),
@@ -125,7 +125,7 @@ fn main() {
     };
 
     let main_rs_result = registry
-        .execute(
+        .execute_tool(
             "write_file",
             json!({
                 "path": format!("{}/src/main.rs", name),
@@ -171,7 +171,7 @@ cargo test
     );
 
     let readme_result = registry
-        .execute(
+        .execute_tool(
             "write_file",
             json!({
                 "path": format!("{}/README.md", name),
@@ -197,7 +197,7 @@ Cargo.lock
 "#;
 
     let gitignore_result = registry
-        .execute(
+        .execute_tool(
             "write_file",
             json!({
                 "path": format!("{}/.gitignore", name),
@@ -216,7 +216,7 @@ Cargo.lock
     // Step 6: Test the build
     println!("{}", style("Step 6: Testing project build...").yellow());
     let test_build_result = registry
-        .execute(
+        .execute_tool(
             "list_files",
             json!({
                 "path": format!("{}/src", name),

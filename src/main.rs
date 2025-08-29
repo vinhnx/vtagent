@@ -1,10 +1,13 @@
 mod gemini;
 mod tools;
+mod context_analyzer;
+mod markdown_renderer;
 
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use console::style;
 use gemini::{Candidate, Content, FunctionCall, FunctionResponse, GenerateContentRequest, Part, Tool, ToolConfig};
+use markdown_renderer::MarkdownRenderer;
 use serde_json::json;
 use std::io::{self, Write};
 use std::path::PathBuf;
@@ -13,6 +16,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use tools::{build_function_declarations, ToolRegistry};
+use context_analyzer::ContextAnalyzer;
 
 #[derive(Parser, Debug)]
 #[command(name = "vtagent", version, about = "Advanced Rust coding agent powered by Gemini with Anthropic-inspired architecture")]
@@ -34,6 +38,7 @@ struct Cli {
 }
 
 #[derive(Subcommand, Debug)]
+#[derive(PartialEq)]
 enum Commands {
     /// Interactive AI coding assistant with advanced tool-calling capabilities
     Chat,
@@ -66,16 +71,25 @@ async fn main() -> Result<()> {
         .workspace
         .unwrap_or(std::env::current_dir().context("cannot determine current dir")?);
 
-    let client = gemini::Client::new(api_key, args.model.clone());
+    // Use optimized client configuration for better performance
+    let client_config = if args.command.as_ref().unwrap_or(&Commands::Chat) == &Commands::Chat {
+        // For chat, use low-latency configuration for better responsiveness
+        gemini::ClientConfig::low_latency()
+    } else {
+        // For other commands, use default configuration
+        gemini::ClientConfig::default()
+    };
+
+    let mut client = gemini::Client::with_config(api_key, args.model.clone(), client_config);
     let mut registry = ToolRegistry::new(workspace.clone());
 
     match args.command.unwrap_or(Commands::Chat) {
-        Commands::Chat => chat_loop(&client, &mut registry, false).await,
-        Commands::ChatVerbose => chat_loop(&client, &mut registry, true).await,
-        Commands::Ask { prompt } => ask_once(&client, prompt.join(" ")).await,
-        Commands::Analyze => analyze_workspace(&client, &mut registry).await,
-        Commands::CreateProject { name, features } => create_project_workflow(&client, &mut registry, &name, &features).await,
-        Commands::CompressContext => compress_context_demo(&client).await,
+        Commands::Chat => chat_loop(&mut client, &mut registry, false).await,
+        Commands::ChatVerbose => chat_loop(&mut client, &mut registry, true).await,
+        Commands::Ask { prompt } => ask_once(&mut client, prompt.join(" ")).await,
+        Commands::Analyze => analyze_workspace(&mut client, &mut registry).await,
+        Commands::CreateProject { name, features } => create_project_workflow(&mut client, &mut registry, &name, &features).await,
+        Commands::CompressContext => compress_context_demo(&mut client).await,
     }
 }
 
@@ -85,15 +99,16 @@ fn show_loading_spinner(message: &str) {
     println!("{} {}", style("⏳").cyan(), message);
 }
 
-/// Start a loading spinner that can be stopped via AtomicBool flag with status messages
-fn start_loading_spinner(is_loading: Arc<AtomicBool>, status: Arc<Mutex<String>>) -> thread::JoinHandle<()> {
-    thread::spawn(move || {
-        let spinner_chars = vec!["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+/// Optimized async loading spinner with better performance
+fn start_loading_spinner(is_loading: Arc<AtomicBool>, status: Arc<Mutex<String>>) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let spinner_chars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
         let mut i = 0;
         let start_time = std::time::Instant::now();
+        let mut line_buffer = String::with_capacity(120);
 
         while is_loading.load(Ordering::Relaxed) {
-            // Safety timeout - stop spinner after 30 seconds to prevent infinite spinning
+            // Safety timeout - stop spinner after 30 seconds
             if start_time.elapsed() > Duration::from_secs(30) {
                 is_loading.store(false, Ordering::Relaxed);
                 print!("\r{} [TIMEOUT] ", style("vtagent:").yellow().bold());
@@ -101,21 +116,31 @@ fn start_loading_spinner(is_loading: Arc<AtomicBool>, status: Arc<Mutex<String>>
                 break;
             }
 
-            // Get current status message
+            // Get current status message with minimal locking time
             let current_status = {
                 let status_guard = status.lock().unwrap();
                 status_guard.clone()
             };
 
-            // Clear the line completely and print vtagent: with spinner and status
-            let line = format!("{}{} {}", style("vtagent:").yellow().bold(), style(spinner_chars[i % spinner_chars.len()]).cyan(), style(&current_status).dim());
-            print!("\r{}{}", line, " ".repeat(80_usize.saturating_sub(line.len())));
+            // Build the display line efficiently
+            line_buffer.clear();
+            line_buffer.push_str(&format!("{}{} {}",
+                style("vtagent:").yellow().bold(),
+                style(spinner_chars[i % spinner_chars.len()]).cyan(),
+                style(&current_status).dim()
+            ));
+
+            // Calculate padding and print efficiently
+            let padding_needed = 80_usize.saturating_sub(line_buffer.len());
+            let padding = " ".repeat(padding_needed);
+            print!("\r{}{}", line_buffer, padding);
             io::stdout().flush().ok();
+
             i += 1;
-            thread::sleep(Duration::from_millis(120));
+            tokio::time::sleep(Duration::from_millis(120)).await;
         }
 
-        // Clear the spinner line completely when stopped
+        // Clear the spinner line
         print!("\r{}  \r{}", style("vtagent:").yellow().bold(), style("vtagent:").yellow().bold());
         io::stdout().flush().ok();
     })
@@ -123,6 +148,23 @@ fn start_loading_spinner(is_loading: Arc<AtomicBool>, status: Arc<Mutex<String>>
 
 /// Render markdown content in terminal with basic formatting
 fn render_markdown(text: &str) {
+
+/// Clean up spinner and prepare for next message
+async fn cleanup_spinner_and_print(
+    is_loading: &Arc<AtomicBool>,
+    spinner_handle: tokio::task::JoinHandle<()>,
+    message: String,
+) {
+    // Stop the spinner
+    is_loading.store(false, Ordering::Relaxed);
+    
+    // Wait for spinner cleanup to complete
+    let _ = spinner_handle.await;
+    
+    // Print the message cleanly
+    println!("{}", message);
+}
+
     // Simple markdown-like formatting for terminal
     let formatted = text
         .replace("**", "")  // Remove bold markers
@@ -132,7 +174,25 @@ fn render_markdown(text: &str) {
     println!("{}", formatted);
 }
 
-async fn chat_loop(client: &gemini::Client, registry: &mut ToolRegistry, verbose: bool) -> Result<()> {
+/// Extract function calls from text that contains embedded function call markers
+fn extract_function_calls_from_text(text: &str) -> Vec<FunctionCall> {
+    let mut tool_calls = vec![];
+
+    // Look for function call markers in the format [FUNCTION_CALL:{json}]
+    let function_call_pattern = regex::Regex::new(r"\[FUNCTION_CALL:(.*?)\]").unwrap();
+
+    for capture in function_call_pattern.captures_iter(text) {
+        if let Some(json_str) = capture.get(1) {
+            if let Ok(function_call) = serde_json::from_str::<FunctionCall>(json_str.as_str()) {
+                tool_calls.push(function_call);
+            }
+        }
+    }
+
+    tool_calls
+}
+
+async fn chat_loop(client: &mut gemini::Client, registry: &mut ToolRegistry, verbose: bool) -> Result<()> {
     if verbose {
         println!("{} {}\n", style("Verbose logging enabled").yellow().bold(), style("").dim());
         println!("{} {}\n", style("Chat with vtagent (use 'ctrl-c' to quit)").cyan().bold(), style("").dim());
@@ -146,6 +206,7 @@ async fn chat_loop(client: &gemini::Client, registry: &mut ToolRegistry, verbose
         println!("  • Single-threaded execution for reliability");
         println!("  • Full context sharing with each API call");
         println!("  • Actions carry explicit decision tracking");
+        println!("  • Proactive context understanding");
     }
 
     let mut contents: Vec<Content> = vec![];
@@ -154,6 +215,7 @@ async fn chat_loop(client: &gemini::Client, registry: &mut ToolRegistry, verbose
         function_declarations: build_function_declarations(),
     }];
     let tool_config = Some(ToolConfig::auto());
+    let context_analyzer = ContextAnalyzer::new();
 
     let stdin = io::stdin();
     let mut read_user_input = true;
@@ -177,6 +239,98 @@ async fn chat_loop(client: &gemini::Client, registry: &mut ToolRegistry, verbose
             if verbose {
                 println!("{} User input: {} chars", style("[INPUT]").dim(), user_message.len());
             }
+
+            // Analyze context to understand user intent proactively
+            let context_analysis = context_analyzer.analyze_context(&contents, user_message);
+            if verbose && context_analysis.confidence > 0.5 {
+                println!("{} Detected intent: {} (confidence: {:.1}%)",
+                    style("[CONTEXT]").dim(),
+                    context_analysis.intent,
+                    context_analysis.confidence * 100.0
+                );
+            }
+
+            // Check if we can act proactively
+            if let Some(proactive_response) = context_analyzer.generate_proactive_response(&context_analysis) {
+                if verbose {
+                    println!("{} Acting proactively: {}", style("[PROACTIVE]").cyan().bold(), proactive_response);
+                }
+                println!("{} {}", style("vtagent:").yellow().bold(), proactive_response);
+
+                // For file creation, act immediately if confidence is high
+                if context_analysis.intent == "create_file" && context_analysis.confidence > 0.7 {
+                    if let (Some(language), Some(filename)) = (
+                        context_analysis.parameters.get("language"),
+                        context_analysis.parameters.get("filename")
+                    ) {
+                        let file_content = generate_file_content(language, filename);
+                        let write_result = registry.execute_tool("write_file", json!({
+                            "path": filename,
+                            "content": file_content,
+                            "overwrite": false,
+                            "create_dirs": true
+                        })).await;
+
+                        match write_result {
+                            Ok(_) => {
+                                println!("{} Successfully created {} with {} content",
+                                    style("✅").green(),
+                                    filename,
+                                    language
+                                );
+                                contents.push(Content::user_text(user_message));
+                                read_user_input = true;
+                                continue;
+                            }
+                            Err(e) => {
+                                println!("{} Failed to create file: {}", style("❌").red(), e);
+                                contents.push(Content::user_text(user_message));
+                                read_user_input = true;
+                                continue;
+                            }
+                        }
+                    }
+                }
+
+                // For directory exploration, act immediately
+                if context_analysis.intent == "explore_directory" && context_analysis.confidence > 0.7 {
+                    let list_result = registry.execute_tool("list_files", json!({
+                        "path": ".",
+                        "max_items": 50
+                    })).await;
+
+                    match list_result {
+                        Ok(result) => {
+                            if let Some(files) = result.get("files") {
+                                if let Some(files_array) = files.as_array() {
+                                    println!("{} Found {} files in current directory:",
+                                        style("📁").cyan(),
+                                        files_array.len()
+                                    );
+                                    for file in files_array.iter().take(10) {
+                                        if let Some(name) = file.get("name") {
+                                            println!("  {}", name);
+                                        }
+                                    }
+                                    if files_array.len() > 10 {
+                                        println!("  ... and {} more", files_array.len() - 10);
+                                    }
+                                }
+                            }
+                            contents.push(Content::user_text(user_message));
+                            read_user_input = true;
+                            continue;
+                        }
+                        Err(e) => {
+                            println!("{} Failed to list files: {}", style("❌").red(), e);
+                            contents.push(Content::user_text(user_message));
+                            read_user_input = true;
+                            continue;
+                        }
+                    }
+                }
+            }
+
             contents.push(Content::user_text(user_message));
         }
 
@@ -208,19 +362,19 @@ async fn chat_loop(client: &gemini::Client, registry: &mut ToolRegistry, verbose
         }
 
         let resp = match client.generate_content_stream(&req, |chunk| {
-            // Update status on first chunk to show response generation
-            {
-                let mut status_guard = status.lock().unwrap();
-                if *status_guard == "Processing request..." {
+            // Stop spinner on first chunk and update status
+            if is_loading.load(Ordering::Relaxed) {
+                is_loading.store(false, Ordering::Relaxed);
+
+                // Wait for spinner thread to clean up
+                thread::sleep(Duration::from_millis(150));
+
+                // Update status to show response generation
+                {
+                    let mut status_guard = status.lock().unwrap();
                     *status_guard = "Generating response...".to_string();
                 }
             }
-
-            // Stop spinner on first chunk
-            is_loading.store(false, Ordering::Relaxed);
-
-            // Wait for spinner thread to clean up
-            thread::sleep(Duration::from_millis(100));
 
             print!("{}", chunk);
             io::stdout().flush()?;
@@ -251,17 +405,24 @@ async fn chat_loop(client: &gemini::Client, registry: &mut ToolRegistry, verbose
         };
 
         // Wait for spinner thread to finish after successful response processing
-        let _ = spinner_handle.join();
+        let _ = spinner_handle.await;
 
         if verbose {
             println!("{} Received response with {} content blocks", style("[RESPONSE]").dim(), content.parts.len());
         }
 
         let mut tool_calls: Vec<FunctionCall> = vec![];
+
+        // Extract function calls from both the structured response and embedded function calls in streaming text
         for part in &content.parts {
             if let Part::FunctionCall { function_call } = part {
                 tool_calls.push(function_call.clone());
             }
+        }
+
+        // Also extract function calls from the accumulated streaming response
+        if let Some(text_content) = content.parts.iter().find_map(|p| p.as_text()) {
+            tool_calls.extend(extract_function_calls_from_text(text_content));
         }
 
         if verbose && !tool_calls.is_empty() {
@@ -303,7 +464,7 @@ async fn chat_loop(client: &gemini::Client, registry: &mut ToolRegistry, verbose
         for (i, call) in tool_calls.iter().enumerate() {
             let _task_description = format!("Executing {}", call.name);
 
-            // Start enhanced loading spinner for tool execution (both verbose and non-verbose)
+            // Start optimized loading spinner for tool execution (both verbose and non-verbose)
             let is_loading = Arc::new(AtomicBool::new(true));
             let status = Arc::new(Mutex::new(format!("Running {}...", call.name)));
             let tool_spinner = start_loading_spinner(Arc::clone(&is_loading), Arc::clone(&status));
@@ -321,10 +482,15 @@ async fn chat_loop(client: &gemini::Client, registry: &mut ToolRegistry, verbose
                 *status_guard = format!("Processing {}...", call.name);
             }
 
-            let result = registry.execute(&call.name, call.args.clone()).await;
+            let result = registry.execute_tool(&call.name, call.args.clone()).await;
             let response_json = match result {
                 Ok(value) => {
                     successful_tools += 1;
+
+                    // Stop spinner and show success message
+                    let success_msg = format!("{} {} completed successfully", style("✅").green(), call.name);
+                    cleanup_spinner_and_print(&is_loading, tool_spinner, success_msg).await;
+                    let tool_spinner = start_loading_spinner(Arc::clone(&is_loading), Arc::clone(&status)); // Restart for next tool
 
                     // Update status to show completion
                     {
@@ -332,7 +498,6 @@ async fn chat_loop(client: &gemini::Client, registry: &mut ToolRegistry, verbose
                         *status_guard = format!("{} completed", call.name);
                     }
 
-                    println!("{} {} completed successfully", style("✅").green(), call.name);
                     if verbose {
                         println!("{} Tool {} succeeded", style("[SUCCESS]").green().bold(), call.name);
                         // Show what this action accomplished
@@ -385,7 +550,7 @@ async fn chat_loop(client: &gemini::Client, registry: &mut ToolRegistry, verbose
 
             // Stop tool spinner and join thread
             is_loading.store(false, Ordering::Relaxed);
-            let _ = tool_spinner.join();
+            let _ = tool_spinner.await;
         }
 
         // Show execution summary
@@ -432,7 +597,7 @@ async fn chat_loop(client: &gemini::Client, registry: &mut ToolRegistry, verbose
     Ok(())
 }
 
-async fn ask_once(client: &gemini::Client, prompt: String) -> Result<()> {
+async fn ask_once(client: &mut gemini::Client, prompt: String) -> Result<()> {
     let contents = vec![Content::user_text(prompt)];
     let sys_instruction = system_instruction();
     let req = GenerateContentRequest { contents, tools: None, tool_config: None, generation_config: None, system_instruction: Some(sys_instruction) };
@@ -485,7 +650,7 @@ async fn ask_once(client: &gemini::Client, prompt: String) -> Result<()> {
     }
 
     // Wait for spinner thread to finish
-    let _ = spinner_handle.join();
+    let _ = spinner_handle.await;
     Ok(())
 }
 
@@ -565,12 +730,12 @@ Remember: You're working in a safe, isolated workspace. All file operations are 
 }
 
 /// Analyze workspace using orchestrator pattern - combines multiple tools for comprehensive overview
-async fn analyze_workspace(_client: &gemini::Client, registry: &mut ToolRegistry) -> Result<()> {
+async fn analyze_workspace(_client: &mut gemini::Client, registry: &mut ToolRegistry) -> Result<()> {
     println!("{}", style("🔍 Analyzing workspace...").cyan().bold());
 
     // Step 1: Get high-level directory structure
     println!("{}", style("1. Getting workspace structure...").dim());
-    let root_files = registry.execute("list_files", serde_json::json!({"path": ".", "max_items": 50})).await;
+    let root_files = registry.execute_tool("list_files", serde_json::json!({"path": ".", "max_items": 50})).await;
     match root_files {
         Ok(result) => {
             println!("{}", style("✓ Root directory structure obtained").green());
@@ -586,7 +751,7 @@ async fn analyze_workspace(_client: &gemini::Client, registry: &mut ToolRegistry
     let important_files = vec!["README.md", "Cargo.toml", "package.json", "go.mod", "requirements.txt", "Makefile"];
 
     for file in important_files {
-        let check_file = registry.execute("list_files", serde_json::json!({"path": ".", "include_hidden": false})).await;
+        let check_file = registry.execute_tool("list_files", serde_json::json!({"path": ".", "include_hidden": false})).await;
         if let Ok(result) = check_file {
             if let Some(files) = result.get("files") {
                 if let Some(files_array) = files.as_array() {
@@ -608,7 +773,7 @@ async fn analyze_workspace(_client: &gemini::Client, registry: &mut ToolRegistry
     let config_files = vec!["README.md", "Cargo.toml", "package.json"];
 
     for config_file in config_files {
-        let read_result = registry.execute("read_file", serde_json::json!({"path": config_file, "max_bytes": 2000})).await;
+        let read_result = registry.execute_tool("read_file", serde_json::json!({"path": config_file, "max_bytes": 2000})).await;
         match read_result {
             Ok(result) => {
                 println!("   {} Read {} ({} bytes)", style("✓").green(), config_file,
@@ -624,7 +789,7 @@ async fn analyze_workspace(_client: &gemini::Client, registry: &mut ToolRegistry
     // Check for common source directories
     let src_dirs = vec!["src", "lib", "pkg", "internal", "cmd"];
     for dir in src_dirs {
-        let check_dir = registry.execute("list_files", serde_json::json!({"path": ".", "include_hidden": false})).await;
+        let check_dir = registry.execute_tool("list_files", serde_json::json!({"path": ".", "include_hidden": false})).await;
         if let Ok(result) = check_dir {
             if let Some(files) = result.get("files") {
                 if let Some(files_array) = files.as_array() {
@@ -648,12 +813,12 @@ async fn analyze_workspace(_client: &gemini::Client, registry: &mut ToolRegistry
 }
 
 /// Create a complete Rust project using prompt chaining workflow
-async fn create_project_workflow(_client: &gemini::Client, registry: &mut ToolRegistry, project_name: &str, features: &[String]) -> Result<()> {
+async fn create_project_workflow(_client: &mut gemini::Client, registry: &mut ToolRegistry, project_name: &str, features: &[String]) -> Result<()> {
     println!("{}", style(format!("🚀 Creating Rust project '{}' with features: {:?}", project_name, features)).cyan().bold());
 
     // Step 1: Create project directory structure
     println!("{}", style("Step 1: Creating project directory structure...").yellow());
-    let create_dir_result = registry.execute("write_file", serde_json::json!({
+    let create_dir_result = registry.execute_tool("write_file", serde_json::json!({
         "path": format!("{}/.gitkeep", project_name),
         "content": "",
         "overwrite": true,
@@ -678,7 +843,7 @@ edition = "2021"
 [dependencies]
 {}"#, project_name, if features.contains(&"serde".to_string()) { "serde = { version = \"1.0\", features = [\"derive\"] }" } else { "" });
 
-    let cargo_result = registry.execute("write_file", serde_json::json!({
+    let cargo_result = registry.execute_tool("write_file", serde_json::json!({
         "path": format!("{}/Cargo.toml", project_name),
         "content": cargo_toml_content,
         "overwrite": true,
@@ -718,7 +883,7 @@ fn main() {
 }}"#, project_name)
     };
 
-    let main_rs_result = registry.execute("write_file", serde_json::json!({
+    let main_rs_result = registry.execute_tool("write_file", serde_json::json!({
         "path": format!("{}/src/main.rs", project_name),
         "content": main_rs_content,
         "overwrite": true,
@@ -755,7 +920,7 @@ cargo test
 ```
 "#, project_name, features.join(", "));
 
-    let readme_result = registry.execute("write_file", serde_json::json!({
+    let readme_result = registry.execute_tool("write_file", serde_json::json!({
         "path": format!("{}/README.md", project_name),
         "content": readme_content,
         "overwrite": true,
@@ -776,7 +941,7 @@ Cargo.lock
 .env
 "#;
 
-    let gitignore_result = registry.execute("write_file", serde_json::json!({
+    let gitignore_result = registry.execute_tool("write_file", serde_json::json!({
         "path": format!("{}/.gitignore", project_name),
         "content": gitignore_content,
         "overwrite": true,
@@ -790,7 +955,7 @@ Cargo.lock
 
     // Step 6: Test the build
     println!("{}", style("Step 6: Testing project build...").yellow());
-    let test_build_result = registry.execute("list_files", serde_json::json!({
+    let test_build_result = registry.execute_tool("list_files", serde_json::json!({
         "path": format!("{}/src", project_name),
         "include_hidden": false
     })).await;
@@ -815,8 +980,291 @@ Cargo.lock
     Ok(())
 }
 
+/// Generate appropriate file content based on language and filename
+fn generate_file_content(language: &str, filename: &str) -> String {
+    match language.to_lowercase().as_str() {
+        "python" => {
+            if filename.contains("calc") || filename.contains("calculator") {
+                r#"def add(a, b):
+    """Add two numbers together."""
+    return a + b
+
+def subtract(a, b):
+    """Subtract b from a."""
+    return a - b
+
+def multiply(a, b):
+    """Multiply two numbers."""
+    return a * b
+
+def divide(a, b):
+    """Divide a by b."""
+    if b == 0:
+        raise ValueError("Cannot divide by zero")
+    return a / b
+
+def main():
+    print("Simple Calculator")
+    print("=================")
+
+    while True:
+        print("\nOperations:")
+        print("1. Add")
+        print("2. Subtract")
+        print("3. Multiply")
+        print("4. Divide")
+        print("5. Quit")
+
+        choice = input("Choose operation (1-5): ")
+
+        if choice == "5":
+            print("Goodbye!")
+            break
+
+        try:
+            num1 = float(input("Enter first number: "))
+            num2 = float(input("Enter second number: "))
+
+            if choice == "1":
+                result = add(num1, num2)
+            elif choice == "2":
+                result = subtract(num1, num2)
+            elif choice == "3":
+                result = multiply(num1, num2)
+            elif choice == "4":
+                result = divide(num1, num2)
+            else:
+                print("Invalid choice")
+                continue
+
+            print(f"Result: {result}")
+
+        except ValueError as e:
+            print(f"Error: {e}")
+        except Exception as e:
+            print(f"An error occurred: {e}")
+
+if __name__ == "__main__":
+    main()
+"#.to_string()
+            } else {
+                r#"print("Hello, World!")
+print("Welcome to Python!")
+"#.to_string()
+            }
+        }
+        "rust" => {
+            if filename.contains("calc") || filename.contains("calculator") {
+                r#"use std::io;
+
+fn add(a: f64, b: f64) -> f64 {
+    a + b
+}
+
+fn subtract(a: f64, b: f64) -> f64 {
+    a - b
+}
+
+fn multiply(a: f64, b: f64) -> f64 {
+    a * b
+}
+
+fn divide(a: f64, b: f64) -> Result<f64, String> {
+    if b == 0.0 {
+        Err("Cannot divide by zero".to_string())
+    } else {
+        Ok(a / b)
+    }
+}
+
+fn main() {
+    println!("Simple Calculator");
+    println!("=================");
+
+    loop {
+        println!("\nOperations:");
+        println!("1. Add");
+        println!("2. Subtract");
+        println!("3. Multiply");
+        println!("4. Divide");
+        println!("5. Quit");
+
+        let mut choice = String::new();
+        print!("Choose operation (1-5): ");
+        io::stdout().flush().unwrap();
+        io::stdin().read_line(&mut choice).unwrap();
+
+        let choice = choice.trim();
+
+        if choice == "5" {
+            println!("Goodbye!");
+            break;
+        }
+
+        let mut num1 = String::new();
+        let mut num2 = String::new();
+
+        print!("Enter first number: ");
+        io::stdout().flush().unwrap();
+        io::stdin().read_line(&mut num1).unwrap();
+
+        print!("Enter second number: ");
+        io::stdout().flush().unwrap();
+        io::stdin().read_line(&mut num2).unwrap();
+
+        let num1: f64 = match num1.trim().parse() {
+            Ok(n) => n,
+            Err(_) => {
+                println!("Invalid number");
+                continue;
+            }
+        };
+
+        let num2: f64 = match num2.trim().parse() {
+            Ok(n) => n,
+            Err(_) => {
+                println!("Invalid number");
+                continue;
+            }
+        };
+
+        let result = match choice {
+            "1" => add(num1, num2),
+            "2" => subtract(num1, num2),
+            "3" => multiply(num1, num2),
+            "4" => match divide(num1, num2) {
+                Ok(res) => res,
+                Err(e) => {
+                    println!("Error: {}", e);
+                    continue;
+                }
+            },
+            _ => {
+                println!("Invalid choice");
+                continue;
+            }
+        };
+
+        println!("Result: {}", result);
+    }
+}
+"#.to_string()
+            } else {
+                r#"fn main() {
+    println!("Hello, World!");
+    println!("Welcome to Rust!");
+}
+"#.to_string()
+            }
+        }
+        "javascript" | "js" => {
+            if filename.contains("calc") || filename.contains("calculator") {
+                r#"const readline = require('readline');
+
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
+
+function add(a, b) {
+    return a + b;
+}
+
+function subtract(a, b) {
+    return a - b;
+}
+
+function multiply(a, b) {
+    return a * b;
+}
+
+function divide(a, b) {
+    if (b === 0) {
+        throw new Error("Cannot divide by zero");
+    }
+    return a / b;
+}
+
+function askQuestion(question) {
+    return new Promise((resolve) => {
+        rl.question(question, (answer) => {
+            resolve(answer);
+        });
+    });
+}
+
+async function main() {
+    console.log("Simple Calculator");
+    console.log("=================");
+
+    while (true) {
+        console.log("\nOperations:");
+        console.log("1. Add");
+        console.log("2. Subtract");
+        console.log("3. Multiply");
+        console.log("4. Divide");
+        console.log("5. Quit");
+
+        const choice = await askQuestion("Choose operation (1-5): ");
+
+        if (choice === "5") {
+            console.log("Goodbye!");
+            rl.close();
+            break;
+        }
+
+        try {
+            const num1 = parseFloat(await askQuestion("Enter first number: "));
+            const num2 = parseFloat(await askQuestion("Enter second number: "));
+
+            if (isNaN(num1) || isNaN(num2)) {
+                console.log("Invalid numbers");
+                continue;
+            }
+
+            let result;
+            switch (choice) {
+                case "1":
+                    result = add(num1, num2);
+                    break;
+                case "2":
+                    result = subtract(num1, num2);
+                    break;
+                case "3":
+                    result = multiply(num1, num2);
+                    break;
+                case "4":
+                    result = divide(num1, num2);
+                    break;
+                default:
+                    console.log("Invalid choice");
+                    continue;
+            }
+
+            console.log(`Result: ${result}`);
+
+        } catch (error) {
+            console.log(`Error: ${error.message}`);
+        }
+    }
+}
+
+main().catch(console.error);
+"#.to_string()
+            } else {
+                r#"console.log("Hello, World!");
+console.log("Welcome to JavaScript!");
+"#.to_string()
+            }
+        }
+        _ => {
+            format!("# Hello, World!\n# Welcome to {}!\n\nprint(\"Hello from {}!\")\n", language, language)
+        }
+    }
+}
+
 /// Demonstrate context compression following Cognition's principles
-async fn compress_context_demo(client: &gemini::Client) -> Result<()> {
+async fn compress_context_demo(client: &mut gemini::Client) -> Result<()> {
     println!("{}", style("🧠 Context Compression Demo").cyan().bold());
     println!("{}", style("Following Cognition's context engineering principles...").dim());
 

@@ -948,4 +948,3090 @@ tui
 
 --
 
-Serena MCP: Perform a comprehensive cleanup of unused code and files. Conduct a major code review and refactoring for improved maintainability, clarity, and context-awareness. Ensure memory and journaling leverage Serena MCP for enhanced agent context.
+Directory structure:
+└── ghuntley-how-to-build-a-coding-agent/
+    ├── README.md
+    ├── AGENT.md
+    ├── bash_tool.go
+    ├── chat.go
+    ├── code_search_tool.go
+    ├── devenv.lock
+    ├── devenv.nix
+    ├── devenv.yaml
+    ├── edit_tool.go
+    ├── go.mod
+    ├── go.sum
+    ├── list_files.go
+    ├── Makefile
+    ├── read.go
+    ├── renovate.json
+    ├── riddle.txt
+    ├── .envrc
+    └── prompts/
+        ├── 00-weather.md
+        ├── 01-read_file.md
+        ├── 02-list_files.md
+        ├── 03-bash_tool.md
+        └── 04-edit_tool.md
+
+Files Content:
+
+================================================
+FILE: README.md
+================================================
+
+# 🧠 Build Your Own Coding Agent via a Step-by-Step Workshop
+
+Welcome! 👋 This workshop will guide you through building your own **AI-powered coding assistant** — starting from a basic chatbot, and adding powerful tools like file reading, shell command execution, and code searching.
+
+You don’t need to be an AI expert. Just follow along and build step-by-step!
+
+🌐 **Want a detailed overview?** Check out the blog post: [ghuntley.com/agent](https://ghuntley.com/agent/)
+
+---
+
+## 🎯 What You'll Learn
+
+By the end of this workshop, you’ll understand how to:
+
+- ✅ Connect to the Anthropic Claude API
+- ✅ Build a simple AI chatbot
+- ✅ Add tools like reading files, editing code, and running commands
+- ✅ Handle tool requests and errors
+- ✅ Build an agent that gets smarter with each step
+
+---
+
+## 🛠️ What We're Building
+
+You’ll build 6 versions of a coding assistant.
+
+Each version adds more features:
+
+1. **Basic Chat** — talk to Claude
+2. **File Reader** — read code files
+3. **File Explorer** — list files in folders
+4. **Command Runner** — run shell commands
+5. **File Editor** — modify files
+6. **Code Search** — search your codebase with patterns
+
+```mermaid
+graph LR
+    subgraph "Application Progression"
+        A[chat.go<br/>Basic Chat] --> B[read.go<br/>+ File Reading]
+        B --> C[list_files.go<br/>+ Directory Listing]
+        C --> D[bash_tool.go<br/>+ Shell Commands]
+        D --> E[edit_tool.go<br/>+ File Editing]
+        E --> F[code_search_tool.go<br/>+ Code Search]
+    end
+
+    subgraph "Tool Capabilities"
+        G[No Tools] --> H[read_file]
+        H --> I[read_file<br/>list_files]
+        I --> J[read_file<br/>list_files<br/>bash]
+        J --> K[read_file<br/>list_files<br/>bash<br/>edit_file]
+        K --> L[read_file<br/>list_files<br/>bash<br/>code_search]
+    end
+
+    A -.-> G
+    B -.-> H
+    C -.-> I
+    D -.-> J
+    E -.-> K
+    F -.-> L
+```
+
+At the end, you’ll end up with a powerful local developer assistant!
+
+---
+
+## 🧱 How It Works (Architecture)
+
+Each agent works like this:
+
+1. Waits for your input
+2. Sends it to Claude
+3. Claude may respond directly or ask to use a tool
+4. The agent runs the tool (e.g., read a file)
+5. Sends the result back to Claude
+6. Claude gives you the final answer
+
+We call this the **event loop** — it's like the agent's heartbeat.
+
+```mermaid
+graph TB
+    subgraph "Agent Architecture"
+        A[Agent] --> B[Anthropic Client]
+        A --> C[Tool Registry]
+        A --> D[getUserMessage Function]
+        A --> E[Verbose Logging]
+    end
+
+    subgraph "Shared Event Loop"
+        F[Start Chat Session] --> G[Get User Input]
+        G --> H{Empty Input?}
+        H -->|Yes| G
+        H -->|No| I[Add to Conversation]
+        I --> J[runInference]
+        J --> K[Claude Response]
+        K --> L{Tool Use?}
+        L -->|No| M[Display Text]
+        L -->|Yes| N[Execute Tools]
+        N --> O[Collect Results]
+        O --> P[Send Results to Claude]
+        P --> J
+        M --> G
+    end
+
+    subgraph "Tool Execution Loop"
+        N --> Q[Find Tool by Name]
+        Q --> R[Execute Tool Function]
+        R --> S[Capture Result/Error]
+        S --> T[Add to Tool Results]
+        T --> U{More Tools?}
+        U -->|Yes| Q
+        U -->|No| O
+    end
+```
+
+## 🚀 Getting Started
+
+### ✅ Prerequisites
+
+- Go 1.24.2+ or [devenv](https://devenv.sh/) (recommended for easy setup)
+- An [Anthropic API Key](https://www.anthropic.com/product/claude)
+
+### 🔧 Set Up Your Environment
+
+**Option 1: Recommended (using devenv)**
+
+```bash
+devenv shell  # Loads everything you need
+```
+
+**Option 2: Manual setup**
+
+```bash
+# Make sure Go is installed
+go mod tidy
+```
+
+### 🔐 Add Your API Key
+
+```bash
+export ANTHROPIC_API_KEY="your-api-key-here"
+```
+
+---
+
+## 🏁 Start with the Basics
+
+### 1. `chat.go` — Basic Chat
+
+A simple chatbot that talks to Claude.
+
+```bash
+go run chat.go
+```
+
+- ➡️ Try: “Hello!”
+- ➡️ Add `--verbose` to see detailed logs
+
+---
+
+## 🛠️ Add Tools (One Step at a Time)
+
+### 2. `read.go` — Read Files
+
+Now Claude can read files from your computer.
+
+```bash
+go run read.go
+```
+
+- ➡️ Try: “Read fizzbuzz.js”
+
+---
+
+### 3. `list_files.go` — Explore Folders
+
+Lets Claude look around your directory.
+
+```bash
+go run list_files.go
+```
+
+- ➡️ Try: “List all files in this folder”
+- ➡️ Try: “What’s in fizzbuzz.js?”
+
+---
+
+### 4. `bash_tool.go` — Run Shell Commands
+
+Allows Claude to run safe terminal commands.
+
+```bash
+go run bash_tool.go
+```
+
+- ➡️ Try: “Run git status”
+- ➡️ Try: “List all .go files using bash”
+
+---
+
+### 5. `edit_tool.go` — Edit Files
+
+Claude can now **modify code**, create files, and make changes.
+
+```bash
+go run edit_tool.go
+```
+
+- ➡️ Try: “Create a Python hello world script”
+- ➡️ Try: “Add a comment to the top of fizzbuzz.js”
+
+---
+
+### 6. `code_search_tool.go` — Search Code
+
+Use pattern search (powered by [ripgrep](https://github.com/BurntSushi/ripgrep)).
+
+```bash
+go run code_search_tool.go
+```
+
+- ➡️ Try: “Find all function definitions in Go files”
+- ➡️ Try: “Search for TODO comments”
+
+---
+
+## 🧪 Sample Files (Already Included)
+
+1. `fizzbuzz.js`: for file reading and editing
+1. `riddle.txt`: a fun text file to explore
+1. `AGENT.md`: info about the project environment
+
+---
+
+## 🐞 Troubleshooting
+
+**API key not working?**
+
+- Make sure it’s exported: `echo $ANTHROPIC_API_KEY`
+- Check your quota on [Anthropic’s dashboard](https://www.anthropic.com)
+
+**Go errors?**
+
+- Run `go mod tidy`
+- Make sure you’re using Go 1.24.2 or later
+
+**Tool errors?**
+
+- Use `--verbose` for full error logs
+- Check file paths and permissions
+
+**Environment issues?**
+
+- Use `devenv shell` to avoid config problems
+
+---
+
+## 💡 How Tools Work (Under the Hood)
+
+Tools are like plugins. You define:
+
+- **Name** (e.g., `read_file`)
+- **Input Schema** (what info it needs)
+- **Function** (what it does)
+
+Example tool definition in Go:
+
+```go
+var ToolDefinition = ToolDefinition{
+    Name:        "read_file",
+    Description: "Reads the contents of a file",
+    InputSchema: GenerateSchema[ReadFileInput](),
+    Function:    ReadFile,
+}
+```
+
+Schema generation uses Go structs — so it’s easy to define and reuse.
+
+---
+
+## 🧭 Workshop Path: Learn by Building
+
+| Phase | What to Focus On                                 |
+| ----- | ------------------------------------------------ |
+| **1** | `chat.go`: API integration and response handling |
+| **2** | `read.go`: Tool system, schema generation        |
+| **3** | `list_files.go`: Multiple tools, file system     |
+| **4** | `bash_tool.go`: Shell execution, error capture   |
+| **5** | `edit_tool.go`: File editing, safety checks      |
+| **6** | `code_search_tool.go`: Pattern search, ripgrep   |
+
+---
+
+## 🛠️ Developer Environment (Optional)
+
+If you use [`devenv`](https://devenv.sh/), it gives you:
+
+- Go, Node, Python, Rust, .NET
+- Git and other dev tools
+
+```bash
+devenv shell   # Load everything
+devenv test    # Run checks
+hello          # Greeting script
+```
+
+---
+
+## 🚀 What's Next?
+
+Once you complete the workshop, try building:
+
+- Custom tools (e.g., API caller, web scraper)
+- Tool chains (run tools in a sequence)
+- Memory features (remember things across sessions)
+- A web UI for your agent
+- Integration with other AI models
+
+---
+
+## 📦 Summary
+
+This workshop helps you:
+
+- Understand agent architecture
+- Learn to build smart assistants
+- Grow capabilities step-by-step
+- Practice using Claude and Go together
+
+---
+
+Have fun exploring and building your own AI-powered tools! 💻✨
+
+If you have questions or ideas, feel free to fork the repo, open issues, or connect with the community!
+
+================================================
+FILE: AGENT.md
+================================================
+
+# Agent Instructions
+
+## Development Environment
+
+This project uses [devenv](https://devenv.sh/) for reproducible development environments with Nix.
+
+## Commands
+
+- `devenv shell` - Enter the development shell
+- `devenv test` - Run tests (currently runs git version check)
+- `go build` - Build Go project
+- `go run main.go` - Run the chat application
+- `go test ./...` - Run all Go tests
+- `go test <package>` - Run tests for specific package
+- `go mod tidy` - Download dependencies
+- `hello` - Custom script that greets from the development environment
+
+### Application Commands
+
+- `go run chat.go` - Simple chat interface with Claude
+- `go run read.go` - Chat with file reading capabilities
+- `go run list_files.go` - Chat with file listing and reading capabilities
+- `go run bash_tool.go` - Chat with file operations and bash command execution
+- `go run edit_tool.go` - Chat with full file operations (read, list, edit, bash)
+
+### Verbose Logging
+
+All Go applications support a `--verbose` flag for detailed execution logging:
+
+- `go run chat.go --verbose` - Enable verbose logging for debugging
+- `go run read.go --verbose` - See detailed tool execution and API calls
+- `go run edit_tool.go --verbose` - Debug file operations and tool usage
+
+## Architecture
+
+- **Environment**: Nix-based development environment using devenv
+- **Shell**: Includes Git, Go toolchain, and custom greeting script
+- **Structure**: Chat application with terminal interface to Claude via Anthropic API
+
+## Code Style Guidelines
+
+- Follow Nix conventions for devenv.nix configuration
+- Use standard Git workflows
+- Development environment configuration should be reproducible
+
+## Troubleshooting
+
+### Verbose Logging
+
+When debugging issues with the chat applications, use the `--verbose` flag to get detailed execution logs:
+
+```bash
+go run edit_tool.go --verbose
+```
+
+**What verbose logging shows:**
+
+- API calls to Claude (model, timing, success/failure)
+- Tool execution details (which tools are called, input parameters, results)
+- File operations (reading, writing, listing files with sizes/counts)
+- Bash command execution (commands run, output, errors)
+- Conversation flow (message processing, content blocks)
+- Error details with stack traces
+
+**Log output locations:**
+
+- **Verbose mode**: Detailed logs go to stderr with timestamps and file locations
+- **Normal mode**: Only essential output goes to stdout
+
+**Common troubleshooting scenarios:**
+
+- **API failures**: Check verbose logs for authentication errors or rate limits
+- **Tool failures**: See exactly which tool failed and why (file not found, permission errors)
+- **Unexpected responses**: View full conversation flow and Claude's reasoning
+- **Performance issues**: See API call timing and response sizes
+
+### Environment Issues
+
+- Ensure `ANTHROPIC_API_KEY` environment variable is set
+- Run `devenv shell` to ensure proper development environment
+- Use `go mod tidy` to ensure dependencies are installed
+
+## Notes
+
+- Requires ANTHROPIC_API_KEY environment variable to be set
+- Chat application provides a simple terminal interface to Claude
+- Use ctrl-c to quit the chat session
+
+================================================
+FILE: bash_tool.go
+================================================
+
+package main
+
+import (
+ "bufio"
+ "context"
+ "encoding/json"
+ "flag"
+ "fmt"
+ "log"
+ "os"
+ "os/exec"
+ "path/filepath"
+ "strings"
+
+ "github.com/anthropics/anthropic-sdk-go"
+ "github.com/invopop/jsonschema"
+)
+
+func main() {
+ verbose := flag.Bool("verbose", false, "enable verbose logging")
+ flag.Parse()
+
+ if *verbose {
+  log.SetOutput(os.Stderr)
+  log.SetFlags(log.LstdFlags | log.Lshortfile)
+  log.Println("Verbose logging enabled")
+ } else {
+  log.SetOutput(os.Stdout)
+  log.SetFlags(0)
+  log.SetPrefix("")
+ }
+
+ client := anthropic.NewClient()
+ if *verbose {
+  log.Println("Anthropic client initialized")
+ }
+
+ scanner := bufio.NewScanner(os.Stdin)
+ getUserMessage := func() (string, bool) {
+  if !scanner.Scan() {
+   return "", false
+  }
+  return scanner.Text(), true
+ }
+
+ tools := []ToolDefinition{ReadFileDefinition, ListFilesDefinition, BashDefinition}
+ if *verbose {
+  log.Printf("Initialized %d tools", len(tools))
+ }
+ agent := NewAgent(&client, getUserMessage, tools,*verbose)
+ err := agent.Run(context.TODO())
+ if err != nil {
+  fmt.Printf("Error: %s\n", err.Error())
+ }
+}
+
+func NewAgent(
+ client *anthropic.Client,
+ getUserMessage func() (string, bool),
+ tools []ToolDefinition,
+ verbose bool,
+)*Agent {
+ return &Agent{
+  client:         client,
+  getUserMessage: getUserMessage,
+  tools:          tools,
+  verbose:        verbose,
+ }
+}
+
+type Agent struct {
+ client         *anthropic.Client
+ getUserMessage func() (string, bool)
+ tools          []ToolDefinition
+ verbose        bool
+}
+
+func (a *Agent) Run(ctx context.Context) error {
+ conversation := []anthropic.MessageParam{}
+
+ if a.verbose {
+  log.Println("Starting chat session with tools enabled")
+ }
+ fmt.Println("Chat with Claude (use 'ctrl-c' to quit)")
+
+ for {
+  fmt.Print("\u001b[94mYou\u001b[0m: ")
+  userInput, ok := a.getUserMessage()
+  if !ok {
+   if a.verbose {
+    log.Println("User input ended, breaking from chat loop")
+   }
+   break
+  }
+
+  // Skip empty messages
+  if userInput == "" {
+   if a.verbose {
+    log.Println("Skipping empty message")
+   }
+   continue
+  }
+
+  if a.verbose {
+   log.Printf("User input received: %q", userInput)
+  }
+
+  userMessage := anthropic.NewUserMessage(anthropic.NewTextBlock(userInput))
+  conversation = append(conversation, userMessage)
+
+  if a.verbose {
+   log.Printf("Sending message to Claude, conversation length: %d", len(conversation))
+  }
+
+  message, err := a.runInference(ctx, conversation)
+  if err != nil {
+   if a.verbose {
+    log.Printf("Error during inference: %v", err)
+   }
+   return err
+  }
+  conversation = append(conversation, message.ToParam())
+
+  // Keep processing until Claude stops using tools
+  for {
+   // Collect all tool uses and their results
+   var toolResults []anthropic.ContentBlockParamUnion
+   var hasToolUse bool
+
+   if a.verbose {
+    log.Printf("Processing %d content blocks from Claude", len(message.Content))
+   }
+
+   for _, content := range message.Content {
+    switch content.Type {
+    case "text":
+     fmt.Printf("\u001b[93mClaude\u001b[0m: %s\n", content.Text)
+    case "tool_use":
+     hasToolUse = true
+     toolUse := content.AsToolUse()
+     if a.verbose {
+      log.Printf("Tool use detected: %s with input: %s", toolUse.Name, string(toolUse.Input))
+     }
+     fmt.Printf("\u001b[96mtool\u001b[0m: %s(%s)\n", toolUse.Name, string(toolUse.Input))
+
+     // Find and execute the tool
+     var toolResult string
+     var toolError error
+     var toolFound bool
+     for _, tool := range a.tools {
+      if tool.Name == toolUse.Name {
+       if a.verbose {
+        log.Printf("Executing tool: %s", tool.Name)
+       }
+       toolResult, toolError = tool.Function(toolUse.Input)
+       fmt.Printf("\u001b[92mresult\u001b[0m: %s\n", toolResult)
+       if toolError != nil {
+        fmt.Printf("\u001b[91merror\u001b[0m: %s\n", toolError.Error())
+       }
+       if a.verbose {
+        if toolError != nil {
+         log.Printf("Tool execution failed: %v", toolError)
+        } else {
+         log.Printf("Tool execution successful, result length: %d chars", len(toolResult))
+        }
+       }
+       toolFound = true
+       break
+      }
+     }
+
+     if !toolFound {
+      toolError = fmt.Errorf("tool '%s' not found", toolUse.Name)
+      fmt.Printf("\u001b[91merror\u001b[0m: %s\n", toolError.Error())
+     }
+
+     // Add tool result to collection
+     if toolError != nil {
+      toolResults = append(toolResults, anthropic.NewToolResultBlock(toolUse.ID, toolError.Error(), true))
+     } else {
+      toolResults = append(toolResults, anthropic.NewToolResultBlock(toolUse.ID, toolResult, false))
+     }
+    }
+   }
+
+   // If there were no tool uses, we're done
+   if !hasToolUse {
+    break
+   }
+
+   // Send all tool results back and get Claude's response
+   if a.verbose {
+    log.Printf("Sending %d tool results back to Claude", len(toolResults))
+   }
+   toolResultMessage := anthropic.NewUserMessage(toolResults...)
+   conversation = append(conversation, toolResultMessage)
+
+   // Get Claude's response after tool execution
+   message, err = a.runInference(ctx, conversation)
+   if err != nil {
+    if a.verbose {
+     log.Printf("Error during followup inference: %v", err)
+    }
+    return err
+   }
+   conversation = append(conversation, message.ToParam())
+
+   if a.verbose {
+    log.Printf("Received followup response with %d content blocks", len(message.Content))
+   }
+
+   // Continue loop to process the new message
+  }
+ }
+
+ if a.verbose {
+  log.Println("Chat session ended")
+ }
+ return nil
+}
+
+func (a *Agent) runInference(ctx context.Context, conversation []anthropic.MessageParam) (*anthropic.Message, error) {
+ anthropicTools := []anthropic.ToolUnionParam{}
+ for _, tool := range a.tools {
+  anthropicTools = append(anthropicTools, anthropic.ToolUnionParam{
+   OfTool: &anthropic.ToolParam{
+    Name:        tool.Name,
+    Description: anthropic.String(tool.Description),
+    InputSchema: tool.InputSchema,
+   },
+  })
+ }
+
+ if a.verbose {
+  log.Printf("Making API call to Claude with model: %s and %d tools", anthropic.ModelClaude3_7SonnetLatest, len(anthropicTools))
+ }
+
+ message, err := a.client.Messages.New(ctx, anthropic.MessageNewParams{
+  Model:     anthropic.ModelClaude3_7SonnetLatest,
+  MaxTokens: int64(1024),
+  Messages:  conversation,
+  Tools:     anthropicTools,
+ })
+
+ if a.verbose {
+  if err != nil {
+   log.Printf("API call failed: %v", err)
+  } else {
+   log.Printf("API call successful, response received")
+  }
+ }
+
+ return message, err
+}
+
+type ToolDefinition struct {
+ Name        string                         `json:"name"`
+ Description string                         `json:"description"`
+ InputSchema anthropic.ToolInputSchemaParam `json:"input_schema"`
+ Function    func(input json.RawMessage) (string, error)
+}
+
+var ReadFileDefinition = ToolDefinition{
+ Name:        "read_file",
+ Description: "Read the contents of a given relative file path. Use this when you want to see what's inside a file. Do not use this with directory names.",
+ InputSchema: ReadFileInputSchema,
+ Function:    ReadFile,
+}
+
+var ListFilesDefinition = ToolDefinition{
+ Name:        "list_files",
+ Description: "List files and directories at a given path. If no path is provided, lists files in the current directory.",
+ InputSchema: ListFilesInputSchema,
+ Function:    ListFiles,
+}
+
+var BashDefinition = ToolDefinition{
+ Name:        "bash",
+ Description: "Execute a bash command and return its output. Use this to run shell commands.",
+ InputSchema: BashInputSchema,
+ Function:    Bash,
+}
+
+type ReadFileInput struct {
+ Path string `json:"path" jsonschema_description:"The relative path of a file in the working directory."`
+}
+
+var ReadFileInputSchema = GenerateSchema[ReadFileInput]()
+
+type ListFilesInput struct {
+ Path string `json:"path,omitempty" jsonschema_description:"Optional relative path to list files from. Defaults to current directory if not provided."`
+}
+
+var ListFilesInputSchema = GenerateSchema[ListFilesInput]()
+
+type BashInput struct {
+ Command string `json:"command" jsonschema_description:"The bash command to execute."`
+}
+
+var BashInputSchema = GenerateSchema[BashInput]()
+
+func ReadFile(input json.RawMessage) (string, error) {
+ readFileInput := ReadFileInput{}
+ err := json.Unmarshal(input, &readFileInput)
+ if err != nil {
+  panic(err)
+ }
+
+ log.Printf("Reading file: %s", readFileInput.Path)
+ content, err := os.ReadFile(readFileInput.Path)
+ if err != nil {
+  log.Printf("Failed to read file %s: %v", readFileInput.Path, err)
+  return "", err
+ }
+ log.Printf("Successfully read file %s (%d bytes)", readFileInput.Path, len(content))
+ return string(content), nil
+}
+
+func ListFiles(input json.RawMessage) (string, error) {
+ listFilesInput := ListFilesInput{}
+ err := json.Unmarshal(input, &listFilesInput)
+ if err != nil {
+  panic(err)
+ }
+
+ dir := "."
+ if listFilesInput.Path != "" {
+  dir = listFilesInput.Path
+ }
+
+ log.Printf("Listing files in directory: %s", dir)
+ var files []string
+ err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+  if err != nil {
+   return err
+  }
+
+  relPath, err := filepath.Rel(dir, path)
+  if err != nil {
+   return err
+  }
+
+  // Skip .devenv directory and its contents
+  if info.IsDir() && (relPath == ".devenv" || strings.HasPrefix(relPath, ".devenv/")) {
+   return filepath.SkipDir
+  }
+
+  if relPath != "." {
+   if info.IsDir() {
+    files = append(files, relPath+"/")
+   } else {
+    files = append(files, relPath)
+   }
+  }
+  return nil
+ })
+
+ if err != nil {
+  log.Printf("Failed to list files in %s: %v", dir, err)
+  return "", err
+ }
+
+ result, err := json.Marshal(files)
+ if err != nil {
+  return "", err
+ }
+
+ log.Printf("Successfully listed %d files/directories in %s", len(files), dir)
+ return string(result), nil
+}
+
+func Bash(input json.RawMessage) (string, error) {
+ bashInput := BashInput{}
+ err := json.Unmarshal(input, &bashInput)
+ if err != nil {
+  return "", err
+ }
+
+ log.Printf("Executing bash command: %s", bashInput.Command)
+ cmd := exec.Command("bash", "-c", bashInput.Command)
+ output, err := cmd.CombinedOutput()
+ if err != nil {
+  log.Printf("Bash command failed: %s, error: %v", bashInput.Command, err)
+  return fmt.Sprintf("Command failed with error: %s\nOutput: %s", err.Error(), string(output)), nil
+ }
+
+ log.Printf("Bash command succeeded: %s (output: %d bytes)", bashInput.Command, len(output))
+ return strings.TrimSpace(string(output)), nil
+}
+
+func GenerateSchema[T any]() anthropic.ToolInputSchemaParam {
+ reflector := jsonschema.Reflector{
+  AllowAdditionalProperties: false,
+  DoNotReference:            true,
+ }
+ var v T
+
+ schema := reflector.Reflect(v)
+
+ return anthropic.ToolInputSchemaParam{
+  Properties: schema.Properties,
+ }
+}
+
+================================================
+FILE: chat.go
+================================================
+
+package main
+
+import (
+ "bufio"
+ "context"
+ "flag"
+ "fmt"
+ "log"
+ "os"
+
+ "github.com/anthropics/anthropic-sdk-go"
+)
+
+func main() {
+ verbose := flag.Bool("verbose", false, "enable verbose logging")
+ flag.Parse()
+
+ if *verbose {
+  log.SetOutput(os.Stderr)
+  log.SetFlags(log.LstdFlags | log.Lshortfile)
+  log.Println("Verbose logging enabled")
+ } else {
+  log.SetOutput(os.Stdout)
+  log.SetFlags(0)
+  log.SetPrefix("")
+ }
+
+ client := anthropic.NewClient()
+ if *verbose {
+  log.Println("Anthropic client initialized")
+ }
+
+ scanner := bufio.NewScanner(os.Stdin)
+ getUserMessage := func() (string, bool) {
+  if !scanner.Scan() {
+   return "", false
+  }
+  return scanner.Text(), true
+ }
+
+ agent := NewAgent(&client, getUserMessage, *verbose)
+ err := agent.Run(context.TODO())
+ if err != nil {
+  fmt.Printf("Error: %s\n", err.Error())
+ }
+}
+
+func NewAgent(client *anthropic.Client, getUserMessage func() (string, bool), verbose bool)*Agent {
+ return &Agent{
+  client:         client,
+  getUserMessage: getUserMessage,
+  verbose:        verbose,
+ }
+}
+
+type Agent struct {
+ client         *anthropic.Client
+ getUserMessage func() (string, bool)
+ verbose        bool
+}
+
+func (a *Agent) Run(ctx context.Context) error {
+ conversation := []anthropic.MessageParam{}
+
+ if a.verbose {
+  log.Println("Starting chat session")
+ }
+ fmt.Println("Chat with Claude (use 'ctrl-c' to quit)")
+
+ for {
+  fmt.Print("\u001b[94mYou\u001b[0m: ")
+  userInput, ok := a.getUserMessage()
+  if !ok {
+   if a.verbose {
+    log.Println("User input ended, breaking from chat loop")
+   }
+   break
+  }
+
+  // Skip empty messages
+  if userInput == "" {
+   if a.verbose {
+    log.Println("Skipping empty message")
+   }
+   continue
+  }
+
+  if a.verbose {
+   log.Printf("User input received: %q", userInput)
+  }
+
+  userMessage := anthropic.NewUserMessage(anthropic.NewTextBlock(userInput))
+  conversation = append(conversation, userMessage)
+
+  if a.verbose {
+   log.Printf("Sending message to Claude, conversation length: %d", len(conversation))
+  }
+
+  message, err := a.runInference(ctx, conversation)
+  if err != nil {
+   if a.verbose {
+    log.Printf("Error during inference: %v", err)
+   }
+   return err
+  }
+  conversation = append(conversation, message.ToParam())
+
+  if a.verbose {
+   log.Printf("Received response from Claude with %d content blocks", len(message.Content))
+  }
+
+  for _, content := range message.Content {
+   switch content.Type {
+   case "text":
+    fmt.Printf("\u001b[93mClaude\u001b[0m: %s\n", content.Text)
+   }
+  }
+ }
+
+ if a.verbose {
+  log.Println("Chat session ended")
+ }
+ return nil
+}
+
+func (a *Agent) runInference(ctx context.Context, conversation []anthropic.MessageParam) (*anthropic.Message, error) {
+ if a.verbose {
+  log.Printf("Making API call to Claude with model: %s", anthropic.ModelClaude3_7SonnetLatest)
+ }
+
+ message, err := a.client.Messages.New(ctx, anthropic.MessageNewParams{
+  Model:     anthropic.ModelClaude3_7SonnetLatest,
+  MaxTokens: int64(1024),
+  Messages:  conversation,
+ })
+
+ if a.verbose {
+  if err != nil {
+   log.Printf("API call failed: %v", err)
+  } else {
+   log.Printf("API call successful, response received")
+  }
+ }
+
+ return message, err
+}
+
+================================================
+FILE: code_search_tool.go
+================================================
+
+package main
+
+import (
+ "bufio"
+ "context"
+ "encoding/json"
+ "flag"
+ "fmt"
+ "log"
+ "os"
+ "os/exec"
+ "strings"
+
+ "github.com/anthropics/anthropic-sdk-go"
+ "github.com/invopop/jsonschema"
+)
+
+func main() {
+ verbose := flag.Bool("verbose", false, "enable verbose logging")
+ flag.Parse()
+
+ if *verbose {
+  log.SetOutput(os.Stderr)
+  log.SetFlags(log.LstdFlags | log.Lshortfile)
+  log.Println("Verbose logging enabled")
+ } else {
+  log.SetOutput(os.Stdout)
+  log.SetFlags(0)
+  log.SetPrefix("")
+ }
+
+ client := anthropic.NewClient()
+ if *verbose {
+  log.Println("Anthropic client initialized")
+ }
+
+ scanner := bufio.NewScanner(os.Stdin)
+ getUserMessage := func() (string, bool) {
+  if !scanner.Scan() {
+   return "", false
+  }
+  return scanner.Text(), true
+ }
+
+ tools := []ToolDefinition{ReadFileDefinition, ListFilesDefinition, BashDefinition, CodeSearchDefinition}
+ if *verbose {
+  log.Printf("Initialized %d tools", len(tools))
+ }
+ agent := NewAgent(&client, getUserMessage, tools,*verbose)
+ err := agent.Run(context.TODO())
+ if err != nil {
+  fmt.Printf("Error: %s\n", err.Error())
+ }
+}
+
+func NewAgent(
+ client *anthropic.Client,
+ getUserMessage func() (string, bool),
+ tools []ToolDefinition,
+ verbose bool,
+)*Agent {
+ return &Agent{
+  client:         client,
+  getUserMessage: getUserMessage,
+  tools:          tools,
+  verbose:        verbose,
+ }
+}
+
+type Agent struct {
+ client         *anthropic.Client
+ getUserMessage func() (string, bool)
+ tools          []ToolDefinition
+ verbose        bool
+}
+
+func (a *Agent) Run(ctx context.Context) error {
+ conversation := []anthropic.MessageParam{}
+
+ if a.verbose {
+  log.Println("Starting chat session with tools enabled")
+ }
+ fmt.Println("Chat with Claude (use 'ctrl-c' to quit)")
+
+ for {
+  fmt.Print("\u001b[94mYou\u001b[0m: ")
+  userInput, ok := a.getUserMessage()
+  if !ok {
+   if a.verbose {
+    log.Println("User input ended, breaking from chat loop")
+   }
+   break
+  }
+
+  // Skip empty messages
+  if userInput == "" {
+   if a.verbose {
+    log.Println("Skipping empty message")
+   }
+   continue
+  }
+
+  if a.verbose {
+   log.Printf("User input received: %q", userInput)
+  }
+
+  userMessage := anthropic.NewUserMessage(anthropic.NewTextBlock(userInput))
+  conversation = append(conversation, userMessage)
+
+  if a.verbose {
+   log.Printf("Sending message to Claude, conversation length: %d", len(conversation))
+  }
+
+  message, err := a.runInference(ctx, conversation)
+  if err != nil {
+   if a.verbose {
+    log.Printf("Error during inference: %v", err)
+   }
+   return err
+  }
+  conversation = append(conversation, message.ToParam())
+
+  // Keep processing until Claude stops using tools
+  for {
+   // Collect all tool uses and their results
+   var toolResults []anthropic.ContentBlockParamUnion
+   var hasToolUse bool
+
+   if a.verbose {
+    log.Printf("Processing %d content blocks from Claude", len(message.Content))
+   }
+
+   for _, content := range message.Content {
+    switch content.Type {
+    case "text":
+     fmt.Printf("\u001b[93mClaude\u001b[0m: %s\n", content.Text)
+    case "tool_use":
+     hasToolUse = true
+     toolUse := content.AsToolUse()
+     if a.verbose {
+      log.Printf("Tool use detected: %s with input: %s", toolUse.Name, string(toolUse.Input))
+     }
+     fmt.Printf("\u001b[96mtool\u001b[0m: %s(%s)\n", toolUse.Name, string(toolUse.Input))
+
+     // Find and execute the tool
+     var toolResult string
+     var toolError error
+     var toolFound bool
+     for _, tool := range a.tools {
+      if tool.Name == toolUse.Name {
+       if a.verbose {
+        log.Printf("Executing tool: %s", tool.Name)
+       }
+       toolResult, toolError = tool.Function(toolUse.Input)
+       fmt.Printf("\u001b[92mresult\u001b[0m: %s\n", toolResult)
+       if toolError != nil {
+        fmt.Printf("\u001b[91merror\u001b[0m: %s\n", toolError.Error())
+       }
+       if a.verbose {
+        if toolError != nil {
+         log.Printf("Tool execution failed: %v", toolError)
+        } else {
+         log.Printf("Tool execution successful, result length: %d chars", len(toolResult))
+        }
+       }
+       toolFound = true
+       break
+      }
+     }
+
+     if !toolFound {
+      toolError = fmt.Errorf("tool '%s' not found", toolUse.Name)
+      fmt.Printf("\u001b[91merror\u001b[0m: %s\n", toolError.Error())
+     }
+
+     // Add tool result to collection
+     if toolError != nil {
+      toolResults = append(toolResults, anthropic.NewToolResultBlock(toolUse.ID, toolError.Error(), true))
+     } else {
+      toolResults = append(toolResults, anthropic.NewToolResultBlock(toolUse.ID, toolResult, false))
+     }
+    }
+   }
+
+   // If there were no tool uses, we're done
+   if !hasToolUse {
+    break
+   }
+
+   // Send all tool results back and get Claude's response
+   if a.verbose {
+    log.Printf("Sending %d tool results back to Claude", len(toolResults))
+   }
+   toolResultMessage := anthropic.NewUserMessage(toolResults...)
+   conversation = append(conversation, toolResultMessage)
+
+   // Get Claude's response after tool execution
+   message, err = a.runInference(ctx, conversation)
+   if err != nil {
+    if a.verbose {
+     log.Printf("Error during followup inference: %v", err)
+    }
+    return err
+   }
+   conversation = append(conversation, message.ToParam())
+
+   if a.verbose {
+    log.Printf("Received followup response with %d content blocks", len(message.Content))
+   }
+
+   // Continue loop to process the new message
+  }
+ }
+
+ if a.verbose {
+  log.Println("Chat session ended")
+ }
+ return nil
+}
+
+func (a *Agent) runInference(ctx context.Context, conversation []anthropic.MessageParam) (*anthropic.Message, error) {
+ anthropicTools := []anthropic.ToolUnionParam{}
+ for _, tool := range a.tools {
+  anthropicTools = append(anthropicTools, anthropic.ToolUnionParam{
+   OfTool: &anthropic.ToolParam{
+    Name:        tool.Name,
+    Description: anthropic.String(tool.Description),
+    InputSchema: tool.InputSchema,
+   },
+  })
+ }
+
+ if a.verbose {
+  log.Printf("Making API call to Claude with model: %s and %d tools", anthropic.ModelClaude3_7SonnetLatest, len(anthropicTools))
+ }
+
+ message, err := a.client.Messages.New(ctx, anthropic.MessageNewParams{
+  Model:     anthropic.ModelClaude3_7SonnetLatest,
+  MaxTokens: int64(1024),
+  Messages:  conversation,
+  Tools:     anthropicTools,
+ })
+
+ if a.verbose {
+  if err != nil {
+   log.Printf("API call failed: %v", err)
+  } else {
+   log.Printf("API call successful, response received")
+  }
+ }
+
+ return message, err
+}
+
+type ToolDefinition struct {
+ Name        string                         `json:"name"`
+ Description string                         `json:"description"`
+ InputSchema anthropic.ToolInputSchemaParam `json:"input_schema"`
+ Function    func(input json.RawMessage) (string, error)
+}
+
+var ReadFileDefinition = ToolDefinition{
+ Name:        "read_file",
+ Description: "Read the contents of a given relative file path. Use this when you want to see what's inside a file. Do not use this with directory names.",
+ InputSchema: ReadFileInputSchema,
+ Function:    ReadFile,
+}
+
+var ListFilesDefinition = ToolDefinition{
+ Name:        "list_files",
+ Description: "List files and directories at a given path. If no path is provided, lists files in the current directory.",
+ InputSchema: ListFilesInputSchema,
+ Function:    ListFiles,
+}
+
+var BashDefinition = ToolDefinition{
+ Name:        "bash",
+ Description: "Execute a bash command and return its output. Use this to run shell commands.",
+ InputSchema: BashInputSchema,
+ Function:    Bash,
+}
+
+var CodeSearchDefinition = ToolDefinition{
+ Name: "code_search",
+ Description: `Search for code patterns using ripgrep (rg).
+
+Use this to find code patterns, function definitions, variable usage, or any text in the codebase.
+You can search by pattern, file type, or directory.`,
+ InputSchema: CodeSearchInputSchema,
+ Function:    CodeSearch,
+}
+
+type ReadFileInput struct {
+ Path string `json:"path" jsonschema_description:"The relative path of a file in the working directory."`
+}
+
+var ReadFileInputSchema = GenerateSchema[ReadFileInput]()
+
+type ListFilesInput struct {
+ Path string `json:"path,omitempty" jsonschema_description:"Optional relative path to list files from. Defaults to current directory if not provided."`
+}
+
+var ListFilesInputSchema = GenerateSchema[ListFilesInput]()
+
+type BashInput struct {
+ Command string `json:"command" jsonschema_description:"The bash command to execute."`
+}
+
+var BashInputSchema = GenerateSchema[BashInput]()
+
+type CodeSearchInput struct {
+ Pattern   string `json:"pattern" jsonschema_description:"The search pattern or regex to look for"`
+ Path      string `json:"path,omitempty" jsonschema_description:"Optional path to search in (file or directory)"`
+ FileType  string `json:"file_type,omitempty" jsonschema_description:"Optional file extension to limit search to (e.g., 'go', 'js', 'py')"`
+ CaseSensitive bool `json:"case_sensitive,omitempty" jsonschema_description:"Whether the search should be case sensitive (default: false)"`
+}
+
+var CodeSearchInputSchema = GenerateSchema[CodeSearchInput]()
+
+func ReadFile(input json.RawMessage) (string, error) {
+ readFileInput := ReadFileInput{}
+ err := json.Unmarshal(input, &readFileInput)
+ if err != nil {
+  panic(err)
+ }
+
+ log.Printf("Reading file: %s", readFileInput.Path)
+ content, err := os.ReadFile(readFileInput.Path)
+ if err != nil {
+  log.Printf("Failed to read file %s: %v", readFileInput.Path, err)
+  return "", err
+ }
+ log.Printf("Successfully read file %s (%d bytes)", readFileInput.Path, len(content))
+ return string(content), nil
+}
+
+func ListFiles(input json.RawMessage) (string, error) {
+ listFilesInput := ListFilesInput{}
+ err := json.Unmarshal(input, &listFilesInput)
+ if err != nil {
+  panic(err)
+ }
+
+ dir := "."
+ if listFilesInput.Path != "" {
+  dir = listFilesInput.Path
+ }
+
+ log.Printf("Listing files in directory: %s", dir)
+ cmd := exec.Command("find", dir, "-type", "f", "-not", "-path", "*/.devenv/*", "-not", "-path", "*/.git/*")
+ output, err := cmd.Output()
+ if err != nil {
+  log.Printf("Failed to list files in %s: %v", dir, err)
+  return "", err
+ }
+
+ files := strings.Split(strings.TrimSpace(string(output)), "\n")
+ if len(files) == 1 && files[0] == "" {
+  files = []string{}
+ }
+
+ result, err := json.Marshal(files)
+ if err != nil {
+  return "", err
+ }
+
+ log.Printf("Successfully listed %d files in %s", len(files), dir)
+ return string(result), nil
+}
+
+func Bash(input json.RawMessage) (string, error) {
+ bashInput := BashInput{}
+ err := json.Unmarshal(input, &bashInput)
+ if err != nil {
+  return "", err
+ }
+
+ log.Printf("Executing bash command: %s", bashInput.Command)
+ cmd := exec.Command("bash", "-c", bashInput.Command)
+ output, err := cmd.CombinedOutput()
+ if err != nil {
+  log.Printf("Bash command failed: %v", err)
+  return fmt.Sprintf("Command failed with error: %s\nOutput: %s", err.Error(), string(output)), nil
+ }
+
+ log.Printf("Bash command executed successfully, output length: %d chars", len(output))
+ return strings.TrimSpace(string(output)), nil
+}
+
+func CodeSearch(input json.RawMessage) (string, error) {
+ codeSearchInput := CodeSearchInput{}
+ err := json.Unmarshal(input, &codeSearchInput)
+ if err != nil {
+  return "", err
+ }
+
+ if codeSearchInput.Pattern == "" {
+  log.Printf("CodeSearch failed: pattern is required")
+  return "", fmt.Errorf("pattern is required")
+ }
+
+ log.Printf("Searching for pattern: %s", codeSearchInput.Pattern)
+
+ // Build ripgrep command
+ args := []string{"rg", "--line-number", "--with-filename", "--color=never"}
+
+ // Add case sensitivity flag
+ if !codeSearchInput.CaseSensitive {
+  args = append(args, "--ignore-case")
+ }
+
+ // Add file type filter if specified
+ if codeSearchInput.FileType != "" {
+  args = append(args, "--type", codeSearchInput.FileType)
+ }
+
+ // Add pattern
+ args = append(args, codeSearchInput.Pattern)
+
+ // Add path if specified
+ if codeSearchInput.Path != "" {
+  args = append(args, codeSearchInput.Path)
+ } else {
+  args = append(args, ".")
+ }
+
+ if a := false; a { // This is a hack to access verbose mode
+  log.Printf("Executing ripgrep with args: %v", args)
+ }
+
+ cmd := exec.Command(args[0], args[1:]...)
+ output, err := cmd.Output()
+
+ // ripgrep returns exit code 1 when no matches are found, which is not an error
+ if err != nil {
+  if exitError, ok := err.(*exec.ExitError); ok && exitError.ExitCode() == 1 {
+   log.Printf("No matches found for pattern: %s", codeSearchInput.Pattern)
+   return "No matches found", nil
+  }
+  log.Printf("Ripgrep command failed: %v", err)
+  return "", fmt.Errorf("search failed: %w", err)
+ }
+
+ result := strings.TrimSpace(string(output))
+ lines := strings.Split(result, "\n")
+
+ log.Printf("Found %d matches for pattern: %s", len(lines), codeSearchInput.Pattern)
+
+ // Limit output to prevent overwhelming responses
+ if len(lines) > 50 {
+  result = strings.Join(lines[:50], "\n") + fmt.Sprintf("\n... (showing first 50 of %d matches)", len(lines))
+ }
+
+ return result, nil
+}
+
+func GenerateSchema[T any]() anthropic.ToolInputSchemaParam {
+ reflector := jsonschema.Reflector{
+  AllowAdditionalProperties: false,
+  DoNotReference:            true,
+ }
+ var v T
+
+ schema := reflector.Reflect(v)
+
+ return anthropic.ToolInputSchemaParam{
+  Properties: schema.Properties,
+ }
+}
+
+================================================
+FILE: devenv.lock
+================================================
+
+{
+  "nodes": {
+    "devenv": {
+      "locked": {
+        "dir": "src/modules",
+        "lastModified": 1752951785,
+        "owner": "cachix",
+        "repo": "devenv",
+        "rev": "3d4f8b778378a0e3f29ba779af0ff1717cf1fa00",
+        "type": "github"
+      },
+      "original": {
+        "dir": "src/modules",
+        "owner": "cachix",
+        "repo": "devenv",
+        "type": "github"
+      }
+    },
+    "flake-compat": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1747046372,
+        "owner": "edolstra",
+        "repo": "flake-compat",
+        "rev": "9100a0f413b0c601e0533d1d94ffd501ce2e7885",
+        "type": "github"
+      },
+      "original": {
+        "owner": "edolstra",
+        "repo": "flake-compat",
+        "type": "github"
+      }
+    },
+    "git-hooks": {
+      "inputs": {
+        "flake-compat": "flake-compat",
+        "gitignore": "gitignore",
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1750779888,
+        "owner": "cachix",
+        "repo": "git-hooks.nix",
+        "rev": "16ec914f6fb6f599ce988427d9d94efddf25fe6d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "cachix",
+        "repo": "git-hooks.nix",
+        "type": "github"
+      }
+    },
+    "gitignore": {
+      "inputs": {
+        "nixpkgs": [
+          "git-hooks",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1709087332,
+        "owner": "hercules-ci",
+        "repo": "gitignore.nix",
+        "rev": "637db329424fd7e46cf4185293b9cc8c88c95394",
+        "type": "github"
+      },
+      "original": {
+        "owner": "hercules-ci",
+        "repo": "gitignore.nix",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1750441195,
+        "owner": "cachix",
+        "repo": "devenv-nixpkgs",
+        "rev": "0ceffe312871b443929ff3006960d29b120dc627",
+        "type": "github"
+      },
+      "original": {
+        "owner": "cachix",
+        "ref": "rolling",
+        "repo": "devenv-nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "devenv": "devenv",
+        "git-hooks": "git-hooks",
+        "nixpkgs": "nixpkgs",
+        "pre-commit-hooks": [
+          "git-hooks"
+        ]
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
+
+================================================
+FILE: devenv.nix
+================================================
+
+{ pkgs, lib, config, inputs, ... }:
+
+{
+
+# <https://devenv.sh/basics/>
+
+  env.GREET = "devenv";
+
+# <https://devenv.sh/packages/>
+
+  packages = [
+    pkgs.git
+    pkgs.nodejs_20
+    pkgs.nodePackages.typescript
+    pkgs.nodePackages.ts-node
+    pkgs.ripgrep
+  ];
+
+# <https://devenv.sh/languages/>
+
+  languages.go.enable = true;
+  languages.python = {
+    enable = true;
+    package = pkgs.python311;
+    venv.enable = true;
+    venv.requirements = ''
+      # Add Python requirements here
+    '';
+  };
+  languages.rust.enable = true;
+  languages.dotnet.enable = true;
+  languages.typescript.enable = true;
+
+# <https://devenv.sh/processes/>
+
+# processes.cargo-watch.exec = "cargo-watch"
+
+# <https://devenv.sh/services/>
+
+# services.postgres.enable = true
+
+# <https://devenv.sh/scripts/>
+
+  scripts.hello.exec = ''
+    echo hello from $GREET
+  '';
+
+  enterShell = ''
+    hello
+    echo "Available tools:"
+    git --version
+    go version
+    python --version
+    node --version
+    tsc --version
+    rustc --version
+    dotnet --version
+    rg --version
+  '';
+
+# <https://devenv.sh/tasks/>
+
+# tasks = {
+
+# "myproj:setup".exec = "mytool build"
+
+# "devenv:enterShell".after = [ "myproj:setup" ]
+
+# }
+
+# <https://devenv.sh/tests/>
+
+  enterTest = ''
+    echo "Running tests"
+    git --version | grep --color=auto "${pkgs.git.version}"
+    go version
+    python --version
+    node --version
+    rustc --version
+    dotnet --version
+    rg --version
+  '';
+
+# <https://devenv.sh/git-hooks/>
+
+# git-hooks.hooks.shellcheck.enable = true
+
+# See full reference at <https://devenv.sh/reference/options/>
+
+}
+
+================================================
+FILE: devenv.yaml
+================================================
+
+# yaml-language-server: $schema=<https://devenv.sh/devenv.schema.json>
+
+inputs:
+  nixpkgs:
+    url: github:cachix/devenv-nixpkgs/rolling
+
+# If you're using non-OSS software, you can set allowUnfree to true
+
+# allowUnfree: true
+
+# If you're willing to use a package that's vulnerable
+
+# permittedInsecurePackages
+
+# - "openssl-1.1.1w"
+
+# If you have more than one devenv you can merge them
+
+# imports
+
+# - ./backend
+
+================================================
+FILE: edit_tool.go
+================================================
+
+package main
+
+import (
+ "bufio"
+ "context"
+ "encoding/json"
+ "flag"
+ "fmt"
+ "log"
+ "os"
+ "os/exec"
+ "path"
+ "path/filepath"
+ "strings"
+
+ "github.com/anthropics/anthropic-sdk-go"
+ "github.com/invopop/jsonschema"
+)
+
+func main() {
+ verbose := flag.Bool("verbose", false, "enable verbose logging")
+ flag.Parse()
+
+ if *verbose {
+  log.SetOutput(os.Stderr)
+  log.SetFlags(log.LstdFlags | log.Lshortfile)
+  log.Println("Verbose logging enabled")
+ } else {
+  log.SetOutput(os.Stdout)
+  log.SetFlags(0)
+  log.SetPrefix("")
+ }
+
+ client := anthropic.NewClient()
+ if *verbose {
+  log.Println("Anthropic client initialized")
+ }
+
+ scanner := bufio.NewScanner(os.Stdin)
+ getUserMessage := func() (string, bool) {
+  if !scanner.Scan() {
+   return "", false
+  }
+  return scanner.Text(), true
+ }
+
+ tools := []ToolDefinition{ReadFileDefinition, ListFilesDefinition, BashDefinition, EditFileDefinition}
+ if *verbose {
+  log.Printf("Initialized %d tools", len(tools))
+ }
+ agent := NewAgent(&client, getUserMessage, tools,*verbose)
+ err := agent.Run(context.TODO())
+ if err != nil {
+  fmt.Printf("Error: %s\n", err.Error())
+ }
+}
+
+func NewAgent(
+ client *anthropic.Client,
+ getUserMessage func() (string, bool),
+ tools []ToolDefinition,
+ verbose bool,
+)*Agent {
+ return &Agent{
+  client:         client,
+  getUserMessage: getUserMessage,
+  tools:          tools,
+  verbose:        verbose,
+ }
+}
+
+type Agent struct {
+ client         *anthropic.Client
+ getUserMessage func() (string, bool)
+ tools          []ToolDefinition
+ verbose        bool
+}
+
+func (a *Agent) Run(ctx context.Context) error {
+ conversation := []anthropic.MessageParam{}
+
+ if a.verbose {
+  log.Println("Starting chat session with tools enabled")
+ }
+ fmt.Println("Chat with Claude (use 'ctrl-c' to quit)")
+
+ for {
+  fmt.Print("\u001b[94mYou\u001b[0m: ")
+  userInput, ok := a.getUserMessage()
+  if !ok {
+   if a.verbose {
+    log.Println("User input ended, breaking from chat loop")
+   }
+   break
+  }
+
+  // Skip empty messages
+  if userInput == "" {
+   if a.verbose {
+    log.Println("Skipping empty message")
+   }
+   continue
+  }
+
+  if a.verbose {
+   log.Printf("User input received: %q", userInput)
+  }
+
+  userMessage := anthropic.NewUserMessage(anthropic.NewTextBlock(userInput))
+  conversation = append(conversation, userMessage)
+
+  if a.verbose {
+   log.Printf("Sending message to Claude, conversation length: %d", len(conversation))
+  }
+
+  message, err := a.runInference(ctx, conversation)
+  if err != nil {
+   if a.verbose {
+    log.Printf("Error during inference: %v", err)
+   }
+   return err
+  }
+  conversation = append(conversation, message.ToParam())
+
+  // Keep processing until Claude stops using tools
+  for {
+   // Collect all tool uses and their results
+   var toolResults []anthropic.ContentBlockParamUnion
+   var hasToolUse bool
+
+   if a.verbose {
+    log.Printf("Processing %d content blocks from Claude", len(message.Content))
+   }
+
+   for _, content := range message.Content {
+    switch content.Type {
+    case "text":
+     fmt.Printf("\u001b[93mClaude\u001b[0m: %s\n", content.Text)
+    case "tool_use":
+     hasToolUse = true
+     toolUse := content.AsToolUse()
+     if a.verbose {
+      log.Printf("Tool use detected: %s with input: %s", toolUse.Name, string(toolUse.Input))
+     }
+     fmt.Printf("\u001b[96mtool\u001b[0m: %s(%s)\n", toolUse.Name, string(toolUse.Input))
+
+     // Find and execute the tool
+     var toolResult string
+     var toolError error
+     var toolFound bool
+     for _, tool := range a.tools {
+      if tool.Name == toolUse.Name {
+       if a.verbose {
+        log.Printf("Executing tool: %s", tool.Name)
+       }
+       toolResult, toolError = tool.Function(toolUse.Input)
+       fmt.Printf("\u001b[92mresult\u001b[0m: %s\n", toolResult)
+       if toolError != nil {
+        fmt.Printf("\u001b[91merror\u001b[0m: %s\n", toolError.Error())
+       }
+       if a.verbose {
+        if toolError != nil {
+         log.Printf("Tool execution failed: %v", toolError)
+        } else {
+         log.Printf("Tool execution successful, result length: %d chars", len(toolResult))
+        }
+       }
+       toolFound = true
+       break
+      }
+     }
+
+     if !toolFound {
+      toolError = fmt.Errorf("tool '%s' not found", toolUse.Name)
+      fmt.Printf("\u001b[91merror\u001b[0m: %s\n", toolError.Error())
+     }
+
+     // Add tool result to collection
+     if toolError != nil {
+      toolResults = append(toolResults, anthropic.NewToolResultBlock(toolUse.ID, toolError.Error(), true))
+     } else {
+      toolResults = append(toolResults, anthropic.NewToolResultBlock(toolUse.ID, toolResult, false))
+     }
+    }
+   }
+
+   // If there were no tool uses, we're done
+   if !hasToolUse {
+    break
+   }
+
+   // Send all tool results back and get Claude's response
+   if a.verbose {
+    log.Printf("Sending %d tool results back to Claude", len(toolResults))
+   }
+   toolResultMessage := anthropic.NewUserMessage(toolResults...)
+   conversation = append(conversation, toolResultMessage)
+
+   // Get Claude's response after tool execution
+   message, err = a.runInference(ctx, conversation)
+   if err != nil {
+    if a.verbose {
+     log.Printf("Error during followup inference: %v", err)
+    }
+    return err
+   }
+   conversation = append(conversation, message.ToParam())
+
+   if a.verbose {
+    log.Printf("Received followup response with %d content blocks", len(message.Content))
+   }
+
+   // Continue loop to process the new message
+  }
+ }
+
+ if a.verbose {
+  log.Println("Chat session ended")
+ }
+ return nil
+}
+
+func (a *Agent) runInference(ctx context.Context, conversation []anthropic.MessageParam) (*anthropic.Message, error) {
+ anthropicTools := []anthropic.ToolUnionParam{}
+ for _, tool := range a.tools {
+  anthropicTools = append(anthropicTools, anthropic.ToolUnionParam{
+   OfTool: &anthropic.ToolParam{
+    Name:        tool.Name,
+    Description: anthropic.String(tool.Description),
+    InputSchema: tool.InputSchema,
+   },
+  })
+ }
+
+ if a.verbose {
+  log.Printf("Making API call to Claude with model: %s and %d tools", anthropic.ModelClaude3_7SonnetLatest, len(anthropicTools))
+ }
+
+ message, err := a.client.Messages.New(ctx, anthropic.MessageNewParams{
+  Model:     anthropic.ModelClaude3_7SonnetLatest,
+  MaxTokens: int64(1024),
+  Messages:  conversation,
+  Tools:     anthropicTools,
+ })
+
+ if a.verbose {
+  if err != nil {
+   log.Printf("API call failed: %v", err)
+  } else {
+   log.Printf("API call successful, response received")
+  }
+ }
+
+ return message, err
+}
+
+type ToolDefinition struct {
+ Name        string                         `json:"name"`
+ Description string                         `json:"description"`
+ InputSchema anthropic.ToolInputSchemaParam `json:"input_schema"`
+ Function    func(input json.RawMessage) (string, error)
+}
+
+var ReadFileDefinition = ToolDefinition{
+ Name:        "read_file",
+ Description: "Read the contents of a given relative file path. Use this when you want to see what's inside a file. Do not use this with directory names.",
+ InputSchema: ReadFileInputSchema,
+ Function:    ReadFile,
+}
+
+var ListFilesDefinition = ToolDefinition{
+ Name:        "list_files",
+ Description: "List files and directories at a given path. If no path is provided, lists files in the current directory.",
+ InputSchema: ListFilesInputSchema,
+ Function:    ListFiles,
+}
+
+var BashDefinition = ToolDefinition{
+ Name:        "bash",
+ Description: "Execute a bash command and return its output. Use this to run shell commands.",
+ InputSchema: BashInputSchema,
+ Function:    Bash,
+}
+
+var EditFileDefinition = ToolDefinition{
+ Name: "edit_file",
+ Description: `Make edits to a text file.
+
+Replaces 'old_str' with 'new_str' in the given file. 'old_str' and 'new_str' MUST be different from each other.
+
+If the file specified with path doesn't exist, it will be created.
+`,
+ InputSchema: EditFileInputSchema,
+ Function:    EditFile,
+}
+
+type ReadFileInput struct {
+ Path string `json:"path" jsonschema_description:"The relative path of a file in the working directory."`
+}
+
+var ReadFileInputSchema = GenerateSchema[ReadFileInput]()
+
+type ListFilesInput struct {
+ Path string `json:"path,omitempty" jsonschema_description:"Optional relative path to list files from. Defaults to current directory if not provided."`
+}
+
+var ListFilesInputSchema = GenerateSchema[ListFilesInput]()
+
+type BashInput struct {
+ Command string `json:"command" jsonschema_description:"The bash command to execute."`
+}
+
+var BashInputSchema = GenerateSchema[BashInput]()
+
+type EditFileInput struct {
+ Path   string `json:"path" jsonschema_description:"The path to the file"`
+ OldStr string `json:"old_str" jsonschema_description:"Text to search for - must match exactly and must only have one match exactly"`
+ NewStr string `json:"new_str" jsonschema_description:"Text to replace old_str with"`
+}
+
+var EditFileInputSchema = GenerateSchema[EditFileInput]()
+
+func ReadFile(input json.RawMessage) (string, error) {
+ readFileInput := ReadFileInput{}
+ err := json.Unmarshal(input, &readFileInput)
+ if err != nil {
+  panic(err)
+ }
+
+ log.Printf("Reading file: %s", readFileInput.Path)
+ content, err := os.ReadFile(readFileInput.Path)
+ if err != nil {
+  log.Printf("Failed to read file %s: %v", readFileInput.Path, err)
+  return "", err
+ }
+ log.Printf("Successfully read file %s (%d bytes)", readFileInput.Path, len(content))
+ return string(content), nil
+}
+
+func ListFiles(input json.RawMessage) (string, error) {
+ listFilesInput := ListFilesInput{}
+ err := json.Unmarshal(input, &listFilesInput)
+ if err != nil {
+  panic(err)
+ }
+
+ dir := "."
+ if listFilesInput.Path != "" {
+  dir = listFilesInput.Path
+ }
+
+ log.Printf("Listing files in directory: %s", dir)
+ var files []string
+ err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+  if err != nil {
+   return err
+  }
+
+  relPath, err := filepath.Rel(dir, path)
+  if err != nil {
+   return err
+  }
+
+  // Skip .devenv directory and its contents
+  if info.IsDir() && (relPath == ".devenv" || strings.HasPrefix(relPath, ".devenv/")) {
+   return filepath.SkipDir
+  }
+
+  if relPath != "." {
+   if info.IsDir() {
+    files = append(files, relPath+"/")
+   } else {
+    files = append(files, relPath)
+   }
+  }
+  return nil
+ })
+
+ if err != nil {
+  log.Printf("Failed to list files in %s: %v", dir, err)
+  return "", err
+ }
+
+ result, err := json.Marshal(files)
+ if err != nil {
+  return "", err
+ }
+
+ log.Printf("Successfully listed %d files in %s", len(files), dir)
+ return string(result), nil
+}
+
+func Bash(input json.RawMessage) (string, error) {
+ bashInput := BashInput{}
+ err := json.Unmarshal(input, &bashInput)
+ if err != nil {
+  return "", err
+ }
+
+ log.Printf("Executing bash command: %s", bashInput.Command)
+ cmd := exec.Command("bash", "-c", bashInput.Command)
+ output, err := cmd.CombinedOutput()
+ if err != nil {
+  log.Printf("Bash command failed: %v", err)
+  return fmt.Sprintf("Command failed with error: %s\nOutput: %s", err.Error(), string(output)), nil
+ }
+
+ log.Printf("Bash command executed successfully, output length: %d chars", len(output))
+ return strings.TrimSpace(string(output)), nil
+}
+
+func EditFile(input json.RawMessage) (string, error) {
+ editFileInput := EditFileInput{}
+ err := json.Unmarshal(input, &editFileInput)
+ if err != nil {
+  return "", err
+ }
+
+ if editFileInput.Path == "" || editFileInput.OldStr == editFileInput.NewStr {
+  log.Printf("EditFile failed: invalid input parameters")
+  return "", fmt.Errorf("invalid input parameters")
+ }
+
+ log.Printf("Editing file: %s (replacing %d chars with %d chars)", editFileInput.Path, len(editFileInput.OldStr), len(editFileInput.NewStr))
+ content, err := os.ReadFile(editFileInput.Path)
+ if err != nil {
+  if os.IsNotExist(err) && editFileInput.OldStr == "" {
+   log.Printf("File does not exist, creating new file: %s", editFileInput.Path)
+   return createNewFile(editFileInput.Path, editFileInput.NewStr)
+  }
+  log.Printf("Failed to read file %s: %v", editFileInput.Path, err)
+  return "", err
+ }
+
+ oldContent := string(content)
+
+ // Special case: if old_str is empty, we're appending to the file
+ var newContent string
+ if editFileInput.OldStr == "" {
+  newContent = oldContent + editFileInput.NewStr
+ } else {
+  // Count occurrences first to ensure we have exactly one match
+  count := strings.Count(oldContent, editFileInput.OldStr)
+  if count == 0 {
+   log.Printf("EditFile failed: old_str not found in file %s", editFileInput.Path)
+   return "", fmt.Errorf("old_str not found in file")
+  }
+  if count > 1 {
+   log.Printf("EditFile failed: old_str found %d times in file %s, must be unique", count, editFileInput.Path)
+   return "", fmt.Errorf("old_str found %d times in file, must be unique", count)
+  }
+
+  newContent = strings.Replace(oldContent, editFileInput.OldStr, editFileInput.NewStr, 1)
+ }
+
+ err = os.WriteFile(editFileInput.Path, []byte(newContent), 0644)
+ if err != nil {
+  log.Printf("Failed to write file %s: %v", editFileInput.Path, err)
+  return "", err
+ }
+
+ log.Printf("Successfully edited file %s", editFileInput.Path)
+ return "OK", nil
+}
+
+func createNewFile(filePath, content string) (string, error) {
+ log.Printf("Creating new file: %s (%d bytes)", filePath, len(content))
+ dir := path.Dir(filePath)
+ if dir != "." {
+  log.Printf("Creating directory: %s", dir)
+  err := os.MkdirAll(dir, 0755)
+  if err != nil {
+   log.Printf("Failed to create directory %s: %v", dir, err)
+   return "", fmt.Errorf("failed to create directory: %w", err)
+  }
+ }
+
+ err := os.WriteFile(filePath, []byte(content), 0644)
+ if err != nil {
+  log.Printf("Failed to create file %s: %v", filePath, err)
+  return "", fmt.Errorf("failed to create file: %w", err)
+ }
+
+ log.Printf("Successfully created file %s", filePath)
+ return fmt.Sprintf("Successfully created file %s", filePath), nil
+}
+
+func GenerateSchema[T any]() anthropic.ToolInputSchemaParam {
+ reflector := jsonschema.Reflector{
+  AllowAdditionalProperties: false,
+  DoNotReference:            true,
+ }
+ var v T
+
+ schema := reflector.Reflect(v)
+
+ return anthropic.ToolInputSchemaParam{
+  Properties: schema.Properties,
+ }
+}
+
+================================================
+FILE: go.mod
+================================================
+
+module chat
+
+go 1.24.2
+
+require (
+ github.com/anthropics/anthropic-sdk-go v1.6.2
+ github.com/invopop/jsonschema v0.13.0
+)
+
+require (
+ github.com/bahlo/generic-list-go v0.2.0 // indirect
+ github.com/buger/jsonparser v1.1.1 // indirect
+ github.com/mailru/easyjson v0.7.7 // indirect
+ github.com/tidwall/gjson v1.14.4 // indirect
+ github.com/tidwall/match v1.1.1 // indirect
+ github.com/tidwall/pretty v1.2.1 // indirect
+ github.com/tidwall/sjson v1.2.5 // indirect
+ github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
+ gopkg.in/yaml.v3 v3.0.1 // indirect
+)
+
+================================================
+FILE: go.sum
+================================================
+
+github.com/anthropics/anthropic-sdk-go v1.6.2 h1:oORA212y0/zAxe7OPvdgIbflnn/x5PGk5uwjF60GqXM=
+github.com/anthropics/anthropic-sdk-go v1.6.2/go.mod h1:3qSNQ5NrAmjC8A2ykuruSQttfqfdEYNZY5o8c0XSHB8=
+github.com/bahlo/generic-list-go v0.2.0 h1:5sz/EEAK+ls5wF+NeqDpk5+iNdMDXrh3z3nPnH1Wvgk=
+github.com/bahlo/generic-list-go v0.2.0/go.mod h1:2KvAjgMlE5NNynlg/5iLrrCCZ2+5xWbdbCW3pNTGyYg=
+github.com/buger/jsonparser v1.1.1 h1:2PnMjfWD7wBILjqQbt530v576A/cAbQvEW9gGIpYMUs=
+github.com/buger/jsonparser v1.1.1/go.mod h1:6RYKKt7H4d4+iWqouImQ9R2FZql3VbhNgx27UK13J/0=
+github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
+github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/invopop/jsonschema v0.13.0 h1:KvpoAJWEjR3uD9Kbm2HWJmqsEaHt8lBUpd0qHcIi21E=
+github.com/invopop/jsonschema v0.13.0/go.mod h1:ffZ5Km5SWWRAIN6wbDXItl95euhFz2uON45H2qjYt+0=
+github.com/josharian/intern v1.0.0/go.mod h1:5DoeVV0s6jJacbCEi61lwdGj/aVlrQvzHFFd8Hwg//Y=
+github.com/mailru/easyjson v0.7.7 h1:UGYAvKxe3sBsEDzO8ZeWOSlIQfWFlxbzLZe7hwFURr0=
+github.com/mailru/easyjson v0.7.7/go.mod h1:xzfreul335JAWq5oZzymOObrkdz5UnU4kGfJJLY9Nlc=
+github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
+github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
+github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcUk=
+github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
+github.com/tidwall/gjson v1.14.2/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=
+github.com/tidwall/gjson v1.14.4 h1:uo0p8EbA09J7RQaflQ1aBRffTR7xedD2bcIVSYxLnkM=
+github.com/tidwall/gjson v1.14.4/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=
+github.com/tidwall/match v1.1.1 h1:+Ho715JplO36QYgwN9PGYNhgZvoUSc9X2c80KVTi+GA=
+github.com/tidwall/match v1.1.1/go.mod h1:eRSPERbgtNPcGhD8UCthc6PmLEQXEWd3PRB5JTxsfmM=
+github.com/tidwall/pretty v1.2.0/go.mod h1:ITEVvHYasfjBbM0u2Pg8T2nJnzm8xPwvNhhsoaGGjNU=
+github.com/tidwall/pretty v1.2.1 h1:qjsOFOWWQl+N3RsoF5/ssm1pHmJJwhjlSbZ51I6wMl4=
+github.com/tidwall/pretty v1.2.1/go.mod h1:ITEVvHYasfjBbM0u2Pg8T2nJnzm8xPwvNhhsoaGGjNU=
+github.com/tidwall/sjson v1.2.5 h1:kLy8mja+1c9jlljvWTlSazM7cKDRfJuR/bOJhcY5NcY=
+github.com/tidwall/sjson v1.2.5/go.mod h1:Fvgq9kS/6ociJEDnK0Fk1cpYF4FIW6ZF7LAe+6jwd28=
+github.com/wk8/go-ordered-map/v2 v2.1.8 h1:5h/BUHu93oj4gIdvHHHGsScSTMijfx5PeYkE/fJgbpc=
+github.com/wk8/go-ordered-map/v2 v2.1.8/go.mod h1:5nJHM5DyteebpVlHnWMV0rPz6Zp7+xBAnxjb1X5vnTw=
+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+SDo693bJlVdllGtEeKM=
+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
+gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
+gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
+
+================================================
+FILE: list_files.go
+================================================
+
+package main
+
+import (
+ "bufio"
+ "context"
+ "encoding/json"
+ "flag"
+ "fmt"
+ "log"
+ "os"
+ "path/filepath"
+ "strings"
+
+ "github.com/anthropics/anthropic-sdk-go"
+ "github.com/invopop/jsonschema"
+)
+
+func main() {
+ verbose := flag.Bool("verbose", false, "enable verbose logging")
+ flag.Parse()
+
+ if *verbose {
+  log.SetOutput(os.Stderr)
+  log.SetFlags(log.LstdFlags | log.Lshortfile)
+  log.Println("Verbose logging enabled")
+ } else {
+  log.SetOutput(os.Stdout)
+  log.SetFlags(0)
+  log.SetPrefix("")
+ }
+
+ client := anthropic.NewClient()
+ if *verbose {
+  log.Println("Anthropic client initialized")
+ }
+
+ scanner := bufio.NewScanner(os.Stdin)
+ getUserMessage := func() (string, bool) {
+  if !scanner.Scan() {
+   return "", false
+  }
+  return scanner.Text(), true
+ }
+
+ tools := []ToolDefinition{ReadFileDefinition, ListFilesDefinition}
+ if *verbose {
+  log.Printf("Initialized %d tools", len(tools))
+ }
+ agent := NewAgent(&client, getUserMessage, tools,*verbose)
+ err := agent.Run(context.TODO())
+ if err != nil {
+  fmt.Printf("Error: %s\n", err.Error())
+ }
+}
+
+func NewAgent(
+ client *anthropic.Client,
+ getUserMessage func() (string, bool),
+ tools []ToolDefinition,
+ verbose bool,
+)*Agent {
+ return &Agent{
+  client:         client,
+  getUserMessage: getUserMessage,
+  tools:          tools,
+  verbose:        verbose,
+ }
+}
+
+type Agent struct {
+ client         *anthropic.Client
+ getUserMessage func() (string, bool)
+ tools          []ToolDefinition
+ verbose        bool
+}
+
+func (a *Agent) Run(ctx context.Context) error {
+ conversation := []anthropic.MessageParam{}
+
+ if a.verbose {
+  log.Println("Starting chat session with tools enabled")
+ }
+ fmt.Println("Chat with Claude (use 'ctrl-c' to quit)")
+
+ for {
+  fmt.Print("\u001b[94mYou\u001b[0m: ")
+  userInput, ok := a.getUserMessage()
+  if !ok {
+   if a.verbose {
+    log.Println("User input ended, breaking from chat loop")
+   }
+   break
+  }
+
+  // Skip empty messages
+  if userInput == "" {
+   if a.verbose {
+    log.Println("Skipping empty message")
+   }
+   continue
+  }
+
+  if a.verbose {
+   log.Printf("User input received: %q", userInput)
+  }
+
+  userMessage := anthropic.NewUserMessage(anthropic.NewTextBlock(userInput))
+  conversation = append(conversation, userMessage)
+
+  if a.verbose {
+   log.Printf("Sending message to Claude, conversation length: %d", len(conversation))
+  }
+
+  message, err := a.runInference(ctx, conversation)
+  if err != nil {
+   if a.verbose {
+    log.Printf("Error during inference: %v", err)
+   }
+   return err
+  }
+  conversation = append(conversation, message.ToParam())
+
+  // Keep processing until Claude stops using tools
+  for {
+   // Collect all tool uses and their results
+   var toolResults []anthropic.ContentBlockParamUnion
+   var hasToolUse bool
+
+   if a.verbose {
+    log.Printf("Processing %d content blocks from Claude", len(message.Content))
+   }
+
+   for _, content := range message.Content {
+    switch content.Type {
+    case "text":
+     fmt.Printf("\u001b[93mClaude\u001b[0m: %s\n", content.Text)
+    case "tool_use":
+     hasToolUse = true
+     toolUse := content.AsToolUse()
+     if a.verbose {
+      log.Printf("Tool use detected: %s with input: %s", toolUse.Name, string(toolUse.Input))
+     }
+     fmt.Printf("\u001b[96mtool\u001b[0m: %s(%s)\n", toolUse.Name, string(toolUse.Input))
+
+     // Find and execute the tool
+     var toolResult string
+     var toolError error
+     var toolFound bool
+     for _, tool := range a.tools {
+      if tool.Name == toolUse.Name {
+       if a.verbose {
+        log.Printf("Executing tool: %s", tool.Name)
+       }
+       toolResult, toolError = tool.Function(toolUse.Input)
+       fmt.Printf("\u001b[92mresult\u001b[0m: %s\n", toolResult)
+       if toolError != nil {
+        fmt.Printf("\u001b[91merror\u001b[0m: %s\n", toolError.Error())
+       }
+       if a.verbose {
+        if toolError != nil {
+         log.Printf("Tool execution failed: %v", toolError)
+        } else {
+         log.Printf("Tool execution successful, result length: %d chars", len(toolResult))
+        }
+       }
+       toolFound = true
+       break
+      }
+     }
+
+     if !toolFound {
+      toolError = fmt.Errorf("tool '%s' not found", toolUse.Name)
+      fmt.Printf("\u001b[91merror\u001b[0m: %s\n", toolError.Error())
+     }
+
+     // Add tool result to collection
+     if toolError != nil {
+      toolResults = append(toolResults, anthropic.NewToolResultBlock(toolUse.ID, toolError.Error(), true))
+     } else {
+      toolResults = append(toolResults, anthropic.NewToolResultBlock(toolUse.ID, toolResult, false))
+     }
+    }
+   }
+
+   // If there were no tool uses, we're done
+   if !hasToolUse {
+    break
+   }
+
+   // Send all tool results back and get Claude's response
+   if a.verbose {
+    log.Printf("Sending %d tool results back to Claude", len(toolResults))
+   }
+   toolResultMessage := anthropic.NewUserMessage(toolResults...)
+   conversation = append(conversation, toolResultMessage)
+
+   // Get Claude's response after tool execution
+   message, err = a.runInference(ctx, conversation)
+   if err != nil {
+    if a.verbose {
+     log.Printf("Error during followup inference: %v", err)
+    }
+    return err
+   }
+   conversation = append(conversation, message.ToParam())
+
+   if a.verbose {
+    log.Printf("Received followup response with %d content blocks", len(message.Content))
+   }
+
+   // Continue loop to process the new message
+  }
+ }
+
+ if a.verbose {
+  log.Println("Chat session ended")
+ }
+ return nil
+}
+
+func (a *Agent) runInference(ctx context.Context, conversation []anthropic.MessageParam) (*anthropic.Message, error) {
+ anthropicTools := []anthropic.ToolUnionParam{}
+ for _, tool := range a.tools {
+  anthropicTools = append(anthropicTools, anthropic.ToolUnionParam{
+   OfTool: &anthropic.ToolParam{
+    Name:        tool.Name,
+    Description: anthropic.String(tool.Description),
+    InputSchema: tool.InputSchema,
+   },
+  })
+ }
+
+ if a.verbose {
+  log.Printf("Making API call to Claude with model: %s and %d tools", anthropic.ModelClaude3_7SonnetLatest, len(anthropicTools))
+ }
+
+ message, err := a.client.Messages.New(ctx, anthropic.MessageNewParams{
+  Model:     anthropic.ModelClaude3_7SonnetLatest,
+  MaxTokens: int64(1024),
+  Messages:  conversation,
+  Tools:     anthropicTools,
+ })
+
+ if a.verbose {
+  if err != nil {
+   log.Printf("API call failed: %v", err)
+  } else {
+   log.Printf("API call successful, response received")
+  }
+ }
+
+ return message, err
+}
+
+type ToolDefinition struct {
+ Name        string                         `json:"name"`
+ Description string                         `json:"description"`
+ InputSchema anthropic.ToolInputSchemaParam `json:"input_schema"`
+ Function    func(input json.RawMessage) (string, error)
+}
+
+var ReadFileDefinition = ToolDefinition{
+ Name:        "read_file",
+ Description: "Read the contents of a given relative file path. Use this when you want to see what's inside a file. Do not use this with directory names.",
+ InputSchema: ReadFileInputSchema,
+ Function:    ReadFile,
+}
+
+var ListFilesDefinition = ToolDefinition{
+ Name:        "list_files",
+ Description: "List files and directories at a given path. If no path is provided, lists files in the current directory.",
+ InputSchema: ListFilesInputSchema,
+ Function:    ListFiles,
+}
+
+type ReadFileInput struct {
+ Path string `json:"path" jsonschema_description:"The relative path of a file in the working directory."`
+}
+
+var ReadFileInputSchema = GenerateSchema[ReadFileInput]()
+
+type ListFilesInput struct {
+ Path string `json:"path,omitempty" jsonschema_description:"Optional relative path to list files from. Defaults to current directory if not provided."`
+}
+
+var ListFilesInputSchema = GenerateSchema[ListFilesInput]()
+
+func ReadFile(input json.RawMessage) (string, error) {
+ readFileInput := ReadFileInput{}
+ err := json.Unmarshal(input, &readFileInput)
+ if err != nil {
+  panic(err)
+ }
+
+ content, err := os.ReadFile(readFileInput.Path)
+ if err != nil {
+  return "", err
+ }
+ return string(content), nil
+}
+
+func ListFiles(input json.RawMessage) (string, error) {
+ listFilesInput := ListFilesInput{}
+ err := json.Unmarshal(input, &listFilesInput)
+ if err != nil {
+  panic(err)
+ }
+
+ dir := "."
+ if listFilesInput.Path != "" {
+  dir = listFilesInput.Path
+ }
+
+ log.Printf("Listing files in directory: %s", dir)
+
+ var files []string
+ err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+  if err != nil {
+   return err
+  }
+
+  relPath, err := filepath.Rel(dir, path)
+  if err != nil {
+   return err
+  }
+
+  // Skip .devenv directory and its contents
+  if info.IsDir() && (relPath == ".devenv" || strings.HasPrefix(relPath, ".devenv/")) {
+   return filepath.SkipDir
+  }
+
+  if relPath != "." {
+   if info.IsDir() {
+    files = append(files, relPath+"/")
+   } else {
+    files = append(files, relPath)
+   }
+  }
+  return nil
+ })
+
+ if err != nil {
+  log.Printf("Failed to list files in %s: %v", dir, err)
+  return "", err
+ }
+
+ log.Printf("Successfully listed %d items in %s", len(files), dir)
+
+ result, err := json.Marshal(files)
+ if err != nil {
+  return "", err
+ }
+
+ return string(result), nil
+}
+
+func GenerateSchema[T any]() anthropic.ToolInputSchemaParam {
+ reflector := jsonschema.Reflector{
+  AllowAdditionalProperties: false,
+  DoNotReference:            true,
+ }
+ var v T
+
+ schema := reflector.Reflect(v)
+
+ return anthropic.ToolInputSchemaParam{
+  Properties: schema.Properties,
+ }
+}
+
+================================================
+FILE: Makefile
+================================================
+
+.PHONY: build fmt check clean all
+
+# Go binaries to build
+
+BINARIES := bash_tool chat edit_tool list_files read
+
+# Build all binaries
+
+build:
+ @echo "Building binaries..."
+ go build -o bash_tool bash_tool.go
+ go build -o chat chat.go
+ go build -o edit_tool edit_tool.go
+ go build -o list_files list_files.go
+ go build -o read read.go
+
+# Format all Go files
+
+fmt:
+ @echo "Formatting Go files..."
+ go fmt ./...
+
+# Check (lint and vet) all Go files
+
+check:
+ @echo "Running go vet on individual files..."
+ go vet bash_tool.go
+ go vet chat.go
+ go vet edit_tool.go
+ go vet list_files.go
+ go vet read.go
+ @echo "Running go mod tidy..."
+ go mod tidy
+
+# Clean built binaries
+
+clean:
+ @echo "Cleaning binaries..."
+ rm -f $(BINARIES)
+
+# Build everything and run checks
+
+all: fmt check build
+
+# Default target
+
+.DEFAULT_GOAL := all
+
+================================================
+FILE: read.go
+================================================
+
+package main
+
+import (
+ "bufio"
+ "context"
+ "encoding/json"
+ "flag"
+ "fmt"
+ "log"
+ "os"
+
+ "github.com/anthropics/anthropic-sdk-go"
+ "github.com/invopop/jsonschema"
+)
+
+func main() {
+ verbose := flag.Bool("verbose", false, "enable verbose logging")
+ flag.Parse()
+
+ if *verbose {
+  log.SetOutput(os.Stderr)
+  log.SetFlags(log.LstdFlags | log.Lshortfile)
+  log.Println("Verbose logging enabled")
+ } else {
+  log.SetOutput(os.Stdout)
+  log.SetFlags(0)
+  log.SetPrefix("")
+ }
+
+ client := anthropic.NewClient()
+ if *verbose {
+  log.Println("Anthropic client initialized")
+ }
+
+ scanner := bufio.NewScanner(os.Stdin)
+ getUserMessage := func() (string, bool) {
+  if !scanner.Scan() {
+   return "", false
+  }
+  return scanner.Text(), true
+ }
+
+ tools := []ToolDefinition{ReadFileDefinition}
+ if *verbose {
+  log.Printf("Initialized %d tools", len(tools))
+ }
+ agent := NewAgent(&client, getUserMessage, tools,*verbose)
+ err := agent.Run(context.TODO())
+ if err != nil {
+  fmt.Printf("Error: %s\n", err.Error())
+ }
+}
+
+func NewAgent(
+ client *anthropic.Client,
+ getUserMessage func() (string, bool),
+ tools []ToolDefinition,
+ verbose bool,
+)*Agent {
+ return &Agent{
+  client:         client,
+  getUserMessage: getUserMessage,
+  tools:          tools,
+  verbose:        verbose,
+ }
+}
+
+type Agent struct {
+ client         *anthropic.Client
+ getUserMessage func() (string, bool)
+ tools          []ToolDefinition
+ verbose        bool
+}
+
+func (a *Agent) Run(ctx context.Context) error {
+ conversation := []anthropic.MessageParam{}
+
+ if a.verbose {
+  log.Println("Starting chat session with tools enabled")
+ }
+ fmt.Println("Chat with Claude (use 'ctrl-c' to quit)")
+
+ for {
+  fmt.Print("\u001b[94mYou\u001b[0m: ")
+  userInput, ok := a.getUserMessage()
+  if !ok {
+   if a.verbose {
+    log.Println("User input ended, breaking from chat loop")
+   }
+   break
+  }
+
+  // Skip empty messages
+  if userInput == "" {
+   if a.verbose {
+    log.Println("Skipping empty message")
+   }
+   continue
+  }
+
+  if a.verbose {
+   log.Printf("User input received: %q", userInput)
+  }
+
+  userMessage := anthropic.NewUserMessage(anthropic.NewTextBlock(userInput))
+  conversation = append(conversation, userMessage)
+
+  if a.verbose {
+   log.Printf("Sending message to Claude, conversation length: %d", len(conversation))
+  }
+
+  message, err := a.runInference(ctx, conversation)
+  if err != nil {
+   if a.verbose {
+    log.Printf("Error during inference: %v", err)
+   }
+   return err
+  }
+  conversation = append(conversation, message.ToParam())
+
+  // Keep processing until Claude stops using tools
+  for {
+   // Collect all tool uses and their results
+   var toolResults []anthropic.ContentBlockParamUnion
+   var hasToolUse bool
+
+   if a.verbose {
+    log.Printf("Processing %d content blocks from Claude", len(message.Content))
+   }
+
+   for _, content := range message.Content {
+    switch content.Type {
+    case "text":
+     fmt.Printf("\u001b[93mClaude\u001b[0m: %s\n", content.Text)
+    case "tool_use":
+     hasToolUse = true
+     toolUse := content.AsToolUse()
+     if a.verbose {
+      log.Printf("Tool use detected: %s with input: %s", toolUse.Name, string(toolUse.Input))
+     }
+     fmt.Printf("\u001b[96mtool\u001b[0m: %s(%s)\n", toolUse.Name, string(toolUse.Input))
+
+     // Find and execute the tool
+     var toolResult string
+     var toolError error
+     var toolFound bool
+     for _, tool := range a.tools {
+      if tool.Name == toolUse.Name {
+       if a.verbose {
+        log.Printf("Executing tool: %s", tool.Name)
+       }
+       toolResult, toolError = tool.Function(toolUse.Input)
+       fmt.Printf("\u001b[92mresult\u001b[0m: %s\n", toolResult)
+       if toolError != nil {
+        fmt.Printf("\u001b[91merror\u001b[0m: %s\n", toolError.Error())
+       }
+       if a.verbose {
+        if toolError != nil {
+         log.Printf("Tool execution failed: %v", toolError)
+        } else {
+         log.Printf("Tool execution successful, result length: %d chars", len(toolResult))
+        }
+       }
+       toolFound = true
+       break
+      }
+     }
+
+     if !toolFound {
+      toolError = fmt.Errorf("tool '%s' not found", toolUse.Name)
+      fmt.Printf("\u001b[91merror\u001b[0m: %s\n", toolError.Error())
+     }
+
+     // Add tool result to collection
+     if toolError != nil {
+      toolResults = append(toolResults, anthropic.NewToolResultBlock(toolUse.ID, toolError.Error(), true))
+     } else {
+      toolResults = append(toolResults, anthropic.NewToolResultBlock(toolUse.ID, toolResult, false))
+     }
+    }
+   }
+
+   // If there were no tool uses, we're done
+   if !hasToolUse {
+    break
+   }
+
+   // Send all tool results back and get Claude's response
+   if a.verbose {
+    log.Printf("Sending %d tool results back to Claude", len(toolResults))
+   }
+   toolResultMessage := anthropic.NewUserMessage(toolResults...)
+   conversation = append(conversation, toolResultMessage)
+
+   // Get Claude's response after tool execution
+   message, err = a.runInference(ctx, conversation)
+   if err != nil {
+    if a.verbose {
+     log.Printf("Error during followup inference: %v", err)
+    }
+    return err
+   }
+   conversation = append(conversation, message.ToParam())
+
+   if a.verbose {
+    log.Printf("Received followup response with %d content blocks", len(message.Content))
+   }
+
+   // Continue loop to process the new message
+  }
+ }
+
+ if a.verbose {
+  log.Println("Chat session ended")
+ }
+ return nil
+}
+
+func (a *Agent) runInference(ctx context.Context, conversation []anthropic.MessageParam) (*anthropic.Message, error) {
+ anthropicTools := []anthropic.ToolUnionParam{}
+ for _, tool := range a.tools {
+  anthropicTools = append(anthropicTools, anthropic.ToolUnionParam{
+   OfTool: &anthropic.ToolParam{
+    Name:        tool.Name,
+    Description: anthropic.String(tool.Description),
+    InputSchema: tool.InputSchema,
+   },
+  })
+ }
+
+ if a.verbose {
+  log.Printf("Making API call to Claude with model: %s and %d tools", anthropic.ModelClaude3_7SonnetLatest, len(anthropicTools))
+ }
+
+ message, err := a.client.Messages.New(ctx, anthropic.MessageNewParams{
+  Model:     anthropic.ModelClaude3_7SonnetLatest,
+  MaxTokens: int64(1024),
+  Messages:  conversation,
+  Tools:     anthropicTools,
+ })
+
+ if a.verbose {
+  if err != nil {
+   log.Printf("API call failed: %v", err)
+  } else {
+   log.Printf("API call successful, response received")
+  }
+ }
+
+ return message, err
+}
+
+type ToolDefinition struct {
+ Name        string                         `json:"name"`
+ Description string                         `json:"description"`
+ InputSchema anthropic.ToolInputSchemaParam `json:"input_schema"`
+ Function    func(input json.RawMessage) (string, error)
+}
+
+var ReadFileDefinition = ToolDefinition{
+ Name:        "read_file",
+ Description: "Read the contents of a given relative file path. Use this when you want to see what's inside a file. Do not use this with directory names.",
+ InputSchema: ReadFileInputSchema,
+ Function:    ReadFile,
+}
+
+type ReadFileInput struct {
+ Path string `json:"path" jsonschema_description:"The relative path of a file in the working directory."`
+}
+
+var ReadFileInputSchema = GenerateSchema[ReadFileInput]()
+
+func ReadFile(input json.RawMessage) (string, error) {
+ readFileInput := ReadFileInput{}
+ err := json.Unmarshal(input, &readFileInput)
+ if err != nil {
+  panic(err)
+ }
+
+ log.Printf("Reading file: %s", readFileInput.Path)
+ content, err := os.ReadFile(readFileInput.Path)
+ if err != nil {
+  log.Printf("Failed to read file %s: %v", readFileInput.Path, err)
+  return "", err
+ }
+ log.Printf("Successfully read file %s (%d bytes)", readFileInput.Path, len(content))
+ return string(content), nil
+}
+
+func GenerateSchema[T any]() anthropic.ToolInputSchemaParam {
+ reflector := jsonschema.Reflector{
+  AllowAdditionalProperties: false,
+  DoNotReference:            true,
+ }
+ var v T
+
+ schema := reflector.Reflect(v)
+
+ return anthropic.ToolInputSchemaParam{
+  Properties: schema.Properties,
+ }
+}
+
+================================================
+FILE: renovate.json
+================================================
+
+{
+  "$schema": "<https://docs.renovatebot.com/renovate-schema.json>",
+  "extends": [
+    "config:recommended"
+  ]
+}
+
+================================================
+FILE: riddle.txt
+================================================
+
+I have a mane but I'm not a lion,
+I have four legs but I'm not a table,
+I can gallop but I'm not running,
+People say I'm disagreeable because I always say "neigh."
+What am I?
+
+================================================
+FILE: .envrc
+================================================
+
+export DIRENV_WARN_TIMEOUT=20s
+
+eval "$(devenv direnvrc)"
+
+# The use_devenv function supports passing flags to the devenv command
+
+# For example: use devenv --impure --option services.postgres.enable:bool true
+
+use devenv
+
+================================================
+FILE: prompts/00-weather.md
+================================================
+
+You are a weather expert. When I ask you about the weather in a given location, I want you to reply with `get_weather(<location_name>)`. I will then tell you what the weather in that location is. Understood?
+
+================================================
+FILE: prompts/01-read_file.md
+================================================
+
+Claude, mate. What's the answer to this riddle in riddle.txt?
+
+================================================
+FILE: prompts/02-list_files.md
+================================================
+
+Claude, mate. What's files are in this directory?
+
+What is the contents of riddle.txt?
+
+================================================
+FILE: prompts/03-bash_tool.md
+================================================
+
+Hey Claude, provide a summary of all the processes running on this computer
+
+================================================
+FILE: prompts/04-edit_tool.md
+================================================
+
+hey claude, create fizzbuzz.js that I can run with Nodejs and that has fizzbuzz in it and executes it

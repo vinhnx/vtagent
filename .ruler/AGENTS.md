@@ -102,3 +102,5 @@ This is a Rust project called "vtagent" that appears to be a code analysis tool 
 - Update documentation if needed
 - Consider performance implications
 - Test with various input files and edge cases
+- Prefered ripgrep for searching code
+- DO NOT USE EMOJI THIS IS IMPORTANT

@@ -5,9 +5,11 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use console::style;
-use once_cell::sync::Lazy;
+use std::io::{self, Write};
 use std::path::PathBuf;
-use std::sync::Mutex;
+use vtagent_core::agent::AgentBuilder;
+use vtagent_core::gemini::{Content, FunctionCall, GenerateContentRequest, Tool};
+use vtagent_core::tools::build_function_declarations;
 
 /// Simple markdown renderer for terminal output
 struct MarkdownRenderer;

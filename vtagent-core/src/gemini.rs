@@ -368,27 +368,120 @@ impl Client {
         req: &GenerateContentRequest,
     ) -> Result<GenerateContentResponse> {
         let url = self.endpoint()?;
-        let resp = self
-            .http
-            .post(url)
-            .query(&[("key", self.api_key.as_str())])
-            .json(req)
-            .send()
-            .await
-            .context("request to Gemini API failed")?;
+        // Simple retry on 5xx errors
+        let mut attempts = 0u32;
+        loop {
+            let resp = self
+                .http
+                .post(url.clone())
+                .query(&[("key", self.api_key.as_str())])
+                .json(req)
+                .send()
+                .await
+                .context("request to Gemini API failed")?;
 
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let text = resp.text().await.unwrap_or_default();
-            let msg = format!("Gemini API error: {} - {}", status, text);
-            return Err(anyhow::anyhow!(msg));
+            if !resp.status().is_success() {
+                let status = resp.status();
+                let text = resp.text().await.unwrap_or_default();
+                // Retry on server errors
+                if status.is_server_error() && attempts < 2 {
+                    attempts += 1;
+                    let delay_ms = [200u64, 600u64, 1200u64][attempts as usize - 1];
+                    tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
+                    continue;
+                }
+                let msg = format!("Gemini API error: {} - {}", status, text);
+                return Err(anyhow::anyhow!(msg));
+            }
+
+            let body_text = resp.text().await.unwrap_or_default();
+            match serde_json::from_str::<GenerateContentResponse>(&body_text) {
+                Ok(data) => return Ok(data),
+                Err(parse_err) => {
+                    match serde_json::from_str::<serde_json::Value>(&body_text) {
+                        Ok(v) => {
+                            if let Some(resp) = Self::coerce_response_from_value(&v) {
+                                return Ok(resp);
+                            } else if let Some(text) = Self::extract_first_text(&v) {
+                                return Ok(GenerateContentResponse {
+                                    candidates: vec![Candidate { content: Content { role: "model".to_string(), parts: vec![Part::Text { text }] }, finish_reason: None }],
+                                    prompt_feedback: None,
+                                    usage_metadata: None,
+                                });
+                            } else {
+                                // If parsing still fails, retry a limited number of times
+                                if attempts < 2 { attempts += 1; continue; }
+                                return Err(anyhow::anyhow!("invalid response JSON from Gemini API: {}", parse_err));
+                            }
+                        }
+                        Err(_) => {
+                            if attempts < 2 { attempts += 1; continue; }
+                            return Err(anyhow::anyhow!("invalid response JSON from Gemini API: {}", parse_err));
+                        }
+                    }
+                }
+            }
         }
-        let data = resp
-            .json::<GenerateContentResponse>()
-            .await
-            .context("invalid response JSON from Gemini API")?;
-        Ok(data)
     }
+
+    fn extract_first_text(v: &serde_json::Value) -> Option<String> {
+        v.get("candidates")
+            .and_then(|c| c.as_array())
+            .and_then(|arr| arr.get(0))
+            .and_then(|cand| cand.get("content"))
+            .and_then(|c| c.get("parts"))
+            .and_then(|p| p.as_array())
+            .and_then(|parts| {
+                for part in parts {
+                    if let Some(t) = part.get("text").and_then(|x| x.as_str()) {
+                        if !t.trim().is_empty() { return Some(t.to_string()); }
+                    }
+                }
+                None
+            })
+    }
+
+    fn coerce_response_from_value(v: &serde_json::Value) -> Option<GenerateContentResponse> {
+        let mut candidates_out: Vec<Candidate> = Vec::new();
+        let cands = v.get("candidates").and_then(|c| c.as_array()).cloned().unwrap_or_default();
+        for c in cands {
+            if let Some(parts_v) = c.get("content").and_then(|cnt| cnt.get("parts")).and_then(|p| p.as_array()) {
+                let mut parts: Vec<Part> = Vec::new();
+                for p in parts_v {
+                    if let Some(t) = p.get("text").and_then(|x| x.as_str()) {
+                        parts.push(Part::Text { text: t.to_string() });
+                    } else if let Some(fc) = p.get("functionCall") {
+                        let name = fc.get("name").and_then(|x| x.as_str()).unwrap_or("").to_string();
+                        let args = fc.get("args").cloned().unwrap_or(serde_json::json!({}));
+                        let id = fc.get("id").and_then(|x| x.as_str()).map(|s| s.to_string());
+                        parts.push(Part::FunctionCall { function_call: FunctionCall { name, args, id } });
+                    } else if let Some(fr) = p.get("functionResponse") {
+                        let name = fr.get("name").and_then(|x| x.as_str()).unwrap_or("").to_string();
+                        let response = fr.get("response").cloned().unwrap_or(serde_json::json!({}));
+                        parts.push(Part::FunctionResponse { function_response: FunctionResponse { name, response } });
+                    }
+                }
+                candidates_out.push(Candidate { content: Content { role: "model".to_string(), parts }, finish_reason: c.get("finishReason").and_then(|x| x.as_str()).map(|s| s.to_string()) });
+                continue;
+            }
+            if let Some(fc) = c.get("functionCall") {
+                let name = fc.get("name").and_then(|x| x.as_str()).unwrap_or("").to_string();
+                let args = fc.get("args").cloned().unwrap_or(serde_json::json!({}));
+                let id = fc.get("id").and_then(|x| x.as_str()).map(|s| s.to_string());
+                let parts = vec![Part::FunctionCall { function_call: FunctionCall { name, args, id } }];
+                candidates_out.push(Candidate { content: Content { role: "model".to_string(), parts }, finish_reason: c.get("finishReason").and_then(|x| x.as_str()).map(|s| s.to_string()) });
+                continue;
+            }
+            if let Some(t) = c.get("text").and_then(|x| x.as_str()) {
+                let parts = vec![Part::Text { text: t.to_string() }];
+                candidates_out.push(Candidate { content: Content { role: "model".to_string(), parts }, finish_reason: c.get("finishReason").and_then(|x| x.as_str()).map(|s| s.to_string()) });
+                continue;
+            }
+        }
+        if candidates_out.is_empty() { None } else { Some(GenerateContentResponse { candidates: candidates_out, prompt_feedback: None, usage_metadata: None }) }
+    }
+
+        // end of coerce_response_from_value
 
     /// Stream generate content with real-time output and comprehensive error handling
     pub async fn generate_content_stream<F>(
@@ -427,7 +520,7 @@ impl Client {
 
         let config = TIMEOUT_DETECTOR.get_config(&OperationType::ApiCall).await;
         let mut attempt = 0;
-        let mut last_error = None;
+        let mut last_error: Option<anyhow::Error> = None;
 
         loop {
             let handle = TIMEOUT_DETECTOR.start_operation(

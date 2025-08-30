@@ -25,13 +25,13 @@ console = "0.15"
 owo-colors = "4.0"
 termimad = "0.31"
 regex = "1.10"
-tree-sitter = "0.20"
-tree-sitter-rust = "0.20"
-tree-sitter-python = "0.20"
-tree-sitter-javascript = "0.20"
-tree-sitter-typescript = "0.20"
-tree-sitter-go = "0.20"
-tree-sitter-java = "0.20"
+tree-sitter = "0.23"
+tree-sitter-rust = "0.23"
+tree-sitter-python = "0.23"
+tree-sitter-javascript = "0.23"
+tree-sitter-typescript = "0.23"
+tree-sitter-go = "0.23"
+tree-sitter-java = "0.23"
 flate2 = "1.0"  # For compression in performance module
 pathdiff = "0.2" # For path operations
 tempfile = "3.0" # For temporary files in tests
@@ -56,3 +56,6 @@ lto = true
 [[bin]]
 name = "vtagent"
 path = "src/main.rs"
+
+[dev-dependencies]
+criterion = "0.5"

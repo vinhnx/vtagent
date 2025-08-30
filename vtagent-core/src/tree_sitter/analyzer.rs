@@ -5,7 +5,8 @@ use crate::tree_sitter::languages::*;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-// use tree_sitter_swift; // TODO: Enable when Swift support is resolved
+// Swift parser is currently disabled to avoid optional dependency issues
+// use tree_sitter_swift;
 use std::path::Path;
 use tree_sitter::{Language, Parser, Tree};
 
@@ -37,7 +38,7 @@ pub enum LanguageSupport {
     TypeScript,
     Go,
     Java,
-    // Swift, // TODO: Enable Swift support once tree-sitter-swift API is resolved
+    Swift,
 }
 
 /// Syntax tree representation
@@ -56,8 +57,12 @@ pub struct SyntaxNode {
     pub start_position: Position,
     pub end_position: Position,
     pub text: String,
+    // Children within the AST subtree
     pub children: Vec<SyntaxNode>,
     pub named_children: HashMap<String, Vec<SyntaxNode>>,
+    // Collected comments that immediately precede this node as sibling comments
+    // (useful for documentation extraction like docstrings or /// comments)
+    pub leading_comments: Vec<String>,
 }
 
 /// Position in source code
@@ -109,7 +114,7 @@ impl TreeSitterAnalyzer {
         for language in &languages {
             let mut parser = Parser::new();
             let ts_language = get_language(language.clone())?;
-            parser.set_language(ts_language)?;
+            parser.set_language(&ts_language)?;
             parsers.insert(language.clone(), parser);
         }
 
@@ -144,7 +149,7 @@ impl TreeSitterAnalyzer {
             "jsx" => Ok(LanguageSupport::JavaScript),
             "go" => Ok(LanguageSupport::Go),
             "java" => Ok(LanguageSupport::Java),
-            // "swift" => Ok(LanguageSupport::Swift), // TODO: Enable when API is resolved
+            "swift" => Ok(LanguageSupport::Swift),
             _ => Err(TreeSitterError::UnsupportedLanguage(extension.to_string()).into()),
         }
     }
@@ -241,6 +246,28 @@ impl TreeSitterAnalyzer {
         let start = node.start_position();
         let end = node.end_position();
 
+        // First, convert all children sequentially so we can compute leading sibling comments
+        let mut converted_children: Vec<SyntaxNode> = Vec::new();
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            // Gather trailing run of comment siblings immediately preceding this child
+            let mut leading_comments: Vec<String> = Vec::new();
+            for prev in converted_children.iter().rev() {
+                let k = prev.kind.to_lowercase();
+                if k.contains("comment") {
+                    leading_comments.push(prev.text.trim().to_string());
+                } else {
+                    break;
+                }
+            }
+            leading_comments.reverse();
+
+            // Convert current child
+            let mut converted = self.convert_tree_to_syntax_node(child, source_code);
+            converted.leading_comments = leading_comments;
+            converted_children.push(converted);
+        }
+
         SyntaxNode {
             kind: node.kind().to_string(),
             start_position: Position {
@@ -254,11 +281,9 @@ impl TreeSitterAnalyzer {
                 byte_offset: node.end_byte(),
             },
             text: source_code[node.start_byte()..node.end_byte()].to_string(),
-            children: node
-                .children(&mut node.walk())
-                .map(|child| self.convert_tree_to_syntax_node(child, source_code))
-                .collect(),
+            children: converted_children,
             named_children: self.collect_named_children(node, source_code),
+            leading_comments: Vec::new(),
         }
     }
 
@@ -317,15 +342,21 @@ impl TreeSitterAnalyzer {
 
 /// Helper function to get tree-sitter language
 fn get_language(language: LanguageSupport) -> Result<Language> {
-    match language {
-        LanguageSupport::Rust => Ok(tree_sitter_rust::language()),
-        LanguageSupport::Python => Ok(tree_sitter_python::language()),
-        LanguageSupport::JavaScript => Ok(tree_sitter_javascript::language()),
-        LanguageSupport::TypeScript => Ok(tree_sitter_typescript::language_tsx()),
-        LanguageSupport::Go => Ok(tree_sitter_go::language()),
-        LanguageSupport::Java => Ok(tree_sitter_java::language()),
-        // LanguageSupport::Swift => Ok(tree_sitter_swift::language()), // TODO: Enable when API is resolved
-    }
+    let lang = match language {
+        LanguageSupport::Rust => tree_sitter_rust::LANGUAGE,
+        LanguageSupport::Python => tree_sitter_python::LANGUAGE,
+        LanguageSupport::JavaScript => tree_sitter_javascript::LANGUAGE,
+        LanguageSupport::TypeScript => tree_sitter_typescript::LANGUAGE_TYPESCRIPT,
+        LanguageSupport::Go => tree_sitter_go::LANGUAGE,
+        LanguageSupport::Java => tree_sitter_java::LANGUAGE,
+        LanguageSupport::Swift => {
+            #[cfg(feature = "swift")]
+            { tree_sitter_swift::LANGUAGE }
+            #[cfg(not(feature = "swift"))]
+            { return Err(TreeSitterError::UnsupportedLanguage("Swift".to_string()).into()); }
+        },
+    };
+    Ok(lang.into())
 }
 
 impl std::fmt::Display for LanguageSupport {
@@ -337,7 +368,7 @@ impl std::fmt::Display for LanguageSupport {
             LanguageSupport::TypeScript => "TypeScript",
             LanguageSupport::Go => "Go",
             LanguageSupport::Java => "Java",
-            // LanguageSupport::Swift => "Swift", // TODO: Enable when API is resolved
+            LanguageSupport::Swift => "Swift",
         };
         write!(f, "{}", language_name)
     }
@@ -460,6 +491,17 @@ mod tests {
         let result = analyzer.parse(rust_code, LanguageSupport::Rust);
         assert!(result.is_ok());
 
+        let tree = result.unwrap();
+        assert!(!tree.root_node().has_error());
+    }
+
+    #[cfg(feature = "swift")]
+    #[test]
+    fn test_parse_swift_code() {
+        let mut analyzer = create_test_analyzer();
+        let swift_code = r#"print(\"Hello, World!\")"#;
+        let result = analyzer.parse(swift_code, LanguageSupport::Swift);
+        assert!(result.is_ok());
         let tree = result.unwrap();
         assert!(!tree.root_node().has_error());
     }

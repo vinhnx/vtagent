@@ -2,7 +2,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use serde_json::json;
 use std::env;
 use tempfile::TempDir;
-use vtagent::tools::ToolRegistry;
+use vtagent_core::tools::ToolRegistry;
 
 /// Benchmark search performance across different file sizes and patterns
 fn benchmark_search_performance(c: &mut Criterion) {
@@ -14,7 +14,7 @@ fn benchmark_search_performance(c: &mut Criterion) {
     // Create test files of different sizes
     create_test_files(&temp_dir);
 
-    let mut registry = ToolRegistry::new(temp_dir.path().to_path_buf());
+    let registry = ToolRegistry::new(temp_dir.path().to_path_buf());
 
     let mut group = c.benchmark_group("search");
 
@@ -23,10 +23,9 @@ fn benchmark_search_performance(c: &mut Criterion) {
         b.iter(|| {
             let args = json!({
                 "pattern": "fn main",
-                "path": ".",
-                "type": "regex"
+                "path": "."
             });
-            let _result = registry.execute("grep_search", args);
+            let _ = futures::executor::block_on(registry.execute_tool("rg_search", args));
         });
     });
 
@@ -34,11 +33,10 @@ fn benchmark_search_performance(c: &mut Criterion) {
     group.bench_function("word_boundary", |b| {
         b.iter(|| {
             let args = json!({
-                "pattern": "function",
-                "path": ".",
-                "type": "word"
+                "pattern": "\\bfunction\\b",
+                "path": "."
             });
-            let _result = registry.execute("grep_search", args);
+            let _ = futures::executor::block_on(registry.execute_tool("rg_search", args));
         });
     });
 
@@ -50,7 +48,7 @@ fn benchmark_search_performance(c: &mut Criterion) {
                 "path": ".",
                 "case_sensitive": false
             });
-            let _result = registry.execute("grep_search", args);
+            let _ = futures::executor::block_on(registry.execute_tool("rg_search", args));
         });
     });
 
@@ -62,7 +60,7 @@ fn benchmark_search_performance(c: &mut Criterion) {
                 "path": ".",
                 "context_lines": 3
             });
-            let _result = registry.execute("grep_search", args);
+            let _ = futures::executor::block_on(registry.execute_tool("rg_search", args));
         });
     });
 
@@ -72,9 +70,9 @@ fn benchmark_search_performance(c: &mut Criterion) {
             let args = json!({
                 "pattern": "function",
                 "path": ".",
-                "glob_pattern": "*.rs"
+                "glob_pattern": "**/*.rs"
             });
-            let _result = registry.execute("grep_search", args);
+            let _ = futures::executor::block_on(registry.execute_tool("rg_search", args));
         });
     });
 
@@ -92,7 +90,7 @@ fn benchmark_file_operations(c: &mut Criterion) {
     env::set_current_dir(&temp_dir).unwrap();
     create_test_files(&temp_dir);
 
-    let mut registry = ToolRegistry::new(temp_dir.path().to_path_buf());
+    let registry = ToolRegistry::new(temp_dir.path().to_path_buf());
 
     let mut group = c.benchmark_group("file_operations");
 
@@ -102,7 +100,7 @@ fn benchmark_file_operations(c: &mut Criterion) {
             let args = json!({
                 "path": "large_file.txt"
             });
-            let _result = registry.execute("read_file", args);
+            let _ = futures::executor::block_on(registry.execute_tool("read_file", args));
         });
     });
 
@@ -112,7 +110,7 @@ fn benchmark_file_operations(c: &mut Criterion) {
             let args = json!({
                 "path": "."
             });
-            let _result = registry.execute("list_files", args);
+            let _ = futures::executor::block_on(registry.execute_tool("list_files", args));
         });
     });
 
@@ -124,7 +122,7 @@ fn benchmark_file_operations(c: &mut Criterion) {
                 "content": "benchmark content",
                 "overwrite": true
             });
-            let _result = registry.execute("write_file", args);
+            let _ = futures::executor::block_on(registry.execute_tool("write_file", args));
         });
     });
 

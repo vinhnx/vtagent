@@ -93,8 +93,8 @@ impl ContextAnalyzer {
 
         // Search patterns
         intent_patterns.insert("search_code".to_string(), vec![
-            Regex::new(r"(?i)(?:find|search|grep|locate)\s+(?:for\s+)?(?:function|class|variable|method)").unwrap(),
-            Regex::new(r"(?i)(?:grep|search)\s+(?:for\s+)").unwrap(),
+            Regex::new(r"(?i)(?:find|search|grep|rg|ripgrep|locate)\s+(?:for\s+)?(?:function|class|variable|method)").unwrap(),
+            Regex::new(r"(?i)(?:grep|rg|ripgrep|search)\s+(?:for\s+)").unwrap(),
             Regex::new(r"(?i)where\s+(?:is|are)\s+(?:the\s+)?(?:function|class|variable)").unwrap(),
         ]);
 

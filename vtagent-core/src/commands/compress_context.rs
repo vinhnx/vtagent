@@ -1,6 +1,7 @@
 //! Compress context command implementation
 
-use crate::gemini::{Client, Content, FunctionResponse, GenerateContentRequest, Part};
+use crate::gemini::{Content, FunctionResponse, GenerateContentRequest, Part};
+use crate::llm::make_client;
 use crate::types::AgentConfig;
 use anyhow::Result;
 use console::style;
@@ -154,7 +155,7 @@ Focus on: key decisions, actions taken, current state, and user requirements."#,
         )),
     };
 
-    let client = Client::new(config.api_key.clone(), config.model.clone());
+    let mut client = make_client(config.api_key.clone(), config.model.clone());
     println!("{}", style("🔄 Compressing conversation...").cyan());
 
     let compressed_response = client.generate_content(&compression_request).await?;

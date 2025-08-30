@@ -210,9 +210,10 @@ impl CodeAnalyzer {
             }
             LanguageSupport::Java => {
                 self.extract_java_dependencies(&tree.root, &mut dependencies);
-            } // LanguageSupport::Swift => {
-              //     self.extract_swift_dependencies(&tree.root, &mut dependencies);
-              // } // TODO: Enable when Swift support is resolved
+            }
+            LanguageSupport::Swift => {
+                  self.extract_swift_dependencies(&tree.root, &mut dependencies);
+              }
         }
 
         dependencies

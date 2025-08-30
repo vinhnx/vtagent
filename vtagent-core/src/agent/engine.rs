@@ -29,11 +29,21 @@ impl CompactionEngine {
         }
     }
 
+    /// Create a new compaction engine with custom configuration
+    pub fn with_config(config: CompactionConfig) -> Self {
+        Self {
+            config: Arc::new(RwLock::new(config)),
+            message_history: Arc::new(RwLock::new(VecDeque::new())),
+            enhanced_messages: Arc::new(RwLock::new(Vec::new())),
+            semantic_analyzer: SemanticAnalyzer::new(),
+        }
+    }
+
     /// Add a message to be tracked for compaction
     pub async fn add_message(&self, content: &Content, message_type: MessageType) -> Result<()> {
         // Extract text content
         let text_content = self.extract_text_content(content)?;
-        
+
         // Create compacted message
         let compacted = CompactedMessage {
             timestamp: std::time::SystemTime::now()
@@ -53,7 +63,7 @@ impl CompactionEngine {
 
         // Create enhanced message
         let enhanced = EnhancedMessage {
-            base_message: compacted,
+            base_message: compacted.clone(),
             priority,
             semantic_tags,
             context_references: Vec::new(),
@@ -105,5 +115,57 @@ impl CompactionEngine {
         }
 
         Ok(key_info)
+    }
+
+    /// Get compaction suggestions (minimal implementation)
+    pub async fn get_compaction_suggestions(&self) -> Result<Vec<crate::agent::compaction::CompactionSuggestion>> {
+        Ok(Vec::new()) // Minimal implementation
+    }
+
+    /// Get statistics (minimal implementation)
+    pub async fn get_statistics(&self) -> Result<crate::agent::compaction::CompactionStatistics> {
+        Ok(crate::agent::compaction::CompactionStatistics {
+            total_messages: 0,
+            messages_by_priority: std::collections::HashMap::new(),
+            total_memory_usage: 0,
+            average_message_size: 0,
+            last_compaction_timestamp: 0,
+            compaction_frequency: 0.0,
+        })
+    }
+
+    /// Check if should compact (minimal implementation)
+    pub async fn should_compact(&self) -> Result<bool> {
+        Ok(false) // Minimal implementation
+    }
+
+    /// Compact messages intelligently (minimal implementation)
+    pub async fn compact_messages_intelligently(&self) -> Result<crate::agent::compaction::CompactionResult> {
+        Ok(crate::agent::compaction::CompactionResult {
+            messages_processed: 0,
+            messages_compacted: 0,
+            original_size: 0,
+            compacted_size: 0,
+            compression_ratio: 1.0,
+            processing_time_ms: 0,
+        })
+    }
+
+    /// Compact context (minimal implementation)
+    pub async fn compact_context(&self, _context_key: &str, _context_data: &mut std::collections::HashMap<String, serde_json::Value>) -> Result<crate::agent::compaction::CompactionResult> {
+        Ok(crate::agent::compaction::CompactionResult {
+            messages_processed: 0,
+            messages_compacted: 0,
+            original_size: 0,
+            compacted_size: 0,
+            compression_ratio: 1.0,
+            processing_time_ms: 0,
+        })
+    }
+}
+
+impl Default for CompactionEngine {
+    fn default() -> Self {
+        Self::new()
     }
 }

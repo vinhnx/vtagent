@@ -3,13 +3,7 @@
 //! This module implements Minimal research-preview compaction strategies to optimize memory usage
 //! and performance by intelligently compressing conversation threads and semantic context.
 
-use crate::gemini::{Content, Part};
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::Arc;
-use std::time::{Duration, Instant};
-use tokio::sync::RwLock;
 
 /// Compaction strategy configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]

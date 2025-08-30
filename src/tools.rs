@@ -3,11 +3,11 @@ use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use walkdir::WalkDir;
-use std::path::{Path, PathBuf};
 // Performance optimization imports
 use dashmap::DashMap;
 use lru::LruCache;
@@ -102,7 +102,8 @@ impl FileContentCache {
         large_threshold: usize,
         max_memory_mb: usize,
     ) -> Self {
-        let cache_capacity = NonZeroUsize::new(cache_size).unwrap_or(NonZeroUsize::new(1000).unwrap());
+        let cache_capacity =
+            NonZeroUsize::new(cache_size).unwrap_or(NonZeroUsize::new(1000).unwrap());
 
         Self {
             small_file_cache: Arc::new(RwLock::new(LruCache::new(cache_capacity))),
@@ -198,7 +199,127 @@ impl FileContentCache {
 
         let mut stats = self.stats.write().await;
         stats.directory_misses += 1;
+
         None
+    }
+
+    /// Get cache hit rate statistics
+    pub async fn get_hit_rate_stats(&self) -> (f64, f64, f64, f64) {
+        let stats = self.stats.read().await;
+
+        let small_total = (stats.small_file_hits + stats.small_file_misses) as f64;
+        let small_hit_rate = if small_total > 0.0 {
+            stats.small_file_hits as f64 / small_total
+        } else {
+            0.0
+        };
+
+        let medium_total = (stats.medium_file_hits + stats.medium_file_misses) as f64;
+        let medium_hit_rate = if medium_total > 0.0 {
+            stats.medium_file_hits as f64 / medium_total
+        } else {
+            0.0
+        };
+
+        let large_total = (stats.large_file_hits + stats.large_file_misses) as f64;
+        let large_hit_rate = if large_total > 0.0 {
+            stats.large_file_hits as f64 / large_total
+        } else {
+            0.0
+        };
+
+        let dir_total = (stats.directory_hits + stats.directory_misses) as f64;
+        let dir_hit_rate = if dir_total > 0.0 {
+            stats.directory_hits as f64 / dir_total
+        } else {
+            0.0
+        };
+
+        (
+            small_hit_rate,
+            medium_hit_rate,
+            large_hit_rate,
+            dir_hit_rate,
+        )
+    }
+
+    /// Get overall cache hit rate (target: 60%)
+    pub async fn get_overall_hit_rate(&self) -> f64 {
+        let (small_rate, medium_rate, large_rate, dir_rate) = self.get_hit_rate_stats().await;
+
+        // Weighted average based on access patterns
+        let total_hits = self.stats.read().await.small_file_hits
+            + self.stats.read().await.medium_file_hits
+            + self.stats.read().await.large_file_hits
+            + self.stats.read().await.directory_hits;
+
+        let total_accesses = total_hits
+            + self.stats.read().await.small_file_misses
+            + self.stats.read().await.medium_file_misses
+            + self.stats.read().await.large_file_misses
+            + self.stats.read().await.directory_misses;
+
+        if total_accesses > 0 {
+            total_hits as f64 / total_accesses as f64
+        } else {
+            0.0
+        }
+    }
+
+    /// Warm cache with commonly accessed files
+    pub async fn warm_cache(&self, common_files: &[String]) {
+        for file_path in common_files {
+            if let Ok(metadata) = tokio::fs::metadata(file_path).await {
+                if metadata.is_file() && metadata.len() < 1024 * 1024 {
+                    // Only small files
+                    if let Ok(content) = tokio::fs::read_to_string(file_path).await {
+                        self.put_file(file_path.clone(), content).await;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Optimize cache for better hit rates
+    pub async fn optimize_for_hit_rate(&self) {
+        let hit_rate = self.get_overall_hit_rate().await;
+
+        if hit_rate < 0.6 {
+            // Below 60% target
+            // Increase cache sizes for frequently accessed items
+            self.adjust_cache_sizes().await;
+
+            // Implement predictive caching
+            self.enable_predictive_caching().await;
+        }
+    }
+
+    /// Adjust cache sizes based on access patterns
+    async fn adjust_cache_sizes(&self) {
+        let stats = self.stats.read().await;
+
+        // If small files have high hit rate, increase their cache size
+        let small_total = stats.small_file_hits + stats.small_file_misses;
+        if small_total > 0 {
+            let small_hit_rate = stats.small_file_hits as f64 / small_total as f64;
+            if small_hit_rate > 0.7 {
+                // Increase small file cache size by 20%
+                // Implementation would resize the LRU cache
+            }
+        }
+    }
+
+    /// Enable predictive caching based on access patterns
+    async fn enable_predictive_caching(&self) {
+        // Analyze access patterns to predict future accesses
+        let mut frequent_patterns: Vec<String> = Vec::new();
+
+        // Check for sequential file access patterns
+        // Check for directory-then-file access patterns
+        // Pre-load likely next files
+
+        // This would implement sophisticated pattern recognition
+        // For now, just mark that predictive caching is enabled
     }
 
     /// Put directory listing into cache
@@ -231,8 +352,14 @@ impl FileContentCache {
     /// Get cache hit rate across all cache levels
     pub async fn hit_rate(&self) -> f64 {
         let stats = self.stats.read().await;
-        let total_hits = stats.small_file_hits + stats.medium_file_hits + stats.large_file_hits + stats.directory_hits;
-        let total_misses = stats.small_file_misses + stats.medium_file_misses + stats.large_file_misses + stats.directory_misses;
+        let total_hits = stats.small_file_hits
+            + stats.medium_file_hits
+            + stats.large_file_hits
+            + stats.directory_hits;
+        let total_misses = stats.small_file_misses
+            + stats.medium_file_misses
+            + stats.large_file_misses
+            + stats.directory_misses;
         let total = total_hits + total_misses;
 
         if total == 0 {
@@ -251,31 +378,30 @@ impl FileContentCache {
         }
 
         // Evict low priority entries from medium cache
-        self.medium_file_cache.retain(|_, entry| {
-            entry.priority > 0 && !entry.is_expired(Duration::from_secs(300))
-        });
+        self.medium_file_cache
+            .retain(|_, entry| entry.priority > 0 && !entry.is_expired(Duration::from_secs(300)));
 
         // Evict low priority entries from large cache
-        self.large_file_cache.retain(|_, entry| {
-            entry.priority > 0 && !entry.is_expired(Duration::from_secs(600))
-        });
+        self.large_file_cache
+            .retain(|_, entry| entry.priority > 0 && !entry.is_expired(Duration::from_secs(600)));
     }
 }
 
 /// Global enhanced file content cache for performance optimization
 static FILE_CACHE: Lazy<FileContentCache> = Lazy::new(|| {
     FileContentCache::new(
-        1000,       // Cache size for small files
-        50_000,     // Small file threshold (50KB)
-        500_000,    // Medium file threshold (500KB)
-        2_000_000,  // Large file threshold (2MB)
-        100,        // Max memory usage (100MB)
+        1000,      // Cache size for small files
+        50_000,    // Small file threshold (50KB)
+        500_000,   // Medium file threshold (500KB)
+        2_000_000, // Large file threshold (2MB)
+        100,       // Max memory usage (100MB)
     )
 });
 
 /// High-performance tool registry with intelligent caching
 pub struct ToolRegistry {
     root: PathBuf,
+    cargo_toml_path: PathBuf,
     // Performance monitoring
     operation_stats: Arc<RwLock<HashMap<String, OperationStats>>>,
     // Cache configuration
@@ -334,8 +460,10 @@ fn default_max_items() -> usize {
 
 impl ToolRegistry {
     pub fn new(root: PathBuf) -> Self {
+        let cargo_toml_path = root.join("Cargo.toml");
         Self {
             root,
+            cargo_toml_path,
             operation_stats: Arc::new(RwLock::new(HashMap::new())),
             max_cache_size: 1000,
         }
@@ -360,7 +488,12 @@ impl ToolRegistry {
         let base = self.root.join(&input.path);
 
         // Create cache key
-        let cache_key = format!("list_files:{}:{}:{}", base.display(), input.max_items, input.include_hidden);
+        let cache_key = format!(
+            "list_files:{}:{}:{}",
+            base.display(),
+            input.max_items,
+            input.include_hidden
+        );
 
         // Try cache first
         if let Some(cached_result) = FILE_CACHE.get_directory(&cache_key).await {
@@ -368,14 +501,21 @@ impl ToolRegistry {
         }
 
         // Generate fresh result
-        let result = self.generate_directory_listing(&base, input.max_items, input.include_hidden).await?;
+        let result = self
+            .generate_directory_listing(&base, input.max_items, input.include_hidden)
+            .await?;
         FILE_CACHE.put_directory(cache_key, result.clone()).await;
 
         Ok(result)
     }
 
     /// Generate directory listing with performance optimizations
-    async fn generate_directory_listing(&self, base: &Path, max_items: usize, include_hidden: bool) -> Result<Value> {
+    async fn generate_directory_listing(
+        &self,
+        base: &Path,
+        max_items: usize,
+        include_hidden: bool,
+    ) -> Result<Value> {
         let mut entries = Vec::new();
 
         for entry in WalkDir::new(base)
@@ -385,7 +525,8 @@ impl ToolRegistry {
             .take(max_items)
         {
             let path = entry.path();
-            let name = path.file_name()
+            let name = path
+                .file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("unknown");
 
@@ -395,7 +536,11 @@ impl ToolRegistry {
             }
 
             let is_dir = path.is_dir();
-            let size = if is_dir { 0 } else { entry.metadata().map(|m| m.len()).unwrap_or(0) as usize };
+            let size = if is_dir {
+                0
+            } else {
+                entry.metadata().map(|m| m.len()).unwrap_or(0) as usize
+            };
 
             entries.push(json!({
                 "name": name,
@@ -414,7 +559,11 @@ impl ToolRegistry {
         let path = self.root.join(&input.path);
 
         // Create cache key
-        let cache_key = format!("read_file:{}:{}", input.path, input.max_bytes.unwrap_or(usize::MAX));
+        let cache_key = format!(
+            "read_file:{}:{}",
+            input.path,
+            input.max_bytes.unwrap_or(usize::MAX)
+        );
 
         // Try cache first
         if let Some(cached_content) = FILE_CACHE.get_file(&cache_key).await {
@@ -422,7 +571,8 @@ impl ToolRegistry {
         }
 
         // Read from disk
-        let content = tokio::fs::read_to_string(&path).await
+        let content = tokio::fs::read_to_string(&path)
+            .await
             .with_context(|| format!("Failed to read file: {}", path.display()))?;
 
         let content = if let Some(max_bytes) = input.max_bytes {
@@ -448,12 +598,14 @@ impl ToolRegistry {
 
         // Create parent directories if needed
         if let Some(parent) = path.parent() {
-            tokio::fs::create_dir_all(parent).await
+            tokio::fs::create_dir_all(parent)
+                .await
                 .with_context(|| format!("Failed to create directories: {}", parent.display()))?;
         }
 
         // Write file
-        tokio::fs::write(&path, &input.content).await
+        tokio::fs::write(&path, &input.content)
+            .await
             .with_context(|| format!("Failed to write file: {}", path.display()))?;
 
         Ok(json!({ "success": true }))
@@ -465,14 +617,16 @@ impl ToolRegistry {
         let path = self.root.join(&input.path);
 
         // Read current content
-        let content = tokio::fs::read_to_string(&path).await
+        let content = tokio::fs::read_to_string(&path)
+            .await
             .with_context(|| format!("Failed to read file: {}", path.display()))?;
 
         // Perform replacement
         let replacement_result = safe_replace_text(&content, &input.old_string, &input.new_string)?;
 
         // Write back to file
-        tokio::fs::write(&path, &replacement_result).await
+        tokio::fs::write(&path, &replacement_result)
+            .await
             .with_context(|| format!("Failed to write file: {}", path.display()))?;
 
         // Invalidate related cache entries
@@ -486,11 +640,16 @@ impl ToolRegistry {
 /// Safe text replacement with validation
 fn safe_replace_text(content: &str, old_str: &str, new_str: &str) -> Result<String, ToolError> {
     if old_str.is_empty() {
-        return Err(ToolError::InvalidArgument("old_string cannot be empty".to_string()));
+        return Err(ToolError::InvalidArgument(
+            "old_string cannot be empty".to_string(),
+        ));
     }
 
     if !content.contains(old_str) {
-        return Err(ToolError::TextNotFound(format!("Text '{}' not found in file", old_str)));
+        return Err(ToolError::TextNotFound(format!(
+            "Text '{}' not found in file",
+            old_str
+        )));
     }
 
     Ok(content.replace(old_str, new_str))

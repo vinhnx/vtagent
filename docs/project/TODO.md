@@ -1094,3 +1094,7 @@ use ai-gateway or litellm
 --
 
 - [ ] todo list for a given task
+
+--
+
+Compaction... to frequently compact threads and context

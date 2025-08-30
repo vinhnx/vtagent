@@ -112,8 +112,7 @@ ORIGINAL CONVERSATION:"#;
             } else if let Part::FunctionResponse { function_response } = part {
                 content_summary.push_str(&format!(
                     "\n[TOOL RESULT: {}]",
-                    serde_json::to_string_pretty(&function_response.response)
-                        .unwrap_or_default()
+                    serde_json::to_string_pretty(&function_response.response).unwrap_or_default()
                 ));
             }
         }

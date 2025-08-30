@@ -32,6 +32,9 @@ vtagent follows proven agent architecture patterns:
 
 ### Advanced Features
 
+- **Async File Operations** - Non-blocking file writes with concurrent processing
+- **Real-time Diff Rendering** - Visual diff display in chat for file changes
+- **Chunked File Reading** - Memory-efficient reading of large files
 - **Context compression** - Handle long conversations without losing important information
 - **Decision transparency** - Track why each action is taken
 - **Error recovery** - Preserve context during failures
@@ -43,6 +46,66 @@ vtagent follows proven agent architecture patterns:
 - `read_file(path, max_bytes?)` - Read text files with size control
 - `write_file(path, content, overwrite?, create_dirs?)` - Create/overwrite files
 - `edit_file(path, old_str, new_str)` - Surgical file editing with validation
+
+## Async File Operations & Diff Rendering
+
+### Async File Operations
+
+vtagent supports non-blocking file operations for improved performance:
+
+```bash
+# Enable async file operations
+cargo run -- --async-file-ops chat
+
+# Configure concurrent operations
+cargo run -- --async-file-ops --max-concurrent-ops 10 chat
+```
+
+**Benefits:**
+
+- Non-blocking file writes during chat
+- Concurrent processing of multiple file operations
+- Improved responsiveness for file-intensive tasks
+
+### Real-time Diff Rendering
+
+See file changes directly in the chat interface:
+
+```bash
+# Enable diff display for file changes
+cargo run -- --show-file-diffs chat
+
+# Combine with async operations
+cargo run -- --async-file-ops --show-file-diffs chat
+```
+
+**Features:**
+
+- Visual diff display with syntax highlighting
+- Before/after comparison in chat thread
+- Automatic change detection for watched files
+- Color-coded additions and deletions
+
+### Example Output
+
+```
+📝 File: src/main.rs
+══════════════════════════════════════════════════
+📊 Changes: 5 additions, 2 deletions, 3 modifications
+
+   1| use tokio::fs;
+   2|+ use async_file_ops::AsyncFileWriter;
+   3| use std::path::PathBuf;
+   4|
+   5|- fn old_function() {
+   6|+ async fn new_async_function() -> Result<()> {
+   7|     let writer = AsyncFileWriter::new(5);
+   8|+     writer.write_file(path, content).await?;
+   9|-     // old code
+  10|+     // new async code
+  11|     Ok(())
+  12| }
+```
 
 ## Prerequisites
 
@@ -62,6 +125,12 @@ cargo run -- chat
 
 # Verbose mode with detailed logging
 cargo run -- chat-verbose
+
+# Async file operations with diff display
+cargo run -- --async-file-ops --show-file-diffs chat
+
+# Chunked file reading for large files
+cargo run -- --chunked-reading --chunk-size-kb 256 render --file large-file.md
 ```
 
 ### Specialized Modes
@@ -101,7 +170,13 @@ cargo run -- ask "What is Rust?"
 
 - `--model <model>` - Gemini model (default: gemini-2.5-flash)
 - `--api-key-env <var>` - API key environment variable (default: GEMINI_API_KEY)
-- `--workspace <path>` - Working directory (default: current directory)
+- `--workspace <path>` - Workspace root directory
+- `--async-file-ops` - Enable async file operations
+- `--show-file-diffs` - Display file changes as diffs in chat
+- `--max-concurrent-ops <n>` - Maximum concurrent file operations (default: 5)
+- `--chunked-reading` - Enable chunked reading for large files
+- `--chunk-size-kb <size>` - Chunk size in KB for file reading (default: 64)
+- `--chunk-threshold-mb <size>` - Threshold in MB for using chunked reading (default: 10)
 
 ## How It Works
 

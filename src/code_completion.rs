@@ -1,14 +1,18 @@
-use crate::tree_sitter::{TreeSitterAnalyzer, CodeAnalysis};
 use crate::performance_monitor::PERFORMANCE_MONITOR;
+use crate::tree_sitter::{CodeAnalysis, TreeSitterAnalyzer};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use std::time::{Duration, Instant};
+use tokio::sync::RwLock;
 
 /// Code completion suggestion with metadata
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct CompletionSuggestion {
+    /// Completion acceptance rate (target: 70%)
+    pub acceptance_rate: f64,
+    /// Learning data for improving suggestions
+    pub learning_data: CompletionLearningData,
     pub text: String,
     pub kind: CompletionKind,
     pub confidence: f64,
@@ -56,20 +60,30 @@ pub struct CodeCompletionEngine {
 }
 
 /// Learning data for improving completion accuracy
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompletionLearningData {
-    pub user_patterns: HashMap<String, UserPattern>,
-    pub language_patterns: HashMap<String, LanguagePattern>,
-    pub acceptance_rates: HashMap<String, AcceptanceStats>,
+    pub user_patterns: HashMap<String, Vec<String>>, // Simplified: just preferred suggestions
+    pub language_patterns: HashMap<String, Vec<String>>, // Simplified: just common patterns
+    pub acceptance_rates: HashMap<String, f64>,      // Simplified: just acceptance rates
+}
+
+impl Default for CompletionLearningData {
+    fn default() -> Self {
+        Self {
+            user_patterns: HashMap::new(),
+            language_patterns: HashMap::new(),
+            acceptance_rates: HashMap::new(),
+        }
+    }
 }
 
 /// User-specific completion patterns
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserPattern {
     pub preferred_suggestions: Vec<String>,
-    pub rejected_suggestions: HashSet<String>,
+    pub rejected_suggestions: Vec<String>, // Changed from HashSet to Vec for serialization
     pub common_prefixes: HashMap<String, Vec<String>>,
-    pub last_updated: Instant,
+    pub last_updated: String, // Changed from Instant to String for serialization
 }
 
 /// Language-specific patterns
@@ -151,27 +165,39 @@ impl CodeCompletionEngine {
         max_suggestions: usize,
     ) -> Result<Vec<CompletionSuggestion>, CompletionError> {
         let start_time = Instant::now();
-        PERFORMANCE_MONITOR.start_operation(format!("completion_{}", context.language)).await;
+        PERFORMANCE_MONITOR
+            .start_operation(format!("completion_{}", context.language))
+            .await;
 
-        let cache_key = format!("{}:{}:{}:{}", context.language, context.line, context.column, context.prefix);
+        let cache_key = format!(
+            "{}:{}:{}:{}",
+            context.language, context.line, context.column, context.prefix
+        );
 
         // Check cache first
         if let Some(cached) = self.check_cache(&cache_key).await {
-            PERFORMANCE_MONITOR.end_operation(format!("completion_{}", context.language), true).await;
+            PERFORMANCE_MONITOR
+                .end_operation(format!("completion_{}", context.language), true)
+                .await;
             return Ok(cached.into_iter().take(max_suggestions).collect());
         }
 
         // Generate new suggestions
-        let suggestions = self.generate_fresh_completions(code, &context, max_suggestions).await?;
+        let suggestions = self
+            .generate_fresh_completions(code, &context, max_suggestions)
+            .await?;
 
         // Cache the results
         self.update_cache(cache_key, suggestions.clone()).await;
 
         // Update performance stats
         let duration = start_time.elapsed();
-        self.update_performance_stats(&context.language, duration, !suggestions.is_empty()).await;
+        self.update_performance_stats(&context.language, duration, !suggestions.is_empty())
+            .await;
 
-        PERFORMANCE_MONITOR.end_operation(format!("completion_{}", context.language), true).await;
+        PERFORMANCE_MONITOR
+            .end_operation(format!("completion_{}", context.language), true)
+            .await;
 
         Ok(suggestions)
     }
@@ -190,10 +216,7 @@ impl CodeCompletionEngine {
         // Keep cache size manageable
         if cache.len() > 1000 {
             // Remove oldest entries (simple FIFO eviction)
-            let keys_to_remove: Vec<String> = cache.keys()
-                .take(100)
-                .cloned()
-                .collect();
+            let keys_to_remove: Vec<String> = cache.keys().take(100).cloned().collect();
             for key in keys_to_remove {
                 cache.remove(&key);
             }
@@ -216,11 +239,15 @@ impl CodeCompletionEngine {
             let temp_path = std::path::Path::new("temp");
             if let Ok(analysis) = analyzer.analyze_file_with_tree_sitter(temp_path, code) {
                 // Generate semantic completions
-                let semantic_suggestions = self.generate_semantic_completions(&analysis, context).await?;
+                let semantic_suggestions = self
+                    .generate_semantic_completions(&analysis, context)
+                    .await?;
                 suggestions.extend(semantic_suggestions);
 
                 // Generate context-aware completions
-                let context_suggestions = self.generate_context_completions(&analysis, context).await?;
+                let context_suggestions = self
+                    .generate_context_completions(&analysis, context)
+                    .await?;
                 suggestions.extend(context_suggestions);
             }
         }
@@ -230,12 +257,15 @@ impl CodeCompletionEngine {
         suggestions.extend(pattern_suggestions);
 
         // Generate keyword completions
-        let keyword_suggestions = self.generate_keyword_completions(&context.language, &context.prefix)?;
+        let keyword_suggestions =
+            self.generate_keyword_completions(&context.language, &context.prefix)?;
         suggestions.extend(keyword_suggestions);
 
         // Rank and filter suggestions
         let ranked_suggestions = self.rank_suggestions(suggestions, context).await?;
-        let filtered_suggestions = self.filter_suggestions(ranked_suggestions, max_suggestions).await?;
+        let filtered_suggestions = self
+            .filter_suggestions(ranked_suggestions, max_suggestions)
+            .await?;
 
         Ok(filtered_suggestions)
     }
@@ -255,12 +285,21 @@ impl CodeCompletionEngine {
                 let confidence = self.calculate_semantic_confidence(symbol, context);
 
                 suggestions.push(CompletionSuggestion {
+                    acceptance_rate: 0.0,
+                    learning_data: CompletionLearningData {
+                        user_patterns: HashMap::new(),
+                        language_patterns: HashMap::new(),
+                        acceptance_rates: HashMap::new(),
+                    },
                     text: symbol.name.clone(),
                     kind,
                     confidence,
                     context: context.clone(),
                     metadata: HashMap::from([
-                        ("scope".to_string(), symbol.scope.clone().unwrap_or_default()),
+                        (
+                            "scope".to_string(),
+                            symbol.scope.clone().unwrap_or_default(),
+                        ),
                         ("source".to_string(), "semantic".to_string()),
                     ]),
                     accepted_count: 0,
@@ -271,10 +310,18 @@ impl CodeCompletionEngine {
 
         // Add method completions for current object/class
         if let Some(current_object) = self.infer_current_object(analysis, context) {
-            let methods = self.get_object_methods(&current_object, &context.language).await?;
+            let methods = self
+                .get_object_methods(&current_object, &context.language)
+                .await?;
             for method in methods {
                 if method.starts_with(&context.prefix) {
                     suggestions.push(CompletionSuggestion {
+                        acceptance_rate: 0.0,
+                        learning_data: CompletionLearningData {
+                            user_patterns: HashMap::new(),
+                            language_patterns: HashMap::new(),
+                            acceptance_rates: HashMap::new(),
+                        },
                         text: method,
                         kind: CompletionKind::Method,
                         confidence: 0.85,
@@ -301,28 +348,30 @@ impl CodeCompletionEngine {
     ) -> Result<Vec<CompletionSuggestion>, CompletionError> {
         let mut suggestions = Vec::new();
 
-        // Check learning data for context patterns
+        // Check learning data for context patterns (simplified)
         let learning_data = self.learning_data.read().await;
 
         if let Some(patterns) = learning_data.language_patterns.get(&context.language) {
-            for pattern in &patterns.context_patterns {
-                if context.prefix.contains(&pattern.trigger) {
-                    for suggestion in &pattern.suggestions {
-                        if suggestion.starts_with(&context.prefix) {
-                            suggestions.push(CompletionSuggestion {
-                                text: suggestion.clone(),
-                                kind: CompletionKind::Snippet,
-                                confidence: pattern.confidence,
-                                context: context.clone(),
-                                metadata: HashMap::from([
-                                    ("pattern".to_string(), pattern.trigger.clone()),
-                                    ("source".to_string(), "context".to_string()),
-                                ]),
-                                accepted_count: 0,
-                                rejected_count: 0,
-                            });
-                        }
-                    }
+            for pattern in patterns {
+                if context.prefix.contains(pattern) {
+                    suggestions.push(CompletionSuggestion {
+                        acceptance_rate: 0.0,
+                        learning_data: CompletionLearningData {
+                            user_patterns: HashMap::new(),
+                            language_patterns: HashMap::new(),
+                            acceptance_rates: HashMap::new(),
+                        },
+                        text: pattern.clone(),
+                        kind: CompletionKind::Snippet,
+                        confidence: 0.7,
+                        context: context.clone(),
+                        metadata: HashMap::from([
+                            ("pattern".to_string(), pattern.clone()),
+                            ("source".to_string(), "context".to_string()),
+                        ]),
+                        accepted_count: 0,
+                        rejected_count: 0,
+                    });
                 }
             }
         }
@@ -340,16 +389,20 @@ impl CodeCompletionEngine {
         let learning_data = self.learning_data.read().await;
 
         if let Some(user_patterns) = learning_data.user_patterns.get("default") {
-            if let Some(prefix_suggestions) = user_patterns.common_prefixes.get(&context.prefix) {
-                for suggestion in prefix_suggestions {
+            for suggestion in user_patterns {
+                if suggestion.starts_with(&context.prefix) {
                     suggestions.push(CompletionSuggestion {
+                        acceptance_rate: 0.0,
+                        learning_data: CompletionLearningData {
+                            user_patterns: HashMap::new(),
+                            language_patterns: HashMap::new(),
+                            acceptance_rates: HashMap::new(),
+                        },
                         text: suggestion.clone(),
                         kind: CompletionKind::Snippet,
                         confidence: 0.7,
                         context: context.clone(),
-                        metadata: HashMap::from([
-                            ("source".to_string(), "pattern".to_string()),
-                        ]),
+                        metadata: HashMap::from([("source".to_string(), "pattern".to_string())]),
                         accepted_count: 0,
                         rejected_count: 0,
                     });
@@ -372,6 +425,12 @@ impl CodeCompletionEngine {
         for keyword in keywords {
             if keyword.starts_with(prefix) && keyword != prefix {
                 suggestions.push(CompletionSuggestion {
+                    acceptance_rate: 0.0,
+                    learning_data: CompletionLearningData {
+                        user_patterns: HashMap::new(),
+                        language_patterns: HashMap::new(),
+                        acceptance_rates: HashMap::new(),
+                    },
                     text: keyword.to_string(),
                     kind: CompletionKind::Keyword,
                     confidence: 0.9,
@@ -384,9 +443,7 @@ impl CodeCompletionEngine {
                         imports: vec![],
                         recent_symbols: vec![],
                     },
-                    metadata: HashMap::from([
-                        ("source".to_string(), "keyword".to_string()),
-                    ]),
+                    metadata: HashMap::from([("source".to_string(), "keyword".to_string())]),
                     accepted_count: 0,
                     rejected_count: 0,
                 });
@@ -410,7 +467,9 @@ impl CodeCompletionEngine {
             let a_score = self.calculate_suggestion_score(a, context, &_learning_data);
             let b_score = self.calculate_suggestion_score(b, context, &_learning_data);
 
-            b_score.partial_cmp(&a_score).unwrap_or(std::cmp::Ordering::Equal)
+            b_score
+                .partial_cmp(&a_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         Ok(ranked)
@@ -427,8 +486,8 @@ impl CodeCompletionEngine {
 
         // Boost score based on acceptance history
         if suggestion.accepted_count > 0 {
-            let acceptance_rate = suggestion.accepted_count as f64 /
-                                (suggestion.accepted_count + suggestion.rejected_count) as f64;
+            let acceptance_rate = suggestion.accepted_count as f64
+                / (suggestion.accepted_count + suggestion.rejected_count) as f64;
             score += acceptance_rate * 0.2;
         }
 
@@ -451,19 +510,8 @@ impl CodeCompletionEngine {
         suggestions: Vec<CompletionSuggestion>,
         max_suggestions: usize,
     ) -> Result<Vec<CompletionSuggestion>, CompletionError> {
-        let _learning_data = self.learning_data.read().await;
-
-        // Remove rejected suggestions
-        let filtered: Vec<_> = suggestions.into_iter()
-            .filter(|s| {
-                if let Some(user_patterns) = _learning_data.user_patterns.get("default") {
-                    !user_patterns.rejected_suggestions.contains(&s.text)
-                } else {
-                    true
-                }
-            })
-            .take(max_suggestions)
-            .collect();
+        // Simplified filtering - just limit the number of suggestions
+        let filtered: Vec<_> = suggestions.into_iter().take(max_suggestions).collect();
 
         Ok(filtered)
     }
@@ -474,34 +522,28 @@ impl CodeCompletionEngine {
 
         let key = format!("{}:{}", format!("{:?}", suggestion.kind), suggestion.text);
 
-        if let Some(stats) = learning_data.acceptance_rates.get_mut(&key) {
-            stats.total_suggestions += 1;
-            if accepted {
-                stats.accepted_suggestions += 1;
-            }
-            stats.acceptance_rate = stats.accepted_suggestions as f64 / stats.total_suggestions as f64;
-            stats.last_updated = Instant::now();
+        // Update acceptance rate (simplified)
+        let current_rate = learning_data
+            .acceptance_rates
+            .get(&key)
+            .copied()
+            .unwrap_or(0.0);
+        let new_rate = if accepted {
+            (current_rate + 1.0) / 2.0 // Simple moving average
         } else {
-            learning_data.acceptance_rates.insert(key, AcceptanceStats {
-                total_suggestions: 1,
-                accepted_suggestions: if accepted { 1 } else { 0 },
-                acceptance_rate: if accepted { 1.0 } else { 0.0 },
-                last_updated: Instant::now(),
-            });
-        }
+            current_rate * 0.9 // Decay for rejections
+        };
+        learning_data.acceptance_rates.insert(key, new_rate);
 
-        // Update user patterns
+        // Update user patterns (simplified)
         if let Some(user_patterns) = learning_data.user_patterns.get_mut("default") {
-            if accepted {
-                user_patterns.preferred_suggestions.push(suggestion.text.clone());
+            if accepted && !user_patterns.contains(&suggestion.text) {
+                user_patterns.push(suggestion.text.clone());
                 // Keep only recent preferences
-                if user_patterns.preferred_suggestions.len() > 100 {
-                    user_patterns.preferred_suggestions.remove(0);
+                if user_patterns.len() > 100 {
+                    user_patterns.remove(0);
                 }
-            } else {
-                user_patterns.rejected_suggestions.insert(suggestion.text.clone());
             }
-            user_patterns.last_updated = Instant::now();
         }
     }
 
@@ -517,11 +559,15 @@ impl CodeCompletionEngine {
         stats.total_requests += 1;
 
         // Update average response time
-        let total_duration = stats.average_response_time * (stats.total_requests - 1) as u32 + duration;
+        let total_duration =
+            stats.average_response_time * (stats.total_requests - 1) as u32 + duration;
         stats.average_response_time = total_duration / stats.total_requests as u32;
 
         // Update language-specific stats
-        let lang_stats = stats.language_stats.entry(language.to_string()).or_default();
+        let lang_stats = stats
+            .language_stats
+            .entry(language.to_string())
+            .or_default();
         lang_stats.requests += 1;
         if success {
             lang_stats.successful_completions += 1;
@@ -529,8 +575,8 @@ impl CodeCompletionEngine {
 
         // Update acceptance rates from learning data
         let learning_data = self.learning_data.read().await;
-        if let Some(acceptance_stats) = learning_data.acceptance_rates.values().next() {
-            lang_stats.top_suggestion_accuracy = acceptance_stats.acceptance_rate;
+        if let Some(acceptance_rate) = learning_data.acceptance_rates.values().next() {
+            lang_stats.top_suggestion_accuracy = *acceptance_rate;
         }
     }
 
@@ -550,7 +596,11 @@ impl CodeCompletionEngine {
         }
     }
 
-    fn calculate_semantic_confidence(&self, symbol: &crate::tree_sitter::SymbolInfo, context: &CompletionContext) -> f64 {
+    fn calculate_semantic_confidence(
+        &self,
+        symbol: &crate::tree_sitter::SymbolInfo,
+        context: &CompletionContext,
+    ) -> f64 {
         let mut confidence: f64 = 0.8;
 
         // Boost confidence for symbols in current scope
@@ -568,13 +618,21 @@ impl CodeCompletionEngine {
         confidence.min(1.0)
     }
 
-    fn infer_current_object(&self, _analysis: &CodeAnalysis, _context: &CompletionContext) -> Option<String> {
+    fn infer_current_object(
+        &self,
+        _analysis: &CodeAnalysis,
+        _context: &CompletionContext,
+    ) -> Option<String> {
         // For now, return None as we need to implement proper line access
         // This would require storing the source code lines in the CodeAnalysis struct
         None
     }
 
-    async fn get_object_methods(&self, _object: &str, language: &str) -> Result<Vec<String>, CompletionError> {
+    async fn get_object_methods(
+        &self,
+        _object: &str,
+        language: &str,
+    ) -> Result<Vec<String>, CompletionError> {
         // This would integrate with language-specific analyzers
         // For now, return common methods
         match language {
@@ -601,19 +659,45 @@ impl CodeCompletionEngine {
     fn get_language_keywords(&self, language: &str) -> Vec<&'static str> {
         match language {
             "rust" => vec![
-                "fn", "let", "mut", "const", "static", "struct", "enum", "impl", "trait", "mod", "use", "pub",
-                "crate", "super", "self", "Self", "async", "await", "move", "if", "else", "match", "loop",
-                "while", "for", "in", "break", "continue", "return", "as", "dyn", "where", "unsafe",
+                "fn", "let", "mut", "const", "static", "struct", "enum", "impl", "trait", "mod",
+                "use", "pub", "crate", "super", "self", "Self", "async", "await", "move", "if",
+                "else", "match", "loop", "while", "for", "in", "break", "continue", "return", "as",
+                "dyn", "where", "unsafe",
             ],
             "python" => vec![
-                "def", "class", "if", "elif", "else", "for", "while", "try", "except", "finally", "with",
-                "as", "import", "from", "return", "yield", "lambda", "and", "or", "not", "in", "is",
-                "None", "True", "False", "self", "super",
+                "def", "class", "if", "elif", "else", "for", "while", "try", "except", "finally",
+                "with", "as", "import", "from", "return", "yield", "lambda", "and", "or", "not",
+                "in", "is", "None", "True", "False", "self", "super",
             ],
             "javascript" | "typescript" => vec![
-                "function", "const", "let", "var", "if", "else", "for", "while", "try", "catch", "finally",
-                "return", "async", "await", "class", "extends", "implements", "interface", "enum",
-                "import", "export", "from", "as", "this", "super", "new", "typeof", "instanceof",
+                "function",
+                "const",
+                "let",
+                "var",
+                "if",
+                "else",
+                "for",
+                "while",
+                "try",
+                "catch",
+                "finally",
+                "return",
+                "async",
+                "await",
+                "class",
+                "extends",
+                "implements",
+                "interface",
+                "enum",
+                "import",
+                "export",
+                "from",
+                "as",
+                "this",
+                "super",
+                "new",
+                "typeof",
+                "instanceof",
             ],
             _ => vec![],
         }

@@ -25,16 +25,20 @@ The agent follows proven patterns for reliable, long-running coding assistance:
 //! - **Conversation Summarization**: Automatic compression for long sessions
 
 pub mod agent;
+pub mod async_file_ops;
 pub mod cli;
 pub mod code_completion;
 pub mod commands;
 pub mod context_analyzer;
 pub mod conversation_summarizer;
 pub mod decision_tracker;
+pub mod diff_renderer;
 pub mod enhanced_tools;
 pub mod error_recovery;
 pub mod gemini;
+pub mod markdown_renderer;
 pub mod performance_monitor;
+pub mod performance_profiler;
 pub mod prompts;
 pub mod tools;
 pub mod tree_sitter;
@@ -43,7 +47,9 @@ pub mod types;
 // Re-export commonly used types for convenience
 pub use agent::{Agent, AgentBuilder};
 pub use cli::{Cli, Commands};
-pub use code_completion::{CodeCompletionEngine, COMPLETION_ENGINE, CompletionSuggestion, CompletionContext};
+pub use code_completion::{
+    CodeCompletionEngine, CompletionContext, CompletionSuggestion, COMPLETION_ENGINE,
+};
 pub use conversation_summarizer::ConversationSummarizer;
 pub use decision_tracker::{Action, DecisionOutcome, DecisionTracker, ResponseType};
 pub use error_recovery::{ErrorContext, ErrorRecoveryManager, ErrorType};

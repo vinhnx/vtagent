@@ -39,3 +39,7 @@ lazy_static = "1.4" # For lazy static initialization
 codegen-units = 1
 opt-level = 3
 lto = true
+
+[[bin]]
+name = "test_async"
+path = "src/test_async.rs"

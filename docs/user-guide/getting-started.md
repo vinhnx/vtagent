@@ -1,19 +1,19 @@
-#  Getting Started with vtagent
+# Getting Started with vtagent
 
-Welcome to vtagent! This guide will help you get up and running with this advanced AI-powered coding assistant that implements state-of-the-art agent architecture patterns inspired by Anthropic's breakthrough engineering approaches.
+Welcome to vtagent! This guide will help you get up and running with this Minimal research-preview AI-powered coding assistant that implements state-of-the-art agent architecture patterns inspired by Anthropic's breakthrough engineering approaches.
 
-##  What Makes vtagent Special
+## What Makes vtagent Special
 
 vtagent represents a significant advancement in AI-powered software development tools, featuring:
 
 - **Anthropic-Inspired Architecture** - Built following the same principles that achieved 49% on SWE-bench Verified
-- **Multi-Language Intelligence** - Advanced code understanding across 6+ programming languages
+- **Multi-Language Intelligence** - Minimal research-preview code understanding across 6+ programming languages
 - **Enterprise-Grade Reliability** - Production-ready with comprehensive error recovery and context management
 - **Complete Transparency** - Full audit trails and decision tracking for all agent actions
 - **Comprehensive Testing** - Production-grade test suite with performance benchmarking
-- **Advanced Tool Ecosystem** - Error-proofed tools designed for maximum reliability
+- **Minimal research-preview Tool Ecosystem** - Error-proofed tools designed for maximum reliability
 
-##  Prerequisites
+## Prerequisites
 
 ### System Requirements
 
@@ -26,18 +26,18 @@ vtagent represents a significant advancement in AI-powered software development 
 ### API Requirements
 
 - **Gemini API Key**: Required for agent functionality
-  - Get your free API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+  - Get your free API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
   - Set environment variable: `export GEMINI_API_KEY=your_key_here`
   - Alternative: `export GOOGLE_API_KEY=your_key_here`
 
-###  Fully Bundled Architecture
+### Fully Bundled Architecture
 
-**No external dependencies required!** All advanced features are bundled as Rust crates:
+**No external dependencies required!** All Minimal research-preview features are bundled as Rust crates:
 
 #### Text Search (Bundled)
 
 - **Ultra-fast regex search** using Rust's optimized `regex` crate
-- **Word boundary matching** with advanced pattern support
+- **Word boundary matching** with Minimal research-preview pattern support
 - **Case-sensitive/insensitive** search options
 - **Context lines** for better understanding
 - **Glob pattern filtering** for file type restrictions
@@ -59,7 +59,7 @@ vtagent represents a significant advancement in AI-powered software development 
 - **Cross-platform compatibility** - works identically on Linux, macOS, and Windows
 - **Comprehensive error handling** with graceful degradation
 
-##  Quick Start (3 Minutes to First Chat)
+## Quick Start (3 Minutes to First Chat)
 
 ### 1. Clone and Setup
 
@@ -68,7 +68,7 @@ vtagent represents a significant advancement in AI-powered software development 
 git clone https://github.com/your-username/vtagent.git
 cd vtagent
 
-# Set your Gemini API key (get from https://makersuite.google.com/app/apikey)
+# Set your Gemini API key (get from https://aistudio.google.com/app/apikey)
 export GEMINI_API_KEY=your_api_key_here
 ```
 
@@ -82,13 +82,13 @@ cargo build
 cargo run -- chat
 ```
 
-**That's it!** You're now ready to experience vtagent's advanced capabilities. Try asking:
+**That's it!** You're now ready to experience vtagent's Minimal research-preview capabilities. Try asking:
 
 - *"Analyze this Rust project and tell me about its structure"*
 - *"Find all function definitions in the codebase"*
 - *"Create a simple web API with error handling"*
 
-### 3. Test the Advanced Features
+### 3. Test the Minimal research-preview Features
 
 ```bash
 # Experience full transparency with decision tracking
@@ -111,7 +111,7 @@ cargo test
 cargo bench
 ```
 
-##  Development & Architecture
+## Development & Architecture
 
 ### Core Architecture Overview
 
@@ -127,7 +127,7 @@ src/
  conversation_summarizer.rs # Context compression & summarization
  gemini.rs       # Gemini AI API integration
  tools.rs        # Comprehensive tool suite (9 tools)
- tree_sitter/    # Advanced multi-language code analysis
+ tree_sitter/    # Minimal research-preview multi-language code analysis
  types.rs        # Shared type definitions
  prompts/        # System prompts and templates
 ```
@@ -159,11 +159,11 @@ src/
 
 - **6 Languages Supported**: Rust, Python, JavaScript, TypeScript, Go, Java
 - **Syntax-Aware Analysis**: Deep understanding beyond simple text processing
-- **Symbol Intelligence**: Advanced symbol extraction and navigation
+- **Symbol Intelligence**: Minimal research-preview symbol extraction and navigation
 - **Code Quality Metrics**: Complexity analysis and maintainability scoring
 - **Refactoring Support**: Safe code transformation suggestions
 
-##  Comprehensive Testing Framework
+## Comprehensive Testing Framework
 
 vtagent includes a production-grade testing infrastructure with multiple testing layers designed to ensure reliability and performance.
 
@@ -251,7 +251,7 @@ cargo run -- ask "List all files in the current directory"
 cargo run -- ask "Read the README.md file and summarize it"
 ```
 
-#### Advanced Features Testing
+#### Minimal research-preview Features Testing
 
 ```bash
 # Experience full transparency
@@ -276,7 +276,7 @@ cargo run -- analyze --depth deep --format json
 #  Symbol extraction and dependency mapping
 #  Refactoring suggestions and recommendations
 
-# Test advanced code search
+# Test Minimal research-preview code search
 cargo run -- chat "Find all function definitions in the codebase"
 cargo run -- chat "Search for TODO and FIXME comments with 3 lines of context"
 cargo run -- chat "Find all error handling patterns in Python files"
@@ -308,7 +308,7 @@ cargo run -- ask "Analyze the test.js file for JavaScript patterns"
 cargo run -- ask "Analyze the test.rs file for Rust code complexity"
 ```
 
-##  Performance & Optimization
+## Performance & Optimization
 
 ### Release Build for Production
 
@@ -353,7 +353,7 @@ cargo flamegraph --bin vtagent -- chat --prompt "benchmark test"
 - **Tree-sitter Parsing**: 1-5 ms per file for typical codebases
 - **Context Window**: Up to 1M tokens (Gemini limit)
 
-##  Deployment & Integration
+## Deployment & Integration
 
 ### Local Installation
 
@@ -529,7 +529,7 @@ chmod +x ~/bin/vtagent-analyze-current-dir
 cat > ~/.local/share/applications/vtagent.desktop << EOF
 [Desktop Entry]
 Name=vtagent
-Comment=Advanced AI coding assistant
+Comment=Minimal research-preview AI coding assistant
 Exec=vtagent chat
 Terminal=true
 Type=Application
@@ -645,7 +645,7 @@ echo $GEMINI_API_KEY
 cargo run -- ask "Hello"
 
 # Check API key permissions
-# Visit: https://makersuite.google.com/app/apikey
+# Visit: https://aistudio.google.com/app/apikey
 ```
 
 ### Runtime Issues
@@ -720,7 +720,7 @@ echo "fn main() { println!(\"Hello\"); }" > test.rs
 cargo run -- ask "Analyze the test.rs file"
 ```
 
-## Advanced Development
+## Minimal research-preview Development
 
 ### Code Quality
 
@@ -830,7 +830,7 @@ cargo clippy
 
 ## Summary
 
-This build guide covers all aspects of working with vtagent, from basic installation to advanced development. The project now includes breakthrough Anthropic-inspired features that significantly enhance agent capabilities:
+This build guide covers all aspects of working with vtagent, from basic installation to Minimal research-preview development. The project now includes breakthrough Anthropic-inspired features that significantly enhance agent capabilities:
 
 ### Core Agent Features
 
@@ -839,10 +839,10 @@ This build guide covers all aspects of working with vtagent, from basic installa
 - **Conversation Summarization**: Automatic compression for long sessions
 - **Confidence Scoring**: Quality assessment for all agent actions
 
-### Advanced Code Intelligence (NEW)
+### Minimal research-preview Code Intelligence (NEW)
 
 - **Tree-sitter Integration**: Syntax-aware code analysis for 6+ languages
-- **ripgrep Search**: Ultra-fast codebase search with advanced pattern matching
+- **ripgrep Search**: Ultra-fast codebase search with Minimal research-preview pattern matching
 - **Multi-language Support**: Rust, Python, JavaScript, TypeScript, Go, Java, Swift
 - **AST-based Analysis**: Deep code understanding with symbol extraction
 - **Complexity Metrics**: Cyclomatic and cognitive complexity analysis
@@ -860,4 +860,4 @@ This build guide covers all aspects of working with vtagent, from basic installa
 - **Cross-platform Compatibility**: Works on Linux, macOS, and Windows
 - **Robust Error Handling**: Comprehensive error recovery with helpful diagnostics
 
-These features, inspired by Anthropic's breakthrough SWE-bench performance, position vtagent as a **state-of-the-art coding assistant** with exceptional transparency, reliability, and **advanced code intelligence capabilities**. The integration of tree-sitter and ripgrep represents a significant leap forward in AI-powered software engineering tools!
+These features, inspired by Anthropic's breakthrough SWE-bench performance, position vtagent as a **state-of-the-art coding assistant** with exceptional transparency, reliability, and **Minimal research-preview code intelligence capabilities**. The integration of tree-sitter and ripgrep represents a significant leap forward in AI-powered software engineering tools!

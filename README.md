@@ -1,4 +1,4 @@
-# vtagent - Advanced Rust Coding Agent
+# vtagent - Minimal research-preview Rust Coding Agent
 
 vtagent is a minimal terminal-based coding agent that implements modern agent architecture patterns. It combines Anthropic's agent-building principles with Cognition's context engineering approach to provide a reliable, long-running coding assistant.
 
@@ -30,7 +30,7 @@ vtagent follows proven agent architecture patterns:
 - Comprehensive logging and debugging support
 - Multiple operational modes
 
-### Advanced Features
+### Minimal research-preview Features
 
 - **Async File Operations** - Non-blocking file writes with concurrent processing
 - **Real-time Diff Rendering** - Visual diff display in chat for file changes
@@ -39,6 +39,8 @@ vtagent follows proven agent architecture patterns:
 - **Decision transparency** - Track why each action is taken
 - **Error recovery** - Preserve context during failures
 - **Workflow patterns** - Specialized modes for different tasks
+- **.vtagentgitignore Support** - Custom file exclusion patterns for agent operations
+- **Snapshot Checkpoint System** - Complete state persistence and revert capabilities
 
 ### Built-in Tools
 
@@ -46,6 +48,219 @@ vtagent follows proven agent architecture patterns:
 - `read_file(path, max_bytes?)` - Read text files with size control
 - `write_file(path, content, overwrite?, create_dirs?)` - Create/overwrite files
 - `edit_file(path, old_str, new_str)` - Surgical file editing with validation
+
+## .vtagentgitignore - Custom File Exclusion
+
+vtagent supports a `.vtagentgitignore` file that works like `.gitignore` but only affects the agent's file operations. This allows you to exclude certain files from the agent's context without affecting your project's actual `.gitignore`.
+
+### How it Works
+
+1. Create a `.vtagentgitignore` file in your project root
+2. Use standard gitignore patterns to specify files to exclude
+3. The agent automatically respects these patterns during file operations
+4. Your project's `.gitignore` remains unaffected
+
+### Example .vtagentgitignore
+
+```gitignore
+# Exclude log files
+*.log
+logs/
+
+# Exclude build artifacts
+target/
+build/
+dist/
+
+# Exclude temporary files
+*.tmp
+*.temp
+.cache/
+
+# Exclude sensitive files
+.env
+.env.local
+secrets/
+
+# Exclude IDE files
+.vscode/
+.idea/
+
+# Allow specific files (negation patterns)
+!important.log
+!CHANGELOG.md
+```
+
+### Benefits
+
+- **Performance**: Exclude large or irrelevant files from processing
+- **Security**: Prevent the agent from accessing sensitive files
+- **Focus**: Keep the agent focused on relevant code files
+- **Flexibility**: Different exclusion patterns for different projects
+- **Separation**: Agent exclusions don't interfere with your project's git configuration
+
+The agent automatically detects and uses `.vtagentgitignore` files when present, with no additional configuration required.
+
+## Snapshot Checkpoint System
+
+vtagent includes a comprehensive snapshot checkpoint system that enables robust experimentation, debugging, and reproducibility. Every agent turn automatically creates a complete state snapshot, allowing you to revert to any previous point in the conversation.
+
+### Key Features
+
+- **Automatic Snapshots** - Complete agent state saved on every turn
+- **Selective Revert** - Revert memory, context, or full state independently
+- **Encryption Support** - Optional AES-256 encryption for sensitive data
+- **Compression** - Automatic gzip compression for large snapshots
+- **Integrity Verification** - SHA-256 checksums ensure data integrity
+- **Cleanup Management** - Automatic cleanup of old snapshots
+
+### How It Works
+
+1. **Snapshot Creation** - On each agent turn, complete state is serialized to JSON
+2. **State Components** - Captures conversation history, decisions, errors, performance metrics
+3. **Integrity Checks** - SHA-256 checksums verify snapshot integrity
+4. **Compression** - Large snapshots automatically compressed with gzip
+5. **Encryption** - Optional AES-256-GCM encryption for sensitive data
+
+### Snapshot Contents
+
+Each snapshot includes:
+
+- **Conversation History** - Complete chat history with all messages
+- **Agent Configuration** - Model settings, API keys (masked), workspace
+- **Decision Tracking** - All decisions made with reasoning and outcomes
+- **Error Recovery** - Error patterns and recovery attempts
+- **Performance Metrics** - Response times, token usage, success rates
+- **Context State** - Compaction engine, summarizer, tree-sitter state
+- **Environment** - Safe environment variables and system state
+
+### Usage Examples
+
+#### Basic Revert Operations
+
+```bash
+# Revert to a specific turn (full state)
+cargo run -- revert --turn 5
+
+# Revert only conversation memory
+cargo run -- revert --turn 3 --scope memory
+
+# Revert only decision context
+cargo run -- revert --turn 2 --scope context
+
+# List all available snapshots
+cargo run -- list-snapshots
+
+# Clean up old snapshots (keep last 20)
+cargo run -- cleanup-snapshots --max 20
+```
+
+#### Encrypted Snapshots
+
+```bash
+# Create encrypted snapshots
+export VTAGENT_ENCRYPTION_KEY="your-secure-password"
+cargo run -- --encryption-enabled chat
+
+# Revert from encrypted snapshot
+cargo run -- revert --turn 5 --encryption-key "your-secure-password"
+```
+
+#### Snapshot Management
+
+```bash
+# View snapshot information
+cargo run -- show-snapshot --id turn_5_1640995200
+
+# Delete specific snapshot
+cargo run -- delete-snapshot --id turn_5_1640995200
+
+# Export snapshot for analysis
+cargo run -- export-snapshot --id turn_5_1640995200 --output snapshot.json
+```
+
+### Configuration Options
+
+```bash
+# Enable encryption
+--encryption-enabled
+
+# Set encryption key
+--encryption-key "your-password"
+
+# Configure snapshot directory
+--snapshots-dir "./my-snapshots"
+
+# Set maximum snapshots to keep
+--max-snapshots 50
+
+# Set compression threshold (bytes)
+--compression-threshold 1048576  # 1MB
+
+# Disable automatic cleanup
+--no-cleanup
+```
+
+### Security Considerations
+
+- **API Key Masking** - API keys are never stored in plain text
+- **Encryption** - AES-256-GCM encryption for sensitive snapshots
+- **Environment Filtering** - Only safe environment variables are captured
+- **File Permissions** - Snapshots stored with appropriate permissions
+- **Automatic Cleanup** - Old snapshots automatically removed
+
+### Performance Impact
+
+- **Minimal Overhead** - Snapshot creation is asynchronous and optimized
+- **Compression** - Automatic compression reduces storage requirements
+- **Cleanup** - Automatic cleanup prevents disk space issues
+- **Memory Efficient** - Streaming serialization for large conversations
+
+### Example Workflow
+
+```bash
+# Start a session
+cargo run -- chat
+
+# Agent processes several turns, creating snapshots automatically
+# turn_1_1640995200.json
+# turn_2_1640995260.json
+# turn_3_1640995320.json
+
+# Something goes wrong at turn 5
+# Revert to turn 3 and continue
+cargo run -- revert --turn 3
+
+# Create a branch for experimentation
+cargo run -- branch-snapshot --from turn_3 --name experiment_1
+
+# Continue with different approach
+cargo run -- chat
+
+# Later, revert to the experimental branch
+cargo run -- revert --snapshot experiment_1_turn_1
+```
+
+### Integration with Development Workflow
+
+The snapshot system integrates seamlessly with development:
+
+- **Debugging** - Step back through conversation to identify issues
+- **Experimentation** - Try different approaches from the same starting point
+- **Reproducibility** - Share exact conversation states with team members
+- **Recovery** - Quickly recover from errors without losing progress
+- **Analysis** - Review decision patterns and agent behavior over time
+
+### Technical Details
+
+- **Format** - JSON with optional gzip compression
+- **Encryption** - AES-256-GCM with Argon2 key derivation
+- **Integrity** - SHA-256 checksums for all snapshots
+- **Storage** - Atomic writes prevent corruption
+- **Cleanup** - Configurable retention policies
+- **Versioning** - Forward and backward compatibility
+
+The snapshot system ensures that every agent interaction is preserved and recoverable, enabling safe experimentation and reliable debugging workflows.
 
 ## Async File Operations & Diff Rendering
 
@@ -91,7 +306,7 @@ cargo run -- --async-file-ops --show-file-diffs chat
 ```
 📝 File: src/main.rs
 ══════════════════════════════════════════════════
-📊 Changes: 5 additions, 2 deletions, 3 modifications
+Changes: 5 additions, 2 deletions, 3 modifications
 
    1| use tokio::fs;
    2|+ use async_file_ops::AsyncFileWriter;
@@ -205,7 +420,7 @@ Following Cognition's principles:
 - **Overwrite protection** - Optional safety checks for file operations
 - **Error context preservation** - Maintain conversation state during failures
 
-## Advanced Usage Examples
+## Minimal research-preview Usage Examples
 
 ### Project Analysis
 
@@ -302,7 +517,7 @@ Create specialized command patterns by:
 
 ### Research Areas
 
-- **Advanced context management** - Sophisticated compression algorithms
+- **Minimal research-preview context management** - Sophisticated compression algorithms
 - **Multi-modal inputs** - Support for images, diagrams, audio
 - **Collaborative workflows** - Human-agent teaming patterns
 - **Domain specialization** - Industry-specific agent capabilities

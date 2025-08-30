@@ -2,32 +2,32 @@
 
 ## Overview
 
-The tree-sitter integration provides advanced code parsing and analysis capabilities to enhance vtagent's understanding of codebases. This implementation follows Anthropic's breakthrough engineering approach for SWE-bench optimization.
+The tree-sitter integration provides Minimal research-preview code parsing and analysis capabilities to enhance vtagent's understanding of codebases. This implementation follows Anthropic's breakthrough engineering approach for SWE-bench optimization.
 
 ## Features
 
-###  **Advanced Code Parsing**
+### **Minimal research-preview Code Parsing**
 
 - **Syntax-aware parsing** for multiple programming languages
 - **Abstract Syntax Tree (AST)** generation and traversal
 - **Incremental parsing** for efficient updates
 - **Language-agnostic architecture** for extensibility
 
-###  **Code Analysis**
+### **Code Analysis**
 
 - **Comprehensive metrics** calculation (complexity, maintainability, etc.)
 - **Symbol extraction** (functions, classes, variables, imports)
 - **Dependency analysis** and relationship mapping
 - **Code quality assessment** with actionable insights
 
-###  **Code Navigation**
+### **Code Navigation**
 
 - **Go-to-definition** functionality
 - **Symbol search** and discovery
 - **Scope analysis** and hierarchy understanding
 - **Reference finding** and cross-referencing
 
-###  **Refactoring Support**
+### **Refactoring Support**
 
 - **Intelligent refactoring suggestions**
 - **Safe code transformation** with conflict detection
@@ -344,7 +344,7 @@ RUST_LOG=tree_sitter=debug cargo run -- analyze --depth deep
 
 - **Incremental parsing** for real-time analysis
 - **Language server protocol** integration
-- **Advanced refactoring** with AI assistance
+- **Minimal research-preview refactoring** with AI assistance
 - **Code generation** from analysis results
 - **Cross-language analysis** for polyglot projects
 
@@ -386,11 +386,11 @@ cargo bench tree_sitter
 
 ---
 
-##  **SWE-bench Impact**
+## **SWE-bench Impact**
 
 This tree-sitter integration directly addresses key requirements for SWE-bench optimization:
 
-- **Advanced Code Understanding**: Syntax-aware parsing enables better code comprehension
+- **Minimal research-preview Code Understanding**: Syntax-aware parsing enables better code comprehension
 - **Precise Navigation**: Accurate symbol location and relationship analysis
 - **Intelligent Analysis**: Complexity and quality metrics guide decision making
 - **Multi-language Support**: Essential for diverse software ecosystems

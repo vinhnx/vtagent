@@ -45,9 +45,9 @@ This section contains information for developers who want to contribute to, modi
 
 ## **Technical Deep Dives**
 
-### Minimal research-preview Topics
+### Research-preview Topics
 
-- **[Prompt Engineering](./prompt-engineering.md)** - Minimal research-preview prompt design techniques
+- **[Prompt Engineering](./prompt-engineering.md)** - Research-preview prompt design techniques
 - **[Context Management](./context-management.md)** - Managing conversation context
 - **[Error Recovery](./error-recovery.md)** - Error handling and recovery strategies
 - **[Decision Tracking](./decision-tracking.md)** - How decisions are tracked and analyzed

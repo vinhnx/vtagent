@@ -30,7 +30,11 @@ pub fn start_loading_spinner(
                     status_guard.clone()
                 };
 
-                print!("\r{} {}", style(spinner).cyan(), style(&current_status).dim());
+                print!(
+                    "\r{} {}",
+                    style(spinner).cyan(),
+                    style(&current_status).dim()
+                );
                 std::io::Write::flush(&mut std::io::stdout()).ok();
 
                 thread::sleep(Duration::from_millis(100));

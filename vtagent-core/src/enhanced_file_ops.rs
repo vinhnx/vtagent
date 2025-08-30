@@ -101,9 +101,11 @@ impl EnhancedFileOps {
         let start_time = Instant::now();
 
         // Acquire semaphore for concurrency control
-        let permit = self.semaphore.acquire().await.map_err(|e| {
-            anyhow!("Failed to acquire semaphore for file operation: {}", e)
-        })?;
+        let permit = self
+            .semaphore
+            .acquire()
+            .await
+            .map_err(|e| anyhow!("Failed to acquire semaphore for file operation: {}", e))?;
 
         let result = timeout(self.operation_timeout, async {
             // Validate path exists and is readable
@@ -144,10 +146,12 @@ impl EnhancedFileOps {
             };
 
             // Update statistics
-            self.update_stats(true, duration, content.len() as u64, None).await;
+            self.update_stats(true, duration, content.len() as u64, None)
+                .await;
 
             Ok((content, result))
-        }).await;
+        })
+        .await;
 
         drop(permit);
 
@@ -155,7 +159,8 @@ impl EnhancedFileOps {
             Ok(inner_result) => inner_result,
             Err(_) => {
                 let duration = start_time.elapsed();
-                self.update_stats(false, duration, 0, Some("timeout".to_string())).await;
+                self.update_stats(false, duration, 0, Some("timeout".to_string()))
+                    .await;
                 Err(anyhow!("File read operation timed out: {}", path.display()))
             }
         }
@@ -170,9 +175,11 @@ impl EnhancedFileOps {
     ) -> Result<EnhancedFileResult> {
         let start_time = Instant::now();
 
-        let permit = self.semaphore.acquire().await.map_err(|e| {
-            anyhow!("Failed to acquire semaphore for file operation: {}", e)
-        })?;
+        let permit = self
+            .semaphore
+            .acquire()
+            .await
+            .map_err(|e| anyhow!("Failed to acquire semaphore for file operation: {}", e))?;
 
         let result = timeout(self.operation_timeout, async {
             // Create parent directories if they don't exist
@@ -212,15 +219,19 @@ impl EnhancedFileOps {
             };
 
             // Update statistics
-            self.update_stats(true, duration, content.len() as u64, None).await;
+            self.update_stats(true, duration, content.len() as u64, None)
+                .await;
 
             // Update file watcher if available
             if let Some(ref watcher) = self.file_watcher {
-                watcher.update_watched_file(path.to_path_buf(), content.to_string()).await;
+                watcher
+                    .update_watched_file(path.to_path_buf(), content.to_string())
+                    .await;
             }
 
             Ok(result)
-        }).await;
+        })
+        .await;
 
         drop(permit);
 
@@ -228,8 +239,12 @@ impl EnhancedFileOps {
             Ok(inner_result) => inner_result,
             Err(_) => {
                 let duration = start_time.elapsed();
-                self.update_stats(false, duration, 0, Some("timeout".to_string())).await;
-                Err(anyhow!("File write operation timed out: {}", path.display()))
+                self.update_stats(false, duration, 0, Some("timeout".to_string()))
+                    .await;
+                Err(anyhow!(
+                    "File write operation timed out: {}",
+                    path.display()
+                ))
             }
         }
     }
@@ -268,7 +283,8 @@ impl EnhancedFileOps {
         let new_content = current_content.replace(old_string, new_string);
 
         // Write the modified content
-        self.write_file_enhanced(path, &new_content, create_backup).await
+        self.write_file_enhanced(path, &new_content, create_backup)
+            .await
     }
 
     /// Enhanced directory listing with filtering and validation
@@ -280,9 +296,10 @@ impl EnhancedFileOps {
         filter_pattern: Option<&str>,
     ) -> Result<(Vec<fs::DirEntry>, EnhancedFileResult)> {
         let start_time = Instant::now();
-        let permit = self.semaphore.acquire().await.map_err(|e| {
-            anyhow!("Failed to acquire semaphore for directory operation: {}", e)
-        })?;
+        let permit =
+            self.semaphore.acquire().await.map_err(|e| {
+                anyhow!("Failed to acquire semaphore for directory operation: {}", e)
+            })?;
 
         let result = timeout(self.operation_timeout, async {
             if !path.exists() {
@@ -341,7 +358,8 @@ impl EnhancedFileOps {
             self.update_stats(true, duration, total_bytes, None).await;
 
             Ok((entries, result))
-        }).await;
+        })
+        .await;
 
         drop(permit);
 
@@ -349,8 +367,12 @@ impl EnhancedFileOps {
             Ok(inner_result) => inner_result,
             Err(_) => {
                 let duration = start_time.elapsed();
-                self.update_stats(false, duration, 0, Some("timeout".to_string())).await;
-                Err(anyhow!("Directory listing operation timed out: {}", path.display()))
+                self.update_stats(false, duration, 0, Some("timeout".to_string()))
+                    .await;
+                Err(anyhow!(
+                    "Directory listing operation timed out: {}",
+                    path.display()
+                ))
             }
         }
     }
@@ -360,7 +382,8 @@ impl EnhancedFileOps {
         let start_time = Instant::now();
 
         if let Some(backup_content) = self.async_writer.get_backup(path).await {
-            self.write_file_enhanced(path, &backup_content, false).await?;
+            self.write_file_enhanced(path, &backup_content, false)
+                .await?;
             self.update_rollback_stats().await;
 
             Ok(EnhancedFileResult {
@@ -390,7 +413,13 @@ impl EnhancedFileOps {
     }
 
     /// Update operation statistics
-    async fn update_stats(&self, success: bool, duration: Duration, bytes_processed: u64, error_type: Option<String>) {
+    async fn update_stats(
+        &self,
+        success: bool,
+        duration: Duration,
+        bytes_processed: u64,
+        error_type: Option<String>,
+    ) {
         let mut stats = self.stats.write().await;
 
         stats.total_operations += 1;
@@ -423,14 +452,20 @@ impl EnhancedFileOps {
 
 /// Utility functions for file validation
 pub mod validation {
-    use std::path::Path;
     use anyhow::{anyhow, Result};
+    use std::path::Path;
 
     /// Validate file path for security and correctness
     pub fn validate_file_path(path: &Path) -> Result<()> {
         // Check for directory traversal attempts
-        if path.components().any(|c| c.as_os_str() == ".." || c.as_os_str() == ".") {
-            return Err(anyhow!("Path contains invalid components: {}", path.display()));
+        if path
+            .components()
+            .any(|c| c.as_os_str() == ".." || c.as_os_str() == ".")
+        {
+            return Err(anyhow!(
+                "Path contains invalid components: {}",
+                path.display()
+            ));
         }
 
         // Check path length
@@ -443,20 +478,16 @@ pub mod validation {
 
     /// Check if file is safe to modify
     pub fn is_safe_to_modify(path: &Path) -> Result<()> {
-        let file_name = path.file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("");
+        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
         // Prevent modification of critical system files
-        let critical_files = [
-            "Cargo.lock",
-            ".git/config",
-            ".env",
-            "package-lock.json",
-        ];
+        let critical_files = ["Cargo.lock", ".git/config", ".env", "package-lock.json"];
 
         if critical_files.contains(&file_name) {
-            return Err(anyhow!("Modification of critical file not allowed: {}", file_name));
+            return Err(anyhow!(
+                "Modification of critical file not allowed: {}",
+                file_name
+            ));
         }
 
         Ok(())
@@ -477,7 +508,10 @@ mod tests {
         let ops = EnhancedFileOps::new(5);
 
         // Test write operation
-        let result = ops.write_file_enhanced(&file_path, "Hello World", true).await.unwrap();
+        let result = ops
+            .write_file_enhanced(&file_path, "Hello World", true)
+            .await
+            .unwrap();
         assert!(result.success);
         assert_eq!(result.bytes_processed, 11);
 
@@ -487,7 +521,10 @@ mod tests {
         assert!(read_result.success);
 
         // Test edit operation
-        let edit_result = ops.edit_file_enhanced(&file_path, "World", "Universe", true).await.unwrap();
+        let edit_result = ops
+            .edit_file_enhanced(&file_path, "World", "Universe", true)
+            .await
+            .unwrap();
         assert!(edit_result.success);
 
         // Verify edit worked

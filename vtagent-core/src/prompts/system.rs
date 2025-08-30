@@ -36,9 +36,61 @@ pub fn read_agent_guidelines(project_root: &Path) -> Option<String> {
     }
 }
 
+/// Generate system instruction with configuration and AGENTS.md guidelines
+pub fn generate_system_instruction_with_config(
+    config: &SystemPromptConfig,
+    project_root: &Path,
+    vtagent_config: Option<&crate::config::VTAgentConfig>,
+) -> Content {
+    let mut instruction = generate_system_instruction(config).parts[0]
+        .as_text()
+        .unwrap()
+        .to_string();
+
+    // Add configuration awareness
+    if let Some(cfg) = vtagent_config {
+        instruction.push_str("\n\n## CONFIGURATION AWARENESS\n");
+        instruction.push_str("The agent is configured with the following policies from vtagent.toml:\n\n");
+
+        // Add security settings info
+        if cfg.security.human_in_the_loop {
+            instruction.push_str("- **Human-in-the-loop**: Required for critical actions\n");
+        }
+        if cfg.security.confirm_destructive_actions {
+            instruction.push_str("- **Destructive action confirmation**: Required for dangerous operations\n");
+        }
+
+        // Add command policy info
+        if !cfg.commands.allow_list.is_empty() {
+            instruction.push_str(&format!("- **Allowed commands**: {} commands in allow list\n", cfg.commands.allow_list.len()));
+        }
+        if !cfg.commands.deny_list.is_empty() {
+            instruction.push_str(&format!("- **Denied commands**: {} commands in deny list\n", cfg.commands.deny_list.len()));
+        }
+
+        instruction.push_str("\n**IMPORTANT**: Respect these configuration policies. Commands not in the allow list will require user confirmation. Always inform users when actions require confirmation due to security policies.\n");
+    }
+
+    // Read and incorporate AGENTS.md guidelines if available
+    if let Some(guidelines) = read_agent_guidelines(project_root) {
+        instruction.push_str("\n\n## AGENTS.MD GUIDELINES\n");
+        instruction.push_str("Please follow these project-specific guidelines from AGENTS.md:\n\n");
+        instruction.push_str(&guidelines);
+        instruction.push_str("\n\nThese guidelines take precedence over general instructions.");
+    }
+
+    Content::system_text(instruction)
+}
+
 /// Generate system instruction with AGENTS.md guidelines incorporated
-pub fn generate_system_instruction_with_guidelines(config: &SystemPromptConfig, project_root: &Path) -> Content {
-    let mut instruction = generate_system_instruction(config).parts[0].as_text().unwrap().to_string();
+pub fn generate_system_instruction_with_guidelines(
+    config: &SystemPromptConfig,
+    project_root: &Path,
+) -> Content {
+    let mut instruction = generate_system_instruction(config).parts[0]
+        .as_text()
+        .unwrap()
+        .to_string();
 
     // Read and incorporate AGENTS.md guidelines if available
     if let Some(guidelines) = read_agent_guidelines(project_root) {
@@ -58,7 +110,7 @@ pub fn generate_system_instruction(_config: &SystemPromptConfig) -> Content {
 ## AVAILABLE TOOLS
 - **File Operations**: list_files, read_file, write_file, edit_file, delete_file
 - **Search & Analysis**: rg_search (ripgrep), codebase_search, read_lints
-- **Task Management**: todo_plan, todo_write, todo_update, todo_mark_done, todo_get, todo_get_by_status, todo_delete, todo_stats, todo_cleanup
+- **Task Management**: todo_plan, todo_write, todo_update, todo_mark_done, todo_get, todo_get_by_status, todo_delete, todo_stats, todo_cleanup, todo_temp_info
 - **Code Quality**: code analysis, linting, formatting
 - **Build & Test**: cargo check, cargo build, cargo test
 - **Git Operations**: git status, git diff, git log
@@ -66,6 +118,8 @@ pub fn generate_system_instruction(_config: &SystemPromptConfig) -> Content {
 
 ## TASK MANAGEMENT SYSTEM
 You have access to the TodoWrite tools to help you manage and plan tasks. Use these tools VERY frequently to ensure that you are tracking your tasks and giving the user visibility into your progress.
+
+**Note**: Todos are stored in temporary files that are automatically cleaned up when the session ends. This prevents workspace clutter while maintaining session-based task tracking. Use `todo_temp_info` to see the temporary file location.
 
 ### When to Use TodoWrite Tool:
 1. **Complex multi-step tasks** - When a task requires 3 or more distinct steps or actions
@@ -137,13 +191,19 @@ Always use the TodoWrite tool to plan and track tasks throughout the conversatio
 }
 
 /// Generate a specialized system instruction for specific tasks
-pub fn generate_specialized_instruction(task_type: &str, config: &SystemPromptConfig, project_root: &Path) -> Content {
+pub fn generate_specialized_instruction(
+    task_type: &str,
+    config: &SystemPromptConfig,
+    project_root: &Path,
+) -> Content {
     let base_instruction = generate_system_instruction_with_guidelines(config, project_root);
     let mut specialized_instruction = base_instruction.parts[0].as_text().unwrap().to_string();
 
     // Add task management guidance for all specialized tasks
     specialized_instruction.push_str("\n\n## TASK MANAGEMENT FOR THIS SPECIALIZED WORK\n");
-    specialized_instruction.push_str("Use TodoWrite tools extensively to break down complex tasks and track progress:\n");
+    specialized_instruction.push_str(
+        "Use TodoWrite tools extensively to break down complex tasks and track progress:\n",
+    );
     specialized_instruction.push_str("- Create detailed task lists for multi-step processes\n");
     specialized_instruction.push_str("- Mark tasks as in_progress when starting work\n");
     specialized_instruction.push_str("- Update task status immediately upon completion\n");
@@ -153,12 +213,18 @@ pub fn generate_specialized_instruction(task_type: &str, config: &SystemPromptCo
         "analysis" => {
             specialized_instruction.push_str("\n\n## SPECIALIZED FOR CODE ANALYSIS\n");
             specialized_instruction.push_str("### Analysis Workflow:\n");
-            specialized_instruction.push_str("1. **Use TodoWrite** to create analysis task breakdown\n");
-            specialized_instruction.push_str("2. **Explore codebase structure** with list_files and read_file\n");
-            specialized_instruction.push_str("3. **Identify key patterns** and architectural decisions\n");
-            specialized_instruction.push_str("4. **Analyze dependencies** and module relationships\n");
-            specialized_instruction.push_str("5. **Highlight potential issues** and improvement areas\n");
-            specialized_instruction.push_str("6. **Provide comprehensive summaries** with actionable insights\n");
+            specialized_instruction
+                .push_str("1. **Use TodoWrite** to create analysis task breakdown\n");
+            specialized_instruction
+                .push_str("2. **Explore codebase structure** with list_files and read_file\n");
+            specialized_instruction
+                .push_str("3. **Identify key patterns** and architectural decisions\n");
+            specialized_instruction
+                .push_str("4. **Analyze dependencies** and module relationships\n");
+            specialized_instruction
+                .push_str("5. **Highlight potential issues** and improvement areas\n");
+            specialized_instruction
+                .push_str("6. **Provide comprehensive summaries** with actionable insights\n");
             specialized_instruction.push_str("\n### Analysis Tools:\n");
             specialized_instruction.push_str("- codebase_search for semantic code understanding\n");
             specialized_instruction.push_str("- rg_search (ripgrep) for pattern discovery\n");
@@ -168,8 +234,10 @@ pub fn generate_specialized_instruction(task_type: &str, config: &SystemPromptCo
             specialized_instruction.push_str("\n\n## SPECIALIZED FOR DEBUGGING\n");
             specialized_instruction.push_str("### Debugging Workflow:\n");
             specialized_instruction.push_str("1. **Create reproduction plan** with TodoWrite\n");
-            specialized_instruction.push_str("2. **Set up minimal test case** to reproduce the issue\n");
-            specialized_instruction.push_str("3. **Trace error propagation** through the codebase\n");
+            specialized_instruction
+                .push_str("2. **Set up minimal test case** to reproduce the issue\n");
+            specialized_instruction
+                .push_str("3. **Trace error propagation** through the codebase\n");
             specialized_instruction.push_str("4. **Identify root cause** vs symptoms\n");
             specialized_instruction.push_str("5. **Implement fix** with proper testing\n");
             specialized_instruction.push_str("6. **Verify fix** and update tests\n");
@@ -181,9 +249,12 @@ pub fn generate_specialized_instruction(task_type: &str, config: &SystemPromptCo
         "refactoring" => {
             specialized_instruction.push_str("\n\n## SPECIALIZED FOR REFACTORING\n");
             specialized_instruction.push_str("### Refactoring Workflow:\n");
-            specialized_instruction.push_str("1. **Plan refactoring scope** with TodoWrite task breakdown\n");
-            specialized_instruction.push_str("2. **Analyze existing patterns** before making changes\n");
-            specialized_instruction.push_str("3. **Make small, verifiable changes** incrementally\n");
+            specialized_instruction
+                .push_str("1. **Plan refactoring scope** with TodoWrite task breakdown\n");
+            specialized_instruction
+                .push_str("2. **Analyze existing patterns** before making changes\n");
+            specialized_instruction
+                .push_str("3. **Make small, verifiable changes** incrementally\n");
             specialized_instruction.push_str("4. **Maintain backward compatibility** throughout\n");
             specialized_instruction.push_str("5. **Update tests and documentation** accordingly\n");
             specialized_instruction.push_str("6. **Run comprehensive testing** after changes\n");
@@ -200,34 +271,42 @@ pub fn generate_specialized_instruction(task_type: &str, config: &SystemPromptCo
             specialized_instruction.push_str("3. **Write clear, comprehensive documentation**\n");
             specialized_instruction.push_str("4. **Include practical examples** and use cases\n");
             specialized_instruction.push_str("5. **Highlight caveats and limitations**\n");
-            specialized_instruction.push_str("6. **Keep documentation synchronized** with code changes\n");
+            specialized_instruction
+                .push_str("6. **Keep documentation synchronized** with code changes\n");
             specialized_instruction.push_str("\n### Documentation Tools:\n");
             specialized_instruction.push_str("- read_file for understanding code functionality\n");
-            specialized_instruction.push_str("- rg_search (ripgrep) for finding undocumented areas\n");
-            specialized_instruction.push_str("- codebase_search for understanding code relationships\n");
+            specialized_instruction
+                .push_str("- rg_search (ripgrep) for finding undocumented areas\n");
+            specialized_instruction
+                .push_str("- codebase_search for understanding code relationships\n");
         }
         "testing" => {
             specialized_instruction.push_str("\n\n## SPECIALIZED FOR TESTING\n");
             specialized_instruction.push_str("### Testing Workflow:\n");
-            specialized_instruction.push_str("1. **Create test plan** with TodoWrite task breakdown\n");
+            specialized_instruction
+                .push_str("1. **Create test plan** with TodoWrite task breakdown\n");
             specialized_instruction.push_str("2. **Identify test scenarios** and edge cases\n");
             specialized_instruction.push_str("3. **Write comprehensive unit tests**\n");
-            specialized_instruction.push_str("4. **Add integration tests** for complex functionality\n");
+            specialized_instruction
+                .push_str("4. **Add integration tests** for complex functionality\n");
             specialized_instruction.push_str("5. **Run test coverage analysis**\n");
             specialized_instruction.push_str("6. **Document test results** and coverage gaps\n");
             specialized_instruction.push_str("\n### Testing Tools:\n");
             specialized_instruction.push_str("- cargo test for running test suites\n");
             specialized_instruction.push_str("- cargo test --doc for documentation tests\n");
-            specialized_instruction.push_str("- read_file for understanding existing test patterns\n");
+            specialized_instruction
+                .push_str("- read_file for understanding existing test patterns\n");
         }
         "performance" => {
             specialized_instruction.push_str("\n\n## SPECIALIZED FOR PERFORMANCE OPTIMIZATION\n");
             specialized_instruction.push_str("### Performance Workflow:\n");
-            specialized_instruction.push_str("1. **Profile current performance** with TodoWrite plan\n");
+            specialized_instruction
+                .push_str("1. **Profile current performance** with TodoWrite plan\n");
             specialized_instruction.push_str("2. **Identify performance bottlenecks**\n");
             specialized_instruction.push_str("3. **Implement optimizations** incrementally\n");
             specialized_instruction.push_str("4. **Measure performance improvements**\n");
-            specialized_instruction.push_str("5. **Ensure optimization doesn't break functionality**\n");
+            specialized_instruction
+                .push_str("5. **Ensure optimization doesn't break functionality**\n");
             specialized_instruction.push_str("6. **Document performance characteristics**\n");
             specialized_instruction.push_str("\n### Performance Tools:\n");
             specialized_instruction.push_str("- cargo build --release for optimized builds\n");
@@ -236,7 +315,8 @@ pub fn generate_specialized_instruction(task_type: &str, config: &SystemPromptCo
         }
         _ => {
             specialized_instruction.push_str("\n\n## GENERAL DEVELOPMENT TASK\n");
-            specialized_instruction.push_str("Use TodoWrite tools to plan and track your work for this task.\n");
+            specialized_instruction
+                .push_str("Use TodoWrite tools to plan and track your work for this task.\n");
         }
     }
 

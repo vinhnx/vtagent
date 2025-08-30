@@ -12,12 +12,11 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-
 // Re-export types from other modules that we need
-use crate::types::*;
-use crate::performance_monitor::PerformanceMetrics;
-use crate::gemini::Content;
 use crate::agent::core::Agent;
+use crate::gemini::Content;
+use crate::performance_monitor::PerformanceMetrics;
+use crate::types::*;
 
 /// Metadata for snapshot identification and management
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -171,7 +170,9 @@ impl SnapshotManager {
         }
 
         // Extract agent state
-        let snapshot = self.extract_agent_state(agent, turn_number, description).await?;
+        let snapshot = self
+            .extract_agent_state(agent, turn_number, description)
+            .await?;
 
         // Serialize to JSON
         let json_data = serde_json::to_string_pretty(&snapshot)?;
@@ -252,7 +253,10 @@ impl SnapshotManager {
                                 turn_number,
                                 filename: filename.to_string(),
                                 size_bytes: metadata.len() as usize,
-                                created_at: metadata.created()?.duration_since(std::time::UNIX_EPOCH)?.as_secs(),
+                                created_at: metadata
+                                    .created()?
+                                    .duration_since(std::time::UNIX_EPOCH)?
+                                    .as_secs(),
                             });
                         }
                     }
@@ -272,7 +276,9 @@ impl SnapshotManager {
             let to_delete = snapshots.len() - self.config.max_snapshots;
 
             for snapshot in snapshots.iter().rev().take(to_delete) {
-                let filepath = self.snapshots_dir.join(format!("{}.json", snapshot.filename));
+                let filepath = self
+                    .snapshots_dir
+                    .join(format!("{}.json", snapshot.filename));
                 if filepath.exists() {
                     fs::remove_file(&filepath)?;
                 }
@@ -310,42 +316,42 @@ impl SnapshotManager {
         };
 
         let decision_tracker = DecisionTrackerSnapshot {
-            total_decisions: 10, // Placeholder
-            successful_decisions: 8, // Placeholder
-            failed_decisions: 2, // Placeholder
-            recent_decisions: vec![], // Placeholder
+            total_decisions: 10,                            // Placeholder
+            successful_decisions: 8,                        // Placeholder
+            failed_decisions: 2,                            // Placeholder
+            recent_decisions: vec![],                       // Placeholder
             available_tools: vec!["test_tool".to_string()], // Placeholder
         };
 
         let error_recovery = ErrorRecoverySnapshot {
-            total_errors: 0, // Placeholder
-            resolved_errors: 0, // Placeholder
-            error_patterns: vec![], // Placeholder
+            total_errors: 0,           // Placeholder
+            resolved_errors: 0,        // Placeholder
+            error_patterns: vec![],    // Placeholder
             recovery_attempts: vec![], // Placeholder
         };
 
         let summarizer = SummarizerSnapshot {
-            total_summaries: 0, // Placeholder
-            latest_summary: None, // Placeholder
+            total_summaries: 0,      // Placeholder
+            latest_summary: None,    // Placeholder
             summary_history: vec![], // Placeholder
         };
 
         let compaction_engine = CompactionEngineSnapshot {
-            total_compactions: 0, // Placeholder
-            memory_saved: 0, // Placeholder
-            compression_ratio: 1.0, // Placeholder
+            total_compactions: 0,           // Placeholder
+            memory_saved: 0,                // Placeholder
+            compression_ratio: 1.0,         // Placeholder
             compaction_suggestions: vec![], // Placeholder
         };
 
         let tree_sitter_state = TreeSitterSnapshot {
             loaded_languages: vec![], // Placeholder
-            total_analyses: 0, // Placeholder
-            cache_size: 0, // Placeholder
+            total_analyses: 0,        // Placeholder
+            cache_size: 0,            // Placeholder
         };
 
         let tool_registry = ToolRegistrySnapshot {
-            total_tools: 0, // Placeholder
-            available_tools: vec![], // Placeholder
+            total_tools: 0,                   // Placeholder
+            available_tools: vec![],          // Placeholder
             tool_usage_stats: HashMap::new(), // Placeholder
         };
 
@@ -385,20 +391,25 @@ impl SnapshotManager {
 
     /// Revert to full state
     async fn revert_full_state(&self, _agent: &mut Agent, _snapshot: &AgentSnapshot) -> Result<()> {
-        // TODO: Implement full state revert
-        Ok(())
+        anyhow::bail!("Snapshot revert (full) is not implemented yet")
     }
 
     /// Revert memory state only
-    async fn revert_memory_state(&self, _snapshot: &AgentSnapshot, _agent: &mut Agent) -> Result<()> {
-        // TODO: Implement memory state revert
-        Ok(())
+    async fn revert_memory_state(
+        &self,
+        _snapshot: &AgentSnapshot,
+        _agent: &mut Agent,
+    ) -> Result<()> {
+        anyhow::bail!("Snapshot revert (memory) is not implemented yet")
     }
 
     /// Revert context state only
-    async fn revert_context_state(&self, _snapshot: &AgentSnapshot, _agent: &mut Agent) -> Result<()> {
-        // TODO: Implement context state revert
-        Ok(())
+    async fn revert_context_state(
+        &self,
+        _snapshot: &AgentSnapshot,
+        _agent: &mut Agent,
+    ) -> Result<()> {
+        anyhow::bail!("Snapshot revert (context) is not implemented yet")
     }
 }
 

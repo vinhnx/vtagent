@@ -1,4 +1,4 @@
-//! Tree-sitter integration for Minimal research-preview code parsing and analysis
+//! Tree-sitter integration for Research-preview code parsing and analysis
 //!
 //! This module provides syntax-aware code understanding and manipulation capabilities
 //! using tree-sitter parsers for multiple programming languages.

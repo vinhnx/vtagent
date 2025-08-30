@@ -25,14 +25,14 @@ This document outlines planned enhancements and features for the vtagent coding 
 
 - **COMPLETED**: Tree-sitter integration with Rust bindings
 - **COMPLETED**: Multi-language support (Rust, Python, JavaScript, TypeScript, Go, Java)
-- **COMPLETED**: Minimal research-preview code parsing and syntax-aware analysis
+- **COMPLETED**: Research-preview code parsing and syntax-aware analysis
 - **COMPLETED**: Symbol extraction and code navigation
 - **COMPLETED**: Code complexity analysis and quality assessment
 - **COMPLETED**: Intelligent refactoring suggestions
 
 **Next Phase**: Performance optimization and benchmarking
 
-### 2. Minimal research-preview Code Analysis
+### 2. Research-preview Code Analysis
 
 - Add AST-based code analysis using tree-sitter
 - Implement symbol extraction and cross-reference analysis
@@ -50,11 +50,11 @@ This document outlines planned enhancements and features for the vtagent coding 
 
 ## Medium Priority
 
-### 4. Minimal research-preview Context Management
+### 4. Research-preview Context Management
 
 - **Conversation Summarization** - Implemented automatic compression for long sessions
 - **Context Preservation** - Full context maintained during error recovery
-- **Minimal research-preview Compression Algorithms** - More sophisticated summarization techniques
+- **Research-preview Compression Algorithms** - More sophisticated summarization techniques
 - **Selective Context Retention** - Intelligent pruning based on relevance
 - **Context Prioritization** - Focus on most important information
 - **Multi-session Context** - Maintain context across multiple sessions
@@ -71,12 +71,12 @@ This document outlines planned enhancements and features for the vtagent coding 
 
 - **Token Usage Optimization** - Intelligent prompting reduces API costs
 - **Decision Confidence Scoring** - Quality assessment for all actions
-- **Minimal research-preview Caching** - Implement intelligent caching for frequently accessed files
+- **Research-preview Caching** - Implement intelligent caching for frequently accessed files
 - **Incremental Analysis** - Build upon previous analysis rather than starting over
 - **Tool Execution Optimization** - Streamline tool calls and reduce latency
 - **Memory Management** - Optimize memory usage for large codebases
 
-### 7. Minimal research-preview Tool Suite
+### 7. Research-preview Tool Suite
 
 - **Enhanced Tool Design** - Error-proofed tools with comprehensive documentation
 - **Code Search & Indexing** - Full-text search across entire codebases
@@ -116,7 +116,7 @@ This document outlines planned enhancements and features for the vtagent coding 
 - **Usage Analytics** - Comprehensive tracking and metrics
 - **Performance Monitoring** - Real-time performance insights
 - **Conversation Quality Metrics** - Assess interaction effectiveness
-- **Minimal research-preview Debugging Tools** - Enhanced troubleshooting capabilities
+- **Research-preview Debugging Tools** - Enhanced troubleshooting capabilities
 - **Performance Profiling** - Detailed performance analysis
 
 ### 12. Security & Safety
@@ -130,7 +130,7 @@ This document outlines planned enhancements and features for the vtagent coding 
 ### 13. Research & Innovation
 
 - **Multi-agent Coordination** - Safe exploration of agent collaboration
-- **Minimal research-preview Context Management** - Sophisticated conversation handling
+- **Research-preview Context Management** - Sophisticated conversation handling
 - **Novel Tool Design** - Innovative interface patterns
 - **LLM Architecture Experiments** - Comparative model evaluation
 - **Human-Agent Teaming** - Enhanced collaboration patterns
@@ -148,11 +148,11 @@ Following Anthropic's breakthrough approach for maximum performance:
 - **Error-Proofed Tools** - Comprehensive documentation and validation
 - **Thorough Reasoning** - Encourage deep thinking for complex problems
 
-#### Phase 2: Minimal research-preview Capabilities  **COMPLETED**
+#### Phase 2: Research-preview Capabilities  **COMPLETED**
 
 - **Tree-sitter Integration** - Full syntax-aware code understanding
 - **Multi-language Support** - Rust, Python, JavaScript, TypeScript, Go, Java
-- **Minimal research-preview Code Analysis** - AST-based analysis with metrics and quality assessment
+- **Research-preview Code Analysis** - AST-based analysis with metrics and quality assessment
 - **Symbol Navigation** - Go-to-definition, search, and cross-referencing
 - **Intelligent Refactoring** - Safe code transformation with conflict detection
 - **SWE-bench Foundation** - Code understanding capabilities for performance optimization

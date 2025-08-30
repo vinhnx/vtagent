@@ -28,16 +28,6 @@ use vercel ai-gateway, cloudflare ai gateway, openrouter or litellm
 
 
 --
---
-
-- [ ] Ensure human-in-the-loop review for all critical agent actions
-- [ ]  allow action y/n/cancel, the agent should prompt user for confirmation before performing an unix/tool action.
-
---
-
-- [ ] allow list
-
---
 
 - [ ] Build a CLI tool that generates a structured TODO list for any user-supplied task description
   - [ ] Accept a task description as input (via CLI argument or prompt)
@@ -227,7 +217,7 @@ context7 = MCPServerStdio(
     command="npx", args=["-y", "@upstash/context7-mcp"], tool_prefix="context"
 )
 
-The workflow change: When working with newer libraries or trying to use Minimal research-preview features, the agent could look up current documentation rather than relying on potentially outdated training data. This made it much more reliable for real-world development work.
+The workflow change: When working with newer libraries or trying to use Research-preview features, the agent could look up current documentation rather than relying on potentially outdated training data. This made it much more reliable for real-world development work.
 Internet Search for Current Information
 
 Sometimes you need information that's not in any documentation—recent Stack Overflow discussions, GitHub issues, or the latest best practices. We added general internet search:
@@ -4024,7 +4014,7 @@ warning: `vtagent` (bin "vtagent") generated 2 warnings (run `cargo fix --bin "v
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.67s
      Running `target/debug/vtagent chat`
 [VTAgent]
-Welcome to VTAgent - Minimal research-preview Rust coding agent
+Welcome to VTAgent - Research-preview Rust coding agent
 
 Interactive chat mode selected
 API Key: AIzaSyAJ...

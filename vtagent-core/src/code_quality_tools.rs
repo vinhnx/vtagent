@@ -160,7 +160,12 @@ impl CodeQualityManager {
                 language: LanguageSupport::Rust,
                 tool_name: "clippy".to_string(),
                 command: vec!["cargo".to_string()],
-                args: vec!["clippy".to_string(), "--".to_string(), "-D".to_string(), "warnings".to_string()],
+                args: vec![
+                    "clippy".to_string(),
+                    "--".to_string(),
+                    "-D".to_string(),
+                    "warnings".to_string(),
+                ],
                 severity_levels: HashMap::new(),
                 enabled: true,
             },
@@ -288,7 +293,9 @@ impl CodeQualityManager {
         let lint_result = self.lint_codebase(root_path).await?;
 
         // Calculate metrics
-        let metrics = self.calculate_quality_metrics(root_path, &format_result, &lint_result).await?;
+        let metrics = self
+            .calculate_quality_metrics(root_path, &format_result, &lint_result)
+            .await?;
 
         // Determine overall score and grade
         let overall_score = self.calculate_overall_score(&metrics);
@@ -314,7 +321,9 @@ impl CodeQualityManager {
     async fn format_single_file(&self, file_path: &Path) -> Result<FileFormatResult> {
         // Determine language and get format config
         let language = self.tree_sitter.detect_language_from_path(file_path)?;
-        let format_config = self.format_configs.get(&language)
+        let format_config = self
+            .format_configs
+            .get(&language)
             .ok_or_else(|| anyhow!("No formatter configured for language: {:?}", language))?;
 
         if !format_config.enabled {
@@ -365,7 +374,9 @@ impl CodeQualityManager {
     async fn lint_single_file(&self, file_path: &Path) -> Result<Vec<LintFinding>> {
         // Determine language and get lint config
         let language = self.tree_sitter.detect_language_from_path(file_path)?;
-        let lint_config = self.lint_configs.get(&language)
+        let lint_config = self
+            .lint_configs
+            .get(&language)
             .ok_or_else(|| anyhow!("No linter configured for language: {:?}", language))?;
 
         if !lint_config.enabled {
@@ -422,7 +433,12 @@ impl CodeQualityManager {
     }
 
     /// Parse linter output into LintFinding structures
-    fn parse_linter_output(&self, output: &[u8], file_path: &Path, _tool_name: &str) -> Result<Vec<LintFinding>> {
+    fn parse_linter_output(
+        &self,
+        output: &[u8],
+        file_path: &Path,
+        _tool_name: &str,
+    ) -> Result<Vec<LintFinding>> {
         let output_str = String::from_utf8_lossy(output);
         let mut findings = Vec::new();
 
@@ -447,9 +463,18 @@ impl CodeQualityManager {
 
     /// Categorize lint findings by severity
     fn categorize_findings(&self, findings: &[LintFinding]) -> (usize, usize, usize) {
-        let errors = findings.iter().filter(|f| f.severity == LintSeverity::Error || f.severity == LintSeverity::Critical).count();
-        let warnings = findings.iter().filter(|f| f.severity == LintSeverity::Warning).count();
-        let info = findings.iter().filter(|f| f.severity == LintSeverity::Info).count();
+        let errors = findings
+            .iter()
+            .filter(|f| f.severity == LintSeverity::Error || f.severity == LintSeverity::Critical)
+            .count();
+        let warnings = findings
+            .iter()
+            .filter(|f| f.severity == LintSeverity::Warning)
+            .count();
+        let info = findings
+            .iter()
+            .filter(|f| f.severity == LintSeverity::Info)
+            .count();
 
         (errors, warnings, info)
     }
@@ -467,9 +492,9 @@ impl CodeQualityManager {
             lint_errors: lint_result.errors,
             lint_warnings: lint_result.warnings,
             lint_info: lint_result.info,
-            complexity_score: 5.0, // Placeholder
+            complexity_score: 5.0,       // Placeholder
             maintainability_index: 75.0, // Placeholder
-            test_coverage: Some(85.0), // Placeholder
+            test_coverage: Some(85.0),   // Placeholder
         })
     }
 
@@ -509,7 +534,10 @@ impl CodeQualityManager {
         let mut recommendations = Vec::new();
 
         if metrics.lint_errors > 0 {
-            recommendations.push(format!("Fix {} lint errors to improve code quality", metrics.lint_errors));
+            recommendations.push(format!(
+                "Fix {} lint errors to improve code quality",
+                metrics.lint_errors
+            ));
         }
 
         if metrics.lint_warnings > 10 {
@@ -533,11 +561,17 @@ impl CodeQualityManager {
         let mut issues = Vec::new();
 
         if lint_result.errors > 0 {
-            issues.push(format!("{} critical lint errors require immediate attention", lint_result.errors));
+            issues.push(format!(
+                "{} critical lint errors require immediate attention",
+                lint_result.errors
+            ));
         }
 
         if lint_result.warnings > self.quality_thresholds.max_lint_warnings {
-            issues.push(format!("{} warnings exceed threshold of {}", lint_result.warnings, self.quality_thresholds.max_lint_warnings));
+            issues.push(format!(
+                "{} warnings exceed threshold of {}",
+                lint_result.warnings, self.quality_thresholds.max_lint_warnings
+            ));
         }
 
         issues
@@ -612,7 +646,9 @@ mod tests {
         // Test that default configurations are loaded
         assert!(manager.format_configs.contains_key(&LanguageSupport::Rust));
         assert!(manager.lint_configs.contains_key(&LanguageSupport::Rust));
-        assert!(manager.format_configs.contains_key(&LanguageSupport::Python));
+        assert!(manager
+            .format_configs
+            .contains_key(&LanguageSupport::Python));
     }
 
     #[test]

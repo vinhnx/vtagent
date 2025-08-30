@@ -1,4 +1,4 @@
-//! Minimal research-preview intelligence layer for enhanced code understanding and context awareness
+//! Research-preview intelligence layer for enhanced code understanding and context awareness
 //!
 //! This module implements modern coding agent capabilities including:
 //! - Context-aware code understanding
@@ -6,8 +6,8 @@
 //! - Semantic code search
 //! - Learning and adaptation systems
 
-use crate::tree_sitter::{TreeSitterAnalyzer, CodeAnalysis};
-use crate::agent::compaction::{CompactionEngine, CompactionConfig};
+use crate::agent::compaction::{CompactionConfig, CompactionEngine};
+use crate::tree_sitter::{CodeAnalysis, TreeSitterAnalyzer};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -133,7 +133,7 @@ pub enum CompletionKind {
     Import,
 }
 
-/// Minimal research-preview intelligence engine
+/// Research-preview intelligence engine
 pub struct IntelligenceEngine {
     analyzer: TreeSitterAnalyzer,
     context: Arc<RwLock<SemanticContext>>,
@@ -249,16 +249,14 @@ impl IntelligenceEngine {
 
         // Get file analysis
         let source_code = std::fs::read_to_string(file_path)?;
-        let analysis = self.analyzer.analyze_file_with_tree_sitter(file_path, &source_code)?;
+        let analysis = self
+            .analyzer
+            .analyze_file_with_tree_sitter(file_path, &source_code)?;
 
         // Generate context-aware completions
-        self.completion_engine.generate_completions(
-            &context,
-            &analysis,
-            cursor_line,
-            cursor_column,
-            prefix,
-        ).await
+        self.completion_engine
+            .generate_completions(&context, &analysis, cursor_line, cursor_column, prefix)
+            .await
     }
 
     /// Update cursor context for better understanding
@@ -301,10 +299,7 @@ impl IntelligenceEngine {
     }
 
     /// Analyze workspace structure and build project understanding
-    async fn analyze_workspace_structure(
-        &mut self,
-        workspace_root: &Path,
-    ) -> Result<()> {
+    async fn analyze_workspace_structure(&mut self, workspace_root: &Path) -> Result<()> {
         // Analyze project structure
         let mut project_structure = HashMap::new();
 
@@ -336,7 +331,10 @@ impl IntelligenceEngine {
                     line: 0,
                     column: 0,
                 },
-                definition: format!("{:?} project with frameworks: {:?}", project_type, frameworks),
+                definition: format!(
+                    "{:?} project with frameworks: {:?}",
+                    project_type, frameworks
+                ),
                 usages: Vec::new(),
                 related_symbols: Vec::new(),
                 confidence_score: 0.9,
@@ -347,35 +345,42 @@ impl IntelligenceEngine {
     }
 
     /// Build comprehensive symbol table
-    async fn build_symbol_table(
-        &mut self,
-        workspace_root: &Path,
-    ) -> Result<()> {
+    async fn build_symbol_table(&mut self, workspace_root: &Path) -> Result<()> {
         for entry in walkdir::WalkDir::new(workspace_root) {
             let entry = entry?;
             let path = entry.path();
 
             if path.is_file() && self.is_supported_file(path) {
                 if let Ok(source_code) = std::fs::read_to_string(path) {
-                    let analysis = self.analyzer.analyze_file_with_tree_sitter(path, &source_code)?;
+                    let analysis = self
+                        .analyzer
+                        .analyze_file_with_tree_sitter(path, &source_code)?;
 
                     // Extract symbols from analysis
                     for symbol in &analysis.symbols {
                         let symbol_info = SymbolInfo {
                             name: symbol.name.clone(),
-                            kind: self.map_symbol_kind(&format!("{:?}", symbol.kind).to_lowercase()),
+                            kind: self
+                                .map_symbol_kind(&format!("{:?}", symbol.kind).to_lowercase()),
                             location: Location {
                                 file: path.to_string_lossy().to_string(),
                                 line: symbol.position.row,
                                 column: symbol.position.column,
                             },
-                            definition: symbol.signature.clone().unwrap_or_else(|| symbol.name.clone()),
+                            definition: symbol
+                                .signature
+                                .clone()
+                                .unwrap_or_else(|| symbol.name.clone()),
                             usages: Vec::new(), // Would be populated by cross-reference analysis
                             related_symbols: Vec::new(),
                             confidence_score: 0.8,
                         };
 
-                        self.context.write().await.symbol_table.insert(symbol.name.clone(), symbol_info);
+                        self.context
+                            .write()
+                            .await
+                            .symbol_table
+                            .insert(symbol.name.clone(), symbol_info);
                     }
                 }
             }
@@ -413,7 +418,10 @@ impl IntelligenceEngine {
     /// Helper methods
     fn is_supported_file(&self, path: &Path) -> bool {
         if let Some(ext) = path.extension() {
-            matches!(ext.to_str(), Some("rs") | Some("py") | Some("js") | Some("ts") | Some("go") | Some("java"))
+            matches!(
+                ext.to_str(),
+                Some("rs") | Some("py") | Some("js") | Some("ts") | Some("go") | Some("java")
+            )
         } else {
             false
         }
@@ -520,7 +528,8 @@ impl IntelligenceEngine {
 
         for line in definition.lines() {
             let line = line.trim();
-            if line.starts_with("use ") || line.starts_with("import ") || line.starts_with("from ") {
+            if line.starts_with("use ") || line.starts_with("import ") || line.starts_with("from ")
+            {
                 imports.push(line.to_string());
             }
         }
@@ -564,7 +573,8 @@ impl PatternLearner {
         let mut patterns = self.patterns.write().await;
 
         // Analyze naming conventions
-        self.analyze_naming_conventions(context, &mut patterns).await?;
+        self.analyze_naming_conventions(context, &mut patterns)
+            .await?;
 
         // Analyze error handling patterns
         self.analyze_error_patterns(context, &mut patterns).await?;
@@ -584,7 +594,12 @@ impl PatternLearner {
         for symbol in context.symbol_table.values() {
             if symbol.name.contains('_') {
                 snake_case_count += 1;
-            } else if symbol.name.chars().next().map_or(false, |c| c.is_lowercase()) {
+            } else if symbol
+                .name
+                .chars()
+                .next()
+                .map_or(false, |c| c.is_lowercase())
+            {
                 camel_case_count += 1;
             } else {
                 pascal_case_count += 1;
@@ -593,13 +608,14 @@ impl PatternLearner {
 
         let total = snake_case_count + camel_case_count + pascal_case_count;
         if total > 0 {
-            let dominant_style = if snake_case_count > camel_case_count && snake_case_count > pascal_case_count {
-                "snake_case"
-            } else if camel_case_count > pascal_case_count {
-                "camelCase"
-            } else {
-                "PascalCase"
-            };
+            let dominant_style =
+                if snake_case_count > camel_case_count && snake_case_count > pascal_case_count {
+                    "snake_case"
+                } else if camel_case_count > pascal_case_count {
+                    "camelCase"
+                } else {
+                    "PascalCase"
+                };
 
             patterns.insert(
                 "naming_convention".to_string(),
@@ -672,13 +688,23 @@ impl CompletionEngine {
         let mut suggestions = Vec::new();
 
         // Generate symbol-based completions
-        self.generate_symbol_completions(context, _prefix, &mut suggestions).await?;
+        self.generate_symbol_completions(context, _prefix, &mut suggestions)
+            .await?;
 
         // Generate context-aware completions
-        self.generate_context_completions(context, _analysis, _line, _column, _prefix, &mut suggestions).await?;
+        self.generate_context_completions(
+            context,
+            _analysis,
+            _line,
+            _column,
+            _prefix,
+            &mut suggestions,
+        )
+        .await?;
 
         // Generate pattern-based completions
-        self.generate_pattern_completions(context, _prefix, &mut suggestions).await?;
+        self.generate_pattern_completions(context, _prefix, &mut suggestions)
+            .await?;
 
         // Sort by relevance
         suggestions.sort_by(|a, b| b.relevance_score.partial_cmp(&a.relevance_score).unwrap());

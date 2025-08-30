@@ -332,7 +332,11 @@ impl ConversationSummarizer {
         if !completed_tasks.is_empty() {
             summary.push_str("Completed Tasks:\n");
             for task in completed_tasks {
-                let status = if task.success { "[Success]" } else { "[Failure]" };
+                let status = if task.success {
+                    "[Success]"
+                } else {
+                    "[Failure]"
+                };
                 summary.push_str(&format!(
                     "{} {} ({})\n",
                     status, task.description, task.task_type

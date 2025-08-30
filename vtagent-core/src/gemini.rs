@@ -1,10 +1,10 @@
+use crate::timeout_detector::{OperationType, TIMEOUT_DETECTOR};
 use anyhow::{Context, Result};
 use reqwest::{Client as ReqwestClient, StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::time::{Duration, Instant};
 use tokio::time;
-use crate::timeout_detector::{OperationType, TIMEOUT_DETECTOR};
 
 /// Configuration for HTTP client optimization
 #[derive(Clone)]
@@ -404,19 +404,37 @@ impl Client {
                                 return Ok(resp);
                             } else if let Some(text) = Self::extract_first_text(&v) {
                                 return Ok(GenerateContentResponse {
-                                    candidates: vec![Candidate { content: Content { role: "model".to_string(), parts: vec![Part::Text { text }] }, finish_reason: None }],
+                                    candidates: vec![Candidate {
+                                        content: Content {
+                                            role: "model".to_string(),
+                                            parts: vec![Part::Text { text }],
+                                        },
+                                        finish_reason: None,
+                                    }],
                                     prompt_feedback: None,
                                     usage_metadata: None,
                                 });
                             } else {
                                 // If parsing still fails, retry a limited number of times
-                                if attempts < 2 { attempts += 1; continue; }
-                                return Err(anyhow::anyhow!("invalid response JSON from Gemini API: {}", parse_err));
+                                if attempts < 2 {
+                                    attempts += 1;
+                                    continue;
+                                }
+                                return Err(anyhow::anyhow!(
+                                    "invalid response JSON from Gemini API: {}",
+                                    parse_err
+                                ));
                             }
                         }
                         Err(_) => {
-                            if attempts < 2 { attempts += 1; continue; }
-                            return Err(anyhow::anyhow!("invalid response JSON from Gemini API: {}", parse_err));
+                            if attempts < 2 {
+                                attempts += 1;
+                                continue;
+                            }
+                            return Err(anyhow::anyhow!(
+                                "invalid response JSON from Gemini API: {}",
+                                parse_err
+                            ));
                         }
                     }
                 }
@@ -434,7 +452,9 @@ impl Client {
             .and_then(|parts| {
                 for part in parts {
                     if let Some(t) = part.get("text").and_then(|x| x.as_str()) {
-                        if !t.trim().is_empty() { return Some(t.to_string()); }
+                        if !t.trim().is_empty() {
+                            return Some(t.to_string());
+                        }
                     }
                 }
                 None
@@ -443,45 +463,110 @@ impl Client {
 
     fn coerce_response_from_value(v: &serde_json::Value) -> Option<GenerateContentResponse> {
         let mut candidates_out: Vec<Candidate> = Vec::new();
-        let cands = v.get("candidates").and_then(|c| c.as_array()).cloned().unwrap_or_default();
+        let cands = v
+            .get("candidates")
+            .and_then(|c| c.as_array())
+            .cloned()
+            .unwrap_or_default();
         for c in cands {
-            if let Some(parts_v) = c.get("content").and_then(|cnt| cnt.get("parts")).and_then(|p| p.as_array()) {
+            if let Some(parts_v) = c
+                .get("content")
+                .and_then(|cnt| cnt.get("parts"))
+                .and_then(|p| p.as_array())
+            {
                 let mut parts: Vec<Part> = Vec::new();
                 for p in parts_v {
                     if let Some(t) = p.get("text").and_then(|x| x.as_str()) {
-                        parts.push(Part::Text { text: t.to_string() });
+                        parts.push(Part::Text {
+                            text: t.to_string(),
+                        });
                     } else if let Some(fc) = p.get("functionCall") {
-                        let name = fc.get("name").and_then(|x| x.as_str()).unwrap_or("").to_string();
+                        let name = fc
+                            .get("name")
+                            .and_then(|x| x.as_str())
+                            .unwrap_or("")
+                            .to_string();
                         let args = fc.get("args").cloned().unwrap_or(serde_json::json!({}));
                         let id = fc.get("id").and_then(|x| x.as_str()).map(|s| s.to_string());
-                        parts.push(Part::FunctionCall { function_call: FunctionCall { name, args, id } });
+                        parts.push(Part::FunctionCall {
+                            function_call: FunctionCall { name, args, id },
+                        });
                     } else if let Some(fr) = p.get("functionResponse") {
-                        let name = fr.get("name").and_then(|x| x.as_str()).unwrap_or("").to_string();
+                        let name = fr
+                            .get("name")
+                            .and_then(|x| x.as_str())
+                            .unwrap_or("")
+                            .to_string();
                         let response = fr.get("response").cloned().unwrap_or(serde_json::json!({}));
-                        parts.push(Part::FunctionResponse { function_response: FunctionResponse { name, response } });
+                        parts.push(Part::FunctionResponse {
+                            function_response: FunctionResponse { name, response },
+                        });
                     }
                 }
-                candidates_out.push(Candidate { content: Content { role: "model".to_string(), parts }, finish_reason: c.get("finishReason").and_then(|x| x.as_str()).map(|s| s.to_string()) });
+                candidates_out.push(Candidate {
+                    content: Content {
+                        role: "model".to_string(),
+                        parts,
+                    },
+                    finish_reason: c
+                        .get("finishReason")
+                        .and_then(|x| x.as_str())
+                        .map(|s| s.to_string()),
+                });
                 continue;
             }
             if let Some(fc) = c.get("functionCall") {
-                let name = fc.get("name").and_then(|x| x.as_str()).unwrap_or("").to_string();
+                let name = fc
+                    .get("name")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("")
+                    .to_string();
                 let args = fc.get("args").cloned().unwrap_or(serde_json::json!({}));
                 let id = fc.get("id").and_then(|x| x.as_str()).map(|s| s.to_string());
-                let parts = vec![Part::FunctionCall { function_call: FunctionCall { name, args, id } }];
-                candidates_out.push(Candidate { content: Content { role: "model".to_string(), parts }, finish_reason: c.get("finishReason").and_then(|x| x.as_str()).map(|s| s.to_string()) });
+                let parts = vec![Part::FunctionCall {
+                    function_call: FunctionCall { name, args, id },
+                }];
+                candidates_out.push(Candidate {
+                    content: Content {
+                        role: "model".to_string(),
+                        parts,
+                    },
+                    finish_reason: c
+                        .get("finishReason")
+                        .and_then(|x| x.as_str())
+                        .map(|s| s.to_string()),
+                });
                 continue;
             }
             if let Some(t) = c.get("text").and_then(|x| x.as_str()) {
-                let parts = vec![Part::Text { text: t.to_string() }];
-                candidates_out.push(Candidate { content: Content { role: "model".to_string(), parts }, finish_reason: c.get("finishReason").and_then(|x| x.as_str()).map(|s| s.to_string()) });
+                let parts = vec![Part::Text {
+                    text: t.to_string(),
+                }];
+                candidates_out.push(Candidate {
+                    content: Content {
+                        role: "model".to_string(),
+                        parts,
+                    },
+                    finish_reason: c
+                        .get("finishReason")
+                        .and_then(|x| x.as_str())
+                        .map(|s| s.to_string()),
+                });
                 continue;
             }
         }
-        if candidates_out.is_empty() { None } else { Some(GenerateContentResponse { candidates: candidates_out, prompt_feedback: None, usage_metadata: None }) }
+        if candidates_out.is_empty() {
+            None
+        } else {
+            Some(GenerateContentResponse {
+                candidates: candidates_out,
+                prompt_feedback: None,
+                usage_metadata: None,
+            })
+        }
     }
 
-        // end of coerce_response_from_value
+    // end of coerce_response_from_value
 
     /// Stream generate content with real-time output and comprehensive error handling
     pub async fn generate_content_stream<F>(
@@ -498,12 +583,16 @@ impl Client {
         self.metrics.retry_count = 0;
 
         // Use the timeout detector for intelligent retry management
-        let operation_id = format!("gemini_stream_{}", std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs());
+        let operation_id = format!(
+            "gemini_stream_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+        );
 
-        self.execute_streaming_with_timeout(req, on_chunk, operation_id).await
+        self.execute_streaming_with_timeout(req, on_chunk, operation_id)
+            .await
     }
 
     /// Execute streaming with timeout handling
@@ -523,16 +612,32 @@ impl Client {
         let mut last_error: Option<anyhow::Error> = None;
 
         loop {
-            let handle = TIMEOUT_DETECTOR.start_operation(
-                format!("{}_{}", operation_id, attempt),
-                OperationType::ApiCall.clone()
-            ).await;
+            let handle = TIMEOUT_DETECTOR
+                .start_operation(
+                    format!("{}_{}", operation_id, attempt),
+                    OperationType::ApiCall.clone(),
+                )
+                .await;
 
-            let result = match timeout(config.timeout_duration, self.attempt_streaming_request(req, &mut on_chunk)).await {
+            let result = match timeout(
+                config.timeout_duration,
+                self.attempt_streaming_request(req, &mut on_chunk),
+            )
+            .await
+            {
                 Ok(result) => result,
                 Err(_) => {
-                    TIMEOUT_DETECTOR.record_timeout(&format!("{}_{}", operation_id, attempt), Some("Operation timed out".to_string())).await;
-                    Err(anyhow::anyhow!("Operation '{}' timed out after {:?}", operation_id, config.timeout_duration))
+                    TIMEOUT_DETECTOR
+                        .record_timeout(
+                            &format!("{}_{}", operation_id, attempt),
+                            Some("Operation timed out".to_string()),
+                        )
+                        .await;
+                    Err(anyhow::anyhow!(
+                        "Operation '{}' timed out after {:?}",
+                        operation_id,
+                        config.timeout_duration
+                    ))
                 }
             };
 

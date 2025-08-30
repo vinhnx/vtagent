@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "default": {
+    "allow": true,
+    "rate_limit_per_run": 20,
+    "max_concurrent": 2,
+    "fs_write": true,
+    "network": false
+  },
+  "tools": {
+    "run_terminal_cmd": {
+      "allow": true,
+      "fs_write": true,
+      "network": false,
+      "args_policy": {
+        "deny_substrings": [
+          "rm -rf",
+          "git reset --hard",
+          ":(){ :|:& };:"
+        ]
+      }
+    },
+    "cargo_fmt": { "allow": true },
+    "cargo_clippy": { "allow": true },
+    "code_search": { "allow": true },
+    "codebase_search": { "allow": true },
+    "rg_search": { "allow": true },
+    "list_files": { "allow": true },
+    "read_file": { "allow": true },
+    "write_file": { "allow": true },
+    "edit_file": { "allow": true },
+    "todo_add": { "allow": true },
+    "todo_list": { "allow": true },
+    "todo_complete": { "allow": true },
+    "todo_update": { "allow": true },
+    "todo_get": { "allow": true },
+    "todo_get_by_status": { "allow": true },
+    "todo_delete": { "allow": true },
+    "todo_stats": { "allow": true },
+    "todo_cleanup": { "allow": true },
+    "cargo_check": { "allow": true }
+  }
+}
+

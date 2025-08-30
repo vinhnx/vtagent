@@ -64,6 +64,7 @@ This is a Rust project called "vtagent" that appears to be a code analysis tool 
 - Include examples in documentation
 - Keep README.md up to date
 - Document CLI usage and examples
+- Document (.md) files must put in ./docs folder. don't put any unrelated files in root folder. THIS IS IMPORTANT
 
 ## Tree-sitter Integration
 
@@ -109,3 +110,6 @@ This is a Rust project called "vtagent" that appears to be a code analysis tool 
 - Test with various input files and edge cases
 - Prefered ripgrep for searching code
 - DO NOT USE EMOJI THIS IS IMPORTANT
+- Put all agent's configuration option to vtagent.toml. This is important, every logic should be read from this toml config instead of hardcode.
+- Use MCP tools for enhanced context awareness if needed.
+- Don't explain what you are doing, just do what I asked you.

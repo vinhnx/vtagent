@@ -1,6 +1,6 @@
 //! Performance optimization and caching systems for the coding agent
 //!
-//! This module implements Minimal research-preview performance features including:
+//! This module implements Research-preview performance features including:
 //! - Intelligent caching with LRU eviction
 //! - Parallel processing for large codebases
 //! - Memory-efficient data structures
@@ -166,9 +166,7 @@ impl ParallelProcessor {
         let results: Vec<Result<T>> = stream::iter(files)
             .map(|file| {
                 let processor = processor.clone();
-                async move {
-                    processor(file).await
-                }
+                async move { processor(file).await }
             })
             .buffer_unordered(self.max_concurrent_tasks)
             .collect()
@@ -214,9 +212,9 @@ pub struct MemoryEfficientStorage {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct CompressedAnalysis {
-    symbols: Vec<u8>,        // Compressed symbol data
-    dependencies: Vec<u8>,   // Compressed dependency data
-    metrics: Vec<u8>,        // Compressed metrics data
+    symbols: Vec<u8>,      // Compressed symbol data
+    dependencies: Vec<u8>, // Compressed dependency data
+    metrics: Vec<u8>,      // Compressed metrics data
     original_size: usize,
     compressed_size: usize,
 }
@@ -285,7 +283,9 @@ impl MemoryEfficientStorage {
         let dependencies = serialize_and_compress(&serde_json::to_value(&analysis.dependencies)?)?;
         let metrics = serialize_and_compress(&serde_json::to_value(&analysis.metrics)?)?;
 
-        let original_size = analysis.symbols.len() + analysis.dependencies.len() + std::mem::size_of_val(&analysis.metrics);
+        let original_size = analysis.symbols.len()
+            + analysis.dependencies.len()
+            + std::mem::size_of_val(&analysis.metrics);
         let compressed_size = symbols.len() + dependencies.len() + metrics.len();
 
         Ok(CompressedAnalysis {
@@ -308,12 +308,13 @@ impl MemoryEfficientStorage {
             Ok(serde_json::from_slice(&decompressed)?)
         };
 
-        let symbols: Vec<crate::tree_sitter::languages::SymbolInfo> = decompress_and_deserialize(&compressed.symbols)?
-            .as_array()
-            .unwrap_or(&vec![])
-            .iter()
-            .filter_map(|v| serde_json::from_value(v.clone()).ok())
-            .collect();
+        let symbols: Vec<crate::tree_sitter::languages::SymbolInfo> =
+            decompress_and_deserialize(&compressed.symbols)?
+                .as_array()
+                .unwrap_or(&vec![])
+                .iter()
+                .filter_map(|v| serde_json::from_value(v.clone()).ok())
+                .collect();
 
         let _dependencies: Vec<String> = decompress_and_deserialize(&compressed.dependencies)?
             .as_array()
@@ -322,10 +323,11 @@ impl MemoryEfficientStorage {
             .filter_map(|v| v.as_str().map(|s| s.to_string()))
             .collect();
 
-        let metrics: crate::tree_sitter::CodeMetrics = decompress_and_deserialize(&compressed.metrics)?
-            .as_object()
-            .and_then(|obj| serde_json::from_value(serde_json::Value::Object(obj.clone())).ok())
-            .unwrap_or_default();
+        let metrics: crate::tree_sitter::CodeMetrics =
+            decompress_and_deserialize(&compressed.metrics)?
+                .as_object()
+                .and_then(|obj| serde_json::from_value(serde_json::Value::Object(obj.clone())).ok())
+                .unwrap_or_default();
 
         Ok(CodeAnalysis {
             file_path: String::new(), // Would need to be stored separately
@@ -367,7 +369,9 @@ impl ResponseOptimizer {
     pub async fn record_response_time(&self, operation: &str, duration: Duration) {
         let mut response_times = self.response_times.write().await;
 
-        let times = response_times.entry(operation.to_string()).or_insert_with(Vec::new);
+        let times = response_times
+            .entry(operation.to_string())
+            .or_insert_with(Vec::new);
         times.push(duration);
 
         // Keep only last 100 measurements
@@ -383,7 +387,8 @@ impl ResponseOptimizer {
     pub async fn get_optimization_strategy(&self, operation: &str) -> OptimizationStrategy {
         let strategies = self.optimization_strategies.read().await;
 
-        strategies.get(operation)
+        strategies
+            .get(operation)
             .cloned()
             .unwrap_or(OptimizationStrategy::CacheFrequentlyAccessed)
     }
@@ -429,14 +434,17 @@ impl ResponseOptimizer {
             let min_time = times.iter().min().unwrap();
             let max_time = times.iter().max().unwrap();
 
-            stats.insert(operation.clone(), PerformanceStats {
-                operation: operation.clone(),
-                avg_response_time: avg_time,
-                min_response_time: *min_time,
-                max_response_time: *max_time,
-                total_calls: times.len(),
-                p95_response_time: self.calculate_percentile(times, 95),
-            });
+            stats.insert(
+                operation.clone(),
+                PerformanceStats {
+                    operation: operation.clone(),
+                    avg_response_time: avg_time,
+                    min_response_time: *min_time,
+                    max_response_time: *max_time,
+                    total_calls: times.len(),
+                    p95_response_time: self.calculate_percentile(times, 95),
+                },
+            );
         }
 
         stats

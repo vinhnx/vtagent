@@ -1,8 +1,8 @@
 //! Compaction engine implementation
 
 use crate::agent::config::CompactionConfig;
-use crate::agent::types::{CompactedMessage, EnhancedMessage, MessageType};
 use crate::agent::semantic::SemanticAnalyzer;
+use crate::agent::types::{CompactedMessage, EnhancedMessage, MessageType};
 use crate::gemini::Content;
 use anyhow::Result;
 use std::collections::VecDeque;
@@ -58,7 +58,9 @@ impl CompactionEngine {
         };
 
         // Analyze message priority and semantic information
-        let priority = self.semantic_analyzer.analyze_message_priority(&text_content, &message_type);
+        let priority = self
+            .semantic_analyzer
+            .analyze_message_priority(&text_content, &message_type);
         let semantic_tags = self.semantic_analyzer.extract_semantic_tags(&text_content);
 
         // Create enhanced message
@@ -92,7 +94,11 @@ impl CompactionEngine {
         Ok(text.trim().to_string())
     }
 
-    fn generate_message_summary(&self, content: &str, _message_type: &MessageType) -> Result<String> {
+    fn generate_message_summary(
+        &self,
+        content: &str,
+        _message_type: &MessageType,
+    ) -> Result<String> {
         if content.len() <= 100 {
             Ok(content.to_string())
         } else {
@@ -100,7 +106,11 @@ impl CompactionEngine {
         }
     }
 
-    fn extract_key_information(&self, content: &str, _message_type: &MessageType) -> Result<Vec<String>> {
+    fn extract_key_information(
+        &self,
+        content: &str,
+        _message_type: &MessageType,
+    ) -> Result<Vec<String>> {
         let mut key_info = Vec::new();
 
         // Simple keyword extraction
@@ -118,7 +128,9 @@ impl CompactionEngine {
     }
 
     /// Get compaction suggestions (minimal implementation)
-    pub async fn get_compaction_suggestions(&self) -> Result<Vec<crate::agent::compaction::CompactionSuggestion>> {
+    pub async fn get_compaction_suggestions(
+        &self,
+    ) -> Result<Vec<crate::agent::compaction::CompactionSuggestion>> {
         Ok(Vec::new()) // Minimal implementation
     }
 
@@ -140,7 +152,9 @@ impl CompactionEngine {
     }
 
     /// Compact messages intelligently (minimal implementation)
-    pub async fn compact_messages_intelligently(&self) -> Result<crate::agent::compaction::CompactionResult> {
+    pub async fn compact_messages_intelligently(
+        &self,
+    ) -> Result<crate::agent::compaction::CompactionResult> {
         Ok(crate::agent::compaction::CompactionResult {
             messages_processed: 0,
             messages_compacted: 0,
@@ -152,7 +166,11 @@ impl CompactionEngine {
     }
 
     /// Compact context (minimal implementation)
-    pub async fn compact_context(&self, _context_key: &str, _context_data: &mut std::collections::HashMap<String, serde_json::Value>) -> Result<crate::agent::compaction::CompactionResult> {
+    pub async fn compact_context(
+        &self,
+        _context_key: &str,
+        _context_data: &mut std::collections::HashMap<String, serde_json::Value>,
+    ) -> Result<crate::agent::compaction::CompactionResult> {
         Ok(crate::agent::compaction::CompactionResult {
             messages_processed: 0,
             messages_compacted: 0,

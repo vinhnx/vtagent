@@ -4,7 +4,7 @@
 //! types of operations, allowing for fine-tuned timeout behavior based on operation
 //! characteristics and user preferences.
 
-use crate::timeout_detector::{TimeoutConfig, OperationType};
+use crate::timeout_detector::{OperationType, TimeoutConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
@@ -100,10 +100,7 @@ impl TimeoutPolicy {
                 backoff_multiplier: 2.5,
                 use_jitter: true,
                 retry_on_timeout: true,
-                retry_on_errors: vec![
-                    "timeout".to_string(),
-                    "connection".to_string(),
-                ],
+                retry_on_errors: vec!["timeout".to_string(), "connection".to_string()],
             },
             TimeoutPolicy::Custom(config) => config.clone(),
         }
@@ -155,7 +152,11 @@ impl TimeoutPolicyConfig {
     }
 
     /// Add an operation-specific timeout policy
-    pub fn with_operation_policy(mut self, operation_type: OperationType, policy: TimeoutPolicy) -> Self {
+    pub fn with_operation_policy(
+        mut self,
+        operation_type: OperationType,
+        policy: TimeoutPolicy,
+    ) -> Self {
         self.operation_policies.insert(operation_type, policy);
         self
     }
@@ -173,7 +174,10 @@ impl TimeoutPolicyConfig {
     }
 
     /// Get the timeout configuration for a specific operation type
-    pub fn get_config_for_operation(&self, operation_type: &OperationType) -> Option<TimeoutConfig> {
+    pub fn get_config_for_operation(
+        &self,
+        operation_type: &OperationType,
+    ) -> Option<TimeoutConfig> {
         if !self.enabled {
             return None;
         }
@@ -330,7 +334,8 @@ impl TimeoutPolicyManager {
 
     /// Get the effective timeout configuration for an operation
     pub fn get_effective_config(&self, operation_type: &OperationType) -> Option<TimeoutConfig> {
-        self.config.get_adaptive_config_for_operation(operation_type, self.network_quality)
+        self.config
+            .get_adaptive_config_for_operation(operation_type, self.network_quality)
     }
 
     /// Apply the effective configuration to the timeout detector
@@ -342,9 +347,13 @@ impl TimeoutPolicyManager {
             OperationType::ToolExecution,
             OperationType::NetworkRequest,
             OperationType::Processing,
-        ].iter() {
+        ]
+        .iter()
+        {
             if let Some(config) = self.get_effective_config(operation_type) {
-                crate::timeout_detector::TIMEOUT_DETECTOR.set_config(operation_type.clone(), config).await;
+                crate::timeout_detector::TIMEOUT_DETECTOR
+                    .set_config(operation_type.clone(), config)
+                    .await;
             }
         }
     }
@@ -407,7 +416,10 @@ mod tests {
 
         let api_config = config.get_config_for_operation(&OperationType::ApiCall);
         assert!(api_config.is_some());
-        assert_eq!(api_config.unwrap().timeout_duration, Duration::from_secs(120));
+        assert_eq!(
+            api_config.unwrap().timeout_duration,
+            Duration::from_secs(120)
+        );
     }
 
     #[test]
@@ -425,7 +437,8 @@ mod tests {
         // Since we can't easily test the async function in unit tests,
         // we'll test the logic directly
         let timeout_rate = stats.timed_out_operations as f64 / stats.total_operations as f64;
-        let retry_success_rate = stats.successful_retries as f64 / stats.total_retry_attempts as f64;
+        let retry_success_rate =
+            stats.successful_retries as f64 / stats.total_retry_attempts as f64;
 
         assert!(timeout_rate < 0.05); // Should be excellent
         assert!(retry_success_rate > 0.8); // Should be good
@@ -440,6 +453,9 @@ mod tests {
 
         let api_config = manager.get_effective_config(&OperationType::ApiCall);
         assert!(api_config.is_some());
-        assert_eq!(api_config.unwrap().timeout_duration, Duration::from_secs(30));
+        assert_eq!(
+            api_config.unwrap().timeout_duration,
+            Duration::from_secs(30)
+        );
     }
 }

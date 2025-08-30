@@ -1,4 +1,4 @@
-# vtagent - Minimal research-preview Rust Coding Agent
+# vtagent - Research-preview Rust Coding Agent
 
 ## Project Purpose
 

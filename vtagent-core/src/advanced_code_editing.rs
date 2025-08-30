@@ -1,4 +1,4 @@
-//! Minimal research-preview Code Editing Module
+//! Research-preview Code Editing Module
 //!
 //! This module provides sophisticated code editing capabilities with:
 //! - Multi-step edit orchestration
@@ -42,10 +42,7 @@ pub enum EditOperation {
         after: bool, // true = insert after line, false = insert before
     },
     /// Delete text range
-    Delete {
-        start_line: usize,
-        end_line: usize,
-    },
+    Delete { start_line: usize, end_line: usize },
     /// Rename identifier with scope awareness
     Rename {
         old_name: String,
@@ -91,7 +88,7 @@ pub struct MinimalCodeEditor {
 }
 
 impl MinimalCodeEditor {
-    /// Create a new Minimal research-preview code editor
+    /// Create a new Research-preview code editor
     pub fn new(file_ops: Arc<EnhancedFileOps>, tree_sitter: Arc<TreeSitterAnalyzer>) -> Self {
         Self {
             file_ops,
@@ -169,14 +166,29 @@ impl MinimalCodeEditor {
         target_path: &Path,
     ) -> Result<EditPlan> {
         match operation {
-            RefactorOperation::ExtractFunction { start_line, end_line, new_function_name } => {
-                self.generate_extract_function_plan(target_path, start_line, end_line, &new_function_name).await
+            RefactorOperation::ExtractFunction {
+                start_line,
+                end_line,
+                new_function_name,
+            } => {
+                self.generate_extract_function_plan(
+                    target_path,
+                    start_line,
+                    end_line,
+                    &new_function_name,
+                )
+                .await
             }
             RefactorOperation::RenameSymbol { old_name, new_name } => {
-                self.generate_rename_symbol_plan(target_path, &old_name, &new_name).await
+                self.generate_rename_symbol_plan(target_path, &old_name, &new_name)
+                    .await
             }
-            RefactorOperation::AddDependency { crate_name, features } => {
-                self.generate_add_dependency_plan(&crate_name, &features).await
+            RefactorOperation::AddDependency {
+                crate_name,
+                features,
+            } => {
+                self.generate_add_dependency_plan(&crate_name, &features)
+                    .await
             }
         }
     }
@@ -184,22 +196,40 @@ impl MinimalCodeEditor {
     /// Execute a single code edit with context preservation
     async fn execute_single_edit(&self, edit: &CodeEdit) -> Result<EditResult> {
         match &edit.operation {
-            EditOperation::Replace { old_string, new_string, .. } => {
-                self.file_ops.edit_file_enhanced(
-                    &edit.file_path,
-                    old_string,
-                    new_string,
-                    true, // Always create backup
-                ).await?;
+            EditOperation::Replace {
+                old_string,
+                new_string,
+                ..
+            } => {
+                self.file_ops
+                    .edit_file_enhanced(
+                        &edit.file_path,
+                        old_string,
+                        new_string,
+                        true, // Always create backup
+                    )
+                    .await?;
             }
-            EditOperation::Insert { content, line, after } => {
-                self.execute_insert_operation(edit, content, *line, *after).await?;
+            EditOperation::Insert {
+                content,
+                line,
+                after,
+            } => {
+                self.execute_insert_operation(edit, content, *line, *after)
+                    .await?;
             }
-            EditOperation::Delete { start_line, end_line } => {
-                self.execute_delete_operation(edit, *start_line, *end_line).await?;
+            EditOperation::Delete {
+                start_line,
+                end_line,
+            } => {
+                self.execute_delete_operation(edit, *start_line, *end_line)
+                    .await?;
             }
-            EditOperation::Rename { old_name, new_name, .. } => {
-                self.execute_rename_operation(edit, old_name, new_name).await?;
+            EditOperation::Rename {
+                old_name, new_name, ..
+            } => {
+                self.execute_rename_operation(edit, old_name, new_name)
+                    .await?;
             }
         }
 
@@ -221,11 +251,18 @@ impl MinimalCodeEditor {
         after: bool,
     ) -> Result<()> {
         // Read the file to understand context
-        let (file_content, _) = self.file_ops.read_file_enhanced(&edit.file_path, None).await?;
+        let (file_content, _) = self
+            .file_ops
+            .read_file_enhanced(&edit.file_path, None)
+            .await?;
         let lines: Vec<&str> = file_content.lines().collect();
 
         if line >= lines.len() {
-            return Err(anyhow!("Line {} is beyond file length {}", line, lines.len()));
+            return Err(anyhow!(
+                "Line {} is beyond file length {}",
+                line,
+                lines.len()
+            ));
         }
 
         // Determine insertion point and indentation
@@ -246,7 +283,9 @@ impl MinimalCodeEditor {
             after_lines.join("\n")
         );
 
-        self.file_ops.write_file_enhanced(&edit.file_path, &new_content, true).await?;
+        self.file_ops
+            .write_file_enhanced(&edit.file_path, &new_content, true)
+            .await?;
         Ok(())
     }
 
@@ -257,28 +296,36 @@ impl MinimalCodeEditor {
         start_line: usize,
         end_line: usize,
     ) -> Result<()> {
-        let (file_content, _) = self.file_ops.read_file_enhanced(&edit.file_path, None).await?;
+        let (file_content, _) = self
+            .file_ops
+            .read_file_enhanced(&edit.file_path, None)
+            .await?;
         let lines: Vec<&str> = file_content.lines().collect();
 
         if start_line >= lines.len() || end_line >= lines.len() || start_line > end_line {
-            return Err(anyhow!("Invalid line range: {} to {}", start_line, end_line));
+            return Err(anyhow!(
+                "Invalid line range: {} to {}",
+                start_line,
+                end_line
+            ));
         }
 
         // Check for syntax-critical deletions
-        if self.would_break_syntax(&lines[start_line..=end_line], &edit.file_path).await? {
+        if self
+            .would_break_syntax(&lines[start_line..=end_line], &edit.file_path)
+            .await?
+        {
             return Err(anyhow!("Deletion would break syntax - refusing to proceed"));
         }
 
         let before_lines = &lines[0..start_line];
         let after_lines = &lines[end_line + 1..];
 
-        let new_content = format!(
-            "{}\n{}",
-            before_lines.join("\n"),
-            after_lines.join("\n")
-        );
+        let new_content = format!("{}\n{}", before_lines.join("\n"), after_lines.join("\n"));
 
-        self.file_ops.write_file_enhanced(&edit.file_path, &new_content, true).await?;
+        self.file_ops
+            .write_file_enhanced(&edit.file_path, &new_content, true)
+            .await?;
         Ok(())
     }
 
@@ -292,9 +339,9 @@ impl MinimalCodeEditor {
         // Prefer tree-sitter occurrences; fallback to naive scan
         // Extract optional scope hint (e.g., "property", "all")
         let scope_hint = match &edit.operation {
-            EditOperation::Rename { scope, .. } => scope
-                .as_deref()
-                .or(self.default_js_ts_scope.as_deref()),
+            EditOperation::Rename { scope, .. } => {
+                scope.as_deref().or(self.default_js_ts_scope.as_deref())
+            }
             _ => self.default_js_ts_scope.as_deref(),
         };
 
@@ -304,7 +351,10 @@ impl MinimalCodeEditor {
         {
             Ok(v) if !v.is_empty() => v,
             _ => {
-                let (content, _) = self.file_ops.read_file_enhanced(&edit.file_path, None).await?;
+                let (content, _) = self
+                    .file_ops
+                    .read_file_enhanced(&edit.file_path, None)
+                    .await?;
                 let mut occs: Vec<SymbolOccurrence> = Vec::new();
                 for (idx, line) in content.lines().enumerate() {
                     let mut start = 0;
@@ -319,7 +369,10 @@ impl MinimalCodeEditor {
         };
 
         // Load file once and apply replacements per line from right to left
-        let (content, _) = self.file_ops.read_file_enhanced(&edit.file_path, None).await?;
+        let (content, _) = self
+            .file_ops
+            .read_file_enhanced(&edit.file_path, None)
+            .await?;
         let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
 
         use std::collections::BTreeMap;
@@ -385,7 +438,11 @@ impl MinimalCodeEditor {
     }
 
     /// Check if deletion would break syntax
-    async fn would_break_syntax(&self, lines_to_delete: &[&str], _file_path: &Path) -> Result<bool> {
+    async fn would_break_syntax(
+        &self,
+        lines_to_delete: &[&str],
+        _file_path: &Path,
+    ) -> Result<bool> {
         let content_to_check = lines_to_delete.join("\n");
 
         // Check for unmatched braces, incomplete statements, etc.
@@ -409,7 +466,11 @@ impl MinimalCodeEditor {
 
     /// Find all occurrences of a symbol in the code
     #[allow(dead_code)]
-    fn find_symbol_occurrences(&self, _analysis: &CodeAnalysis, _symbol_name: &str) -> Result<Vec<SymbolOccurrence>> {
+    fn find_symbol_occurrences(
+        &self,
+        _analysis: &CodeAnalysis,
+        _symbol_name: &str,
+    ) -> Result<Vec<SymbolOccurrence>> {
         // This would use tree-sitter to find symbol occurrences
         // For now, return empty vec as placeholder
         Ok(Vec::new())
@@ -420,7 +481,11 @@ impl MinimalCodeEditor {
         for (file, deps) in &plan.dependencies {
             for dep in deps {
                 if !dep.exists() {
-                    return Err(anyhow!("Dependency {} does not exist for file {}", dep.display(), file.display()));
+                    return Err(anyhow!(
+                        "Dependency {} does not exist for file {}",
+                        dep.display(),
+                        file.display()
+                    ));
                 }
             }
         }
@@ -431,12 +496,19 @@ impl MinimalCodeEditor {
     async fn run_validation(&self, validation: &ValidationStep) -> Result<()> {
         match validation.check_type {
             ValidationType::SyntaxCheck => {
-                match self.syntax_check_with_tree_sitter(&validation.file_path).await {
+                match self
+                    .syntax_check_with_tree_sitter(&validation.file_path)
+                    .await
+                {
                     Ok(true) => Ok(()),
                     Ok(false) => Err(anyhow!("Tree-sitter syntax diagnostics found")),
                     Err(_) => {
                         let ok = self.lightweight_syntax_check(&validation.file_path).await?;
-                        if ok { Ok(()) } else { Err(anyhow!("Lightweight syntax check failed")) }
+                        if ok {
+                            Ok(())
+                        } else {
+                            Err(anyhow!("Lightweight syntax check failed"))
+                        }
                     }
                 }
             }
@@ -444,7 +516,15 @@ impl MinimalCodeEditor {
                 if !self.enable_type_checks {
                     return Ok(());
                 }
-                let project_dir = self.find_cargo_root(&validation.file_path).unwrap_or_else(|| validation.file_path.parent().unwrap_or(Path::new(".")).to_path_buf());
+                let project_dir =
+                    self.find_cargo_root(&validation.file_path)
+                        .unwrap_or_else(|| {
+                            validation
+                                .file_path
+                                .parent()
+                                .unwrap_or(Path::new("."))
+                                .to_path_buf()
+                        });
                 self.run_cargo_check(&project_dir).await
             }
             ValidationType::ImportResolution => {
@@ -503,9 +583,21 @@ impl MinimalCodeEditor {
                 }
                 _ if in_single || in_double => {}
                 '{' | '[' | '(' => stack.push(ch),
-                '}' => if stack.pop() != Some('{') { return Ok(false); },
-                ']' => if stack.pop() != Some('[') { return Ok(false); },
-                ')' => if stack.pop() != Some('(') { return Ok(false); },
+                '}' => {
+                    if stack.pop() != Some('{') {
+                        return Ok(false);
+                    }
+                }
+                ']' => {
+                    if stack.pop() != Some('[') {
+                        return Ok(false);
+                    }
+                }
+                ')' => {
+                    if stack.pop() != Some('(') {
+                        return Ok(false);
+                    }
+                }
                 _ => {}
             }
         }
@@ -533,13 +625,15 @@ impl MinimalCodeEditor {
         // Allow-list of identifier node kinds per language & scope
         let allowed_kinds: Vec<&str> = match syntax.language {
             crate::tree_sitter::analyzer::LanguageSupport::JavaScript
-            | crate::tree_sitter::analyzer::LanguageSupport::TypeScript => {
-                match scope {
-                    Some("property") => vec!["property_identifier", "shorthand_property_identifier"],
-                    Some("all") => vec!["identifier", "property_identifier", "shorthand_property_identifier"],
-                    _ => vec!["identifier"],
-                }
-            }
+            | crate::tree_sitter::analyzer::LanguageSupport::TypeScript => match scope {
+                Some("property") => vec!["property_identifier", "shorthand_property_identifier"],
+                Some("all") => vec![
+                    "identifier",
+                    "property_identifier",
+                    "shorthand_property_identifier",
+                ],
+                _ => vec!["identifier"],
+            },
             _ => vec!["identifier"],
         };
 
@@ -573,7 +667,9 @@ impl MinimalCodeEditor {
             if dir.join("Cargo.toml").exists() {
                 return Some(dir);
             }
-            if !dir.pop() { break; }
+            if !dir.pop() {
+                break;
+            }
         }
         None
     }
@@ -664,7 +760,7 @@ impl MinimalCodeEditor {
                     check_type: ValidationType::TypeCheck,
                     file_path: file_path.to_path_buf(),
                     expected_result: "cargo check passes".to_string(),
-                }
+                },
             ],
             rollback_plan: vec![],
         })
@@ -677,31 +773,27 @@ impl MinimalCodeEditor {
         old_name: &str,
         new_name: &str,
     ) -> Result<EditPlan> {
-        let edits = vec![
-            CodeEdit {
-                file_path: file_path.to_path_buf(),
-                operation: EditOperation::Rename {
-                    old_name: old_name.to_string(),
-                    new_name: new_name.to_string(),
-                    scope: None,
-                },
-                context: Some(format!("Rename {} to {}", old_name, new_name)),
-                dependencies: vec![],
-                rollback_data: Some(old_name.to_string()),
-            }
-        ];
+        let edits = vec![CodeEdit {
+            file_path: file_path.to_path_buf(),
+            operation: EditOperation::Rename {
+                old_name: old_name.to_string(),
+                new_name: new_name.to_string(),
+                scope: None,
+            },
+            context: Some(format!("Rename {} to {}", old_name, new_name)),
+            dependencies: vec![],
+            rollback_data: Some(old_name.to_string()),
+        }];
 
         Ok(EditPlan {
             edits,
             dependencies: HashMap::new(),
-            validation_steps: vec![
-                ValidationStep {
-                    name: "Symbol Resolution Check".to_string(),
-                    check_type: ValidationType::ImportResolution,
-                    file_path: file_path.to_path_buf(),
-                    expected_result: "All symbols resolved".to_string(),
-                }
-            ],
+            validation_steps: vec![ValidationStep {
+                name: "Symbol Resolution Check".to_string(),
+                check_type: ValidationType::ImportResolution,
+                file_path: file_path.to_path_buf(),
+                expected_result: "All symbols resolved".to_string(),
+            }],
             rollback_plan: vec![],
         })
     }
@@ -724,31 +816,27 @@ impl MinimalCodeEditor {
             )
         };
 
-        let edits = vec![
-            CodeEdit {
-                file_path: cargo_toml_path.clone(),
-                operation: EditOperation::Insert {
-                    content: format!("\n{}", dependency_line),
-                    line: 10, // Insert in dependencies section
-                    after: true,
-                },
-                context: Some(format!("Add dependency: {}", crate_name)),
-                dependencies: vec![],
-                rollback_data: None,
-            }
-        ];
+        let edits = vec![CodeEdit {
+            file_path: cargo_toml_path.clone(),
+            operation: EditOperation::Insert {
+                content: format!("\n{}", dependency_line),
+                line: 10, // Insert in dependencies section
+                after: true,
+            },
+            context: Some(format!("Add dependency: {}", crate_name)),
+            dependencies: vec![],
+            rollback_data: None,
+        }];
 
         Ok(EditPlan {
             edits,
             dependencies: HashMap::new(),
-            validation_steps: vec![
-                ValidationStep {
-                    name: "Cargo Check".to_string(),
-                    check_type: ValidationType::TypeCheck,
-                    file_path: cargo_toml_path,
-                    expected_result: "Dependencies resolved".to_string(),
-                }
-            ],
+            validation_steps: vec![ValidationStep {
+                name: "Cargo Check".to_string(),
+                check_type: ValidationType::TypeCheck,
+                file_path: cargo_toml_path,
+                expected_result: "Dependencies resolved".to_string(),
+            }],
             rollback_plan: vec![],
         })
     }
@@ -772,10 +860,14 @@ pub struct SymbolOccurrence {
     pub scope: String,
 }
 
-// Placeholder implementation - would be used for Minimal research-preview symbol analysis
+// Placeholder implementation - would be used for Research-preview symbol analysis
 impl SymbolOccurrence {
     pub fn new(line: usize, column: usize, scope: String) -> Self {
-        Self { line, column, scope }
+        Self {
+            line,
+            column,
+            scope,
+        }
     }
 }
 
@@ -815,17 +907,18 @@ mod tests {
 }"#;
 
         let file_ops = Arc::new(EnhancedFileOps::new(5));
-        file_ops.write_file_enhanced(&file_path, content, false).await.unwrap();
+        file_ops
+            .write_file_enhanced(&file_path, content, false)
+            .await
+            .unwrap();
 
         let tree_sitter = Arc::new(TreeSitterAnalyzer::new().unwrap());
         let editor = MinimalCodeEditor::new(file_ops, tree_sitter);
 
-        let plan = editor.generate_extract_function_plan(
-            &file_path,
-            1,
-            3,
-            "print_stuff"
-        ).await.unwrap();
+        let plan = editor
+            .generate_extract_function_plan(&file_path, 1, 3, "print_stuff")
+            .await
+            .unwrap();
 
         assert_eq!(plan.edits.len(), 2);
         assert!(!plan.validation_steps.is_empty());
@@ -844,14 +937,21 @@ mod tests {
 }"#;
 
         let file_ops = Arc::new(EnhancedFileOps::new(5));
-        file_ops.write_file_enhanced(&file_path, content, false).await.unwrap();
+        file_ops
+            .write_file_enhanced(&file_path, content, false)
+            .await
+            .unwrap();
 
         let tree_sitter = Arc::new(TreeSitterAnalyzer::new().unwrap());
         let editor = MinimalCodeEditor::new(file_ops.clone(), tree_sitter);
 
         let edit = CodeEdit {
             file_path: file_path.clone(),
-            operation: EditOperation::Rename { old_name: "foo".into(), new_name: "bar".into(), scope: None },
+            operation: EditOperation::Rename {
+                old_name: "foo".into(),
+                new_name: "bar".into(),
+                scope: None,
+            },
             context: None,
             dependencies: vec![],
             rollback_data: None,
@@ -881,14 +981,21 @@ fn use_it() {
 }"#;
 
         let file_ops = Arc::new(EnhancedFileOps::new(5));
-        file_ops.write_file_enhanced(&file_path, content, false).await.unwrap();
+        file_ops
+            .write_file_enhanced(&file_path, content, false)
+            .await
+            .unwrap();
 
         let tree_sitter = Arc::new(TreeSitterAnalyzer::new().unwrap());
         let editor = MinimalCodeEditor::new(file_ops.clone(), tree_sitter);
 
         let edit = CodeEdit {
             file_path: file_path.clone(),
-            operation: EditOperation::Rename { old_name: "foo".into(), new_name: "sum".into(), scope: None },
+            operation: EditOperation::Rename {
+                old_name: "foo".into(),
+                new_name: "sum".into(),
+                scope: None,
+            },
             context: None,
             dependencies: vec![],
             rollback_data: None,
@@ -911,7 +1018,10 @@ console.log(o.foo, o.foobar);
 "#;
 
         let file_ops = Arc::new(EnhancedFileOps::new(5));
-        file_ops.write_file_enhanced(&file_path, content, false).await.unwrap();
+        file_ops
+            .write_file_enhanced(&file_path, content, false)
+            .await
+            .unwrap();
 
         let tree_sitter = Arc::new(TreeSitterAnalyzer::new().unwrap());
         let editor = MinimalCodeEditor::new(file_ops.clone(), tree_sitter);
@@ -919,7 +1029,11 @@ console.log(o.foo, o.foobar);
         // Default rename (identifiers only): variable foo -> bar; properties remain
         let edit_ident_only = CodeEdit {
             file_path: file_path.clone(),
-            operation: EditOperation::Rename { old_name: "foo".into(), new_name: "bar".into(), scope: None },
+            operation: EditOperation::Rename {
+                old_name: "foo".into(),
+                new_name: "bar".into(),
+                scope: None,
+            },
             context: None,
             dependencies: vec![],
             rollback_data: None,
@@ -933,12 +1047,19 @@ console.log(o.foo, o.foobar);
         // Property-only rename: change property foo -> baz; leave variable bar intact
         let edit_property_only = CodeEdit {
             file_path: file_path.clone(),
-            operation: EditOperation::Rename { old_name: "foo".into(), new_name: "baz".into(), scope: Some("property".into()) },
+            operation: EditOperation::Rename {
+                old_name: "foo".into(),
+                new_name: "baz".into(),
+                scope: Some("property".into()),
+            },
             context: None,
             dependencies: vec![],
             rollback_data: None,
         };
-        let _ = editor.execute_single_edit(&edit_property_only).await.unwrap();
+        let _ = editor
+            .execute_single_edit(&edit_property_only)
+            .await
+            .unwrap();
         let (updated2, _) = file_ops.read_file_enhanced(&file_path, None).await.unwrap();
         assert!(updated2.contains("const bar = 1;"));
         assert!(updated2.contains("{ baz: 2, foobar: 3 }"));

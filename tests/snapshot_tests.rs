@@ -107,7 +107,10 @@ async fn test_snapshot_creation_and_loading() {
     snapshot.checksum = checksum;
 
     let final_json = serde_json::to_string_pretty(&snapshot).unwrap();
-    manager.save_snapshot("test_snapshot_1", &final_json, false).await.unwrap();
+    manager
+        .save_snapshot("test_snapshot_1", &final_json, false)
+        .await
+        .unwrap();
 
     // Load snapshot
     let loaded_snapshot = manager
@@ -115,14 +118,30 @@ async fn test_snapshot_creation_and_loading() {
         .await
         .expect("Failed to load snapshot");
 
+    // Basic sanity: loaded snapshot should have matching id and content
+    assert_eq!(loaded_snapshot.metadata.id, "test_snapshot_1");
+}
+
 /// Test revert scope parsing
 #[test]
 fn test_revert_scope_parsing() {
-    assert_eq!(SnapshotManager::parse_revert_scope("memory"), Some(RevertScope::Memory));
-    assert_eq!(SnapshotManager::parse_revert_scope("context"), Some(RevertScope::Context));
-    assert_eq!(SnapshotManager::parse_revert_scope("full"), Some(RevertScope::Full));
+    assert_eq!(
+        SnapshotManager::parse_revert_scope("memory"),
+        Some(RevertScope::Memory)
+    );
+    assert_eq!(
+        SnapshotManager::parse_revert_scope("context"),
+        Some(RevertScope::Context)
+    );
+    assert_eq!(
+        SnapshotManager::parse_revert_scope("full"),
+        Some(RevertScope::Full)
+    );
     assert_eq!(SnapshotManager::parse_revert_scope("invalid"), None);
-    assert_eq!(SnapshotManager::parse_revert_scope("MEMORY"), Some(RevertScope::Memory));
+    assert_eq!(
+        SnapshotManager::parse_revert_scope("MEMORY"),
+        Some(RevertScope::Memory)
+    );
 }
 
 /// Test checksum verification
@@ -210,7 +229,10 @@ async fn test_checksum_verification() {
     snapshot.checksum = checksum;
 
     let final_json = serde_json::to_string_pretty(&snapshot).unwrap();
-    manager.save_snapshot("test_checksum", &final_json, false).await.unwrap();
+    manager
+        .save_snapshot("test_checksum", &final_json, false)
+        .await
+        .unwrap();
 
     // Load snapshot
     let loaded_snapshot = manager
@@ -244,8 +266,8 @@ async fn test_snapshot_encryption() {
     let password = "test_password_123";
 
     // Create snapshot manager with encryption
-    let manager = SnapshotManager::new(snapshots_dir.clone(), 10)
-        .with_encryption_key(password.to_string());
+    let manager =
+        SnapshotManager::new(snapshots_dir.clone(), 10).with_encryption_key(password.to_string());
 
     let agent_config = AgentConfig {
         model: "test-model".to_string(),
@@ -261,13 +283,21 @@ async fn test_snapshot_encryption() {
 
     // Create encrypted snapshot
     let snapshot_id = manager
-        .create_snapshot(&agent_config, &conversation_history, 1, "Encrypted snapshot")
+        .create_snapshot(
+            &agent_config,
+            &conversation_history,
+            1,
+            "Encrypted snapshot",
+        )
         .await
         .expect("Failed to create encrypted snapshot");
 
     // Verify encrypted file exists
     let encrypted_path = snapshots_dir.join(format!("{}.json", snapshot_id));
-    assert!(encrypted_path.exists(), "Encrypted snapshot file should exist");
+    assert!(
+        encrypted_path.exists(),
+        "Encrypted snapshot file should exist"
+    );
 
     // Load encrypted snapshot
     let loaded_snapshot = manager
@@ -300,13 +330,21 @@ async fn test_snapshot_cleanup() {
     for i in 1..=5 {
         let conversation_history = vec![Content::user_text(format!("Message {}", i))];
         manager
-            .create_snapshot(&agent_config, &conversation_history, i, &format!("Snapshot {}", i))
+            .create_snapshot(
+                &agent_config,
+                &conversation_history,
+                i,
+                &format!("Snapshot {}", i),
+            )
             .await
             .expect(&format!("Failed to create snapshot {}", i));
     }
 
     // List snapshots
-    let snapshots = manager.list_snapshots().await.expect("Failed to list snapshots");
+    let snapshots = manager
+        .list_snapshots()
+        .await
+        .expect("Failed to list snapshots");
 
     // Should only keep the 3 most recent snapshots
     assert_eq!(snapshots.len(), 3);
@@ -318,11 +356,23 @@ async fn test_snapshot_cleanup() {
 /// Test revert scope parsing
 #[test]
 fn test_revert_scope_parsing() {
-    assert_eq!(SnapshotManager::parse_revert_scope("memory"), Some(RevertScope::Memory));
-    assert_eq!(SnapshotManager::parse_revert_scope("context"), Some(RevertScope::Context));
-    assert_eq!(SnapshotManager::parse_revert_scope("full"), Some(RevertScope::Full));
+    assert_eq!(
+        SnapshotManager::parse_revert_scope("memory"),
+        Some(RevertScope::Memory)
+    );
+    assert_eq!(
+        SnapshotManager::parse_revert_scope("context"),
+        Some(RevertScope::Context)
+    );
+    assert_eq!(
+        SnapshotManager::parse_revert_scope("full"),
+        Some(RevertScope::Full)
+    );
     assert_eq!(SnapshotManager::parse_revert_scope("invalid"), None);
-    assert_eq!(SnapshotManager::parse_revert_scope("MEMORY"), Some(RevertScope::Memory));
+    assert_eq!(
+        SnapshotManager::parse_revert_scope("MEMORY"),
+        Some(RevertScope::Memory)
+    );
 }
 
 /// Test checksum verification
@@ -421,7 +471,10 @@ async fn test_checksum_verification() {
     snapshot.checksum = checksum;
 
     let final_json = serde_json::to_string_pretty(&snapshot).unwrap();
-    manager.save_snapshot("test_snapshot_1", &final_json, false).await.unwrap();
+    manager
+        .save_snapshot("test_snapshot_1", &final_json, false)
+        .await
+        .unwrap();
 
     let snapshot_id = "test_snapshot_1".to_string();
 
@@ -469,7 +522,12 @@ async fn test_concurrent_snapshot_operations() {
 
         let handle = tokio::spawn(async move {
             manager_clone
-                .create_snapshot(&config_clone, &history, i, &format!("Concurrent snapshot {}", i))
+                .create_snapshot(
+                    &config_clone,
+                    &history,
+                    i,
+                    &format!("Concurrent snapshot {}", i),
+                )
                 .await
         });
         handles.push(handle);
@@ -477,11 +535,17 @@ async fn test_concurrent_snapshot_operations() {
 
     // Wait for all to complete
     for handle in handles {
-        handle.await.unwrap().expect("Concurrent snapshot creation failed");
+        handle
+            .await
+            .unwrap()
+            .expect("Concurrent snapshot creation failed");
     }
 
     // Verify all snapshots were created
-    let snapshots = manager.list_snapshots().await.expect("Failed to list snapshots");
+    let snapshots = manager
+        .list_snapshots()
+        .await
+        .expect("Failed to list snapshots");
     assert_eq!(snapshots.len(), 10);
 }
 
@@ -597,12 +661,21 @@ async fn test_full_snapshot_workflow() {
         .expect("Failed to create second snapshot");
 
     // Step 3: List snapshots
-    let snapshots = manager.list_snapshots().await.expect("Failed to list snapshots");
+    let snapshots = manager
+        .list_snapshots()
+        .await
+        .expect("Failed to list snapshots");
     assert_eq!(snapshots.len(), 2);
 
     // Step 4: Load and verify snapshots
-    let loaded_1 = manager.load_snapshot(&snapshot_1).await.expect("Failed to load first snapshot");
-    let loaded_2 = manager.load_snapshot(&snapshot_2).await.expect("Failed to load second snapshot");
+    let loaded_1 = manager
+        .load_snapshot(&snapshot_1)
+        .await
+        .expect("Failed to load first snapshot");
+    let loaded_2 = manager
+        .load_snapshot(&snapshot_2)
+        .await
+        .expect("Failed to load second snapshot");
 
     assert_eq!(loaded_1.metadata.turn_number, 1);
     assert_eq!(loaded_2.metadata.turn_number, 2);
@@ -610,11 +683,23 @@ async fn test_full_snapshot_workflow() {
     assert_eq!(loaded_2.conversation_history.len(), 3);
 
     // Step 5: Test cleanup
-    let deleted_count = manager.cleanup_old_snapshots().await.expect("Failed to cleanup");
+    let deleted_count = manager
+        .cleanup_old_snapshots()
+        .await
+        .expect("Failed to cleanup");
     assert_eq!(deleted_count, 0); // Should not delete any since we're under the limit
 
     // Step 6: Test revert scope parsing
-    assert_eq!(SnapshotManager::parse_revert_scope("full"), Some(RevertScope::Full));
-    assert_eq!(SnapshotManager::parse_revert_scope("memory"), Some(RevertScope::Memory));
-    assert_eq!(SnapshotManager::parse_revert_scope("context"), Some(RevertScope::Context));
+    assert_eq!(
+        SnapshotManager::parse_revert_scope("full"),
+        Some(RevertScope::Full)
+    );
+    assert_eq!(
+        SnapshotManager::parse_revert_scope("memory"),
+        Some(RevertScope::Memory)
+    );
+    assert_eq!(
+        SnapshotManager::parse_revert_scope("context"),
+        Some(RevertScope::Context)
+    );
 }

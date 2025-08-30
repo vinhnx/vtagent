@@ -22,11 +22,13 @@ struct ProjectAnalysis {
 }
 
 /// Handle the init command - analyze project and generate AGENTS.md
-pub async fn handle_init_command(
-    registry: &mut ToolRegistry,
-    workspace: &PathBuf,
-) -> Result<()> {
-    println!("{}", style("Initializing project with AGENTS.md...").cyan().bold());
+pub async fn handle_init_command(registry: &mut ToolRegistry, workspace: &PathBuf) -> Result<()> {
+    println!(
+        "{}",
+        style("Initializing project with AGENTS.md...")
+            .cyan()
+            .bold()
+    );
 
     // Step 1: Analyze the project structure
     println!("{}", style("1. Analyzing project structure...").dim());
@@ -130,7 +132,10 @@ async fn analyze_file(
 
             // Read Cargo.toml to extract dependencies
             let cargo_content = registry
-                .execute_tool("read_file", json!({"path": "Cargo.toml", "max_bytes": 5000}))
+                .execute_tool(
+                    "read_file",
+                    json!({"path": "Cargo.toml", "max_bytes": 5000}),
+                )
                 .await?;
 
             if let Some(content) = cargo_content.get("content").and_then(|c| c.as_str()) {
@@ -148,7 +153,10 @@ async fn analyze_file(
 
             // Read package.json to extract dependencies
             let package_content = registry
-                .execute_tool("read_file", json!({"path": "package.json", "max_bytes": 5000}))
+                .execute_tool(
+                    "read_file",
+                    json!({"path": "package.json", "max_bytes": 5000}),
+                )
                 .await?;
 
             if let Some(content) = package_content.get("content").and_then(|c| c.as_str()) {
@@ -218,7 +226,9 @@ fn extract_cargo_dependencies(analysis: &mut ProjectAnalysis, content: &str) {
     }
 
     if !deps.is_empty() {
-        analysis.dependencies.insert("Rust (Cargo)".to_string(), deps);
+        analysis
+            .dependencies
+            .insert("Rust (Cargo)".to_string(), deps);
     }
 }
 
@@ -230,9 +240,16 @@ fn extract_package_dependencies(analysis: &mut ProjectAnalysis, content: &str) {
     if content.contains("\"dependencies\":") {
         // Extract dependency names from JSON
         for line in content.lines() {
-            if line.contains("\"") && line.contains(":") && !line.contains("{") && !line.contains("}") {
+            if line.contains("\"")
+                && line.contains(":")
+                && !line.contains("{")
+                && !line.contains("}")
+            {
                 if let Some(dep_name) = line.split('"').nth(1) {
-                    if !dep_name.is_empty() && dep_name != "dependencies" && dep_name != "devDependencies" {
+                    if !dep_name.is_empty()
+                        && dep_name != "dependencies"
+                        && dep_name != "devDependencies"
+                    {
                         deps.push(dep_name.to_string());
                     }
                 }
@@ -241,7 +258,9 @@ fn extract_package_dependencies(analysis: &mut ProjectAnalysis, content: &str) {
     }
 
     if !deps.is_empty() {
-        analysis.dependencies.insert("JavaScript/TypeScript (npm)".to_string(), deps);
+        analysis
+            .dependencies
+            .insert("JavaScript/TypeScript (npm)".to_string(), deps);
     }
 }
 
@@ -287,7 +306,8 @@ fn generate_agents_md(analysis: &ProjectAnalysis) -> Result<String> {
         content.push_str("### Key Dependencies\n");
         for (category, deps) in &analysis.dependencies {
             content.push_str(&format!("**{}:**\n", category));
-            for dep in deps.iter().take(10) { // Limit to first 10
+            for dep in deps.iter().take(10) {
+                // Limit to first 10
                 content.push_str(&format!("- {}\n", dep));
             }
             if deps.len() > 10 {
@@ -309,7 +329,10 @@ fn generate_agents_md(analysis: &ProjectAnalysis) -> Result<String> {
         content.push_str("- Follow the Rust API guidelines for public APIs\n\n");
     }
 
-    if analysis.languages.contains(&"JavaScript/TypeScript".to_string()) {
+    if analysis
+        .languages
+        .contains(&"JavaScript/TypeScript".to_string())
+    {
         content.push_str("### JavaScript/TypeScript Conventions\n");
         content.push_str("- Use camelCase for variables and functions\n");
         content.push_str("- Use PascalCase for classes and interfaces\n");
@@ -363,7 +386,9 @@ fn generate_agents_md(analysis: &ProjectAnalysis) -> Result<String> {
                     content.push_str("- Use `cargo tree` to visualize dependency tree\n");
                 }
                 "npm/yarn/pnpm" => {
-                    content.push_str("- Use `npm install`/`yarn add`/`pnpm add` to add dependencies\n");
+                    content.push_str(
+                        "- Use `npm install`/`yarn add`/`pnpm add` to add dependencies\n",
+                    );
                     content.push_str("- Keep package.json and lock files in sync\n");
                     content.push_str("- Use `npm audit` to check for security vulnerabilities\n");
                 }

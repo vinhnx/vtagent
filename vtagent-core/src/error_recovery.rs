@@ -1,8 +1,8 @@
+use crate::timeout_detector::{OperationType, TIMEOUT_DETECTOR};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::timeout_detector::{OperationType, TIMEOUT_DETECTOR};
 
 /// Represents an error that occurred during execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -332,11 +332,9 @@ impl ErrorRecoveryManager {
     {
         let operation_type = self.get_operation_type(&error_type);
 
-        TIMEOUT_DETECTOR.execute_with_timeout_retry(
-            operation_id,
-            operation_type,
-            operation
-        ).await
+        TIMEOUT_DETECTOR
+            .execute_with_timeout_retry(operation_id, operation_type, operation)
+            .await
     }
 
     /// Check if an operation should be retried based on error analysis
@@ -347,7 +345,9 @@ impl ErrorRecoveryManager {
         attempt: u32,
     ) -> bool {
         let operation_type = self.get_operation_type(error_type);
-        TIMEOUT_DETECTOR.should_retry(&operation_type, error, attempt).await
+        TIMEOUT_DETECTOR
+            .should_retry(&operation_type, error, attempt)
+            .await
     }
 
     /// Get timeout statistics for monitoring and optimization

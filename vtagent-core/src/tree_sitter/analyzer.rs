@@ -351,10 +351,14 @@ fn get_language(language: LanguageSupport) -> Result<Language> {
         LanguageSupport::Java => tree_sitter_java::LANGUAGE,
         LanguageSupport::Swift => {
             #[cfg(feature = "swift")]
-            { tree_sitter_swift::LANGUAGE }
+            {
+                tree_sitter_swift::LANGUAGE
+            }
             #[cfg(not(feature = "swift"))]
-            { return Err(TreeSitterError::UnsupportedLanguage("Swift".to_string()).into()); }
-        },
+            {
+                return Err(TreeSitterError::UnsupportedLanguage("Swift".to_string()).into());
+            }
+        }
     };
     Ok(lang.into())
 }

@@ -186,6 +186,4 @@ impl MarkdownRenderer {
 
         result
     }
-
-
 }

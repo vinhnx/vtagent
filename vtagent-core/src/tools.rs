@@ -1,6 +1,6 @@
 use crate::gemini::FunctionDeclaration;
-use crate::todo_write::{TodoManager};
 use crate::todo_write::tool_functions;
+use crate::todo_write::TodoManager;
 use crate::vtagentgitignore::{initialize_vtagent_gitignore, should_exclude_file};
 use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
@@ -13,11 +13,11 @@ use tokio::sync::RwLock;
 use walkdir::WalkDir;
 // Performance optimization imports
 use dashmap::DashMap;
+use glob::Pattern as GlobPattern;
 use lru::LruCache;
 use once_cell::sync::Lazy;
-use std::num::NonZeroUsize;
 use regex::RegexBuilder;
-use glob::Pattern as GlobPattern;
+use std::num::NonZeroUsize;
 use std::process::Stdio;
 
 /// Enhanced cache entry with better performance tracking
@@ -344,8 +344,14 @@ impl FileContentCache {
     pub async fn invalidate_prefix(&self, prefix: &str) {
         {
             let mut small = self.small_file_cache.write().await;
-            let keys: Vec<String> = small.iter().filter(|(k, _)| k.starts_with(prefix)).map(|(k, _)| k.clone()).collect();
-            for k in keys { let _ = small.pop(&k); }
+            let keys: Vec<String> = small
+                .iter()
+                .filter(|(k, _)| k.starts_with(prefix))
+                .map(|(k, _)| k.clone())
+                .collect();
+            for k in keys {
+                let _ = small.pop(&k);
+            }
         }
         self.medium_file_cache.retain(|k, _| !k.starts_with(prefix));
         self.large_file_cache.retain(|k, _| !k.starts_with(prefix));
@@ -464,7 +470,11 @@ struct EditInput {
     encoding: Option<String>,
 }
 #[derive(Debug, Deserialize)]
-struct DeleteInput { path: String, #[serde(default)] confirm: bool }
+struct DeleteInput {
+    path: String,
+    #[serde(default)]
+    confirm: bool,
+}
 
 #[derive(Debug, Deserialize)]
 struct ListInput {
@@ -498,7 +508,9 @@ struct RgInput {
     max_results: Option<usize>,
 }
 
-fn default_search_path() -> String { ".".to_string() }
+fn default_search_path() -> String {
+    ".".to_string()
+}
 
 impl ToolRegistry {
     pub fn new(root: PathBuf) -> Self {
@@ -546,10 +558,13 @@ impl ToolRegistry {
             "todo_write" => tool_functions::write_todos(&self.todo_manager, args).await,
             "todo_update" => tool_functions::update_todos(&self.todo_manager, args).await,
             "todo_get" => tool_functions::get_todos(&self.todo_manager, args).await,
-            "todo_get_by_status" => tool_functions::get_todos_by_status(&self.todo_manager, args).await,
+            "todo_get_by_status" => {
+                tool_functions::get_todos_by_status(&self.todo_manager, args).await
+            }
             "todo_delete" => tool_functions::delete_todos(&self.todo_manager, args).await,
             "todo_stats" => tool_functions::get_statistics(&self.todo_manager, args).await,
             "todo_cleanup" => tool_functions::cleanup(&self.todo_manager, args).await,
+            "todo_temp_info" => tool_functions::get_temp_info(&self.todo_manager, args).await,
             _ => Err(anyhow!("Unknown tool: {}", name)),
         }
     }
@@ -722,19 +737,28 @@ impl ToolRegistry {
         Ok(json!({ "success": true }))
     }
 
-
-
     /// Delete a file safely and invalidate caches
     async fn delete_file(&self, args: Value) -> Result<Value> {
-        let input: DeleteInput = serde_json::from_value(args).context("invalid delete_file args")?;
+        let input: DeleteInput =
+            serde_json::from_value(args).context("invalid delete_file args")?;
         if !input.confirm {
-            return Err(anyhow!("Deletion requires user confirmation. Pass 'confirm': true"));
+            return Err(anyhow!(
+                "Deletion requires user confirmation. Pass 'confirm': true"
+            ));
         }
         let path = self.root.join(&input.path);
-        if !path.starts_with(&self.root) { return Err(anyhow!("Path escapes workspace")); }
-        if path.is_dir() { return Err(anyhow!("Refusing to delete a directory: {}", input.path)); }
-        if !path.exists() { return Ok(json!({ "success": true, "deleted": false })); }
-        tokio::fs::remove_file(&path).await.with_context(|| format!("Failed to delete file: {}", path.display()))?;
+        if !path.starts_with(&self.root) {
+            return Err(anyhow!("Path escapes workspace"));
+        }
+        if path.is_dir() {
+            return Err(anyhow!("Refusing to delete a directory: {}", input.path));
+        }
+        if !path.exists() {
+            return Ok(json!({ "success": true, "deleted": false }));
+        }
+        tokio::fs::remove_file(&path)
+            .await
+            .with_context(|| format!("Failed to delete file: {}", path.display()))?;
         let prefix = format!("read_file:{}:", input.path);
         FILE_CACHE.invalidate_prefix(&prefix).await;
         Ok(json!({ "success": true, "deleted": true }))
@@ -743,15 +767,30 @@ impl ToolRegistry {
     /// Create an execution plan (todo items) from a free-form task description
     async fn todo_plan(&self, args: Value) -> Result<Value> {
         #[derive(Deserialize)]
-        struct PlanInput { task: String, #[serde(default)] merge: bool, #[serde(default)] max_items: Option<usize>, #[serde(default)] auto_in_progress: bool }
+        struct PlanInput {
+            task: String,
+            #[serde(default)]
+            merge: bool,
+            #[serde(default)]
+            max_items: Option<usize>,
+            #[serde(default)]
+            auto_in_progress: bool,
+        }
         let input: PlanInput = serde_json::from_value(args).context("invalid todo_plan args")?;
 
         let mut raw = input.task.replace('\r', "");
-        for b in ["\n- ", "\n* ", "\n• "] { raw = raw.replace(b, "\n"); }
+        for b in ["\n- ", "\n* ", "\n• "] {
+            raw = raw.replace(b, "\n");
+        }
         let mut parts: Vec<String> = Vec::new();
         for line in raw.split('\n') {
-            let s = line.trim().trim_matches(|c: char| c == '-' || c == '*' || c == '•').trim();
-            if s.is_empty() { continue; }
+            let s = line
+                .trim()
+                .trim_matches(|c: char| c == '-' || c == '*' || c == '•')
+                .trim();
+            if s.is_empty() {
+                continue;
+            }
             let mut segs: Vec<String> = s
                 .split(|c| c == '.' || c == ';')
                 .flat_map(|seg| seg.split(" and "))
@@ -762,13 +801,28 @@ impl ToolRegistry {
             parts.append(&mut segs);
         }
 
-        if let Some(limit) = input.max_items { if parts.len() > limit { parts.truncate(limit); } }
-        if parts.is_empty() { parts.push(input.task.trim().to_string()); }
+        if let Some(limit) = input.max_items {
+            if parts.len() > limit {
+                parts.truncate(limit);
+            }
+        }
+        if parts.is_empty() {
+            parts.push(input.task.trim().to_string());
+        }
 
         let mut todos = Vec::new();
         for (i, p) in parts.into_iter().enumerate() {
-            let status = if i == 0 && input.auto_in_progress { crate::todo_write::TodoStatus::InProgress } else { crate::todo_write::TodoStatus::Pending };
-            todos.push(crate::todo_write::TodoInput { id: None, content: p, status, notes: None });
+            let status = if i == 0 && input.auto_in_progress {
+                crate::todo_write::TodoStatus::InProgress
+            } else {
+                crate::todo_write::TodoStatus::Pending
+            };
+            todos.push(crate::todo_write::TodoInput {
+                id: None,
+                content: p,
+                status,
+                notes: None,
+            });
         }
 
         let created = self.todo_manager.write_todos(input.merge, todos).await?;
@@ -779,15 +833,33 @@ impl ToolRegistry {
     /// Mark todo items completed by id or content contains substring
     async fn todo_mark_done(&self, args: Value) -> Result<Value> {
         #[derive(Deserialize)]
-        struct MarkInput { #[serde(default)] ids: Option<Vec<String>>, #[serde(default)] contains: Option<String> }
-        let input: MarkInput = serde_json::from_value(args).context("invalid todo_mark_done args")?;
+        struct MarkInput {
+            #[serde(default)]
+            ids: Option<Vec<String>>,
+            #[serde(default)]
+            contains: Option<String>,
+        }
+        let input: MarkInput =
+            serde_json::from_value(args).context("invalid todo_mark_done args")?;
         let mut updates = Vec::new();
         if let Some(ids) = input.ids {
-            for id in ids { updates.push(crate::todo_write::TodoUpdate { id, content: None, status: Some(crate::todo_write::TodoStatus::Completed), notes: None }); }
+            for id in ids {
+                updates.push(crate::todo_write::TodoUpdate {
+                    id,
+                    content: None,
+                    status: Some(crate::todo_write::TodoStatus::Completed),
+                    notes: None,
+                });
+            }
         } else if let Some(substr) = input.contains {
             let all = self.todo_manager.get_todos().await;
             for item in all.into_iter().filter(|t| t.content.contains(&substr)) {
-                updates.push(crate::todo_write::TodoUpdate { id: item.id, content: None, status: Some(crate::todo_write::TodoStatus::Completed), notes: None });
+                updates.push(crate::todo_write::TodoUpdate {
+                    id: item.id,
+                    content: None,
+                    status: Some(crate::todo_write::TodoStatus::Completed),
+                    notes: None,
+                });
             }
         } else {
             return Err(anyhow!("Provide 'ids' or 'contains' to select todos"));
@@ -817,7 +889,9 @@ impl ToolRegistry {
             .map_err(|e| anyhow!("Invalid regex pattern: {}", e))?;
 
         let glob = match &input.glob_pattern {
-            Some(g) if !g.trim().is_empty() => Some(GlobPattern::new(g).map_err(|e| anyhow!("Invalid glob pattern '{}': {}", g, e))?),
+            Some(g) if !g.trim().is_empty() => Some(
+                GlobPattern::new(g).map_err(|e| anyhow!("Invalid glob pattern '{}': {}", g, e))?,
+            ),
             _ => None,
         };
 
@@ -828,40 +902,61 @@ impl ToolRegistry {
         let denylist = ["node_modules", "target", ".git", "build", "dist"];
         for entry in WalkDir::new(&base).into_iter().filter_map(|e| e.ok()) {
             let path = entry.path();
-            if path.is_dir() { continue; }
+            if path.is_dir() {
+                continue;
+            }
 
             // Skip hidden files unless requested
             if !include_hidden {
                 if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                    if name.starts_with('.') { continue; }
+                    if name.starts_with('.') {
+                        continue;
+                    }
                 }
             }
 
             // Skip excluded files by .vtagentgitignore
-            if should_exclude_file(path).await { continue; }
+            if should_exclude_file(path).await {
+                continue;
+            }
 
             // Denylist common large/binary folders
-            if path.components().any(|c| denylist.iter().any(|d| c.as_os_str() == *d)) {
+            if path
+                .components()
+                .any(|c| denylist.iter().any(|d| c.as_os_str() == *d))
+            {
                 continue;
             }
 
             // Apply glob filter on path relative to root
             if let Some(glob) = &glob {
                 let rel = path.strip_prefix(&self.root).unwrap_or(path);
-                if !glob.matches_path(rel) { continue; }
+                if !glob.matches_path(rel) {
+                    continue;
+                }
             }
 
             files_scanned += 1;
 
             // Read file content (prefer UTF-8; skip likely binary files)
-            let bytes = match tokio::fs::read(path).await { Ok(b) => b, Err(_) => continue };
+            let bytes = match tokio::fs::read(path).await {
+                Ok(b) => b,
+                Err(_) => continue,
+            };
             let content = match String::from_utf8(bytes.clone()) {
                 Ok(s) => s,
                 Err(_) => {
-                    if bytes.iter().any(|&b| b == 0) { continue; }
-                    let non_text = bytes.iter().filter(|&&b| b < 9 || (b > 13 && b < 32)).count();
+                    if bytes.iter().any(|&b| b == 0) {
+                        continue;
+                    }
+                    let non_text = bytes
+                        .iter()
+                        .filter(|&&b| b < 9 || (b > 13 && b < 32))
+                        .count();
                     let ratio = non_text as f64 / (bytes.len().max(1) as f64);
-                    if ratio > 0.3 { continue; }
+                    if ratio > 0.3 {
+                        continue;
+                    }
                     String::from_utf8_lossy(&bytes).into_owned()
                 }
             };
@@ -870,7 +965,10 @@ impl ToolRegistry {
             // Track cumulative byte offset per line
             let mut line_offsets: Vec<usize> = Vec::with_capacity(lines.len());
             let mut acc = 0usize;
-            for l in &lines { line_offsets.push(acc); acc += l.len() + 1; }
+            for l in &lines {
+                line_offsets.push(acc);
+                acc += l.len() + 1;
+            }
 
             for (i, line) in lines.iter().enumerate() {
                 // Find all matches in the line
@@ -882,12 +980,20 @@ impl ToolRegistry {
                         let start_col = m.start();
                         let end_col = m.end();
                         // Collect context
-                        let start_ctx = if i >= context_lines { i - context_lines } else { 0 };
+                        let start_ctx = if i >= context_lines {
+                            i - context_lines
+                        } else {
+                            0
+                        };
                         let end_ctx = usize::min(lines.len(), i + 1 + context_lines);
                         let mut before = Vec::new();
                         let mut after = Vec::new();
-                        for ci in start_ctx..i { before.push(lines[ci].to_string()); }
-                        for ci in (i + 1)..end_ctx { after.push(lines[ci].to_string()); }
+                        for ci in start_ctx..i {
+                            before.push(lines[ci].to_string());
+                        }
+                        for ci in (i + 1)..end_ctx {
+                            after.push(lines[ci].to_string());
+                        }
 
                         let rel = path.strip_prefix(&self.root).unwrap_or(path);
                         let byte_start = line_offsets.get(i).cloned().unwrap_or(0) + start_col;
@@ -906,10 +1012,14 @@ impl ToolRegistry {
                     }
                 }
 
-                if line_has_match && results.len() >= max_results { break; }
+                if line_has_match && results.len() >= max_results {
+                    break;
+                }
             }
 
-            if results.len() >= max_results { break; }
+            if results.len() >= max_results {
+                break;
+            }
         }
 
         Ok(json!({
@@ -924,7 +1034,8 @@ impl ToolRegistry {
     async fn codebase_search(&self, args: Value) -> Result<Value> {
         let mut obj = args.as_object().cloned().unwrap_or_default();
         let default_glob = "**/*.{rs,py,js,ts,tsx,go,java}".to_string();
-        obj.entry("glob_pattern".to_string()).or_insert(json!(default_glob));
+        obj.entry("glob_pattern".to_string())
+            .or_insert(json!(default_glob));
         self.rg_search(Value::Object(obj)).await
     }
 
@@ -941,26 +1052,42 @@ impl ToolRegistry {
             case_sensitive: Option<bool>,
         }
 
-        let input: CodeSearchInput = serde_json::from_value(args).context("invalid code_search args")?;
+        let input: CodeSearchInput =
+            serde_json::from_value(args).context("invalid code_search args")?;
         if input.pattern.trim().is_empty() {
             return Err(anyhow!("pattern is required"));
         }
 
         // Map file_type to a simple glob if provided
-        let glob = input.file_type.as_ref().map(|ft| format!("**/*.{}", ft.trim().trim_start_matches('.')));
+        let glob = input
+            .file_type
+            .as_ref()
+            .map(|ft| format!("**/*.{}", ft.trim().trim_start_matches('.')));
 
         // Call rg_search and then pretty-format similar to ripgrep output
         let mut rg_obj = serde_json::Map::new();
         rg_obj.insert("pattern".to_string(), json!(input.pattern));
-        rg_obj.insert("path".to_string(), json!(input.path.unwrap_or_else(|| ".".to_string())));
-        rg_obj.insert("case_sensitive".to_string(), json!(input.case_sensitive.unwrap_or(false))); // default false like Go impl
-        if let Some(g) = glob { rg_obj.insert("glob_pattern".to_string(), json!(g)); }
+        rg_obj.insert(
+            "path".to_string(),
+            json!(input.path.unwrap_or_else(|| ".".to_string())),
+        );
+        rg_obj.insert(
+            "case_sensitive".to_string(),
+            json!(input.case_sensitive.unwrap_or(false)),
+        ); // default false like Go impl
+        if let Some(g) = glob {
+            rg_obj.insert("glob_pattern".to_string(), json!(g));
+        }
         rg_obj.insert("context_lines".to_string(), json!(0));
         rg_obj.insert("include_hidden".to_string(), json!(false));
         rg_obj.insert("max_results".to_string(), json!(1000));
 
         let rg_resp = self.rg_search(Value::Object(rg_obj)).await?;
-        let matches = rg_resp.get("matches").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+        let matches = rg_resp
+            .get("matches")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
         if matches.is_empty() {
             return Ok(json!({ "output": "No matches found" }));
         }
@@ -971,7 +1098,9 @@ impl ToolRegistry {
             let line = m.get("line").and_then(|v| v.as_u64()).unwrap_or(0);
             let text = m.get("line_text").and_then(|v| v.as_str()).unwrap_or("");
             lines.push(format!("{}:{}:{}", path, line, text));
-            if lines.len() >= 1000 { break; }
+            if lines.len() >= 1000 {
+                break;
+            }
         }
 
         // Trim to first 50 lines to mimic Go version's guardrail
@@ -990,8 +1119,14 @@ impl ToolRegistry {
     /// Execute cargo commands (check, clippy, fmt)
     async fn cargo_cmd(&self, sub: &str, extra: &[&str]) -> Result<Value> {
         let mut cmd = std::process::Command::new("cargo");
-        cmd.arg(sub).args(extra).current_dir(&self.root).stdout(Stdio::piped()).stderr(Stdio::piped());
-        let out = tokio::task::spawn_blocking(move || cmd.output()).await.map_err(|e| anyhow!("failed to spawn cargo {}: {}", sub, e))??;
+        cmd.arg(sub)
+            .args(extra)
+            .current_dir(&self.root)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        let out = tokio::task::spawn_blocking(move || cmd.output())
+            .await
+            .map_err(|e| anyhow!("failed to spawn cargo {}: {}", sub, e))??;
         let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
         let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
         Ok(json!({
@@ -1002,29 +1137,50 @@ impl ToolRegistry {
         }))
     }
 
-    async fn cargo_check(&self, _args: Value) -> Result<Value> { self.cargo_cmd("check", &["--quiet"]).await }
-    async fn cargo_clippy(&self, _args: Value) -> Result<Value> { self.cargo_cmd("clippy", &["--quiet"]).await }
-    async fn cargo_fmt(&self, _args: Value) -> Result<Value> { self.cargo_cmd("fmt", &["--", "--check"]).await }
+    async fn cargo_check(&self, _args: Value) -> Result<Value> {
+        self.cargo_cmd("check", &["--quiet"]).await
+    }
+    async fn cargo_clippy(&self, _args: Value) -> Result<Value> {
+        self.cargo_cmd("clippy", &["--quiet"]).await
+    }
+    async fn cargo_fmt(&self, _args: Value) -> Result<Value> {
+        self.cargo_cmd("fmt", &["--", "--check"]).await
+    }
 
     /// Run a terminal command with basic safety checks
     async fn run_terminal_cmd(&self, args: Value) -> Result<Value> {
         #[derive(Deserialize)]
-        struct CmdInput { command: Vec<String>, #[serde(default)] working_dir: Option<String> }
-        let input: CmdInput = serde_json::from_value(args).context("invalid run_terminal_cmd args")?;
-        if input.command.is_empty() { return Err(anyhow!("command cannot be empty")); }
+        struct CmdInput {
+            command: Vec<String>,
+            #[serde(default)]
+            working_dir: Option<String>,
+        }
+        let input: CmdInput =
+            serde_json::from_value(args).context("invalid run_terminal_cmd args")?;
+        if input.command.is_empty() {
+            return Err(anyhow!("command cannot be empty"));
+        }
         // Basic injection guards: no shell metacharacters in tokens
         let bad = [";", "&&", "|", ">", "<", "||"];
         for tok in &input.command {
-            if bad.iter().any(|b| tok.contains(b)) { return Err(anyhow!("disallowed characters in command token")); }
+            if bad.iter().any(|b| tok.contains(b)) {
+                return Err(anyhow!("disallowed characters in command token"));
+            }
         }
         let (prog, rest) = (&input.command[0], &input.command[1..]);
         let mut cmd = std::process::Command::new(prog);
         cmd.args(rest);
         let wd = input.working_dir.as_deref().unwrap_or(".");
         let workdir = self.root.join(wd);
-        if !workdir.starts_with(&self.root) { return Err(anyhow!("working_dir must be inside workspace")); }
-        cmd.current_dir(workdir).stdout(Stdio::piped()).stderr(Stdio::piped());
-        let out = tokio::task::spawn_blocking(move || cmd.output()).await.map_err(|e| anyhow!("failed to spawn command: {}", e))??;
+        if !workdir.starts_with(&self.root) {
+            return Err(anyhow!("working_dir must be inside workspace"));
+        }
+        cmd.current_dir(workdir)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        let out = tokio::task::spawn_blocking(move || cmd.output())
+            .await
+            .map_err(|e| anyhow!("failed to spawn command: {}", e))??;
         Ok(json!({
             "success": out.status.success(),
             "code": out.status.code(),
@@ -1088,7 +1244,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
                 "required": ["pattern"]
             }),
         },
-        
+
         FunctionDeclaration {
             name: "codebase_search".to_string(),
             description: "High-level search across common source files (uses rg_search under the hood).".to_string(),
@@ -1314,7 +1470,16 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         },
         FunctionDeclaration {
             name: "todo_cleanup".to_string(),
-            description: "Clean up old todo sessions (older than 7 days)".to_string(),
+            description: "Clean up old todo sessions (not applicable for temp files)".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {},
+                "required": []
+            }),
+        },
+        FunctionDeclaration {
+            name: "todo_temp_info".to_string(),
+            description: "Get information about the temporary file used for todo storage in this session".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {},
@@ -1370,7 +1535,12 @@ mod tests {
 
         // Delete via tool
         let args = json!({ "path": "to_delete.txt" });
-        let resp = registry.execute_tool("delete_file", json!({ "path": "to_delete.txt", "confirm": true })).await?;
+        let resp = registry
+            .execute_tool(
+                "delete_file",
+                json!({ "path": "to_delete.txt", "confirm": true }),
+            )
+            .await?;
         assert_eq!(resp["success"], true);
         assert_eq!(resp["deleted"], true);
         assert!(!file_path.exists());

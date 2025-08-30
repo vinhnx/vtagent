@@ -22,7 +22,7 @@ impl LanguageQueries {
             LanguageSupport::TypeScript => Self::typescript_queries(),
             LanguageSupport::Go => Self::go_queries(),
             LanguageSupport::Java => Self::java_queries(),
-            // LanguageSupport::Swift => Self::swift_queries(), // TODO: Enable when Swift support is resolved
+            LanguageSupport::Swift => Self::swift_queries()
         }
     }
 
@@ -506,7 +506,7 @@ impl LanguageAnalyzer {
                         SymbolKind::Function
                     },
                     position: name_node.start_position.clone(),
-                    scope: None, // TODO: Extract scope information
+                    scope: Some(if node.kind.contains("method") { "method" } else { "function" }.to_string()),
                     signature: self.extract_signature(node),
                     documentation: self.extract_documentation(node),
                 };
@@ -544,7 +544,7 @@ impl LanguageAnalyzer {
                     name: name_node.text.clone(),
                     kind,
                     position: name_node.start_position.clone(),
-                    scope: None,
+                    scope: Some("class".to_string()),
                     signature: None,
                     documentation: self.extract_documentation(node),
                 };
@@ -578,7 +578,7 @@ impl LanguageAnalyzer {
                             SymbolKind::Variable
                         },
                         position: child.start_position.clone(),
-                        scope: None,
+                        scope: Some("variable".to_string()),
                         signature: None,
                         documentation: None,
                     };
@@ -607,7 +607,7 @@ impl LanguageAnalyzer {
                         name: child.text.clone(),
                         kind: SymbolKind::Import,
                         position: child.start_position.clone(),
-                        scope: None,
+                        scope: Some("import".to_string()),
                         signature: None,
                         documentation: None,
                     };
@@ -646,10 +646,25 @@ impl LanguageAnalyzer {
         }
     }
 
-    fn extract_documentation(&self, _node: &SyntaxNode) -> Option<String> {
-        // Look for comments/documentation above the node
-        // This is a simplified implementation - in practice, you'd need
-        // to look at preceding siblings and their position
-        None // TODO: Implement documentation extraction
+    fn extract_documentation(&self, node: &SyntaxNode) -> Option<String> {
+        // Heuristic: combine leading sibling comments (captured during AST build)
+        // with any immediate child comment nodes.
+        let mut docs = Vec::new();
+
+        // Preceding sibling comments collected on the node
+        for c in &node.leading_comments {
+            if !c.is_empty() { docs.push(c.clone()); }
+        }
+
+        // Immediate child comments
+        for child in &node.children {
+            let kind = child.kind.to_lowercase();
+            if kind.contains("comment") {
+                let t = child.text.trim();
+                if !t.is_empty() { docs.push(t.to_string()); }
+            }
+        }
+
+        if docs.is_empty() { None } else { Some(docs.join("\n")) }
     }
 }

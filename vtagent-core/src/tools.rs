@@ -16,6 +16,9 @@ use dashmap::DashMap;
 use lru::LruCache;
 use once_cell::sync::Lazy;
 use std::num::NonZeroUsize;
+use regex::RegexBuilder;
+use glob::Pattern as GlobPattern;
+use std::process::Stdio;
 
 /// Enhanced cache entry with better performance tracking
 #[derive(Debug, Clone)]
@@ -337,6 +340,17 @@ impl FileContentCache {
         self.stats.read().await.clone()
     }
 
+    /// Invalidate cached entries whose keys start with the given prefix
+    pub async fn invalidate_prefix(&self, prefix: &str) {
+        {
+            let mut small = self.small_file_cache.write().await;
+            let keys: Vec<String> = small.iter().filter(|(k, _)| k.starts_with(prefix)).map(|(k, _)| k.clone()).collect();
+            for k in keys { let _ = small.pop(&k); }
+        }
+        self.medium_file_cache.retain(|k, _| !k.starts_with(prefix));
+        self.large_file_cache.retain(|k, _| !k.starts_with(prefix));
+    }
+
     /// Clear all caches
     pub async fn clear(&self) {
         let mut small_cache = self.small_file_cache.write().await;
@@ -449,6 +463,8 @@ struct EditInput {
     #[serde(default)]
     encoding: Option<String>,
 }
+#[derive(Debug, Deserialize)]
+struct DeleteInput { path: String, #[serde(default)] confirm: bool }
 
 #[derive(Debug, Deserialize)]
 struct ListInput {
@@ -462,6 +478,27 @@ struct ListInput {
 fn default_max_items() -> usize {
     1000
 }
+
+#[derive(Debug, Deserialize)]
+struct RgInput {
+    pattern: String,
+    #[serde(default = "default_search_path")]
+    path: String,
+    #[serde(default)]
+    case_sensitive: Option<bool>,
+    #[serde(default)]
+    literal: Option<bool>,
+    #[serde(default)]
+    glob_pattern: Option<String>,
+    #[serde(default)]
+    context_lines: Option<usize>,
+    #[serde(default)]
+    include_hidden: Option<bool>,
+    #[serde(default)]
+    max_results: Option<usize>,
+}
+
+fn default_search_path() -> String { ".".to_string() }
 
 impl ToolRegistry {
     pub fn new(root: PathBuf) -> Self {
@@ -496,6 +533,16 @@ impl ToolRegistry {
             "read_file" => self.read_file(args).await,
             "write_file" => self.write_file(args).await,
             "edit_file" => self.edit_file(args).await,
+            "delete_file" => self.delete_file(args).await,
+            "todo_plan" => self.todo_plan(args).await,
+            "todo_mark_done" => self.todo_mark_done(args).await,
+            "rg_search" => self.rg_search(args).await,
+            "code_search" => self.code_search(args).await,
+            "codebase_search" => self.codebase_search(args).await,
+            "cargo_check" => self.cargo_check(args).await,
+            "cargo_clippy" => self.cargo_clippy(args).await,
+            "cargo_fmt" => self.cargo_fmt(args).await,
+            "run_terminal_cmd" => self.run_terminal_cmd(args).await,
             "todo_write" => tool_functions::write_todos(&self.todo_manager, args).await,
             "todo_update" => tool_functions::update_todos(&self.todo_manager, args).await,
             "todo_get" => tool_functions::get_todos(&self.todo_manager, args).await,
@@ -645,7 +692,8 @@ impl ToolRegistry {
         tokio::fs::write(&path, &input.content)
             .await
             .with_context(|| format!("Failed to write file: {}", path.display()))?;
-
+        let prefix = format!("read_file:{}:", input.path);
+        FILE_CACHE.invalidate_prefix(&prefix).await;
         Ok(json!({ "success": true }))
     }
 
@@ -668,10 +716,321 @@ impl ToolRegistry {
             .with_context(|| format!("Failed to write file: {}", path.display()))?;
 
         // Invalidate related cache entries
-        let _cache_key = format!("read_file:{}:{}", input.path, usize::MAX);
-        // Note: In a full implementation, we'd clear specific cache entries
+        let prefix = format!("read_file:{}:", input.path);
+        FILE_CACHE.invalidate_prefix(&prefix).await;
 
         Ok(json!({ "success": true }))
+    }
+
+
+
+    /// Delete a file safely and invalidate caches
+    async fn delete_file(&self, args: Value) -> Result<Value> {
+        let input: DeleteInput = serde_json::from_value(args).context("invalid delete_file args")?;
+        if !input.confirm {
+            return Err(anyhow!("Deletion requires user confirmation. Pass 'confirm': true"));
+        }
+        let path = self.root.join(&input.path);
+        if !path.starts_with(&self.root) { return Err(anyhow!("Path escapes workspace")); }
+        if path.is_dir() { return Err(anyhow!("Refusing to delete a directory: {}", input.path)); }
+        if !path.exists() { return Ok(json!({ "success": true, "deleted": false })); }
+        tokio::fs::remove_file(&path).await.with_context(|| format!("Failed to delete file: {}", path.display()))?;
+        let prefix = format!("read_file:{}:", input.path);
+        FILE_CACHE.invalidate_prefix(&prefix).await;
+        Ok(json!({ "success": true, "deleted": true }))
+    }
+
+    /// Create an execution plan (todo items) from a free-form task description
+    async fn todo_plan(&self, args: Value) -> Result<Value> {
+        #[derive(Deserialize)]
+        struct PlanInput { task: String, #[serde(default)] merge: bool, #[serde(default)] max_items: Option<usize>, #[serde(default)] auto_in_progress: bool }
+        let input: PlanInput = serde_json::from_value(args).context("invalid todo_plan args")?;
+
+        let mut raw = input.task.replace('\r', "");
+        for b in ["\n- ", "\n* ", "\n• "] { raw = raw.replace(b, "\n"); }
+        let mut parts: Vec<String> = Vec::new();
+        for line in raw.split('\n') {
+            let s = line.trim().trim_matches(|c: char| c == '-' || c == '*' || c == '•').trim();
+            if s.is_empty() { continue; }
+            let mut segs: Vec<String> = s
+                .split(|c| c == '.' || c == ';')
+                .flat_map(|seg| seg.split(" and "))
+                .flat_map(|seg| seg.split(','))
+                .map(|seg| seg.trim().to_string())
+                .filter(|seg| !seg.is_empty())
+                .collect();
+            parts.append(&mut segs);
+        }
+
+        if let Some(limit) = input.max_items { if parts.len() > limit { parts.truncate(limit); } }
+        if parts.is_empty() { parts.push(input.task.trim().to_string()); }
+
+        let mut todos = Vec::new();
+        for (i, p) in parts.into_iter().enumerate() {
+            let status = if i == 0 && input.auto_in_progress { crate::todo_write::TodoStatus::InProgress } else { crate::todo_write::TodoStatus::Pending };
+            todos.push(crate::todo_write::TodoInput { id: None, content: p, status, notes: None });
+        }
+
+        let created = self.todo_manager.write_todos(input.merge, todos).await?;
+        let stats = self.todo_manager.get_statistics().await;
+        Ok(json!({ "created": created, "stats": stats }))
+    }
+
+    /// Mark todo items completed by id or content contains substring
+    async fn todo_mark_done(&self, args: Value) -> Result<Value> {
+        #[derive(Deserialize)]
+        struct MarkInput { #[serde(default)] ids: Option<Vec<String>>, #[serde(default)] contains: Option<String> }
+        let input: MarkInput = serde_json::from_value(args).context("invalid todo_mark_done args")?;
+        let mut updates = Vec::new();
+        if let Some(ids) = input.ids {
+            for id in ids { updates.push(crate::todo_write::TodoUpdate { id, content: None, status: Some(crate::todo_write::TodoStatus::Completed), notes: None }); }
+        } else if let Some(substr) = input.contains {
+            let all = self.todo_manager.get_todos().await;
+            for item in all.into_iter().filter(|t| t.content.contains(&substr)) {
+                updates.push(crate::todo_write::TodoUpdate { id: item.id, content: None, status: Some(crate::todo_write::TodoStatus::Completed), notes: None });
+            }
+        } else {
+            return Err(anyhow!("Provide 'ids' or 'contains' to select todos"));
+        }
+        let updated = self.todo_manager.update_todos(updates).await?;
+        let stats = self.todo_manager.get_statistics().await;
+        Ok(json!({ "updated": updated, "stats": stats }))
+    }
+    /// Ripgrep-like high-speed search across the workspace
+    async fn rg_search(&self, args: Value) -> Result<Value> {
+        let input: RgInput = serde_json::from_value(args).context("invalid rg_search args")?;
+        let base = self.root.join(&input.path);
+        let case_sensitive = input.case_sensitive.unwrap_or(true);
+        let literal = input.literal.unwrap_or(false);
+        let include_hidden = input.include_hidden.unwrap_or(false);
+        let context_lines = input.context_lines.unwrap_or(0);
+        let max_results = input.max_results.unwrap_or(1000);
+
+        let pattern_str = if literal {
+            regex::escape(&input.pattern)
+        } else {
+            input.pattern.clone()
+        };
+        let regex = RegexBuilder::new(&pattern_str)
+            .case_insensitive(!case_sensitive)
+            .build()
+            .map_err(|e| anyhow!("Invalid regex pattern: {}", e))?;
+
+        let glob = match &input.glob_pattern {
+            Some(g) if !g.trim().is_empty() => Some(GlobPattern::new(g).map_err(|e| anyhow!("Invalid glob pattern '{}': {}", g, e))?),
+            _ => None,
+        };
+
+        let mut results = Vec::new();
+        let mut total_matches = 0usize;
+        let mut files_scanned = 0usize;
+
+        let denylist = ["node_modules", "target", ".git", "build", "dist"];
+        for entry in WalkDir::new(&base).into_iter().filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if path.is_dir() { continue; }
+
+            // Skip hidden files unless requested
+            if !include_hidden {
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if name.starts_with('.') { continue; }
+                }
+            }
+
+            // Skip excluded files by .vtagentgitignore
+            if should_exclude_file(path).await { continue; }
+
+            // Denylist common large/binary folders
+            if path.components().any(|c| denylist.iter().any(|d| c.as_os_str() == *d)) {
+                continue;
+            }
+
+            // Apply glob filter on path relative to root
+            if let Some(glob) = &glob {
+                let rel = path.strip_prefix(&self.root).unwrap_or(path);
+                if !glob.matches_path(rel) { continue; }
+            }
+
+            files_scanned += 1;
+
+            // Read file content (prefer UTF-8; skip likely binary files)
+            let bytes = match tokio::fs::read(path).await { Ok(b) => b, Err(_) => continue };
+            let content = match String::from_utf8(bytes.clone()) {
+                Ok(s) => s,
+                Err(_) => {
+                    if bytes.iter().any(|&b| b == 0) { continue; }
+                    let non_text = bytes.iter().filter(|&&b| b < 9 || (b > 13 && b < 32)).count();
+                    let ratio = non_text as f64 / (bytes.len().max(1) as f64);
+                    if ratio > 0.3 { continue; }
+                    String::from_utf8_lossy(&bytes).into_owned()
+                }
+            };
+
+            let lines: Vec<&str> = content.lines().collect();
+            // Track cumulative byte offset per line
+            let mut line_offsets: Vec<usize> = Vec::with_capacity(lines.len());
+            let mut acc = 0usize;
+            for l in &lines { line_offsets.push(acc); acc += l.len() + 1; }
+
+            for (i, line) in lines.iter().enumerate() {
+                // Find all matches in the line
+                let mut line_has_match = false;
+                for m in regex.find_iter(line) {
+                    line_has_match = true;
+                    total_matches += 1;
+                    if results.len() < max_results {
+                        let start_col = m.start();
+                        let end_col = m.end();
+                        // Collect context
+                        let start_ctx = if i >= context_lines { i - context_lines } else { 0 };
+                        let end_ctx = usize::min(lines.len(), i + 1 + context_lines);
+                        let mut before = Vec::new();
+                        let mut after = Vec::new();
+                        for ci in start_ctx..i { before.push(lines[ci].to_string()); }
+                        for ci in (i + 1)..end_ctx { after.push(lines[ci].to_string()); }
+
+                        let rel = path.strip_prefix(&self.root).unwrap_or(path);
+                        let byte_start = line_offsets.get(i).cloned().unwrap_or(0) + start_col;
+                        let byte_end = line_offsets.get(i).cloned().unwrap_or(0) + end_col;
+                        results.push(json!({
+                            "path": rel.display().to_string(),
+                            "line": i + 1,
+                            "column": start_col + 1,
+                            "line_text": *line,
+                            "match_text": &line[start_col..end_col],
+                            "byte_start": byte_start,
+                            "byte_end": byte_end,
+                            "before": before,
+                            "after": after,
+                        }));
+                    }
+                }
+
+                if line_has_match && results.len() >= max_results { break; }
+            }
+
+            if results.len() >= max_results { break; }
+        }
+
+        Ok(json!({
+            "matches": results,
+            "total_matches": total_matches,
+            "total_files_scanned": files_scanned,
+            "truncated": total_matches > max_results,
+        }))
+    }
+
+    /// High-level codebase search that defaults to common source globs
+    async fn codebase_search(&self, args: Value) -> Result<Value> {
+        let mut obj = args.as_object().cloned().unwrap_or_default();
+        let default_glob = "**/*.{rs,py,js,ts,tsx,go,java}".to_string();
+        obj.entry("glob_pattern".to_string()).or_insert(json!(default_glob));
+        self.rg_search(Value::Object(obj)).await
+    }
+
+    /// Simple ripgrep-style code_search compatible with the Go tool signature
+    async fn code_search(&self, args: Value) -> Result<Value> {
+        #[derive(Deserialize)]
+        struct CodeSearchInput {
+            pattern: String,
+            #[serde(default)]
+            path: Option<String>,
+            #[serde(default)]
+            file_type: Option<String>,
+            #[serde(default)]
+            case_sensitive: Option<bool>,
+        }
+
+        let input: CodeSearchInput = serde_json::from_value(args).context("invalid code_search args")?;
+        if input.pattern.trim().is_empty() {
+            return Err(anyhow!("pattern is required"));
+        }
+
+        // Map file_type to a simple glob if provided
+        let glob = input.file_type.as_ref().map(|ft| format!("**/*.{}", ft.trim().trim_start_matches('.')));
+
+        // Call rg_search and then pretty-format similar to ripgrep output
+        let mut rg_obj = serde_json::Map::new();
+        rg_obj.insert("pattern".to_string(), json!(input.pattern));
+        rg_obj.insert("path".to_string(), json!(input.path.unwrap_or_else(|| ".".to_string())));
+        rg_obj.insert("case_sensitive".to_string(), json!(input.case_sensitive.unwrap_or(false))); // default false like Go impl
+        if let Some(g) = glob { rg_obj.insert("glob_pattern".to_string(), json!(g)); }
+        rg_obj.insert("context_lines".to_string(), json!(0));
+        rg_obj.insert("include_hidden".to_string(), json!(false));
+        rg_obj.insert("max_results".to_string(), json!(1000));
+
+        let rg_resp = self.rg_search(Value::Object(rg_obj)).await?;
+        let matches = rg_resp.get("matches").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+        if matches.is_empty() {
+            return Ok(json!({ "output": "No matches found" }));
+        }
+
+        let mut lines: Vec<String> = Vec::new();
+        for m in matches.iter() {
+            let path = m.get("path").and_then(|v| v.as_str()).unwrap_or("");
+            let line = m.get("line").and_then(|v| v.as_u64()).unwrap_or(0);
+            let text = m.get("line_text").and_then(|v| v.as_str()).unwrap_or("");
+            lines.push(format!("{}:{}:{}", path, line, text));
+            if lines.len() >= 1000 { break; }
+        }
+
+        // Trim to first 50 lines to mimic Go version's guardrail
+        let total = lines.len();
+        let output = if total > 50 {
+            let mut head = lines.into_iter().take(50).collect::<Vec<_>>().join("\n");
+            head.push_str(&format!("\n... (showing first 50 of {} matches)", total));
+            head
+        } else {
+            lines.join("\n")
+        };
+
+        Ok(json!({ "output": output }))
+    }
+
+    /// Execute cargo commands (check, clippy, fmt)
+    async fn cargo_cmd(&self, sub: &str, extra: &[&str]) -> Result<Value> {
+        let mut cmd = std::process::Command::new("cargo");
+        cmd.arg(sub).args(extra).current_dir(&self.root).stdout(Stdio::piped()).stderr(Stdio::piped());
+        let out = tokio::task::spawn_blocking(move || cmd.output()).await.map_err(|e| anyhow!("failed to spawn cargo {}: {}", sub, e))??;
+        let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
+        let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
+        Ok(json!({
+            "success": out.status.success(),
+            "code": out.status.code(),
+            "stdout": stdout,
+            "stderr": stderr
+        }))
+    }
+
+    async fn cargo_check(&self, _args: Value) -> Result<Value> { self.cargo_cmd("check", &["--quiet"]).await }
+    async fn cargo_clippy(&self, _args: Value) -> Result<Value> { self.cargo_cmd("clippy", &["--quiet"]).await }
+    async fn cargo_fmt(&self, _args: Value) -> Result<Value> { self.cargo_cmd("fmt", &["--", "--check"]).await }
+
+    /// Run a terminal command with basic safety checks
+    async fn run_terminal_cmd(&self, args: Value) -> Result<Value> {
+        #[derive(Deserialize)]
+        struct CmdInput { command: Vec<String>, #[serde(default)] working_dir: Option<String> }
+        let input: CmdInput = serde_json::from_value(args).context("invalid run_terminal_cmd args")?;
+        if input.command.is_empty() { return Err(anyhow!("command cannot be empty")); }
+        // Basic injection guards: no shell metacharacters in tokens
+        let bad = [";", "&&", "|", ">", "<", "||"];
+        for tok in &input.command {
+            if bad.iter().any(|b| tok.contains(b)) { return Err(anyhow!("disallowed characters in command token")); }
+        }
+        let (prog, rest) = (&input.command[0], &input.command[1..]);
+        let mut cmd = std::process::Command::new(prog);
+        cmd.args(rest);
+        let wd = input.working_dir.as_deref().unwrap_or(".");
+        let workdir = self.root.join(wd);
+        if !workdir.starts_with(&self.root) { return Err(anyhow!("working_dir must be inside workspace")); }
+        cmd.current_dir(workdir).stdout(Stdio::piped()).stderr(Stdio::piped());
+        let out = tokio::task::spawn_blocking(move || cmd.output()).await.map_err(|e| anyhow!("failed to spawn command: {}", e))??;
+        Ok(json!({
+            "success": out.status.success(),
+            "code": out.status.code(),
+            "stdout": String::from_utf8_lossy(&out.stdout),
+            "stderr": String::from_utf8_lossy(&out.stderr),
+        }))
     }
 }
 
@@ -715,6 +1074,56 @@ pub async fn get_cache_stats() -> EnhancedCacheStats {
 /// Get function declarations for tool calling
 pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
     vec![
+        FunctionDeclaration {
+            name: "code_search".to_string(),
+            description: "Search code using ripgrep-like semantics. Compatible with Go code_search.".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "Search pattern (regex)"},
+                    "path": {"type": "string", "description": "Base path (file or dir)", "default": "."},
+                    "file_type": {"type": "string", "description": "Limit to extension, e.g. 'rs', 'go'"},
+                    "case_sensitive": {"type": "boolean", "description": "Case sensitive search", "default": false}
+                },
+                "required": ["pattern"]
+            }),
+        },
+        
+        FunctionDeclaration {
+            name: "codebase_search".to_string(),
+            description: "High-level search across common source files (uses rg_search under the hood).".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "Search pattern"},
+                    "path": {"type": "string", "description": "Base path", "default": "."},
+                    "case_sensitive": {"type": "boolean", "default": true},
+                    "literal": {"type": "boolean", "default": false},
+                    "context_lines": {"type": "integer", "default": 0},
+                    "include_hidden": {"type": "boolean", "default": false},
+                    "max_results": {"type": "integer", "default": 1000}
+                },
+                "required": ["pattern"]
+            }),
+        },
+        FunctionDeclaration {
+            name: "rg_search".to_string(),
+            description: "Ripgrep-like high-speed search across the workspace with glob filters and context.".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "Search pattern (regex unless 'literal' is true)"},
+                    "path": {"type": "string", "description": "Base path to search from", "default": "."},
+                    "case_sensitive": {"type": "boolean", "description": "Enable case-sensitive search", "default": true},
+                    "literal": {"type": "boolean", "description": "Treat pattern as literal text", "default": false},
+                    "glob_pattern": {"type": "string", "description": "Glob pattern to filter files (e.g., '**/*.rs')"},
+                    "context_lines": {"type": "integer", "description": "Number of context lines before/after each match", "default": 0},
+                    "include_hidden": {"type": "boolean", "description": "Include hidden files", "default": false},
+                    "max_results": {"type": "integer", "description": "Maximum number of matches to return", "default": 1000}
+                },
+                "required": ["pattern"]
+            }),
+        },
         FunctionDeclaration {
             name: "list_files".to_string(),
             description: "List files and directories in a given path".to_string(),
@@ -767,6 +1176,19 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
                 },
                 "required": ["path", "old_string", "new_string"]
             }),
+
+        },
+        FunctionDeclaration {
+            name: "delete_file".to_string(),
+            description: "Delete a file in the workspace".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Path to the file to delete"},
+                    "confirm": {"type": "boolean", "description": "Must be true to confirm deletion", "default": false}
+                },
+                "required": ["path", "confirm"]
+            }),
         },
         FunctionDeclaration {
             name: "todo_write".to_string(),
@@ -791,6 +1213,35 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
                     }
                 },
                 "required": ["todos"]
+            }),
+        },
+        FunctionDeclaration {
+            name: "todo_plan".to_string(),
+            description: "Plan and draft a todo list from a free-form task description; uses deterministic breakdown".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "task": {"type": "string", "description": "High-level task description to break down"},
+                    "merge": {"type": "boolean", "description": "Merge with existing todos (true) or replace (false)", "default": true},
+                    "max_items": {"type": "integer", "description": "Maximum number of items to create"},
+                    "auto_in_progress": {"type": "boolean", "description": "Mark the first item as in_progress", "default": true}
+                },
+                "required": ["task"]
+            }),
+        },
+        FunctionDeclaration {
+            name: "todo_mark_done".to_string(),
+            description: "Mark todo items as completed by ids or content substring".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "ids": {"type": "array", "items": {"type": "string"}, "description": "IDs to mark complete"},
+                    "contains": {"type": "string", "description": "Substring match on content to select items"}
+                },
+                "oneOf": [
+                    {"required": ["ids"]},
+                    {"required": ["contains"]}
+                ]
             }),
         },
         FunctionDeclaration {
@@ -870,5 +1321,67 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
                 "required": []
             }),
         },
+        FunctionDeclaration {
+            name: "cargo_check".to_string(),
+            description: "Run 'cargo check' in the workspace".to_string(),
+            parameters: json!({"type": "object", "properties": {}, "required": []}),
+        },
+        FunctionDeclaration {
+            name: "cargo_clippy".to_string(),
+            description: "Run 'cargo clippy' in the workspace".to_string(),
+            parameters: json!({"type": "object", "properties": {}, "required": []}),
+        },
+        FunctionDeclaration {
+            name: "cargo_fmt".to_string(),
+            description: "Run 'cargo fmt -- --check' in the workspace".to_string(),
+            parameters: json!({"type": "object", "properties": {}, "required": []}),
+        },
+        FunctionDeclaration {
+            name: "run_terminal_cmd".to_string(),
+            description: "Run a terminal command in the workspace with basic safety checks".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "command": {"type": "array", "items": {"type": "string"}, "description": "Program + args as array"},
+                    "working_dir": {"type": "string", "description": "Working directory relative to workspace"}
+                },
+                "required": ["command"]
+            }),
+        },
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use tempfile::TempDir;
+
+    #[tokio::test]
+    async fn test_delete_file_removes_temp_file() -> Result<()> {
+        let temp_dir = TempDir::new()?;
+        let workspace = temp_dir.path().to_path_buf();
+        let registry = ToolRegistry::new(workspace.clone());
+
+        // Create a temporary file inside the workspace
+        let file_path = workspace.join("to_delete.txt");
+        tokio::fs::write(&file_path, "temporary").await?;
+        assert!(file_path.exists());
+
+        // Delete via tool
+        let args = json!({ "path": "to_delete.txt" });
+        let resp = registry.execute_tool("delete_file", json!({ "path": "to_delete.txt", "confirm": true })).await?;
+        assert_eq!(resp["success"], true);
+        assert_eq!(resp["deleted"], true);
+        assert!(!file_path.exists());
+
+        // Deleting again should be a no-op
+        let resp2 = registry
+            .execute_tool("delete_file", json!({ "path": "to_delete.txt" }))
+            .await?;
+        assert_eq!(resp2["success"], true);
+        assert_eq!(resp2["deleted"], false);
+
+        Ok(())
+    }
 }

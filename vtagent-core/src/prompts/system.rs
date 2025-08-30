@@ -56,9 +56,9 @@ pub fn generate_system_instruction(_config: &SystemPromptConfig) -> Content {
     let instruction = r#"You are a sophisticated coding assistant with access to comprehensive development tools and task management capabilities.
 
 ## AVAILABLE TOOLS
-- **File Operations**: list_files, read_file, write_file, edit_file
-- **Search & Analysis**: grep_search, codebase_search, read_lints
-- **Task Management**: todo_write, todo_update, todo_get, todo_get_by_status, todo_delete, todo_stats, todo_cleanup
+- **File Operations**: list_files, read_file, write_file, edit_file, delete_file
+- **Search & Analysis**: rg_search (ripgrep), codebase_search, read_lints
+- **Task Management**: todo_plan, todo_write, todo_update, todo_mark_done, todo_get, todo_get_by_status, todo_delete, todo_stats, todo_cleanup
 - **Code Quality**: code analysis, linting, formatting
 - **Build & Test**: cargo check, cargo build, cargo test
 - **Git Operations**: git status, git diff, git log
@@ -93,7 +93,7 @@ The user will primarily request you perform software engineering tasks including
 - Reviewing and documenting code
 
 ### Recommended Steps for Tasks:
-1. **Use TodoWrite tool to plan** the task if it involves multiple steps
+1. **Use Todo tools to plan**: start with `todo_plan` (or `todo_write`) when a task has multiple steps
 2. **Use available search tools extensively** to understand the codebase and user's query
 3. **Implement the solution** using all tools available to you
 4. **Verify the solution** with tests - NEVER assume specific test framework, check the codebase
@@ -161,7 +161,7 @@ pub fn generate_specialized_instruction(task_type: &str, config: &SystemPromptCo
             specialized_instruction.push_str("6. **Provide comprehensive summaries** with actionable insights\n");
             specialized_instruction.push_str("\n### Analysis Tools:\n");
             specialized_instruction.push_str("- codebase_search for semantic code understanding\n");
-            specialized_instruction.push_str("- grep_search for pattern discovery\n");
+            specialized_instruction.push_str("- rg_search (ripgrep) for pattern discovery\n");
             specialized_instruction.push_str("- tree_sitter analysis for syntax understanding\n");
         }
         "debugging" => {
@@ -174,7 +174,7 @@ pub fn generate_specialized_instruction(task_type: &str, config: &SystemPromptCo
             specialized_instruction.push_str("5. **Implement fix** with proper testing\n");
             specialized_instruction.push_str("6. **Verify fix** and update tests\n");
             specialized_instruction.push_str("\n### Debugging Tools:\n");
-            specialized_instruction.push_str("- grep_search for error patterns\n");
+            specialized_instruction.push_str("- rg_search (ripgrep) for error patterns\n");
             specialized_instruction.push_str("- read_lints for code quality issues\n");
             specialized_instruction.push_str("- cargo test for regression testing\n");
         }
@@ -203,7 +203,7 @@ pub fn generate_specialized_instruction(task_type: &str, config: &SystemPromptCo
             specialized_instruction.push_str("6. **Keep documentation synchronized** with code changes\n");
             specialized_instruction.push_str("\n### Documentation Tools:\n");
             specialized_instruction.push_str("- read_file for understanding code functionality\n");
-            specialized_instruction.push_str("- grep_search for finding undocumented areas\n");
+            specialized_instruction.push_str("- rg_search (ripgrep) for finding undocumented areas\n");
             specialized_instruction.push_str("- codebase_search for understanding code relationships\n");
         }
         "testing" => {
@@ -249,7 +249,7 @@ pub fn generate_lightweight_instruction() -> Content {
 
 AVAILABLE TOOLS:
 - File Operations: list_files, read_file, write_file, edit_file
-- Search & Analysis: grep_search, codebase_search
+- Search & Analysis: rg_search (ripgrep), codebase_search
 - Task Management: todo_write, todo_update, todo_get, todo_stats
 - Code Quality: cargo check, cargo clippy, cargo fmt
 - Terminal Access: run_terminal_cmd for any shell operations

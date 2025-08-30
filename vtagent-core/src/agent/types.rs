@@ -30,7 +30,7 @@ pub enum MessageType {
 }
 
 /// Message priority levels for intelligent compaction
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum MessagePriority {
     Low = 1,      // Can be compacted easily (routine tool calls, simple acknowledgments)
     Medium = 2,   // Moderate importance (general responses, standard operations)
@@ -64,4 +64,59 @@ pub struct CompactedContext {
     pub compression_ratio: f64,
     /// Context confidence score
     pub confidence_score: f64,
+}
+
+/// Compaction suggestion for intelligent decision making
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompactionSuggestion {
+    /// Suggested action
+    pub action: String,
+    /// Urgency level
+    pub urgency: Urgency,
+    /// Estimated memory savings
+    pub estimated_savings: usize,
+    /// Reasoning for the suggestion
+    pub reasoning: String,
+}
+
+/// Urgency levels for compaction suggestions
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Urgency {
+    Low = 1,
+    Medium = 2,
+    High = 3,
+}
+
+/// Compaction operation result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompactionResult {
+    /// Number of messages processed
+    pub messages_processed: usize,
+    /// Number of messages compacted
+    pub messages_compacted: usize,
+    /// Total original size (bytes)
+    pub original_size: usize,
+    /// Total compacted size (bytes)
+    pub compacted_size: usize,
+    /// Overall compression ratio
+    pub compression_ratio: f64,
+    /// Processing time in milliseconds
+    pub processing_time_ms: u64,
+}
+
+/// Compaction statistics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompactionStatistics {
+    /// Total messages in history
+    pub total_messages: usize,
+    /// Messages by priority level
+    pub messages_by_priority: std::collections::HashMap<MessagePriority, usize>,
+    /// Total memory usage (bytes)
+    pub total_memory_usage: usize,
+    /// Average message size (bytes)
+    pub average_message_size: usize,
+    /// Last compaction timestamp
+    pub last_compaction_timestamp: u64,
+    /// Compaction frequency (operations per hour)
+    pub compaction_frequency: f64,
 }

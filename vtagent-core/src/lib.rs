@@ -41,6 +41,7 @@ pub mod enhanced_tools;
 pub mod error_recovery;
 pub mod gemini;
 pub mod markdown_renderer;
+pub mod llm;
 pub mod performance_monitor;
 pub mod performance_profiler;
 pub mod prompts;
@@ -54,7 +55,7 @@ pub mod ui;
 pub mod vtagentgitignore;
 
 // Re-export commonly used types for convenience
-pub use agent::{Agent, AgentBuilder};
+pub use agent::core::{Agent, AgentBuilder};
 pub use cli::{Cli, Commands};
 pub use code_completion::{
     CodeCompletionEngine, CompletionContext, CompletionSuggestion, COMPLETION_ENGINE,

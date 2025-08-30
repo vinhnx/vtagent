@@ -111,7 +111,7 @@ async fn check_filesystem_permissions(config: &AgentConfig) -> Result<()> {
         .await?;
 
     // Clean up test file
-    // Note: We don't have a delete tool, so this is just a permission check
+    // Delete is supported via delete_file tool in ToolRegistry; we still validate permissions here
 
     Ok(())
 }

@@ -86,6 +86,8 @@ pub struct MinimalCodeEditor {
     _tree_sitter: Arc<TreeSitterAnalyzer>,
     edit_history: Arc<RwLock<Vec<EditPlan>>>,
     max_history_size: usize,
+    enable_type_checks: bool,
+    default_js_ts_scope: Option<String>,
 }
 
 impl MinimalCodeEditor {
@@ -96,7 +98,21 @@ impl MinimalCodeEditor {
             _tree_sitter: tree_sitter,
             edit_history: Arc::new(RwLock::new(Vec::new())),
             max_history_size: 50,
+            enable_type_checks: false,
+            default_js_ts_scope: None,
         }
+    }
+
+    /// Enable or disable type check validation (cargo check) in validation steps
+    pub fn with_type_checks(mut self, enable: bool) -> Self {
+        self.enable_type_checks = enable;
+        self
+    }
+
+    /// Configure default rename scope for JS/TS (e.g., "identifier", "property", "all")
+    pub fn with_js_ts_scope_default<S: Into<String>>(mut self, scope: S) -> Self {
+        self.default_js_ts_scope = Some(scope.into());
+        self
     }
 
     /// Execute a multi-step edit plan with full validation and rollback support
@@ -273,33 +289,62 @@ impl MinimalCodeEditor {
         old_name: &str,
         new_name: &str,
     ) -> Result<()> {
-        // Use tree-sitter for intelligent renaming
-        // TODO: Implement proper analysis using available TreeSitterAnalyzer methods
+        // Prefer tree-sitter occurrences; fallback to naive scan
+        // Extract optional scope hint (e.g., "property", "all")
+        let scope_hint = match &edit.operation {
+            EditOperation::Rename { scope, .. } => scope
+                .as_deref()
+                .or(self.default_js_ts_scope.as_deref()),
+            _ => self.default_js_ts_scope.as_deref(),
+        };
 
-        // Find all occurrences of the symbol in the appropriate scope
-        // TODO: Implement proper symbol occurrence finding
-        let occurrences: Vec<SymbolOccurrence> = Vec::new();
+        let occurrences = match self
+            .find_identifier_occurrences_ts(&edit.file_path, old_name, scope_hint)
+            .await
+        {
+            Ok(v) if !v.is_empty() => v,
+            _ => {
+                let (content, _) = self.file_ops.read_file_enhanced(&edit.file_path, None).await?;
+                let mut occs: Vec<SymbolOccurrence> = Vec::new();
+                for (idx, line) in content.lines().enumerate() {
+                    let mut start = 0;
+                    while let Some(pos) = line[start..].find(old_name) {
+                        let col = start + pos;
+                        occs.push(SymbolOccurrence::new(idx, col, "file".to_string()));
+                        start = col + old_name.len();
+                    }
+                }
+                occs
+            }
+        };
 
-        // Apply renames in reverse order to avoid position shifts
-        for occurrence in occurrences.into_iter().rev() {
-            let (content, _) = self.file_ops.read_file_enhanced(&edit.file_path, None).await?;
-            let lines: Vec<&str> = content.lines().collect();
+        // Load file once and apply replacements per line from right to left
+        let (content, _) = self.file_ops.read_file_enhanced(&edit.file_path, None).await?;
+        let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
 
-            if let Some(line_content) = lines.get(occurrence.line) {
-                let new_line = line_content.replace(old_name, new_name);
-                let before_lines = &lines[0..occurrence.line];
-                let after_lines = &lines[occurrence.line + 1..];
+        use std::collections::BTreeMap;
+        let mut by_line: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+        for occ in occurrences {
+            by_line.entry(occ.line).or_default().push(occ.column);
+        }
 
-                let new_content = format!(
-                    "{}\n{}\n{}",
-                    before_lines.join("\n"),
-                    new_line,
-                    after_lines.join("\n")
-                );
-
-                self.file_ops.write_file_enhanced(&edit.file_path, &new_content, true).await?;
+        for (line_idx, cols) in by_line.iter_mut() {
+            if let Some(line) = lines.get_mut(*line_idx) {
+                cols.sort_unstable();
+                for &col in cols.iter().rev() {
+                    if col + old_name.len() <= line.len() {
+                        let before = &line[..col];
+                        let after = &line[col + old_name.len()..];
+                        *line = format!("{}{}{}", before, new_name, after);
+                    }
+                }
             }
         }
+
+        let new_content = lines.join("\n");
+        self.file_ops
+            .write_file_enhanced(&edit.file_path, &new_content, true)
+            .await?;
 
         Ok(())
     }
@@ -386,13 +431,21 @@ impl MinimalCodeEditor {
     async fn run_validation(&self, validation: &ValidationStep) -> Result<()> {
         match validation.check_type {
             ValidationType::SyntaxCheck => {
-                // Use tree-sitter to check syntax
-                // TODO: Implement syntax checking using available TreeSitterAnalyzer methods
-                Ok(())
+                match self.syntax_check_with_tree_sitter(&validation.file_path).await {
+                    Ok(true) => Ok(()),
+                    Ok(false) => Err(anyhow!("Tree-sitter syntax diagnostics found")),
+                    Err(_) => {
+                        let ok = self.lightweight_syntax_check(&validation.file_path).await?;
+                        if ok { Ok(()) } else { Err(anyhow!("Lightweight syntax check failed")) }
+                    }
+                }
             }
             ValidationType::TypeCheck => {
-                // This would run a type checker (e.g., cargo check)
-                Ok(())
+                if !self.enable_type_checks {
+                    return Ok(());
+                }
+                let project_dir = self.find_cargo_root(&validation.file_path).unwrap_or_else(|| validation.file_path.parent().unwrap_or(Path::new(".")).to_path_buf());
+                self.run_cargo_check(&project_dir).await
             }
             ValidationType::ImportResolution => {
                 // Check if imports can be resolved
@@ -416,13 +469,134 @@ impl MinimalCodeEditor {
     }
 
     /// Store edit plan in history
-    async fn store_edit_plan(&self, _plan: EditPlan) {
+    async fn store_edit_plan(&self, plan: EditPlan) {
         let mut history = self.edit_history.write().await;
-        // history.push(plan); // TODO: Implement when needed
+        history.push(plan);
 
         // Maintain history size limit
         if history.len() > self.max_history_size {
             history.remove(0);
+        }
+    }
+
+    /// Very lightweight syntax check: braces, brackets, parentheses, and quotes balance
+    async fn lightweight_syntax_check(&self, file_path: &Path) -> Result<bool> {
+        let (content, _) = self.file_ops.read_file_enhanced(file_path, None).await?;
+        let mut stack: Vec<char> = Vec::new();
+        let mut in_single = false;
+        let mut in_double = false;
+        let mut escape = false;
+        for ch in content.chars() {
+            if escape {
+                escape = false;
+                continue;
+            }
+            match ch {
+                '\\' => {
+                    escape = true;
+                }
+                '\'' if !in_double => {
+                    in_single = !in_single;
+                }
+                '"' if !in_single => {
+                    in_double = !in_double;
+                }
+                _ if in_single || in_double => {}
+                '{' | '[' | '(' => stack.push(ch),
+                '}' => if stack.pop() != Some('{') { return Ok(false); },
+                ']' => if stack.pop() != Some('[') { return Ok(false); },
+                ')' => if stack.pop() != Some('(') { return Ok(false); },
+                _ => {}
+            }
+        }
+        Ok(stack.is_empty() && !in_single && !in_double)
+    }
+
+    /// Syntax check using tree-sitter diagnostics
+    async fn syntax_check_with_tree_sitter(&self, file_path: &Path) -> Result<bool> {
+        let mut analyzer = TreeSitterAnalyzer::new()?;
+        let tree = analyzer.parse_file(file_path)?;
+        Ok(tree.diagnostics.is_empty())
+    }
+
+    /// Find identifier occurrences using tree-sitter
+    async fn find_identifier_occurrences_ts(
+        &self,
+        file_path: &Path,
+        identifier: &str,
+        scope: Option<&str>,
+    ) -> Result<Vec<SymbolOccurrence>> {
+        let mut analyzer = TreeSitterAnalyzer::new()?;
+        let syntax = analyzer.parse_file(file_path)?;
+        let mut occs: Vec<SymbolOccurrence> = Vec::new();
+
+        // Allow-list of identifier node kinds per language & scope
+        let allowed_kinds: Vec<&str> = match syntax.language {
+            crate::tree_sitter::analyzer::LanguageSupport::JavaScript
+            | crate::tree_sitter::analyzer::LanguageSupport::TypeScript => {
+                match scope {
+                    Some("property") => vec!["property_identifier", "shorthand_property_identifier"],
+                    Some("all") => vec!["identifier", "property_identifier", "shorthand_property_identifier"],
+                    _ => vec!["identifier"],
+                }
+            }
+            _ => vec!["identifier"],
+        };
+
+        fn walk(
+            node: &crate::tree_sitter::analyzer::SyntaxNode,
+            name: &str,
+            allowed: &[&str],
+            occs: &mut Vec<SymbolOccurrence>,
+        ) {
+            let is_allowed = allowed.iter().any(|k| node.kind == *k);
+            if is_allowed && node.text == name {
+                occs.push(SymbolOccurrence::new(
+                    node.start_position.row,
+                    node.start_position.column,
+                    "file".to_string(),
+                ));
+            }
+            for child in &node.children {
+                walk(child, name, allowed, occs);
+            }
+        }
+
+        walk(&syntax.root, identifier, &allowed_kinds, &mut occs);
+        Ok(occs)
+    }
+
+    /// Find the nearest Cargo project root by searching upwards for Cargo.toml
+    fn find_cargo_root(&self, from_file: &Path) -> Option<PathBuf> {
+        let mut dir = from_file.parent().unwrap_or(Path::new(".")).to_path_buf();
+        loop {
+            if dir.join("Cargo.toml").exists() {
+                return Some(dir);
+            }
+            if !dir.pop() { break; }
+        }
+        None
+    }
+
+    /// Run `cargo check` in the given directory
+    async fn run_cargo_check(&self, dir: &Path) -> Result<()> {
+        let dir = dir.to_path_buf();
+        let dir_disp = dir.display().to_string();
+        let status = tokio::task::spawn_blocking(move || {
+            std::process::Command::new("cargo")
+                .arg("check")
+                .arg("--quiet")
+                .current_dir(&dir)
+                .status()
+        })
+        .await
+        .map_err(|e| anyhow!("Failed to join cargo check task: {}", e))
+        .and_then(|res| res.map_err(|e| anyhow!("Failed to run cargo check: {}", e)))?;
+
+        if status.success() {
+            Ok(())
+        } else {
+            Err(anyhow!("cargo check failed in {}", dir_disp))
         }
     }
 
@@ -484,6 +658,12 @@ impl MinimalCodeEditor {
                     check_type: ValidationType::SyntaxCheck,
                     file_path: file_path.to_path_buf(),
                     expected_result: "Valid syntax".to_string(),
+                },
+                ValidationStep {
+                    name: "Type Check".to_string(),
+                    check_type: ValidationType::TypeCheck,
+                    file_path: file_path.to_path_buf(),
+                    expected_result: "cargo check passes".to_string(),
                 }
             ],
             rollback_plan: vec![],
@@ -649,5 +829,120 @@ mod tests {
 
         assert_eq!(plan.edits.len(), 2);
         assert!(!plan.validation_steps.is_empty());
+    }
+
+    #[test]
+    async fn test_rename_single_line_multiple_occurrences() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("rename.rs");
+
+        let content = r#"fn main() {
+    let foo = 1;
+    let foobar = 0; // should stay
+    let x = foo + foo;
+    println!("{} {}", foo, foobar);
+}"#;
+
+        let file_ops = Arc::new(EnhancedFileOps::new(5));
+        file_ops.write_file_enhanced(&file_path, content, false).await.unwrap();
+
+        let tree_sitter = Arc::new(TreeSitterAnalyzer::new().unwrap());
+        let editor = MinimalCodeEditor::new(file_ops.clone(), tree_sitter);
+
+        let edit = CodeEdit {
+            file_path: file_path.clone(),
+            operation: EditOperation::Rename { old_name: "foo".into(), new_name: "bar".into(), scope: None },
+            context: None,
+            dependencies: vec![],
+            rollback_data: None,
+        };
+
+        let _ = editor.execute_single_edit(&edit).await.unwrap();
+        let (updated, _) = file_ops.read_file_enhanced(&file_path, None).await.unwrap();
+        assert!(updated.contains("let bar = 1;"));
+        assert!(updated.contains("let foobar = 0;"));
+        assert!(updated.contains("let x = bar + bar;"));
+        assert!(updated.contains("bar, foobar"));
+    }
+
+    #[test]
+    async fn test_rename_multi_line_occurrences() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("rename_multi.rs");
+
+        let content = r#"fn add(a: i32, b: i32) -> i32 {
+    let foo = a + b;
+    foo
+}
+
+fn use_it() {
+    let r = add(1, 2);
+    println!("{}", r);
+}"#;
+
+        let file_ops = Arc::new(EnhancedFileOps::new(5));
+        file_ops.write_file_enhanced(&file_path, content, false).await.unwrap();
+
+        let tree_sitter = Arc::new(TreeSitterAnalyzer::new().unwrap());
+        let editor = MinimalCodeEditor::new(file_ops.clone(), tree_sitter);
+
+        let edit = CodeEdit {
+            file_path: file_path.clone(),
+            operation: EditOperation::Rename { old_name: "foo".into(), new_name: "sum".into(), scope: None },
+            context: None,
+            dependencies: vec![],
+            rollback_data: None,
+        };
+
+        let _ = editor.execute_single_edit(&edit).await.unwrap();
+        let (updated, _) = file_ops.read_file_enhanced(&file_path, None).await.unwrap();
+        assert!(updated.contains("let sum = a + b;"));
+        assert!(updated.contains("\n    sum\n"));
+    }
+
+    #[test]
+    async fn test_js_property_rename_scope() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("code.js");
+
+        let content = r#"const foo = 1;
+const o = { foo: 2, foobar: 3 };
+console.log(o.foo, o.foobar);
+"#;
+
+        let file_ops = Arc::new(EnhancedFileOps::new(5));
+        file_ops.write_file_enhanced(&file_path, content, false).await.unwrap();
+
+        let tree_sitter = Arc::new(TreeSitterAnalyzer::new().unwrap());
+        let editor = MinimalCodeEditor::new(file_ops.clone(), tree_sitter);
+
+        // Default rename (identifiers only): variable foo -> bar; properties remain
+        let edit_ident_only = CodeEdit {
+            file_path: file_path.clone(),
+            operation: EditOperation::Rename { old_name: "foo".into(), new_name: "bar".into(), scope: None },
+            context: None,
+            dependencies: vec![],
+            rollback_data: None,
+        };
+        let _ = editor.execute_single_edit(&edit_ident_only).await.unwrap();
+        let (updated1, _) = file_ops.read_file_enhanced(&file_path, None).await.unwrap();
+        assert!(updated1.contains("const bar = 1;"));
+        assert!(updated1.contains("{ foo: 2, foobar: 3 }"));
+        assert!(updated1.contains("o.foo"));
+
+        // Property-only rename: change property foo -> baz; leave variable bar intact
+        let edit_property_only = CodeEdit {
+            file_path: file_path.clone(),
+            operation: EditOperation::Rename { old_name: "foo".into(), new_name: "baz".into(), scope: Some("property".into()) },
+            context: None,
+            dependencies: vec![],
+            rollback_data: None,
+        };
+        let _ = editor.execute_single_edit(&edit_property_only).await.unwrap();
+        let (updated2, _) = file_ops.read_file_enhanced(&file_path, None).await.unwrap();
+        assert!(updated2.contains("const bar = 1;"));
+        assert!(updated2.contains("{ baz: 2, foobar: 3 }"));
+        assert!(updated2.contains("o.baz"));
+        assert!(updated2.contains("o.foobar"));
     }
 }

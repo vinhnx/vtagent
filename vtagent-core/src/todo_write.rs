@@ -231,6 +231,13 @@ impl TodoManager {
     async fn save_todos(&self, todos: &HashMap<String, TodoItem>) -> Result<()> {
         let storage_file = self.storage_path.join(format!("{}.json", self.session_id));
 
+        // Ensure parent directory exists even if initialize() was not called
+        if let Some(parent) = storage_file.parent() {
+            tokio::fs::create_dir_all(parent)
+                .await
+                .map_err(|e| anyhow!("Failed to create todo storage directory: {}", e))?;
+        }
+
         let content = serde_json::to_string_pretty(todos)
             .map_err(|e| anyhow!("Failed to serialize todos: {}", e))?;
 
@@ -342,10 +349,13 @@ pub mod tool_functions {
     use super::*;
     use serde_json::Value;
 
+    fn default_merge_true() -> bool { true }
+
     /// Input for write_todos tool function
     #[derive(Debug, Deserialize)]
     pub struct WriteTodosInput {
         /// Whether to merge with existing todos (true) or replace (false)
+        #[serde(default = "default_merge_true")]
         pub merge: bool,
         /// List of todos to create/update
         pub todos: Vec<TodoInput>,

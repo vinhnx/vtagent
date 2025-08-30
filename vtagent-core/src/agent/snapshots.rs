@@ -17,6 +17,7 @@ use std::path::PathBuf;
 use crate::types::*;
 use crate::performance_monitor::PerformanceMetrics;
 use crate::gemini::Content;
+use crate::agent::core::Agent;
 
 /// Metadata for snapshot identification and management
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -161,7 +162,7 @@ impl SnapshotManager {
     /// Create a snapshot of the current agent state
     pub async fn create_snapshot(
         &self,
-        agent: &crate::agent::Agent,
+        agent: &Agent,
         turn_number: usize,
         description: &str,
     ) -> Result<String> {
@@ -201,7 +202,7 @@ impl SnapshotManager {
     /// Revert agent to a specific snapshot
     pub async fn revert_to_snapshot(
         &self,
-        agent: &mut crate::agent::Agent,
+        agent: &mut Agent,
         turn_number: usize,
         revert_type: RevertType,
     ) -> Result<()> {
@@ -284,7 +285,7 @@ impl SnapshotManager {
     /// Extract current agent state into snapshot
     async fn extract_agent_state(
         &self,
-        agent: &crate::agent::Agent,
+        agent: &Agent,
         turn_number: usize,
         description: &str,
     ) -> Result<AgentSnapshot> {
@@ -354,7 +355,7 @@ impl SnapshotManager {
             metadata,
             config,
             session_info: agent.session_info().clone(),
-            conversation_history: vec![], // TODO: Extract from agent
+            conversation_history: vec![], // Placeholder - would extract from agent in full implementation
             decision_tracker,
             error_recovery,
             summarizer,
@@ -383,19 +384,19 @@ impl SnapshotManager {
     }
 
     /// Revert to full state
-    async fn revert_full_state(&self, _agent: &mut crate::agent::Agent, _snapshot: &AgentSnapshot) -> Result<()> {
+    async fn revert_full_state(&self, _agent: &mut Agent, _snapshot: &AgentSnapshot) -> Result<()> {
         // TODO: Implement full state revert
         Ok(())
     }
 
     /// Revert memory state only
-    async fn revert_memory_state(&self, _snapshot: &AgentSnapshot, _agent: &mut crate::agent::Agent) -> Result<()> {
+    async fn revert_memory_state(&self, _snapshot: &AgentSnapshot, _agent: &mut Agent) -> Result<()> {
         // TODO: Implement memory state revert
         Ok(())
     }
 
     /// Revert context state only
-    async fn revert_context_state(&self, _snapshot: &AgentSnapshot, _agent: &mut crate::agent::Agent) -> Result<()> {
+    async fn revert_context_state(&self, _snapshot: &AgentSnapshot, _agent: &mut Agent) -> Result<()> {
         // TODO: Implement context state revert
         Ok(())
     }

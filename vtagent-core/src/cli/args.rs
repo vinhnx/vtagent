@@ -177,11 +177,49 @@ impl Default for Cli {
 }
 
 impl Cli {
-    /// Load configuration from file if specified (placeholder for future implementation)
+    /// Load configuration from a simple TOML-like file without external deps
+    ///
+    /// Supported keys (top-level): model, api_key_env, verbose, log_level, workspace
+    /// Example:
+    ///   model = "gemini-2.5-flash-lite"
+    ///   api_key_env = "GEMINI_API_KEY"
+    ///   verbose = true
+    ///   log_level = "info"
+    ///   workspace = "/path/to/workspace"
     pub fn load_config(&self) -> Result<ConfigFile, Box<dyn std::error::Error>> {
-        // For now, return default config
-        // TODO: Implement TOML config file loading
-        Ok(ConfigFile {
+        use std::fs;
+        use std::path::Path;
+
+        // Resolve candidate path
+        let path = if let Some(p) = &self.config {
+            p.clone()
+        } else {
+            let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+            let primary = cwd.join("vtagent.toml");
+            let secondary = cwd.join(".vtagent.toml");
+            if primary.exists() {
+                primary
+            } else if secondary.exists() {
+                secondary
+            } else {
+                // No config file; return empty config
+                return Ok(ConfigFile {
+                    model: None,
+                    api_key_env: None,
+                    verbose: None,
+                    log_level: None,
+                    workspace: None,
+                    tools: None,
+                    context: None,
+                    logging: None,
+                });
+            }
+        };
+
+        let text = fs::read_to_string(&path)?;
+
+        // Very small parser: key = value, supports quoted strings, booleans, and plain paths
+        let mut cfg = ConfigFile {
             model: None,
             api_key_env: None,
             verbose: None,
@@ -190,7 +228,64 @@ impl Cli {
             tools: None,
             context: None,
             logging: None,
-        })
+        };
+
+        for raw_line in text.lines() {
+            let line = raw_line.trim();
+            if line.is_empty() || line.starts_with('#') || line.starts_with("//") {
+                continue;
+            }
+            // Strip inline comments after '#'
+            let line = match line.find('#') {
+                Some(idx) => &line[..idx],
+                None => line,
+            }
+            .trim();
+
+            // Expect key = value
+            let mut parts = line.splitn(2, '=');
+            let key = parts.next().map(|s| s.trim()).unwrap_or("");
+            let val = parts.next().map(|s| s.trim()).unwrap_or("");
+            if key.is_empty() || val.is_empty() {
+                continue;
+            }
+
+            // Remove surrounding quotes if present
+            let unquote = |s: &str| -> String {
+                let s = s.trim();
+                if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
+                    s[1..s.len() - 1].to_string()
+                } else {
+                    s.to_string()
+                }
+            };
+
+            match key {
+                "model" => cfg.model = Some(unquote(val)),
+                "api_key_env" => cfg.api_key_env = Some(unquote(val)),
+                "verbose" => {
+                    let v = unquote(val).to_lowercase();
+                    cfg.verbose = Some(matches!(v.as_str(), "true" | "1" | "yes"));
+                }
+                "log_level" => cfg.log_level = Some(unquote(val)),
+                "workspace" => {
+                    let v = unquote(val);
+                    let p = if Path::new(&v).is_absolute() {
+                        PathBuf::from(v)
+                    } else {
+                        // Resolve relative to config file directory
+                        let base = path.parent().unwrap_or(Path::new("."));
+                        base.join(v)
+                    };
+                    cfg.workspace = Some(p);
+                }
+                _ => {
+                    // Ignore unknown keys in this minimal parser
+                }
+            }
+        }
+
+        Ok(cfg)
     }
 
     /// Get the effective workspace path

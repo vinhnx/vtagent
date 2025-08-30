@@ -1,0 +1,68 @@
+# Command Reference
+
+This guide summarizes common actions and how to invoke them with vtagent. The agent exposes a suite of tools to the LLM; you interact with them via chat. When you ask to search, read, or edit files, the agent chooses an appropriate tool.
+
+## rg_search (ripgrep-like)
+
+High-speed code search with glob filters, context lines, and optional literal/regex matching.
+
+- Input fields:
+  - `pattern` (string, required): Search pattern. Treated as regex unless `literal=true`.
+  - `path` (string, default: `.`): Base directory to search from.
+  - `case_sensitive` (bool, default: true): Case-sensitive when true.
+  - `literal` (bool, default: false): Treat pattern as literal text when true.
+  - `glob_pattern` (string, optional): Filter files by glob (e.g., `**/*.rs`).
+  - `context_lines` (integer, default: 0): Lines before/after each hit.
+  - `include_hidden` (bool, default: false): Include dotfiles when true.
+  - `max_results` (integer, default: 1000): Cap results to avoid large payloads.
+
+- Output fields:
+  - `matches[]`: `{ path, line, column, line_text, before[], after[] }`
+  - `total_matches`, `total_files_scanned`, `truncated`
+
+### Examples
+
+- Find TODO/FIXME with 2 lines of context in Rust files only:
+
+```
+Ask: Search for TODO|FIXME across the repo with 2 lines of context in .rs files
+(Agent uses rg_search with)
+{
+  "pattern": "TODO|FIXME",
+  "path": ".",
+  "case_sensitive": false,
+  "glob_pattern": "**/*.rs",
+  "context_lines": 2
+}
+```
+
+- Literal search for `unsafe {` anywhere (hidden files ignored):
+```
+{
+  "pattern": "unsafe {",
+  "literal": true,
+  "context_lines": 1
+}
+```
+
+- Search JavaScript files for a function name, case-insensitive:
+```
+{
+  "pattern": "doSomethingImportant",
+  "case_sensitive": false,
+  "glob_pattern": "**/*.js"
+}
+```
+
+## File operations
+
+- `list_files(path, max_items?, include_hidden?)`
+- `read_file(path, max_bytes?)`
+- `write_file(path, content, overwrite?)`
+- `edit_file(path, old_string, new_string)`
+
+## Tips
+
+- The agent respects `.vtagentgitignore` to exclude files from search and I/O.
+- Prefer `rg_search` for fast, focused searches with glob filters and context.
+- Ask for “N lines of context” when searching to understand usage in-place.

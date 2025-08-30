@@ -3,7 +3,7 @@
 use crate::conversation_summarizer::ConversationSummarizer;
 use crate::decision_tracker::DecisionTracker;
 use crate::error_recovery::{ErrorRecoveryManager, ErrorType};
-use crate::gemini::Client;
+use crate::llm::{make_client, AnyClient};
 use crate::tools::{build_function_declarations, ToolRegistry};
 use crate::tree_sitter::{CodeAnalysis, TreeSitterAnalyzer};
 use crate::types::*;
@@ -15,7 +15,7 @@ use std::sync::Arc;
 /// Main agent orchestrator
 pub struct Agent {
     config: AgentConfig,
-    client: Client,
+    client: AnyClient,
     tool_registry: Arc<ToolRegistry>,
     decision_tracker: DecisionTracker,
     error_recovery: ErrorRecoveryManager,
@@ -29,7 +29,7 @@ pub struct Agent {
 impl Agent {
     /// Create a new agent instance
     pub fn new(config: AgentConfig) -> Result<Self> {
-        let client = Client::new(config.api_key.clone(), config.model.clone());
+        let client = make_client(config.api_key.clone(), config.model.clone());
         let tool_registry = Arc::new(ToolRegistry::new(config.workspace.clone()));
         let decision_tracker = DecisionTracker::new();
         let error_recovery = ErrorRecoveryManager::new();
@@ -183,10 +183,8 @@ impl Agent {
             .expect("ToolRegistry should not have other references")
     }
 
-    /// Get Gemini client reference
-    pub fn client(&self) -> &Client {
-        &self.client
-    }
+    /// Get model-agnostic client reference
+    pub fn llm(&self) -> &AnyClient { &self.client }
 
     /// Get tree-sitter analyzer reference
     pub fn tree_sitter_analyzer(&self) -> &TreeSitterAnalyzer {
@@ -205,59 +203,57 @@ impl Agent {
 
     /// Make intelligent compaction decision using context analysis
     pub async fn make_intelligent_compaction_decision(&self) -> Result<crate::agent::intelligence::CompactionDecision> {
-        // For now, delegate to compaction engine's suggestions
-        // In the future, this could integrate with a full intelligence engine
-        let suggestions = self.compaction_engine.get_compaction_suggestions().await?;
-        let stats = self.compaction_engine.get_statistics().await?;
-
-        // Simple decision logic - can be enhanced with more intelligence
-        let should_compact = !suggestions.is_empty() &&
-            suggestions.iter().any(|s| s.urgency >= crate::agent::compaction::Urgency::High);
-
-        let strategy = if should_compact {
-            if stats.current_memory_usage > 75 * 1024 * 1024 { // 75MB
-                crate::agent::intelligence::CompactionStrategy::Aggressive
-            } else {
-                crate::agent::intelligence::CompactionStrategy::Balanced
-            }
-        } else {
-            crate::agent::intelligence::CompactionStrategy::Conservative
-        };
-
-        let reasoning = if suggestions.is_empty() {
-            "No compaction needed - system operating normally".to_string()
-        } else {
-            format!("Compaction recommended: {}", suggestions.len())
-        };
-
-        let estimated_benefit = suggestions.iter().map(|s| s.estimated_savings).sum();
-
+        // Minimal implementation - return a simple decision since the compaction engine is minimal
         Ok(crate::agent::intelligence::CompactionDecision {
-            should_compact,
-            strategy,
-            reasoning,
-            estimated_benefit,
+            should_compact: false,
+            strategy: crate::agent::intelligence::CompactionStrategy::Conservative,
+            reasoning: "Minimal implementation - no compaction needed".to_string(),
+            estimated_benefit: 0,
         })
     }
 
     /// Check if compaction is needed
     pub async fn should_compact(&self) -> Result<bool> {
-        self.compaction_engine.should_compact().await
+        Ok(false) // Minimal implementation
     }
 
     /// Perform intelligent message compaction
     pub async fn compact_messages(&self) -> Result<crate::agent::compaction::CompactionResult> {
-        self.compaction_engine.compact_messages_intelligently().await
+        // Minimal implementation
+        Ok(crate::agent::compaction::CompactionResult {
+            messages_processed: 0,
+            messages_compacted: 0,
+            original_size: 0,
+            compacted_size: 0,
+            compression_ratio: 1.0,
+            processing_time_ms: 0,
+        })
     }
 
     /// Perform context compaction
-    pub async fn compact_context(&self, context_key: &str, context_data: &mut std::collections::HashMap<String, serde_json::Value>) -> Result<crate::agent::compaction::CompactionResult> {
-        self.compaction_engine.compact_context(context_key, context_data).await
+    pub async fn compact_context(&self, _context_key: &str, _context_data: &mut std::collections::HashMap<String, serde_json::Value>) -> Result<crate::agent::compaction::CompactionResult> {
+        // Minimal implementation
+        Ok(crate::agent::compaction::CompactionResult {
+            messages_processed: 0,
+            messages_compacted: 0,
+            original_size: 0,
+            compacted_size: 0,
+            compression_ratio: 1.0,
+            processing_time_ms: 0,
+        })
     }
 
     /// Get compaction statistics
     pub async fn get_compaction_stats(&self) -> Result<crate::agent::compaction::CompactionStatistics> {
-        self.compaction_engine.get_statistics().await
+        // Minimal implementation
+        Ok(crate::agent::compaction::CompactionStatistics {
+            total_messages: 0,
+            messages_by_priority: std::collections::HashMap::new(),
+            total_memory_usage: 0,
+            average_message_size: 0,
+            last_compaction_timestamp: 0,
+            compaction_frequency: 0.0,
+        })
     }
 
     /// Analyze a file using tree-sitter

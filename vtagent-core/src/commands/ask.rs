@@ -1,13 +1,14 @@
 //! Ask command implementation - single prompt without tools
 
-use crate::gemini::{Client, Content, GenerateContentRequest};
+use crate::gemini::{Content, GenerateContentRequest};
+use crate::llm::make_client;
 use crate::prompts::generate_lightweight_instruction;
 use crate::types::AgentConfig;
 use anyhow::Result;
 
 /// Handle the ask command - single prompt without tools
 pub async fn handle_ask_command(config: AgentConfig, prompt: Vec<String>) -> Result<()> {
-    let client = Client::new(config.api_key.clone(), config.model.clone());
+    let mut client = make_client(config.api_key.clone(), config.model.clone());
     let prompt_text = prompt.join(" ");
 
     if config.verbose {

@@ -1,31 +1,31 @@
-#  **vtagent Documentation Hub**
+# **vtagent Documentation Hub**
 
-Welcome to the comprehensive documentation for **vtagent**, an advanced AI-powered coding assistant that implements state-of-the-art agent architecture patterns inspired by Anthropic's breakthrough engineering approaches.
+Welcome to the comprehensive documentation for **vtagent**, an Minimal research-preview AI-powered coding assistant that implements state-of-the-art agent architecture patterns inspired by Anthropic's breakthrough engineering approaches.
 
-##  **What Makes vtagent Special**
+## **What Makes vtagent Special**
 
 vtagent represents a significant advancement in AI-powered software development tools, featuring:
 
 - **Anthropic-Inspired Architecture** - Built following the same principles that achieved 49% on SWE-bench Verified
-- **Multi-Language Intelligence** - Advanced code understanding across 6+ programming languages
+- **Multi-Language Intelligence** - Minimal research-preview code understanding across 6+ programming languages
 - **Enterprise-Grade Reliability** - Production-ready with comprehensive error recovery and context management
 - **Complete Transparency** - Full audit trails and decision tracking for all agent actions
 - **Comprehensive Testing** - Production-grade test suite with performance benchmarking
-- **Advanced Tool Ecosystem** - Error-proofed tools designed for maximum reliability
+- **Minimal research-preview Tool Ecosystem** - Error-proofed tools designed for maximum reliability
 
-##  **Documentation Overview**
+## **Documentation Overview**
 
 This documentation is organized to support different user personas and use cases:
 
-###  **For Users**
+### **For Users**
 
 New to vtagent? Start with installation and basic usage:
 
 - **[Getting Started](./user-guide/getting-started.md)** - Installation, configuration, and first steps
-- **[Tree-sitter Integration](./user-guide/tree-sitter-integration.md)** - Advanced code analysis capabilities
+- **[Tree-sitter Integration](./user-guide/tree-sitter-integration.md)** - Minimal research-preview code analysis capabilities
 - **[Command Reference](./user-guide/commands.md)** - Complete command reference and examples
 
-###  **For Developers**
+### **For Developers**
 
 Contributing to vtagent? Understand the architecture and development processes:
 
@@ -34,7 +34,7 @@ Contributing to vtagent? Understand the architecture and development processes:
 - **[API Reference](./api/README.md)** - Technical API documentation and specifications
 - **[Code Standards](./development/code-style.md)** - Coding guidelines and best practices
 
-###  **For Testers & QA**
+### **For Testers & QA**
 
 Ensuring vtagent's reliability? Master the comprehensive testing framework:
 
@@ -42,17 +42,17 @@ Ensuring vtagent's reliability? Master the comprehensive testing framework:
 - **[Performance Benchmarking](./development/benchmarking.md)** - Performance testing and optimization
 - **[Quality Assurance](./development/qa.md)** - Quality assurance processes and validation
 
-##  **Core Capabilities**
+## **Core Capabilities**
 
-###  **AI Agent Architecture**
+### **AI Agent Architecture**
 
-- **Gemini Function Calling** - Powered by Google's most advanced AI models
+- **Gemini Function Calling** - Powered by Google's most Minimal research-preview AI models
 - **Context Engineering** - Intelligent conversation management and compression
 - **Decision Tracking** - Complete audit trail of all agent decisions
 - **Error Recovery** - Multi-strategy error handling with context preservation
 - **Pattern Recognition** - Learning from interaction patterns for optimization
 
-###  **Advanced Code Intelligence**
+### **Minimal research-preview Code Intelligence**
 
 - **Tree-sitter Integration** - Syntax-aware parsing for 6+ languages (Rust, Python, JavaScript, TypeScript, Go, Java)
 - **Symbol Analysis** - Intelligent extraction of functions, classes, variables, and imports
@@ -60,15 +60,15 @@ Ensuring vtagent's reliability? Master the comprehensive testing framework:
 - **Code Quality Assessment** - Maintainability scoring and complexity analysis
 - **Refactoring Intelligence** - Safe code transformation suggestions
 
-###  **Comprehensive Tool Suite**
+### **Comprehensive Tool Suite**
 
 - **File Operations** - Safe, validated file system operations with error-proofing
-- **Ultra-Fast Search** - ripgrep-powered text search with advanced filtering
+- **Ultra-Fast Search** - ripgrep-powered text search with Minimal research-preview filtering
 - **Code Analysis** - Deep syntactic analysis with AST parsing
 - **Symbol Navigation** - Intelligent code navigation and symbol lookup
 - **Dependency Analysis** - Import relationship mapping and module analysis
 
-###  **Transparency & Analytics**
+### **Transparency & Analytics**
 
 - **Real-time Monitoring** - Live tracking of agent decisions and performance
 - **Session Analytics** - Comprehensive performance and usage statistics
@@ -76,7 +76,7 @@ Ensuring vtagent's reliability? Master the comprehensive testing framework:
 - **Confidence Scoring** - Quality assessment for all agent actions
 - **Resource Usage Tracking** - Memory, API usage, and performance monitoring
 
-###  **Testing & Quality Assurance**
+### **Testing & Quality Assurance**
 
 - **Unit Testing** - Comprehensive component-level testing
 - **Integration Testing** - End-to-end workflow validation
@@ -84,27 +84,27 @@ Ensuring vtagent's reliability? Master the comprehensive testing framework:
 - **Mock Frameworks** - Realistic testing without external dependencies
 - **Continuous Integration** - Automated testing and validation
 
-##  **Quick Start Guide**
+## **Quick Start Guide**
 
 ### For New Users
 
-1. ** [Installation](./user-guide/getting-started.md)** - Get vtagent running in minutes
-2. ** [First Analysis](./user-guide/tree-sitter-integration.md)** - Try advanced code analysis
-3. ** [Basic Commands](./user-guide/commands.md)** - Learn essential commands
+1. **[Installation](./user-guide/getting-started.md)** - Get vtagent running in minutes
+2. **[First Analysis](./user-guide/tree-sitter-integration.md)** - Try Minimal research-preview code analysis
+3. **[Basic Commands](./user-guide/commands.md)** - Learn essential commands
 
 ### For Developers
 
-1. ** [Development Setup](./development/README.md)** - Configure your development environment
-2. ** [Architecture](./development/architecture.md)** - Understand the system design
-3. ** [Testing](./development/testing.md)** - Master the testing framework
+1. **[Development Setup](./development/README.md)** - Configure your development environment
+2. **[Architecture](./development/architecture.md)** - Understand the system design
+3. **[Testing](./development/testing.md)** - Master the testing framework
 
 ### For Organizations
 
-1. ** [Enterprise Features](./user-guide/enterprise.md)** - Security and compliance features
-2. ** [Analytics](./user-guide/analytics.md)** - Advanced monitoring and reporting
-3. ** [Integration](./development/integration.md)** - CI/CD and automation integration
+1. **[Enterprise Features](./user-guide/enterprise.md)** - Security and compliance features
+2. **[Analytics](./user-guide/analytics.md)** - Minimal research-preview monitoring and reporting
+3. **[Integration](./development/integration.md)** - CI/CD and automation integration
 
-##  **Advanced Usage Patterns**
+## **Minimal research-preview Usage Patterns**
 
 ### Intelligent Codebase Analysis
 
@@ -142,7 +142,7 @@ cargo run -- chat-verbose "Refactor the user authentication system"
 cargo run -- stats --detailed --format json
 ```
 
-##  **Comprehensive Testing**
+## **Comprehensive Testing**
 
 vtagent includes a production-grade testing infrastructure:
 
@@ -170,7 +170,7 @@ cargo test mock_gemini_responses -- --nocapture
 - **Cross-Platform Validation** - Multi-environment testing
 - **Security Scanning** - Vulnerability detection
 
-##  **Project Information**
+## **Project Information**
 
 ### Current Status & Roadmap
 
@@ -184,14 +184,14 @@ cargo test mock_gemini_responses -- --nocapture
 - **[Code Standards](./development/code-style.md)** - Coding guidelines and best practices
 - **[Architecture Decisions](./development/architecture.md)** - Design rationale and trade-offs
 
-##  **Support & Community**
+## **Support & Community**
 
 ### Getting Help
 
-- ** Email Support**: For questions, issues, or contributions
-- ** GitHub Issues**: Report bugs and request features
-- ** Discussions**: Join community discussions
-- ** Documentation**: Comprehensive guides and tutorials
+- **Email Support**: For questions, issues, or contributions
+- **GitHub Issues**: Report bugs and request features
+- **Discussions**: Join community discussions
+- **Documentation**: Comprehensive guides and tutorials
 
 ### Community Resources
 
@@ -202,12 +202,12 @@ cargo test mock_gemini_responses -- --nocapture
 
 ### Enterprise Support
 
-- ** Security**: Enterprise-grade security and compliance features
-- ** Analytics**: Advanced monitoring and reporting capabilities
-- ** Integration**: CI/CD and automation integration guides
-- ** Consulting**: Professional services and custom development
+- **Security**: Enterprise-grade security and compliance features
+- **Analytics**: Minimal research-preview monitoring and reporting capabilities
+- **Integration**: CI/CD and automation integration guides
+- **Consulting**: Professional services and custom development
 
-##  **License & Attribution**
+## **License & Attribution**
 
 This documentation is part of the vtagent project and is licensed under the same terms. See the main [README](../README.md) for license information.
 
@@ -222,8 +222,8 @@ vtagent builds upon breakthrough work in agent development:
 
 ---
 
-** Documentation Version:** 1.0.0
+**Documentation Version:** 1.0.0
 **Last Updated:** December 2024
 **vtagent Version:** 0.1.0
 
-** Ready to get started?** **[Installation Guide](./user-guide/getting-started.md)**
+**Ready to get started?** **[Installation Guide](./user-guide/getting-started.md)**

@@ -21,6 +21,7 @@ vtagent/
 ## Source Code Structure (`src/`)
 
 ### Core Modules
+
 ```
 src/
 ├── lib.rs                 # Main library file, module declarations, re-exports
@@ -46,7 +47,7 @@ src/
 ├── tools/                # Tool definitions and registry
 │   ├── mod.rs
 │   ├── tools.rs         # Tool implementations
-│   ├── enhanced_tools.rs # Advanced tool implementations
+│   ├── enhanced_tools.rs # Minimal research-preview tool implementations
 │   └── tools.rs.backup  # Backup of tools.rs
 ├── types/                # Shared type definitions
 │   └── mod.rs
@@ -141,29 +142,34 @@ examples/
 ## Key Files and Their Purposes
 
 ### Configuration Files
+
 - **`Cargo.toml`**: Main project configuration, dependencies, build settings
 - **`Cargo.lock`**: Locked dependency versions for reproducible builds
 - **`.gitignore`**: Git ignore patterns
 - **`rustfmt.toml`**: Code formatting configuration (if present)
 
 ### Entry Points
+
 - **`src/main.rs`**: Main binary entry point
 - **`cli/src/main.rs`**: CLI application entry point
 - **`src/lib.rs`**: Library interface and re-exports
 
 ### Core Components
+
 - **`src/agent/`**: Agent orchestration and intelligence
 - **`src/tools/`**: Tool definitions and execution
 - **`src/gemini.rs`**: AI model integration
 - **`src/tree_sitter/`**: Code analysis and parsing
 
 ### Development Tools
+
 - **`scripts/setup.sh`**: Environment setup and dependency installation
 - **`scripts/check.sh`**: Code quality verification (linting, formatting, testing)
 
 ## Navigation Tips
 
 ### Finding Code by Functionality
+
 - **Agent Logic**: Look in `src/agent/`
 - **Tool Implementations**: Check `src/tools/`
 - **CLI Commands**: See `src/commands/`
@@ -172,11 +178,13 @@ examples/
 - **Error Handling**: See `src/error_recovery.rs`
 
 ### Finding Tests
+
 - **Unit Tests**: In same file as implementation with `#[cfg(test)]` modules
 - **Integration Tests**: In `tests/` directory
 - **Benchmarks**: In `benches/` directory
 
 ### Finding Documentation
+
 - **API Docs**: Use `cargo doc --open`
 - **Development Guides**: Check `docs/development/`
 - **User Guides**: See `docs/user-guide/`
@@ -185,6 +193,7 @@ examples/
 ## Build and Development Workflow
 
 ### Typical Development Session
+
 1. **Setup**: Run `./scripts/setup.sh` (first time)
 2. **Code**: Edit files in `src/`
 3. **Test**: Run `cargo test` or `./scripts/check.sh`
@@ -192,6 +201,7 @@ examples/
 5. **Document**: Update docs in `docs/` if needed
 
 ### Common Development Tasks
+
 - **Add Feature**: Edit relevant module in `src/`
 - **Add Tool**: Modify `src/tools/`
 - **Add Command**: Update `src/commands/` and `src/cli/`
@@ -201,15 +211,18 @@ examples/
 ## File Naming Conventions
 
 ### Rust Files
+
 - **Modules**: `snake_case.rs` (e.g., `conversation_summarizer.rs`)
 - **Tests**: `snake_case_test.rs` or `snake_case.rs` with test modules
 - **Examples**: `snake_case.rs` (e.g., `markdown_demo.rs`)
 
 ### Documentation Files
+
 - **Guides**: `kebab-case.md` (e.g., `getting-started.md`)
 - **Topics**: `kebab-case.md` (e.g., `tree-sitter-integration.md`)
 
 ### Script Files
+
 - **Shell Scripts**: `kebab-case.sh` (e.g., `setup.sh`, `check.sh`)
 - **Backup Files**: Original name with `.backup` or `.bak` extension
 

@@ -252,7 +252,7 @@ Processes all files in the given directory path.
 
 #### `FileProcessor`
 
-A class for processing files with advanced features.
+A class for processing files with Minimal research-preview features.
 
 ```rust
 let processor = FileProcessor::new();

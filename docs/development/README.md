@@ -1,8 +1,8 @@
-#  **Development Guide**
+# **Development Guide**
 
 This section contains information for developers who want to contribute to, modify, or understand the vtagent codebase.
 
-##  **Getting Started**
+## **Getting Started**
 
 ### Development Setup
 
@@ -11,7 +11,7 @@ This section contains information for developers who want to contribute to, modi
 - **[Running Tests](./testing.md)** - Testing strategies and procedures
 - **[Code Style](./code-style.md)** - Code formatting and style guidelines
 
-##  **Understanding the Codebase**
+## **Understanding the Codebase**
 
 ### Architecture & Design
 
@@ -27,7 +27,7 @@ This section contains information for developers who want to contribute to, modi
 - **[AI Integration](./ai-integration.md)** - Gemini AI integration details
 - **[Tree-sitter Integration](./tree-sitter-integration.md)** - Code analysis capabilities
 
-##  **Development Workflows**
+## **Development Workflows**
 
 ### Contributing
 
@@ -43,11 +43,11 @@ This section contains information for developers who want to contribute to, modi
 - **[Testing Strategies](./testing-strategies.md)** - Comprehensive testing approaches
 - **[Performance Optimization](./performance.md)** - Optimization techniques and best practices
 
-##  **Technical Deep Dives**
+## **Technical Deep Dives**
 
-### Advanced Topics
+### Minimal research-preview Topics
 
-- **[Prompt Engineering](./prompt-engineering.md)** - Advanced prompt design techniques
+- **[Prompt Engineering](./prompt-engineering.md)** - Minimal research-preview prompt design techniques
 - **[Context Management](./context-management.md)** - Managing conversation context
 - **[Error Recovery](./error-recovery.md)** - Error handling and recovery strategies
 - **[Decision Tracking](./decision-tracking.md)** - How decisions are tracked and analyzed
@@ -58,7 +58,7 @@ This section contains information for developers who want to contribute to, modi
 - **[Library Integration](./library-integration.md)** - Using vtagent as a library
 - **[Plugin System](./plugin-system.md)** - Extending vtagent with plugins
 
-##  **Debugging & Troubleshooting**
+## **Debugging & Troubleshooting**
 
 ### Development Tools
 
@@ -67,7 +67,7 @@ This section contains information for developers who want to contribute to, modi
 - **[Profiling](./profiling.md)** - Performance profiling and analysis
 - **[Common Issues](./common-issues.md)** - Frequently encountered problems
 
-##  **Development Standards**
+## **Development Standards**
 
 ### Code Quality
 
@@ -82,22 +82,22 @@ This section contains information for developers who want to contribute to, modi
 - **[CI/CD](./ci-cd.md)** - Continuous integration and deployment
 - **[Quality Assurance](./qa.md)** - Quality assurance processes
 
-##  **API Reference**
+## **API Reference**
 
 For detailed API documentation, see the **[API Reference](../api/)** section.
 
 ---
 
-##  **Navigation**
+## **Navigation**
 
 - **[Back to Documentation Index](./../README.md)**
 - **[User Guide](../user-guide/)**
 - **[API Reference](../api/)**
 - **[Project Info](../project/)**
 
-##  **Getting Help**
+## **Getting Help**
 
-- ** [Development Mailing List](mailto:dev@vtagent-project.org)** - Development discussions
-- ** [Discord Server](https://discord.gg/vtagent)** - Real-time development chat
-- ** [GitHub Issues](https://github.com/username/vtagent/issues)** - Bug reports and feature requests
-- ** [Wiki](https://github.com/username/vtagent/wiki)** - Community-contributed documentation
+- **[Development Mailing List](mailto:dev@vtagent-project.org)** - Development discussions
+- **[Discord Server](https://discord.gg/vtagent)** - Real-time development chat
+- **[GitHub Issues](https://github.com/username/vtagent/issues)** - Bug reports and feature requests
+- **[Wiki](https://github.com/username/vtagent/wiki)** - Community-contributed documentation

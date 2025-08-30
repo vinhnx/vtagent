@@ -5,7 +5,7 @@
 
 set -e
 
-echo "🚀 Setting up vtagent Development Environment..."
+echo "Setting up vtagent Development Environment..."
 echo "=============================================="
 
 # Colors for output
@@ -113,21 +113,21 @@ setup_git_hooks() {
 #!/bin/bash
 # Pre-commit hook to run code quality checks
 
-echo "🔍 Running pre-commit checks..."
+echo "Running pre-commit checks..."
 
 # Run format check
 if ! cargo fmt --all -- --check; then
-    echo "❌ Code formatting issues found. Run 'cargo fmt --all' to fix."
+    echo "Code formatting issues found. Run 'cargo fmt --all' to fix."
     exit 1
 fi
 
 # Run clippy
 if ! cargo clippy -- -D warnings; then
-    echo "❌ Clippy found issues. Please fix them."
+    echo "Clippy found issues. Please fix them."
     exit 1
 fi
 
-echo "✅ Pre-commit checks passed!"
+echo "Pre-commit checks passed!"
 EOF
 
             chmod +x "$pre_commit_hook"
@@ -188,15 +188,15 @@ main() {
 
     echo ""
     echo "=============================================="
-    print_success "🎉 Development environment setup complete!"
+    print_success "Development environment setup complete!"
     echo ""
-    echo "📋 Next steps:"
+    echo "Next steps:"
     echo "  • Run './scripts/check.sh' to verify everything works"
     echo "  • Use 'cargo fmt --all' to format your code"
     echo "  • Use 'cargo clippy' to lint your code"
     echo "  • Use 'cargo test' to run tests"
     echo ""
-    echo "🔧 Useful commands:"
+    echo "Useful commands:"
     echo "  • Format code: cargo fmt --all"
     echo "  • Lint code: cargo clippy -- -D warnings"
     echo "  • Run tests: cargo test --workspace"
@@ -204,7 +204,7 @@ main() {
     echo "  • Check everything: ./scripts/check.sh"
     echo ""
     if [ "$with_hooks" = true ]; then
-        echo "🪝 Git hooks have been set up to run checks before commits."
+        echo "Git hooks have been set up to run checks before commits."
         echo ""
     fi
     exit 0

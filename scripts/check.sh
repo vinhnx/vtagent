@@ -5,7 +5,7 @@
 
 set -e
 
-echo "🔍 Running vtagent Code Quality Checks..."
+echo "Running vtagent Code Quality Checks..."
 echo "========================================"
 
 # Colors for output
@@ -131,7 +131,7 @@ main() {
     local failed_checks=0
 
     echo ""
-    echo "🚀 Starting comprehensive code quality checks..."
+    echo "Starting comprehensive code quality checks..."
     echo ""
 
     # Check prerequisites
@@ -144,7 +144,7 @@ main() {
     fi
 
     echo ""
-    echo "📋 Running checks..."
+    echo "Running checks..."
     echo ""
 
     # Run all checks
@@ -158,18 +158,18 @@ main() {
     echo "========================================"
 
     if [ $failed_checks -eq 0 ]; then
-        print_success "🎉 All checks passed! Your code is ready for commit."
+        print_success "All checks passed! Your code is ready for commit."
         echo ""
-        echo "💡 Tips:"
+        echo "Tips:"
         echo "  • Run 'cargo fmt --all' to auto-format your code"
         echo "  • Run 'cargo clippy' to see clippy suggestions"
         echo "  • Run 'cargo doc --open' to view documentation"
         echo ""
         exit 0
     else
-        print_error "❌ $failed_checks check(s) failed. Please fix the issues above."
+        print_error "$failed_checks check(s) failed. Please fix the issues above."
         echo ""
-        echo "🔧 Quick fixes:"
+        echo "Quick fixes:"
         echo "  • Format code: cargo fmt --all"
         echo "  • Fix clippy: cargo clippy --fix"
         echo "  • Run again: ./scripts/check.sh"

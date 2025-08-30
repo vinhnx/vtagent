@@ -4,7 +4,7 @@ All notable changes to vtagent will be documented in this file.
 
 ## [Unreleased] - Latest Improvements
 
-###  **Major Enhancements - Anthropic-Inspired Architecture**
+### **Major Enhancements - Anthropic-Inspired Architecture**
 
 #### Decision Transparency System
 
@@ -30,7 +30,7 @@ All notable changes to vtagent will be documented in this file.
 - **Confidence Scoring**: Quality assessment for summary reliability
 - **Context Efficiency**: Maintain useful context without hitting limits
 
-###  **Tool Design Improvements**
+### **Tool Design Improvements**
 
 #### Enhanced Tool Documentation
 
@@ -46,7 +46,7 @@ All notable changes to vtagent will be documented in this file.
 - **Flexible Methodology**: Adaptable problem-solving approaches
 - **Quality First**: Emphasize correctness over speed
 
-###  **Transparency & Observability**
+### **Transparency & Observability**
 
 #### Verbose Mode Enhancements
 
@@ -73,13 +73,13 @@ All notable changes to vtagent will be documented in this file.
 - Workspace safety and path validation
 - Comprehensive logging and debugging support
 
-##  **Performance & Reliability**
+## **Performance & Reliability**
 
 ### SWE-bench Inspired Improvements
 
 - **49% Target Achievement**: Architecture designed following Anthropic's breakthrough approach
 - **Error-Proofed Tools**: Extensive validation and error handling
-- **Context Engineering**: Advanced conversation management techniques
+- **Context Engineering**: Minimal research-preview conversation management techniques
 - **Model Empowerment**: Maximum control given to language models
 
 ### Reliability Enhancements
@@ -89,7 +89,7 @@ All notable changes to vtagent will be documented in this file.
 - **Pattern Detection**: Automatic identification of recurring issues
 - **Comprehensive Logging**: Full audit trail of all agent actions
 
-##  **Technical Improvements**
+## **Technical Improvements**
 
 ### Architecture Refactoring
 
@@ -105,7 +105,7 @@ All notable changes to vtagent will be documented in this file.
 - **Testing**: Unit tests for core functionality
 - **Linting**: Clean, well-formatted code following Rust best practices
 
-##  **Key Features Summary**
+## **Key Features Summary**
 
 ### New Capabilities
 
@@ -123,14 +123,14 @@ All notable changes to vtagent will be documented in this file.
 4. **Improved Tool Reliability** - Error-proofed design prevents common issues
 5. **Context Management** - Intelligent handling of conversation limits
 
-##  **Future Roadmap**
+## **Future Roadmap**
 
 ### Planned Enhancements
 
 - **Multi-file Operations**: Batch processing capabilities
 - **Project Templates**: Predefined scaffolds for common projects
 - **Integration APIs**: REST endpoints for external integration
-- **Advanced Context Compression**: More sophisticated summarization algorithms
+- **Minimal research-preview Context Compression**: More sophisticated summarization algorithms
 
 ### Research Areas
 
@@ -139,7 +139,7 @@ All notable changes to vtagent will be documented in this file.
 - **Domain Specialization**: Industry-specific optimizations
 - **Performance Benchmarking**: SWE-bench style evaluation capabilities
 
-##  **Contributing**
+## **Contributing**
 
 ### Development Guidelines
 
@@ -157,7 +157,7 @@ All notable changes to vtagent will be documented in this file.
 
 ---
 
-##  **Related Breakthroughs**
+## **Related Breakthroughs**
 
 This release incorporates insights from Anthropic's engineering approach that achieved **49% on SWE-bench Verified**, including:
 

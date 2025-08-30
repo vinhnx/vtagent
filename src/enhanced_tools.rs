@@ -60,7 +60,8 @@ struct CacheStats {
 impl FileOperationCache {
     /// Create a new cache with specified capacity
     fn new(cache_size: usize) -> Self {
-        let cache_capacity = NonZeroUsize::new(cache_size).unwrap_or(NonZeroUsize::new(100).unwrap());
+        let cache_capacity =
+            NonZeroUsize::new(cache_size).unwrap_or(NonZeroUsize::new(100).unwrap());
         Self {
             file_cache: Arc::new(RwLock::new(LruCache::new(cache_capacity))),
             compressed_cache: Arc::new(DashMap::new()),
@@ -102,15 +103,19 @@ impl FileOperationCache {
     /// Put file content into cache
     async fn put_file(&self, path: String, content: String) {
         // For large files, compress and store in compressed cache
-        if content.len() > 100_000 { // 100KB threshold
+        if content.len() > 100_000 {
+            // 100KB threshold
             let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
             if encoder.write_all(content.as_bytes()).is_ok() {
                 if let Ok(compressed_data) = encoder.finish() {
-                    self.compressed_cache.insert(path.clone(), CompressedFile {
-                        compressed_data,
-                        original_size: content.len(),
-                        timestamp: Instant::now(),
-                    });
+                    self.compressed_cache.insert(
+                        path.clone(),
+                        CompressedFile {
+                            compressed_data,
+                            original_size: content.len(),
+                            timestamp: Instant::now(),
+                        },
+                    );
                     return;
                 }
             }
@@ -137,7 +142,7 @@ impl FileOperationCache {
         let mut cache = self.file_cache.write().await;
         cache.clear();
         self.compressed_cache.clear();
-        
+
         let mut stats = self.stats.write().await;
         stats.hits = 0;
         stats.misses = 0;
@@ -184,7 +189,7 @@ impl ParallelFileProcessor {
                 successful.push(value);
             }
         }
-        
+
         Ok(successful)
     }
 }
@@ -198,7 +203,8 @@ pub async fn get_code_intelligence(args: Value) -> Result<Value> {
         column: Option<usize>,
         context_lines: Option<usize>,
     }
-    let input: Input = serde_json::from_value(args).context("invalid get_code_intelligence args")?;
+    let input: Input =
+        serde_json::from_value(args).context("invalid get_code_intelligence args")?;
     let context_lines = input.context_lines.unwrap_or(3);
 
     // Try to get file content from cache first
@@ -207,10 +213,12 @@ pub async fn get_code_intelligence(args: Value) -> Result<Value> {
     } else {
         // Read file content and cache it
         let content = fs::read_to_string(&input.path)?;
-        FILE_CACHE.put_file(input.path.clone(), content.clone()).await;
+        FILE_CACHE
+            .put_file(input.path.clone(), content.clone())
+            .await;
         content
     };
-    
+
     let lines: Vec<&str> = content.lines().collect();
 
     let line = input.line.unwrap_or(0).min(lines.len().saturating_sub(1));
@@ -224,7 +232,10 @@ pub async fn get_code_intelligence(args: Value) -> Result<Value> {
 
     // Basic analysis without tree-sitter for now
     let total_lines = lines.len();
-    let code_lines = lines.iter().filter(|l| !l.trim().is_empty() && !l.trim().starts_with("//")).count();
+    let code_lines = lines
+        .iter()
+        .filter(|l| !l.trim().is_empty() && !l.trim().starts_with("//"))
+        .count();
 
     insights.push(json!({
         "type": "statistics",
@@ -264,10 +275,12 @@ pub async fn suggest_refactoring(args: Value) -> Result<Value> {
     } else {
         // Read file content and cache it
         let content = fs::read_to_string(&input.path)?;
-        FILE_CACHE.put_file(input.path.clone(), content.clone()).await;
+        FILE_CACHE
+            .put_file(input.path.clone(), content.clone())
+            .await;
         content
     };
-    
+
     let lines = content.lines().count();
 
     let mut suggestions = Vec::new();
@@ -318,7 +331,8 @@ pub async fn analyze_project_structure(args: Value) -> Result<Value> {
         include_hidden: Option<bool>,
         max_depth: Option<usize>,
     }
-    let input: Input = serde_json::from_value(args).context("invalid analyze_project_structure args")?;
+    let input: Input =
+        serde_json::from_value(args).context("invalid analyze_project_structure args")?;
     let include_hidden = input.include_hidden.unwrap_or(false);
     let max_depth = input.max_depth.unwrap_or(3);
 
@@ -332,7 +346,7 @@ pub async fn analyze_project_structure(args: Value) -> Result<Value> {
         .into_iter()
         .filter_map(|e| e.ok())
         .collect();
-        
+
     // Process entries in parallel
     let results: Vec<_> = entries
         .into_par_iter()
@@ -340,10 +354,12 @@ pub async fn analyze_project_structure(args: Value) -> Result<Value> {
             let path = entry.path();
             // Filter hidden files if not included
             if !include_hidden {
-                if path.file_name()
+                if path
+                    .file_name()
                     .and_then(|n| n.to_str())
                     .map(|n| n.starts_with('.'))
-                    .unwrap_or(false) {
+                    .unwrap_or(false)
+                {
                     return false;
                 }
             }
@@ -352,7 +368,10 @@ pub async fn analyze_project_structure(args: Value) -> Result<Value> {
         .map(|entry| {
             let path = entry.path();
             if entry.file_type().is_file() {
-                let ext = path.extension().and_then(|e| e.to_str()).map(|s| s.to_string());
+                let ext = path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .map(|s| s.to_string());
                 (ext, true, false)
             } else if entry.file_type().is_dir() {
                 (None, false, true)
@@ -387,7 +406,8 @@ pub async fn analyze_project_structure(args: Value) -> Result<Value> {
         "Unknown"
     };
 
-    let most_common_ext = structure.iter()
+    let most_common_ext = structure
+        .iter()
         .max_by_key(|(_, count)| *count)
         .map(|(ext, _)| ext.clone())
         .unwrap_or_else(|| "none".to_string());
@@ -424,7 +444,7 @@ pub async fn find_similar_code(args: Value) -> Result<Value> {
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
         .collect();
-        
+
     // Process files in parallel
     let mut results: Vec<_> = entries
         .into_par_iter()
@@ -451,7 +471,9 @@ pub async fn find_similar_code(args: Value) -> Result<Value> {
 
     // Sort by similarity and limit results
     results.sort_by(|a, b| {
-        b["similarity"].as_f64().unwrap_or(0.0)
+        b["similarity"]
+            .as_f64()
+            .unwrap_or(0.0)
             .partial_cmp(&a["similarity"].as_f64().unwrap_or(0.0))
             .unwrap_or(std::cmp::Ordering::Equal)
     });
@@ -473,7 +495,8 @@ pub async fn generate_code_documentation(args: Value) -> Result<Value> {
         path: String,
         include_examples: Option<bool>,
     }
-    let input: Input = serde_json::from_value(args).context("invalid generate_code_documentation args")?;
+    let input: Input =
+        serde_json::from_value(args).context("invalid generate_code_documentation args")?;
 
     // Try to get file content from cache first
     let content = if let Some(cached_content) = FILE_CACHE.get_file(&input.path).await {
@@ -481,10 +504,12 @@ pub async fn generate_code_documentation(args: Value) -> Result<Value> {
     } else {
         // Read file content and cache it
         let content = fs::read_to_string(&input.path)?;
-        FILE_CACHE.put_file(input.path.clone(), content.clone()).await;
+        FILE_CACHE
+            .put_file(input.path.clone(), content.clone())
+            .await;
         content
     };
-    
+
     let include_examples = input.include_examples.unwrap_or(true);
 
     // Extract functions and generate documentation
@@ -532,10 +557,12 @@ pub async fn detect_code_smells(args: Value) -> Result<Value> {
     } else {
         // Read file content and cache it
         let content = fs::read_to_string(&input.path)?;
-        FILE_CACHE.put_file(input.path.clone(), content.clone()).await;
+        FILE_CACHE
+            .put_file(input.path.clone(), content.clone())
+            .await;
         content
     };
-    
+
     let lines = content.lines().collect::<Vec<_>>();
     let mut smells = Vec::new();
 
@@ -587,7 +614,8 @@ pub async fn detect_code_smells(args: Value) -> Result<Value> {
 
     // Filter by severity
     let severity_threshold = input.severity_threshold.as_deref().unwrap_or("medium");
-    let filtered_smells: Vec<_> = smells.into_iter()
+    let filtered_smells: Vec<_> = smells
+        .into_iter()
         .filter(|smell| {
             let smell_severity = smell["severity"].as_str().unwrap_or("low");
             severity_level(smell_severity) >= severity_level(severity_threshold)
@@ -662,7 +690,7 @@ pub async fn semantic_grep_search(args: Value) -> Result<Value> {
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
         .collect();
-        
+
     // Process files in parallel
     let mut results: Vec<Value> = entries
         .into_par_iter()
@@ -670,7 +698,7 @@ pub async fn semantic_grep_search(args: Value) -> Result<Value> {
             if let Ok(content) = fs::read_to_string(entry.path()) {
                 let lines: Vec<&str> = content.lines().collect();
                 let mut file_results = Vec::new();
-                
+
                 for (line_num, line) in lines.iter().enumerate() {
                     if line.contains(&input.pattern) {
                         let start_ctx = line_num.saturating_sub(context_lines);
@@ -693,7 +721,7 @@ pub async fn semantic_grep_search(args: Value) -> Result<Value> {
                         file_results.push(result);
                     }
                 }
-                
+
                 Some(file_results)
             } else {
                 None
@@ -765,7 +793,8 @@ pub async fn batch_file_operations(args: Value) -> Result<Value> {
         new_string: Option<String>,
     }
 
-    let input: Input = serde_json::from_value(args).context("invalid batch_file_operations args")?;
+    let input: Input =
+        serde_json::from_value(args).context("invalid batch_file_operations args")?;
 
     let mut results = Vec::new();
     let mut success_count = 0;
@@ -1005,7 +1034,8 @@ pub async fn get_tool_performance_stats(args: Value) -> Result<Value> {
         #[allow(dead_code)]
         detailed: Option<bool>,
     }
-    let input: Input = serde_json::from_value(args).context("invalid get_tool_performance_stats args")?;
+    let input: Input =
+        serde_json::from_value(args).context("invalid get_tool_performance_stats args")?;
 
     // This function would typically interact with the ToolRegistry to get performance stats
     // For now, we'll return a placeholder response

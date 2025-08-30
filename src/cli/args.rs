@@ -11,8 +11,8 @@ use std::path::PathBuf;
     about = "Advanced Rust coding agent powered by Gemini with Anthropic-inspired architecture"
 )]
 pub struct Cli {
-    /// Gemini model ID, e.g. gemini-2.5-flash
-    #[arg(long, global = true, default_value = "gemini-2.5-flash")]
+    /// Gemini model ID, e.g. gemini-2.5-flash-lite
+    #[arg(long, global = true, default_value = "gemini-2.5-flash-lite")]
     pub model: String,
 
     /// API key environment variable to read (checks GEMINI_API_KEY, then GOOGLE_API_KEY)
@@ -131,8 +131,6 @@ pub enum Commands {
         #[arg(long)]
         all: bool,
     },
-
-
 }
 
 /// Configuration file structure
@@ -177,7 +175,7 @@ pub struct LoggingConfig {
 impl Default for Cli {
     fn default() -> Self {
         Self {
-            model: "gemini-2.5-flash".to_string(),
+            model: "gemini-2.5-flash-lite".to_string(),
             api_key_env: "GEMINI_API_KEY".to_string(),
             workspace: None,
             verbose: false,

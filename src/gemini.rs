@@ -48,6 +48,30 @@ impl ClientConfig {
         }
     }
 
+    /// Configuration optimized for low memory usage (< 100MB target)
+    pub fn low_memory() -> Self {
+        Self {
+            pool_max_idle_per_host: 3,                  // Reduced connection pooling
+            pool_idle_timeout: Duration::from_secs(30), // Shorter idle timeout
+            tcp_keepalive: Duration::from_secs(30),
+            request_timeout: Duration::from_secs(60), // Reasonable timeout
+            connect_timeout: Duration::from_secs(5),  // Faster connection timeout
+            user_agent: "vtagent/1.0.0-low-memory".to_string(),
+        }
+    }
+
+    /// Configuration optimized for ultra-low memory (< 50MB target)
+    pub fn ultra_low_memory() -> Self {
+        Self {
+            pool_max_idle_per_host: 1,                  // Minimal connection pooling
+            pool_idle_timeout: Duration::from_secs(10), // Very short idle timeout
+            tcp_keepalive: Duration::from_secs(15),
+            request_timeout: Duration::from_secs(30), // Shorter timeout
+            connect_timeout: Duration::from_secs(3),  // Very fast connection timeout
+            user_agent: "vtagent/1.0.0-ultra-low-memory".to_string(),
+        }
+    }
+
     /// Configuration optimized for low-latency scenarios
     pub fn low_latency() -> Self {
         Self {
@@ -65,10 +89,7 @@ impl ClientConfig {
 #[derive(Debug, Clone)]
 pub enum StreamingError {
     /// Network-related errors (connection, timeout, DNS, etc.)
-    NetworkError {
-        message: String,
-        is_retryable: bool,
-    },
+    NetworkError { message: String, is_retryable: bool },
     /// API-related errors (rate limits, authentication, etc.)
     ApiError {
         status_code: u16,
@@ -86,9 +107,7 @@ pub enum StreamingError {
         duration: Duration,
     },
     /// Content validation errors
-    ContentError {
-        message: String,
-    },
+    ContentError { message: String },
     /// Streaming-specific errors
     StreamingError {
         message: String,
@@ -102,13 +121,20 @@ impl std::fmt::Display for StreamingError {
             StreamingError::NetworkError { message, .. } => {
                 write!(f, "Network error: {}", message)
             }
-            StreamingError::ApiError { status_code, message, .. } => {
+            StreamingError::ApiError {
+                status_code,
+                message,
+                ..
+            } => {
                 write!(f, "API error ({}): {}", status_code, message)
             }
             StreamingError::ParseError { message, .. } => {
                 write!(f, "Parse error: {}", message)
             }
-            StreamingError::TimeoutError { operation, duration } => {
+            StreamingError::TimeoutError {
+                operation,
+                duration,
+            } => {
                 write!(f, "Timeout during {} after {:?}", operation, duration)
             }
             StreamingError::ContentError { message } => {
@@ -229,8 +255,11 @@ impl Client {
         let error_str = error.to_string().to_lowercase();
 
         // Network errors
-        if error_str.contains("timeout") || error_str.contains("connection") ||
-           error_str.contains("network") || error_str.contains("dns") {
+        if error_str.contains("timeout")
+            || error_str.contains("connection")
+            || error_str.contains("network")
+            || error_str.contains("dns")
+        {
             return StreamingError::NetworkError {
                 message: error.to_string(),
                 is_retryable: true,
@@ -380,10 +409,10 @@ impl Client {
         loop {
             match self.attempt_streaming_request(req, &mut on_chunk).await {
                 Ok(response) => {
-                    // Update metrics on success
+                    // Update metrics on success (but don't print debug info)
                     if let Some(start_time) = self.metrics.request_start_time {
                         let total_duration = start_time.elapsed();
-                        eprintln!("Streaming completed successfully in {:?}", total_duration);
+                        // Removed debug print to keep chat interface clean
                     }
                     return Ok(response);
                 }
@@ -391,17 +420,27 @@ impl Client {
                     self.metrics.error_count += 1;
                     let streaming_error = self.classify_error(&error);
 
-                    eprintln!("Streaming attempt {} failed: {}", attempt + 1, streaming_error);
+                    eprintln!(
+                        "Streaming attempt {} failed: {}",
+                        attempt + 1,
+                        streaming_error
+                    );
 
                     // Check if we should retry
-                    if attempt < self.retry_config.max_attempts && self.should_retry(&streaming_error) {
+                    if attempt < self.retry_config.max_attempts
+                        && self.should_retry(&streaming_error)
+                    {
                         attempt += 1;
                         self.metrics.retry_count += 1;
                         last_error = Some(streaming_error);
 
                         let delay = self.calculate_retry_delay(attempt);
-                        eprintln!("Retrying in {:?}... (attempt {}/{})",
-                                delay, attempt + 1, self.retry_config.max_attempts + 1);
+                        eprintln!(
+                            "Retrying in {:?}... (attempt {}/{})",
+                            delay,
+                            attempt + 1,
+                            self.retry_config.max_attempts + 1
+                        );
 
                         time::sleep(delay).await;
                         continue;
@@ -409,32 +448,78 @@ impl Client {
                         // No more retries or error is not retryable
                         return Err(match streaming_error {
                             StreamingError::NetworkError { message, .. } => {
-                                anyhow::anyhow!("Network error after {} attempts: {}", attempt + 1, message)
+                                anyhow::anyhow!(
+                                    "Network error after {} attempts: {}",
+                                    attempt + 1,
+                                    message
+                                )
                             }
-                            StreamingError::ApiError { status_code, message, .. } => {
-                                anyhow::anyhow!("API error ({}): {} (attempts: {})", status_code, message, attempt + 1)
+                            StreamingError::ApiError {
+                                status_code,
+                                message,
+                                ..
+                            } => {
+                                anyhow::anyhow!(
+                                    "API error ({}): {} (attempts: {})",
+                                    status_code,
+                                    message,
+                                    attempt + 1
+                                )
                             }
-                            StreamingError::ParseError { message, raw_response } => {
+                            StreamingError::ParseError {
+                                message,
+                                raw_response,
+                            } => {
                                 if raw_response.is_empty() {
-                                    anyhow::anyhow!("Parse error: {} (attempts: {})", message, attempt + 1)
+                                    anyhow::anyhow!(
+                                        "Parse error: {} (attempts: {})",
+                                        message,
+                                        attempt + 1
+                                    )
                                 } else {
-                                    anyhow::anyhow!("Parse error: {} (attempts: {}). Raw response: {}",
-                                                  message, attempt + 1, &raw_response.chars().take(500).collect::<String>())
+                                    anyhow::anyhow!(
+                                        "Parse error: {} (attempts: {}). Raw response: {}",
+                                        message,
+                                        attempt + 1,
+                                        &raw_response.chars().take(500).collect::<String>()
+                                    )
                                 }
                             }
-                            StreamingError::TimeoutError { operation, duration } => {
-                                anyhow::anyhow!("Timeout during {} after {:?} (attempts: {})",
-                                              operation, duration, attempt + 1)
+                            StreamingError::TimeoutError {
+                                operation,
+                                duration,
+                            } => {
+                                anyhow::anyhow!(
+                                    "Timeout during {} after {:?} (attempts: {})",
+                                    operation,
+                                    duration,
+                                    attempt + 1
+                                )
                             }
                             StreamingError::ContentError { message } => {
-                                anyhow::anyhow!("Content error: {} (attempts: {})", message, attempt + 1)
+                                anyhow::anyhow!(
+                                    "Content error: {} (attempts: {})",
+                                    message,
+                                    attempt + 1
+                                )
                             }
-                            StreamingError::StreamingError { message, partial_content } => {
+                            StreamingError::StreamingError {
+                                message,
+                                partial_content,
+                            } => {
                                 if let Some(partial) = partial_content {
-                                    anyhow::anyhow!("Streaming error: {} (attempts: {}). Partial content: {}",
-                                                  message, attempt + 1, partial)
+                                    anyhow::anyhow!(
+                                        "Streaming error: {} (attempts: {}). Partial content: {}",
+                                        message,
+                                        attempt + 1,
+                                        partial
+                                    )
                                 } else {
-                                    anyhow::anyhow!("Streaming error: {} (attempts: {})", message, attempt + 1)
+                                    anyhow::anyhow!(
+                                        "Streaming error: {} (attempts: {})",
+                                        message,
+                                        attempt + 1
+                                    )
                                 }
                             }
                         });
@@ -456,7 +541,8 @@ impl Client {
         let url = self.stream_endpoint()?;
 
         // Create request with timeout
-        let request_future = self.http
+        let request_future = self
+            .http
             .post(url)
             .query(&[("key", self.api_key.as_str())])
             .json(req)
@@ -466,7 +552,10 @@ impl Client {
         let resp = match time::timeout(self.config.request_timeout, request_future).await {
             Ok(result) => result.context("HTTP request failed")?,
             Err(_) => {
-                return Err(anyhow::anyhow!("Timeout during HTTP request after {:?}", self.config.request_timeout));
+                return Err(anyhow::anyhow!(
+                    "Timeout during HTTP request after {:?}",
+                    self.config.request_timeout
+                ));
             }
         };
 
@@ -484,8 +573,14 @@ impl Client {
                 StatusCode::UNAUTHORIZED => {
                     return Err(anyhow::anyhow!("API error (401): Authentication failed"));
                 }
-                StatusCode::INTERNAL_SERVER_ERROR | StatusCode::BAD_GATEWAY | StatusCode::SERVICE_UNAVAILABLE => {
-                    return Err(anyhow::anyhow!("API error ({}): Server error: {}", status.as_u16(), text));
+                StatusCode::INTERNAL_SERVER_ERROR
+                | StatusCode::BAD_GATEWAY
+                | StatusCode::SERVICE_UNAVAILABLE => {
+                    return Err(anyhow::anyhow!(
+                        "API error ({}): Server error: {}",
+                        status.as_u16(),
+                        text
+                    ));
                 }
                 _ => {
                     return Err(anyhow::anyhow!("API error ({}): {}", status.as_u16(), text));
@@ -494,13 +589,12 @@ impl Client {
         }
 
         // Read the entire response body with timeout
-        let body_text = match time::timeout(
-            Duration::from_secs(30),
-            resp.text()
-        ).await {
+        let body_text = match time::timeout(Duration::from_secs(30), resp.text()).await {
             Ok(result) => result.context("Failed to read response body")?,
             Err(_) => {
-                return Err(anyhow::anyhow!("Timeout during response reading after 30 seconds"));
+                return Err(anyhow::anyhow!(
+                    "Timeout during response reading after 30 seconds"
+                ));
             }
         };
 
@@ -514,7 +608,7 @@ impl Client {
         let mut partial_content = String::new();
 
         // Process the response as streaming by splitting and simulating real-time output
-        match serde_json::from_str::<Vec<GenerateContentResponse>>(&body_text) {
+        match serde_json::from_str::<Vec<StreamingResponse>>(&body_text) {
             Ok(response_array) => {
                 // Process each response in the array sequentially
                 for (i, response) in response_array.iter().enumerate() {
@@ -527,10 +621,14 @@ impl Client {
                                         self.metrics.total_bytes += text.len();
 
                                         // Simulate streaming by outputting in chunks
-                                        for chunk in text.chars().collect::<Vec<char>>().chunks(10) {
+                                        for chunk in text.chars().collect::<Vec<char>>().chunks(10)
+                                        {
                                             let chunk_str: String = chunk.iter().collect();
                                             if let Err(e) = on_chunk(&chunk_str) {
-                                                return Err(anyhow::anyhow!("Failed to output chunk: {}", e));
+                                                return Err(anyhow::anyhow!(
+                                                    "Failed to output chunk: {}",
+                                                    e
+                                                ));
                                             }
                                             accumulated_response.push_str(&chunk_str);
                                             has_valid_content = true;
@@ -545,18 +643,15 @@ impl Client {
                                     // Handle function calls by serializing them as JSON
                                     match serde_json::to_string(function_call) {
                                         Ok(function_call_json) => {
-                                            let function_call_text = format!("[FUNCTION_CALL:{}]", function_call_json);
-                                            partial_content.push_str(&function_call_text);
-
-                                            if let Err(e) = on_chunk(&function_call_text) {
-                                                return Err(anyhow::anyhow!("Failed to output function call: {}", e));
-                                            }
-                                            accumulated_response.push_str(&function_call_text);
+                                            // Skip outputting raw function call JSON to keep chat clean
                                             has_valid_content = true;
                                             self.metrics.total_chunks += 1;
                                         }
                                         Err(e) => {
-                                            return Err(anyhow::anyhow!("Failed to serialize function call: {}", e));
+                                            return Err(anyhow::anyhow!(
+                                                "Failed to serialize function call: {}",
+                                                e
+                                            ));
                                         }
                                     }
                                 }
@@ -578,7 +673,10 @@ impl Client {
             }
             Err(parse_err) => {
                 // If JSON parsing fails, try to extract text content manually
-                eprintln!("Warning: Failed to parse streaming response as JSON: {}", parse_err);
+                eprintln!(
+                    "Warning: Failed to parse streaming response as JSON: {}",
+                    parse_err
+                );
 
                 // Try to extract text content from raw response
                 if let Some(extracted_text) = self.extract_text_from_raw_response(&body_text) {
@@ -600,7 +698,10 @@ impl Client {
                             partial_content.push_str(&fallback_text);
 
                             if let Err(e) = on_chunk(&fallback_text) {
-                                return Err(anyhow::anyhow!("Failed to output fallback text: {}", e));
+                                return Err(anyhow::anyhow!(
+                                    "Failed to output fallback text: {}",
+                                    e
+                                ));
                             }
                             accumulated_response.push_str(&fallback_text);
                             has_valid_content = true;
@@ -611,24 +712,38 @@ impl Client {
                 }
 
                 if !has_valid_content {
-                    return Err(anyhow::anyhow!("Failed to parse response and extract content: {}", parse_err));
+                    return Err(anyhow::anyhow!(
+                        "Failed to parse response and extract content: {}",
+                        parse_err
+                    ));
                 }
             }
         }
 
         // If no valid content was found, return an error
-        if !has_valid_content || accumulated_response.trim().is_empty() {
-            return Err(anyhow::anyhow!("No valid content received from streaming API"));
+        if !has_valid_content {
+            return Err(anyhow::anyhow!(
+                "No valid content received from streaming API"
+            ));
         }
 
         // Return the final accumulated response as a complete response
+        let parts = if accumulated_response.trim().is_empty() {
+            // If no text content, create a minimal response
+            vec![Part::Text {
+                text: "Function call processed".to_string(),
+            }]
+        } else {
+            vec![Part::Text {
+                text: accumulated_response,
+            }]
+        };
+
         Ok(GenerateContentResponse {
             candidates: vec![Candidate {
                 content: Content {
                     role: "model".to_string(),
-                    parts: vec![Part::Text {
-                        text: accumulated_response,
-                    }],
+                    parts,
                 },
                 finish_reason: None,
             }],
@@ -660,10 +775,8 @@ impl Client {
                                 }
                             }
                             Part::FunctionCall { function_call } => {
-                                if let Ok(function_call_json) = serde_json::to_string(&function_call) {
-                                    let function_call_text = format!("[FUNCTION_CALL:{}]", function_call_json);
-                                    extracted_text.push_str(&function_call_text);
-                                }
+                                // Skip outputting raw function call JSON to keep chat clean
+                                // Function calls are handled separately in the tool execution flow
                             }
                             Part::FunctionResponse { .. } => {
                                 // Mark as having content

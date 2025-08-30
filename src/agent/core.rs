@@ -402,7 +402,7 @@ impl AgentBuilder {
     pub fn new() -> Self {
         Self {
             config: AgentConfig {
-                model: "gemini-2.5-flash".to_string(),
+                model: "gemini-2.5-flash-lite".to_string(),
                 api_key: String::new(),
                 workspace: std::env::current_dir()
                     .unwrap_or_else(|_| std::path::PathBuf::from(".")),

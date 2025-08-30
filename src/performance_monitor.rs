@@ -189,14 +189,22 @@ impl PerformanceMonitor {
              • Context Accuracy: {:.1}% (Target: ≥80%) {}\n\n\
              📈 Throughput: {} req/sec",
             avg_response.as_millis(),
-            if status.response_time_target { "✅" } else { "❌" },
+            if status.response_time_target {
+                "✅"
+            } else {
+                "❌"
+            },
             p95_response.as_millis(),
             metrics.memory_usage,
             if status.memory_target { "✅" } else { "❌" },
             metrics.cache_hit_rate * 100.0,
             if status.cache_target { "✅" } else { "❌" },
             metrics.error_rate * 100.0,
-            if status.error_recovery_target { "✅" } else { "❌" },
+            if status.error_recovery_target {
+                "✅"
+            } else {
+                "❌"
+            },
             metrics.context_accuracy * 100.0,
             if status.context_target { "✅" } else { "❌" },
             metrics.throughput

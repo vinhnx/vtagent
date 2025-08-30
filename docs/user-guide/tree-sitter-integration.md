@@ -2,11 +2,11 @@
 
 ## Overview
 
-The tree-sitter integration provides Minimal research-preview code parsing and analysis capabilities to enhance vtagent's understanding of codebases. This implementation follows Anthropic's breakthrough engineering approach for SWE-bench optimization.
+The tree-sitter integration provides Research-preview code parsing and analysis capabilities to enhance vtagent's understanding of codebases. This implementation follows Anthropic's breakthrough engineering approach for SWE-bench optimization.
 
 ## Features
 
-### **Minimal research-preview Code Parsing**
+### **Research-preview Code Parsing**
 
 - **Syntax-aware parsing** for multiple programming languages
 - **Abstract Syntax Tree (AST)** generation and traversal
@@ -344,7 +344,7 @@ RUST_LOG=tree_sitter=debug cargo run -- analyze --depth deep
 
 - **Incremental parsing** for real-time analysis
 - **Language server protocol** integration
-- **Minimal research-preview refactoring** with AI assistance
+- **Research-preview refactoring** with AI assistance
 - **Code generation** from analysis results
 - **Cross-language analysis** for polyglot projects
 
@@ -390,7 +390,7 @@ cargo bench tree_sitter
 
 This tree-sitter integration directly addresses key requirements for SWE-bench optimization:
 
-- **Minimal research-preview Code Understanding**: Syntax-aware parsing enables better code comprehension
+- **Research-preview Code Understanding**: Syntax-aware parsing enables better code comprehension
 - **Precise Navigation**: Accurate symbol location and relationship analysis
 - **Intelligent Analysis**: Complexity and quality metrics guide decision making
 - **Multi-language Support**: Essential for diverse software ecosystems

@@ -1,6 +1,6 @@
 //! Intelligent compaction system for threads and context
 //!
-//! This module implements Minimal research-preview compaction strategies to optimize memory usage
+//! This module implements Research-preview compaction strategies to optimize memory usage
 //! and performance by intelligently compressing conversation threads and semantic context.
 
 use serde::{Deserialize, Serialize};

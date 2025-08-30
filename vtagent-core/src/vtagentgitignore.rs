@@ -202,9 +202,7 @@ impl Default for VtagentGitignore {
 
 /// Global .vtagentgitignore instance for easy access
 static VTAGENT_GITIGNORE: once_cell::sync::Lazy<tokio::sync::RwLock<VtagentGitignore>> =
-    once_cell::sync::Lazy::new(|| {
-        tokio::sync::RwLock::new(VtagentGitignore::default())
-    });
+    once_cell::sync::Lazy::new(|| tokio::sync::RwLock::new(VtagentGitignore::default()));
 
 /// Initialize the global .vtagentgitignore instance
 pub async fn initialize_vtagent_gitignore() -> Result<()> {
@@ -215,7 +213,8 @@ pub async fn initialize_vtagent_gitignore() -> Result<()> {
 }
 
 /// Get the global .vtagentgitignore instance
-pub async fn get_global_vtagent_gitignore() -> tokio::sync::RwLockReadGuard<'static, VtagentGitignore> {
+pub async fn get_global_vtagent_gitignore(
+) -> tokio::sync::RwLockReadGuard<'static, VtagentGitignore> {
     VTAGENT_GITIGNORE.read().await
 }
 
@@ -260,7 +259,9 @@ mod tests {
         assert!(gitignore_path.exists());
 
         // Test pattern matching logic
-        let gitignore = VtagentGitignore::from_directory(temp_dir.path()).await.unwrap();
+        let gitignore = VtagentGitignore::from_directory(temp_dir.path())
+            .await
+            .unwrap();
         assert!(gitignore.is_loaded());
         assert_eq!(gitignore.pattern_count(), 3);
 
@@ -284,7 +285,9 @@ mod tests {
         writeln!(file, "target/").unwrap();
         writeln!(file, "!important.log").unwrap();
 
-        let gitignore = VtagentGitignore::from_directory(temp_dir.path()).await.unwrap();
+        let gitignore = VtagentGitignore::from_directory(temp_dir.path())
+            .await
+            .unwrap();
         assert!(gitignore.is_loaded());
         assert_eq!(gitignore.pattern_count(), 3);
 
@@ -298,7 +301,9 @@ mod tests {
     #[tokio::test]
     async fn test_no_gitignore_file() {
         let temp_dir = TempDir::new().unwrap();
-        let gitignore = VtagentGitignore::from_directory(temp_dir.path()).await.unwrap();
+        let gitignore = VtagentGitignore::from_directory(temp_dir.path())
+            .await
+            .unwrap();
         assert!(!gitignore.is_loaded());
         assert_eq!(gitignore.pattern_count(), 0);
         assert!(!gitignore.should_exclude(&temp_dir.path().join("anyfile.txt")));
@@ -312,7 +317,9 @@ mod tests {
         // Create an empty .vtagentgitignore
         File::create(&gitignore_path).unwrap();
 
-        let gitignore = VtagentGitignore::from_directory(temp_dir.path()).await.unwrap();
+        let gitignore = VtagentGitignore::from_directory(temp_dir.path())
+            .await
+            .unwrap();
         assert!(gitignore.is_loaded());
         assert_eq!(gitignore.pattern_count(), 0);
     }
@@ -330,7 +337,9 @@ mod tests {
         writeln!(file, "# Another comment").unwrap();
         writeln!(file, "").unwrap();
 
-        let gitignore = VtagentGitignore::from_directory(temp_dir.path()).await.unwrap();
+        let gitignore = VtagentGitignore::from_directory(temp_dir.path())
+            .await
+            .unwrap();
         assert!(gitignore.is_loaded());
         assert_eq!(gitignore.pattern_count(), 1); // Only the *.tmp pattern should be loaded
 
@@ -348,7 +357,9 @@ mod tests {
         writeln!(file, "*.log").unwrap();
         writeln!(file, "temp/").unwrap();
 
-        let gitignore = VtagentGitignore::from_directory(temp_dir.path()).await.unwrap();
+        let gitignore = VtagentGitignore::from_directory(temp_dir.path())
+            .await
+            .unwrap();
 
         let paths = vec![
             temp_dir.path().join("app.log"),

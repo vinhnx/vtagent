@@ -1,6 +1,5 @@
-
-use vtagent_core::tools::ToolRegistry;
 use serde_json::json;
+use vtagent_core::tools::ToolRegistry;
 
 #[tokio::test]
 async fn delete_file_tool_removes_file() {

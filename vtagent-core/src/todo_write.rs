@@ -2,14 +2,17 @@
 //!
 //! This tool helps organize complex multi-step tasks, track progress, and provide
 //! visibility into coding session workflow management.
+//!
+//! Uses temporary files to avoid cluttering the workspace with persistent JSON files.
 
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tempfile::NamedTempFile;
+use tokio::sync::RwLock;
 
 /// Task status enumeration
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -46,15 +49,17 @@ pub struct TodoItem {
 pub struct TodoManager {
     /// Collection of todo items
     todos: Arc<RwLock<HashMap<String, TodoItem>>>,
-    /// Storage path for persistence
-    storage_path: PathBuf,
+    /// Temporary file handle to keep the file alive during the session
+    temp_file_handle: Arc<tokio::sync::Mutex<Option<NamedTempFile>>>,
+    /// Path to the temporary file for operations
+    temp_file_path: Arc<tokio::sync::Mutex<Option<PathBuf>>>,
     /// Session identifier
     session_id: String,
 }
 
 impl TodoManager {
     /// Create a new TodoManager instance
-    pub fn new(workspace: PathBuf) -> Self {
+    pub fn new(_workspace: PathBuf) -> Self {
         let session_id = format!(
             "session_{}",
             SystemTime::now()
@@ -65,18 +70,16 @@ impl TodoManager {
 
         Self {
             todos: Arc::new(RwLock::new(HashMap::new())),
-            storage_path: workspace.join(".vtagent").join("todos"),
+            temp_file_handle: Arc::new(tokio::sync::Mutex::new(None)),
+            temp_file_path: Arc::new(tokio::sync::Mutex::new(None)),
             session_id,
         }
     }
 
     /// Initialize the todo manager (create directories, load existing todos)
     pub async fn initialize(&self) -> Result<()> {
-        // Create storage directory if it doesn't exist
-        tokio::fs::create_dir_all(&self.storage_path).await
-            .map_err(|e| anyhow!("Failed to create todo storage directory: {}", e))?;
-
-        // Load existing todos if they exist
+        // No need to create directories for temp files
+        // Load existing todos if they exist (won't exist for temp files on first run)
         self.load_todos().await?;
 
         Ok(())
@@ -98,7 +101,11 @@ impl TodoManager {
 
         for todo_input in todos {
             let id = todo_input.id.unwrap_or_else(|| {
-                format!("todo_{}_{}", self.session_id, now + created_items.len() as u64)
+                format!(
+                    "todo_{}_{}",
+                    self.session_id,
+                    now + created_items.len() as u64
+                )
             });
 
             let item = TodoItem {
@@ -162,7 +169,8 @@ impl TodoManager {
     /// Get todo items by status
     pub async fn get_todos_by_status(&self, status: TodoStatus) -> Vec<TodoItem> {
         let todos = self.todos.read().await;
-        todos.values()
+        todos
+            .values()
             .filter(|item| item.status == status)
             .cloned()
             .collect()
@@ -209,83 +217,55 @@ impl TodoManager {
         stats
     }
 
-    /// Load todos from disk
+    /// Load todos from temp file (if it exists)
     async fn load_todos(&self) -> Result<()> {
-        let storage_file = self.storage_path.join(format!("{}.json", self.session_id));
-
-        if storage_file.exists() {
-            let content = tokio::fs::read_to_string(&storage_file).await
-                .map_err(|e| anyhow!("Failed to read todo storage: {}", e))?;
-
-            let todos: HashMap<String, TodoItem> = serde_json::from_str(&content)
-                .map_err(|e| anyhow!("Failed to parse todo data: {}", e))?;
-
-            let mut current_todos = self.todos.write().await;
-            *current_todos = todos;
-        }
-
+        // For temp files, there's nothing to load on initialization
+        // The todos exist only in memory during the session
         Ok(())
     }
 
-    /// Save todos to disk
+    /// Save todos to temp file
     async fn save_todos(&self, todos: &HashMap<String, TodoItem>) -> Result<()> {
-        let storage_file = self.storage_path.join(format!("{}.json", self.session_id));
+        // Create a temp file if it doesn't exist
+        let mut temp_handle = self.temp_file_handle.lock().await;
+        let mut temp_path = self.temp_file_path.lock().await;
 
-        // Ensure parent directory exists even if initialize() was not called
-        if let Some(parent) = storage_file.parent() {
-            tokio::fs::create_dir_all(parent)
-                .await
-                .map_err(|e| anyhow!("Failed to create todo storage directory: {}", e))?;
+        if temp_handle.is_none() {
+            // Create a new temporary file
+            let temp_file = NamedTempFile::new()
+                .map_err(|e| anyhow!("Failed to create temporary file: {}", e))?;
+
+            let path = temp_file.path().to_path_buf();
+            *temp_path = Some(path.clone());
+            *temp_handle = Some(temp_file);
+
+            println!("Created temporary todo file at: {}", path.display());
         }
 
-        let content = serde_json::to_string_pretty(todos)
-            .map_err(|e| anyhow!("Failed to serialize todos: {}", e))?;
+        // Save to the temp file
+        if let Some(file_path) = temp_path.as_ref() {
+            let content = serde_json::to_string_pretty(todos)
+                .map_err(|e| anyhow!("Failed to serialize todos: {}", e))?;
 
-        tokio::fs::write(&storage_file, content).await
-            .map_err(|e| anyhow!("Failed to write todo storage: {}", e))?;
+            tokio::fs::write(file_path, content)
+                .await
+                .map_err(|e| anyhow!("Failed to write todo temp file: {}", e))?;
+        }
 
         Ok(())
     }
 
-    /// Clean up old todo files (older than 7 days)
+    /// Clean up old todo files (not applicable for temp files)
     pub async fn cleanup_old_sessions(&self) -> Result<usize> {
-        let mut cleaned_count = 0;
-        let entries = tokio::fs::read_dir(&self.storage_path).await
-            .map_err(|e| anyhow!("Failed to read storage directory: {}", e))?;
+        // For temp files, there's no cleanup needed as they are automatically
+        // cleaned up when the process exits or when the temp file handle is dropped
+        Ok(0)
+    }
 
-        let mut entries_vec = Vec::new();
-        tokio::pin!(entries);
-        while let Some(entry) = entries.next_entry().await
-            .map_err(|e| anyhow!("Failed to read directory entry: {}", e))? {
-            entries_vec.push(entry);
-        }
-
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
-        for entry in entries_vec {
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("json") {
-                if let Ok(metadata) = entry.metadata().await {
-                    let modified = metadata.modified()
-                        .unwrap_or(SystemTime::UNIX_EPOCH)
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs();
-
-                    // Delete files older than 7 days (604800 seconds)
-                    if now - modified > 604800 {
-                        tokio::fs::remove_file(&path).await
-                            .map_err(|e| anyhow!("Failed to remove old todo file: {}", e))?;
-                        cleaned_count += 1;
-                    }
-                }
-            }
-        }
-
-        Ok(cleaned_count)
+    /// Get the path to the temporary file (for debugging/logging)
+    pub async fn get_temp_file_path(&self) -> Option<PathBuf> {
+        let temp_path = self.temp_file_path.lock().await;
+        temp_path.clone()
     }
 }
 
@@ -349,7 +329,9 @@ pub mod tool_functions {
     use super::*;
     use serde_json::Value;
 
-    fn default_merge_true() -> bool { true }
+    fn default_merge_true() -> bool {
+        true
+    }
 
     /// Input for write_todos tool function
     #[derive(Debug, Deserialize)]
@@ -416,7 +398,8 @@ pub mod tool_functions {
 
     /// Execute get_todos_by_status tool function
     pub async fn get_todos_by_status(manager: &TodoManager, args: Value) -> Result<Value> {
-        let status_str = args.get("status")
+        let status_str = args
+            .get("status")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("Missing 'status' parameter"))?;
 
@@ -466,7 +449,20 @@ pub mod tool_functions {
 
         Ok(serde_json::json!({
             "success": true,
-            "cleaned_sessions": cleaned_count
+            "cleaned_sessions": cleaned_count,
+            "message": "Using temporary files - no cleanup needed"
+        }))
+    }
+
+    /// Execute get_temp_info tool function
+    pub async fn get_temp_info(manager: &TodoManager, _args: Value) -> Result<Value> {
+        let temp_path = manager.get_temp_file_path().await;
+
+        Ok(serde_json::json!({
+            "session_id": manager.session_id,
+            "temp_file_path": temp_path.as_ref().map(|p| p.to_string_lossy()),
+            "using_temp_files": true,
+            "description": "Todos are stored in a temporary file that will be automatically cleaned up when the session ends"
         }))
     }
 }

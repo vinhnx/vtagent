@@ -79,7 +79,7 @@ All notable changes to vtagent will be documented in this file.
 
 - **49% Target Achievement**: Architecture designed following Anthropic's breakthrough approach
 - **Error-Proofed Tools**: Extensive validation and error handling
-- **Context Engineering**: Minimal research-preview conversation management techniques
+- **Context Engineering**: Research-preview conversation management techniques
 - **Model Empowerment**: Maximum control given to language models
 
 ### Reliability Enhancements
@@ -130,7 +130,7 @@ All notable changes to vtagent will be documented in this file.
 - **Multi-file Operations**: Batch processing capabilities
 - **Project Templates**: Predefined scaffolds for common projects
 - **Integration APIs**: REST endpoints for external integration
-- **Minimal research-preview Context Compression**: More sophisticated summarization algorithms
+- **Research-preview Context Compression**: More sophisticated summarization algorithms
 
 ### Research Areas
 

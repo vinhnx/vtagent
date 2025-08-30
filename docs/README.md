@@ -1,17 +1,17 @@
 # **vtagent Documentation Hub**
 
-Welcome to the comprehensive documentation for **vtagent**, an Minimal research-preview AI-powered coding assistant that implements state-of-the-art agent architecture patterns inspired by Anthropic's breakthrough engineering approaches.
+Welcome to the comprehensive documentation for **vtagent**, an Research-preview AI-powered coding assistant that implements state-of-the-art agent architecture patterns inspired by Anthropic's breakthrough engineering approaches.
 
 ## **What Makes vtagent Special**
 
 vtagent represents a significant advancement in AI-powered software development tools, featuring:
 
 - **Anthropic-Inspired Architecture** - Built following the same principles that achieved 49% on SWE-bench Verified
-- **Multi-Language Intelligence** - Minimal research-preview code understanding across 6+ programming languages
+- **Multi-Language Intelligence** - Research-preview code understanding across 6+ programming languages
 - **Enterprise-Grade Reliability** - Production-ready with comprehensive error recovery and context management
 - **Complete Transparency** - Full audit trails and decision tracking for all agent actions
 - **Comprehensive Testing** - Production-grade test suite with performance benchmarking
-- **Minimal research-preview Tool Ecosystem** - Error-proofed tools designed for maximum reliability
+- **Research-preview Tool Ecosystem** - Error-proofed tools designed for maximum reliability
 
 ## **Documentation Overview**
 
@@ -22,7 +22,7 @@ This documentation is organized to support different user personas and use cases
 New to vtagent? Start with installation and basic usage:
 
 - **[Getting Started](./user-guide/getting-started.md)** - Installation, configuration, and first steps
-- **[Tree-sitter Integration](./user-guide/tree-sitter-integration.md)** - Minimal research-preview code analysis capabilities
+- **[Tree-sitter Integration](./user-guide/tree-sitter-integration.md)** - Research-preview code analysis capabilities
 - **[Command Reference](./user-guide/commands.md)** - Complete command reference and examples
 
 ### **For Developers**
@@ -46,13 +46,13 @@ Ensuring vtagent's reliability? Master the comprehensive testing framework:
 
 ### **AI Agent Architecture**
 
-- **Gemini Function Calling** - Powered by Google's most Minimal research-preview AI models
+- **Gemini Function Calling** - Powered by Google's most Research-preview AI models
 - **Context Engineering** - Intelligent conversation management and compression
 - **Decision Tracking** - Complete audit trail of all agent decisions
 - **Error Recovery** - Multi-strategy error handling with context preservation
 - **Pattern Recognition** - Learning from interaction patterns for optimization
 
-### **Minimal research-preview Code Intelligence**
+### **Research-preview Code Intelligence**
 
 - **Tree-sitter Integration** - Syntax-aware parsing for 6+ languages (Rust, Python, JavaScript, TypeScript, Go, Java)
 - **Symbol Analysis** - Intelligent extraction of functions, classes, variables, and imports
@@ -63,7 +63,7 @@ Ensuring vtagent's reliability? Master the comprehensive testing framework:
 ### **Comprehensive Tool Suite**
 
 - **File Operations** - Safe, validated file system operations with error-proofing
-- **Ultra-Fast Search** - ripgrep-powered text search with Minimal research-preview filtering
+- **Ultra-Fast Search** - ripgrep-powered text search with Research-preview filtering
 - **Code Analysis** - Deep syntactic analysis with AST parsing
 - **Symbol Navigation** - Intelligent code navigation and symbol lookup
 - **Dependency Analysis** - Import relationship mapping and module analysis
@@ -89,7 +89,7 @@ Ensuring vtagent's reliability? Master the comprehensive testing framework:
 ### For New Users
 
 1. **[Installation](./user-guide/getting-started.md)** - Get vtagent running in minutes
-2. **[First Analysis](./user-guide/tree-sitter-integration.md)** - Try Minimal research-preview code analysis
+2. **[First Analysis](./user-guide/tree-sitter-integration.md)** - Try Research-preview code analysis
 3. **[Basic Commands](./user-guide/commands.md)** - Learn essential commands
 
 ### For Developers
@@ -101,10 +101,10 @@ Ensuring vtagent's reliability? Master the comprehensive testing framework:
 ### For Organizations
 
 1. **[Enterprise Features](./user-guide/enterprise.md)** - Security and compliance features
-2. **[Analytics](./user-guide/analytics.md)** - Minimal research-preview monitoring and reporting
+2. **[Analytics](./user-guide/analytics.md)** - Research-preview monitoring and reporting
 3. **[Integration](./development/integration.md)** - CI/CD and automation integration
 
-## **Minimal research-preview Usage Patterns**
+## **Research-preview Usage Patterns**
 
 ### Intelligent Codebase Analysis
 
@@ -203,7 +203,7 @@ cargo test mock_gemini_responses -- --nocapture
 ### Enterprise Support
 
 - **Security**: Enterprise-grade security and compliance features
-- **Analytics**: Minimal research-preview monitoring and reporting capabilities
+- **Analytics**: Research-preview monitoring and reporting capabilities
 - **Integration**: CI/CD and automation integration guides
 - **Consulting**: Professional services and custom development
 

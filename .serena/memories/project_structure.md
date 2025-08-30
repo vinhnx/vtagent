@@ -47,7 +47,7 @@ src/
 ├── tools/                # Tool definitions and registry
 │   ├── mod.rs
 │   ├── tools.rs         # Tool implementations
-│   ├── enhanced_tools.rs # Minimal research-preview tool implementations
+│   ├── enhanced_tools.rs # Research-preview tool implementations
 │   └── tools.rs.backup  # Backup of tools.rs
 ├── types/                # Shared type definitions
 │   └── mod.rs

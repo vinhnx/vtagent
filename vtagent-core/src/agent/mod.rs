@@ -15,5 +15,5 @@ pub mod types;
 // Re-export main types for convenience
 pub use config::CompactionConfig;
 pub use engine::CompactionEngine;
-pub use types::*;
 pub use semantic::SemanticAnalyzer;
+pub use types::*;

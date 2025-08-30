@@ -50,10 +50,7 @@ pub async fn handle_validate_command(
 
     // Summary
     if all_checks {
-        println!(
-            "{}",
-            style("All validation checks passed!").green().bold()
-        );
+        println!("{}", style("All validation checks passed!").green().bold());
     } else {
         println!(
             "{}",

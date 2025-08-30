@@ -1,17 +1,17 @@
 # Getting Started with vtagent
 
-Welcome to vtagent! This guide will help you get up and running with this Minimal research-preview AI-powered coding assistant that implements state-of-the-art agent architecture patterns inspired by Anthropic's breakthrough engineering approaches.
+Welcome to vtagent! This guide will help you get up and running with this Research-preview AI-powered coding assistant that implements state-of-the-art agent architecture patterns inspired by Anthropic's breakthrough engineering approaches.
 
 ## What Makes vtagent Special
 
 vtagent represents a significant advancement in AI-powered software development tools, featuring:
 
 - **Anthropic-Inspired Architecture** - Built following the same principles that achieved 49% on SWE-bench Verified
-- **Multi-Language Intelligence** - Minimal research-preview code understanding across 6+ programming languages
+- **Multi-Language Intelligence** - Research-preview code understanding across 6+ programming languages
 - **Enterprise-Grade Reliability** - Production-ready with comprehensive error recovery and context management
 - **Complete Transparency** - Full audit trails and decision tracking for all agent actions
 - **Comprehensive Testing** - Production-grade test suite with performance benchmarking
-- **Minimal research-preview Tool Ecosystem** - Error-proofed tools designed for maximum reliability
+- **Research-preview Tool Ecosystem** - Error-proofed tools designed for maximum reliability
 
 ## Prerequisites
 
@@ -32,12 +32,12 @@ vtagent represents a significant advancement in AI-powered software development 
 
 ### Fully Bundled Architecture
 
-**No external dependencies required!** All Minimal research-preview features are bundled as Rust crates:
+**No external dependencies required!** All Research-preview features are bundled as Rust crates:
 
 #### Text Search (Bundled)
 
 - **Ultra-fast regex search** using Rust's optimized `regex` crate
-- **Word boundary matching** with Minimal research-preview pattern support
+- **Word boundary matching** with Research-preview pattern support
 - **Case-sensitive/insensitive** search options
 - **Context lines** for better understanding
 - **Glob pattern filtering** for file type restrictions
@@ -82,13 +82,13 @@ cargo build
 cargo run -- chat
 ```
 
-**That's it!** You're now ready to experience vtagent's Minimal research-preview capabilities. Try asking:
+**That's it!** You're now ready to experience vtagent's Research-preview capabilities. Try asking:
 
 - *"Analyze this Rust project and tell me about its structure"*
 - *"Find all function definitions in the codebase"*
 - *"Create a simple web API with error handling"*
 
-### 3. Test the Minimal research-preview Features
+### 3. Test the Research-preview Features
 
 ```bash
 # Experience full transparency with decision tracking
@@ -131,7 +131,7 @@ src/
  conversation_summarizer.rs # Context compression & summarization
  gemini.rs       # Gemini AI API integration
  tools.rs        # Comprehensive tool suite (9 tools)
- tree_sitter/    # Minimal research-preview multi-language code analysis
+ tree_sitter/    # Research-preview multi-language code analysis
  types.rs        # Shared type definitions
  prompts/        # System prompts and templates
 ```
@@ -163,7 +163,7 @@ src/
 
 - **6 Languages Supported**: Rust, Python, JavaScript, TypeScript, Go, Java
 - **Syntax-Aware Analysis**: Deep understanding beyond simple text processing
-- **Symbol Intelligence**: Minimal research-preview symbol extraction and navigation
+- **Symbol Intelligence**: Research-preview symbol extraction and navigation
 - **Code Quality Metrics**: Complexity analysis and maintainability scoring
 - **Refactoring Support**: Safe code transformation suggestions
 
@@ -255,7 +255,7 @@ cargo run -- ask "List all files in the current directory"
 cargo run -- ask "Read the README.md file and summarize it"
 ```
 
-#### Minimal research-preview Features Testing
+#### Research-preview Features Testing
 
 ```bash
 # Experience full transparency
@@ -280,7 +280,7 @@ cargo run -- analyze --depth deep --format json
 #  Symbol extraction and dependency mapping
 #  Refactoring suggestions and recommendations
 
-# Test Minimal research-preview code search
+# Test Research-preview code search
 cargo run -- chat "Find all function definitions in the codebase"
 cargo run -- chat "Search for TODO and FIXME comments with 3 lines of context"
 cargo run -- chat "Find all error handling patterns in Python files"
@@ -533,7 +533,7 @@ chmod +x ~/bin/vtagent-analyze-current-dir
 cat > ~/.local/share/applications/vtagent.desktop << EOF
 [Desktop Entry]
 Name=vtagent
-Comment=Minimal research-preview AI coding assistant
+Comment=Research-preview AI coding assistant
 Exec=vtagent chat
 Terminal=true
 Type=Application
@@ -724,7 +724,7 @@ echo "fn main() { println!(\"Hello\"); }" > test.rs
 cargo run -- ask "Analyze the test.rs file"
 ```
 
-## Minimal research-preview Development
+## Research-preview Development
 
 ### Code Quality
 
@@ -834,7 +834,7 @@ cargo clippy
 
 ## Summary
 
-This build guide covers all aspects of working with vtagent, from basic installation to Minimal research-preview development. The project now includes breakthrough Anthropic-inspired features that significantly enhance agent capabilities:
+This build guide covers all aspects of working with vtagent, from basic installation to Research-preview development. The project now includes breakthrough Anthropic-inspired features that significantly enhance agent capabilities:
 
 ### Core Agent Features
 
@@ -843,10 +843,10 @@ This build guide covers all aspects of working with vtagent, from basic installa
 - **Conversation Summarization**: Automatic compression for long sessions
 - **Confidence Scoring**: Quality assessment for all agent actions
 
-### Minimal research-preview Code Intelligence (NEW)
+### Research-preview Code Intelligence (NEW)
 
 - **Tree-sitter Integration**: Syntax-aware code analysis for 6+ languages
-- **ripgrep Search**: Ultra-fast codebase search with Minimal research-preview pattern matching
+- **ripgrep Search**: Ultra-fast codebase search with Research-preview pattern matching
 - **Multi-language Support**: Rust, Python, JavaScript, TypeScript, Go, Java, Swift
 - **AST-based Analysis**: Deep code understanding with symbol extraction
 - **Complexity Metrics**: Cyclomatic and cognitive complexity analysis
@@ -864,4 +864,4 @@ This build guide covers all aspects of working with vtagent, from basic installa
 - **Cross-platform Compatibility**: Works on Linux, macOS, and Windows
 - **Robust Error Handling**: Comprehensive error recovery with helpful diagnostics
 
-These features, inspired by Anthropic's breakthrough SWE-bench performance, position vtagent as a **state-of-the-art coding assistant** with exceptional transparency, reliability, and **Minimal research-preview code intelligence capabilities**. The integration of tree-sitter and ripgrep represents a significant leap forward in AI-powered software engineering tools!
+These features, inspired by Anthropic's breakthrough SWE-bench performance, position vtagent as a **state-of-the-art coding assistant** with exceptional transparency, reliability, and **Research-preview code intelligence capabilities**. The integration of tree-sitter and ripgrep represents a significant leap forward in AI-powered software engineering tools!

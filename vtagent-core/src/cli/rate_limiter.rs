@@ -80,6 +80,9 @@ impl RateLimiter {
     pub fn get_current_request_count(&self) -> usize {
         let request_times = self.request_times.lock().unwrap();
         let one_minute_ago = Instant::now() - Duration::from_secs(60);
-        request_times.iter().filter(|&&time| time > one_minute_ago).count()
+        request_times
+            .iter()
+            .filter(|&&time| time > one_minute_ago)
+            .count()
     }
 }

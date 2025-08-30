@@ -1,4 +1,4 @@
-# vtagent - Minimal research-preview Rust Coding Agent
+# vtagent - Research-preview Rust Coding Agent
 
 vtagent is a minimal terminal-based coding agent that implements modern agent architecture patterns. It combines Anthropic's agent-building principles with Cognition's context engineering approach to provide a reliable, long-running coding assistant.
 
@@ -30,7 +30,7 @@ vtagent follows proven agent architecture patterns:
 - Comprehensive logging and debugging support
 - Multiple operational modes
 
-### Minimal research-preview Features
+### Research-preview Features
 
 - **Async File Operations** - Non-blocking file writes with concurrent processing
 - **Real-time Diff Rendering** - Visual diff display in chat for file changes
@@ -100,6 +100,120 @@ secrets/
 - **Separation**: Agent exclusions don't interfere with your project's git configuration
 
 The agent automatically detects and uses `.vtagentgitignore` files when present, with no additional configuration required.
+
+## Configuration (vtagent.toml)
+
+VTAgent uses a comprehensive TOML configuration system that allows you to customize agent behavior, tool policies, and command permissions. Configuration is loaded from `vtagent.toml` in your project root, with fallback to `.vtagent/vtagent.toml`.
+
+### Quick Start
+
+Initialize a new project with default configuration:
+
+```bash
+vtagent init  # Creates vtagent.toml and .vtagentgitignore
+```
+
+Or copy the example configuration:
+
+```bash
+cp vtagent.toml.example vtagent.toml
+```
+
+### Configuration Sections
+
+#### [agent] - Agent Behavior
+```toml
+[agent]
+max_conversation_turns = 1000      # Prevent runaway conversations
+max_session_duration_minutes = 60  # Auto-terminate long sessions
+verbose_logging = false             # Enable detailed logging
+```
+
+#### [tools] - Tool Execution Policies
+```toml
+[tools]
+default_policy = "prompt"  # "allow", "prompt", or "deny"
+
+[tools.policies]
+# Override default policy for specific tools
+read_file = "allow"        # Allow without confirmation
+write_file = "prompt"      # Require user confirmation
+delete_file = "deny"       # Always deny
+run_terminal_cmd = "prompt"
+```
+
+#### [commands] - Unix Command Permissions
+```toml
+[commands]
+# Commands that execute automatically without confirmation
+allow_list = [
+    "ls", "pwd", "cat", "grep", "git status", "cargo check"
+]
+
+# Commands that are always denied
+deny_list = [
+    "rm -rf", "sudo rm", "shutdown", "format"
+]
+
+# Patterns requiring extra confirmation
+dangerous_patterns = [
+    "rm -f", "git reset --hard", "pip install"
+]
+```
+
+#### [security] - Security Settings
+```toml
+[security]
+human_in_the_loop = true              # Require confirmation for critical actions
+confirm_destructive_actions = true    # Extra confirmation for dangerous operations
+log_all_commands = true               # Log all executed commands
+max_file_size_mb = 50                 # Maximum file size to process
+allowed_file_extensions = [".rs", ".toml", ".md"]  # Restrict file types
+```
+
+### Human-in-the-Loop Workflow
+
+The configuration enables sophisticated human-in-the-loop control:
+
+1. **Allow List Commands**: Execute automatically without prompting
+   - `git status`, `cargo check`, `ls`, `grep`, etc.
+
+2. **Standard Commands**: Prompt for confirmation
+   - `cargo build`, `npm install`, custom scripts
+
+3. **Dangerous Commands**: Require extra confirmation with warnings
+   - `rm -f`, `git reset --hard`, `docker system prune`
+
+4. **Denied Commands**: Always blocked for security
+   - `rm -rf`, `sudo rm`, `shutdown`, `format`
+
+### Tool Policies
+
+Each tool can have one of three policies:
+
+- **allow**: Execute automatically without user confirmation
+- **prompt**: Ask user for confirmation before execution
+- **deny**: Never allow execution
+
+### Example Workflow
+
+```bash
+# These commands execute automatically (in allow_list)
+VTAgent: [TOOL] run_terminal_cmd {"command": "git status"}
+[ALLOWED] Command is in allow list: git status
+
+# These commands require confirmation
+VTAgent: [TOOL] run_terminal_cmd {"command": "cargo build"}
+[CONFIRM] Execute command 'cargo build'? [y/N] y
+
+# Dangerous commands get extra warnings
+VTAgent: [TOOL] run_terminal_cmd {"command": "rm -f old_file.txt"}
+[WARNING] DANGEROUS command 'rm -f old_file.txt' - Are you sure? [y/N] y
+```
+
+### Legacy Support
+
+The old `.vtagent/tool-policy.json` format is deprecated but still supported for backward compatibility. New projects should use the TOML configuration.
 
 ## Snapshot Checkpoint System
 
@@ -335,20 +449,39 @@ Changes: 5 additions, 2 deletions, 3 modifications
 # Set API key
 export GEMINI_API_KEY=your_key_here
 
+# Initialize VTAgent in your project
+vtagent init  # Creates vtagent.toml and .vtagentgitignore
+
 # Start interactive chat
 cargo run -- chat
 
+# Or use the built binary
+vtagent chat
+
+# Initialize with force overwrite
+vtagent init --force
+
+# Generate config only
+vtagent config --output my-config.toml
+
 # Verbose mode with detailed logging
 cargo run -- chat-verbose
-
-# Async file operations with diff display
-cargo run -- --async-file-ops --show-file-diffs chat
-
-# Chunked file reading for large files
-cargo run -- --chunked-reading --chunk-size-kb 256 render --file large-file.md
 ```
 
-### Specialized Modes
+### Configuration-Aware Usage
+
+VTAgent now includes comprehensive TOML-based configuration for tool policies and command permissions:
+
+```bash
+# Commands in allow_list execute automatically
+git status    # Executes without prompting
+
+# Commands requiring confirmation
+cargo build   # Prompts: "Execute command 'cargo build'? [y/N]"
+
+# Dangerous commands show warnings
+rm -f file    # Prompts: "[WARNING] DANGEROUS command - Are you sure? [y/N]"
+```### Specialized Modes
 
 ```bash
 # Analyze workspace structure
@@ -420,7 +553,7 @@ Following Cognition's principles:
 - **Overwrite protection** - Optional safety checks for file operations
 - **Error context preservation** - Maintain conversation state during failures
 
-## Minimal research-preview Usage Examples
+## Research-preview Usage Examples
 
 ### Project Analysis
 
@@ -517,7 +650,7 @@ Create specialized command patterns by:
 
 ### Research Areas
 
-- **Minimal research-preview context management** - Sophisticated compression algorithms
+- **Research-preview context management** - Sophisticated compression algorithms
 - **Multi-modal inputs** - Support for images, diagrams, audio
 - **Collaborative workflows** - Human-agent teaming patterns
 - **Domain specialization** - Industry-specific agent capabilities

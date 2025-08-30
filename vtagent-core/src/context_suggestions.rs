@@ -8,10 +8,10 @@
 //! - Security recommendations
 
 use anyhow::Result;
+use regex::Regex;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use regex::Regex;
 
 use crate::enhanced_file_ops::EnhancedFileOps;
 use crate::tree_sitter::{LanguageSupport, TreeSitterAnalyzer};
@@ -118,7 +118,9 @@ impl ContextSuggestionEngine {
 
         // Sort by confidence and impact
         suggestions.sort_by(|a, b| {
-            b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal)
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
                 .then_with(|| match (&a.impact, &b.impact) {
                     (SuggestionImpact::Critical, _) => std::cmp::Ordering::Less,
                     (_, SuggestionImpact::Critical) => std::cmp::Ordering::Greater,
@@ -158,13 +160,22 @@ impl ContextSuggestionEngine {
 
         match language {
             LanguageSupport::Rust => {
-                suggestions.extend(self.generate_rust_completions(current_line, prefix, line, column).await?);
+                suggestions.extend(
+                    self.generate_rust_completions(current_line, prefix, line, column)
+                        .await?,
+                );
             }
             LanguageSupport::Python => {
-                suggestions.extend(self.generate_python_completions(current_line, prefix, line, column).await?);
+                suggestions.extend(
+                    self.generate_python_completions(current_line, prefix, line, column)
+                        .await?,
+                );
             }
             LanguageSupport::JavaScript | LanguageSupport::TypeScript => {
-                suggestions.extend(self.generate_js_completions(current_line, prefix, line, column).await?);
+                suggestions.extend(
+                    self.generate_js_completions(current_line, prefix, line, column)
+                        .await?,
+                );
             }
             _ => {} // Generic completions could be added here
         }
@@ -201,29 +212,84 @@ impl ContextSuggestionEngine {
     fn initialize_default_rules(&mut self) {
         // Rust rules
         let rust_rules = vec![
-            SuggestionRule::new("unused_imports", SuggestionType::CodeStyle, 0.8, Box::new(rust_unused_imports_rule)),
-            SuggestionRule::new("missing_docs", SuggestionType::Documentation, 0.6, Box::new(rust_missing_docs_rule)),
-            SuggestionRule::new("unwrap_usage", SuggestionType::BestPractice, 0.7, Box::new(rust_unwrap_usage_rule)),
-            SuggestionRule::new("large_function", SuggestionType::Refactoring, 0.5, Box::new(rust_large_function_rule)),
+            SuggestionRule::new(
+                "unused_imports",
+                SuggestionType::CodeStyle,
+                0.8,
+                Box::new(rust_unused_imports_rule),
+            ),
+            SuggestionRule::new(
+                "missing_docs",
+                SuggestionType::Documentation,
+                0.6,
+                Box::new(rust_missing_docs_rule),
+            ),
+            SuggestionRule::new(
+                "unwrap_usage",
+                SuggestionType::BestPractice,
+                0.7,
+                Box::new(rust_unwrap_usage_rule),
+            ),
+            SuggestionRule::new(
+                "large_function",
+                SuggestionType::Refactoring,
+                0.5,
+                Box::new(rust_large_function_rule),
+            ),
         ];
-        self.suggestion_rules.insert(LanguageSupport::Rust, rust_rules);
+        self.suggestion_rules
+            .insert(LanguageSupport::Rust, rust_rules);
 
         // Python rules
         let python_rules = vec![
-            SuggestionRule::new("type_hints", SuggestionType::BestPractice, 0.6, Box::new(python_type_hints_rule)),
-            SuggestionRule::new("docstrings", SuggestionType::Documentation, 0.5, Box::new(python_docstrings_rule)),
-            SuggestionRule::new("exception_handling", SuggestionType::BestPractice, 0.7, Box::new(python_exception_handling_rule)),
+            SuggestionRule::new(
+                "type_hints",
+                SuggestionType::BestPractice,
+                0.6,
+                Box::new(python_type_hints_rule),
+            ),
+            SuggestionRule::new(
+                "docstrings",
+                SuggestionType::Documentation,
+                0.5,
+                Box::new(python_docstrings_rule),
+            ),
+            SuggestionRule::new(
+                "exception_handling",
+                SuggestionType::BestPractice,
+                0.7,
+                Box::new(python_exception_handling_rule),
+            ),
         ];
-        self.suggestion_rules.insert(LanguageSupport::Python, python_rules);
+        self.suggestion_rules
+            .insert(LanguageSupport::Python, python_rules);
 
         // JavaScript/TypeScript rules
         let _js_rules = [
-            SuggestionRule::new("const_usage", SuggestionType::BestPractice, 0.6, Box::new(js_const_usage_rule)),
-            SuggestionRule::new("async_await", SuggestionType::BestPractice, 0.8, Box::new(js_async_await_rule)),
-            SuggestionRule::new("error_handling", SuggestionType::BestPractice, 0.7, Box::new(js_error_handling_rule)),
+            SuggestionRule::new(
+                "const_usage",
+                SuggestionType::BestPractice,
+                0.6,
+                Box::new(js_const_usage_rule),
+            ),
+            SuggestionRule::new(
+                "async_await",
+                SuggestionType::BestPractice,
+                0.8,
+                Box::new(js_async_await_rule),
+            ),
+            SuggestionRule::new(
+                "error_handling",
+                SuggestionType::BestPractice,
+                0.7,
+                Box::new(js_error_handling_rule),
+            ),
         ];
-        self.suggestion_rules.insert(LanguageSupport::JavaScript, Vec::new());
-        self.suggestion_rules.insert(LanguageSupport::TypeScript, Vec::new());    }
+        self.suggestion_rules
+            .insert(LanguageSupport::JavaScript, Vec::new());
+        self.suggestion_rules
+            .insert(LanguageSupport::TypeScript, Vec::new());
+    }
 
     /// Generate Rust-specific completion suggestions
     async fn generate_rust_completions(
@@ -237,14 +303,30 @@ impl ContextSuggestionEngine {
 
         // Common Rust patterns
         let rust_patterns = [
-            ("println!", "println!(\"{}\", );", "Print formatted text to stdout"),
+            (
+                "println!",
+                "println!(\"{}\", );",
+                "Print formatted text to stdout",
+            ),
             ("vec!", "vec![", "Create a new vector"),
             ("Some(", "Some(value)", "Wrap value in Option::Some"),
             ("Ok(", "Ok(value)", "Wrap value in Result::Ok"),
             ("Err(", "Err(error)", "Wrap error in Result::Err"),
-            ("match ", "match value {\n    pattern => result,\n    _ => default,\n}", "Pattern matching"),
-            ("if let ", "if let Some(value) = option {\n    // use value\n}", "Pattern matching with if let"),
-            ("while let ", "while let Some(value) = iterator.next() {\n    // process value\n}", "Iterate with pattern matching"),
+            (
+                "match ",
+                "match value {\n    pattern => result,\n    _ => default,\n}",
+                "Pattern matching",
+            ),
+            (
+                "if let ",
+                "if let Some(value) = option {\n    // use value\n}",
+                "Pattern matching with if let",
+            ),
+            (
+                "while let ",
+                "while let Some(value) = iterator.next() {\n    // process value\n}",
+                "Iterate with pattern matching",
+            ),
         ];
 
         for (trigger, completion, description) in &rust_patterns {
@@ -363,7 +445,11 @@ impl ContextSuggestionEngine {
     }
 
     /// Analyze Rust code patterns
-    async fn analyze_rust_patterns(&self, content: &str, file_path: &Path) -> Result<Vec<CodeSuggestion>> {
+    async fn analyze_rust_patterns(
+        &self,
+        content: &str,
+        file_path: &Path,
+    ) -> Result<Vec<CodeSuggestion>> {
         let mut suggestions = Vec::new();
         let lines: Vec<&str> = content.lines().collect();
 
@@ -389,11 +475,13 @@ impl ContextSuggestionEngine {
                 suggestions.push(CodeSuggestion {
                     suggestion_type: SuggestionType::BestPractice,
                     title: "Address TODO comment".to_string(),
-                    description: "TODO comments indicate incomplete work that should be addressed.".to_string(),
+                    description: "TODO comments indicate incomplete work that should be addressed."
+                        .to_string(),
                     code_changes: vec![],
                     confidence: 0.6,
                     impact: SuggestionImpact::Low,
-                    rationale: "TODO comments should be resolved or converted to proper issues".to_string(),
+                    rationale: "TODO comments should be resolved or converted to proper issues"
+                        .to_string(),
                     file_path: file_path.to_path_buf(),
                     line_range: Some((i, i)),
                 });
@@ -404,7 +492,11 @@ impl ContextSuggestionEngine {
     }
 
     /// Analyze Python code patterns
-    async fn analyze_python_patterns(&self, content: &str, file_path: &Path) -> Result<Vec<CodeSuggestion>> {
+    async fn analyze_python_patterns(
+        &self,
+        content: &str,
+        file_path: &Path,
+    ) -> Result<Vec<CodeSuggestion>> {
         let mut suggestions = Vec::new();
         let lines: Vec<&str> = content.lines().collect();
 
@@ -453,12 +545,7 @@ pub struct SuggestionRule {
 }
 
 impl SuggestionRule {
-    pub fn new<F>(
-        name: &str,
-        suggestion_type: SuggestionType,
-        confidence: f64,
-        apply_fn: F,
-    ) -> Self
+    pub fn new<F>(name: &str, suggestion_type: SuggestionType, confidence: f64, apply_fn: F) -> Self
     where
         F: Fn(&str, &Path) -> Result<Vec<CodeSuggestion>> + Send + Sync + 'static,
     {
@@ -542,11 +629,18 @@ fn rust_missing_docs_rule(content: &str, file_path: &Path) -> Result<Vec<CodeSug
             }
 
             if !has_docs {
-                let item_type = if line.contains("fn ") { "function" } else { "struct" };
+                let item_type = if line.contains("fn ") {
+                    "function"
+                } else {
+                    "struct"
+                };
                 suggestions.push(CodeSuggestion {
                     suggestion_type: SuggestionType::Documentation,
                     title: format!("Add documentation for public {}", item_type),
-                    description: format!("Public {} should be documented with /// comments.", item_type),
+                    description: format!(
+                        "Public {} should be documented with /// comments.",
+                        item_type
+                    ),
                     code_changes: vec![CodeChange {
                         change_type: ChangeType::Insert,
                         old_code: None,
@@ -556,7 +650,8 @@ fn rust_missing_docs_rule(content: &str, file_path: &Path) -> Result<Vec<CodeSug
                     }],
                     confidence: 0.6,
                     impact: SuggestionImpact::Low,
-                    rationale: "Public APIs should be documented for better developer experience".to_string(),
+                    rationale: "Public APIs should be documented for better developer experience"
+                        .to_string(),
                     file_path: file_path.to_path_buf(),
                     line_range: Some((i, i)),
                 });
@@ -576,7 +671,9 @@ fn rust_unwrap_usage_rule(content: &str, file_path: &Path) -> Result<Vec<CodeSug
             suggestions.push(CodeSuggestion {
                 suggestion_type: SuggestionType::BestPractice,
                 title: "Replace unwrap() with proper error handling".to_string(),
-                description: "Using unwrap() can cause panics. Consider using ? operator or match statement.".to_string(),
+                description:
+                    "Using unwrap() can cause panics. Consider using ? operator or match statement."
+                        .to_string(),
                 code_changes: vec![], // Would need AST analysis for proper replacement
                 confidence: 0.8,
                 impact: SuggestionImpact::Medium,
@@ -610,7 +707,8 @@ fn rust_large_function_rule(content: &str, file_path: &Path) -> Result<Vec<CodeS
             // If we hit the end of the function
             if brace_count == 0 && start != i {
                 let function_length = i - start;
-                if function_length > 50 { // Arbitrary threshold
+                if function_length > 50 {
+                    // Arbitrary threshold
                     suggestions.push(CodeSuggestion {
                         suggestion_type: SuggestionType::Refactoring,
                         title: "Consider breaking down large function".to_string(),
@@ -642,11 +740,15 @@ fn python_type_hints_rule(content: &str, file_path: &Path) -> Result<Vec<CodeSug
                 suggestions.push(CodeSuggestion {
                     suggestion_type: SuggestionType::BestPractice,
                     title: "Add type hints to function".to_string(),
-                    description: "Consider adding type hints to function parameters and return type.".to_string(),
+                    description:
+                        "Consider adding type hints to function parameters and return type."
+                            .to_string(),
                     code_changes: vec![], // Would need more sophisticated analysis
                     confidence: 0.6,
                     impact: SuggestionImpact::Low,
-                    rationale: "Type hints improve code readability and catch type-related errors early".to_string(),
+                    rationale:
+                        "Type hints improve code readability and catch type-related errors early"
+                            .to_string(),
                     file_path: file_path.to_path_buf(),
                     line_range: Some((i, i)),
                 });
@@ -677,15 +779,23 @@ fn python_docstrings_rule(content: &str, file_path: &Path) -> Result<Vec<CodeSug
             }
 
             if !has_docstring {
-                let item_type = if line.contains("def ") { "function" } else { "class" };
+                let item_type = if line.contains("def ") {
+                    "function"
+                } else {
+                    "class"
+                };
                 suggestions.push(CodeSuggestion {
                     suggestion_type: SuggestionType::Documentation,
                     title: format!("Add docstring to {}", item_type),
-                    description: format!("{} should have a docstring describing its purpose and parameters.", item_type),
+                    description: format!(
+                        "{} should have a docstring describing its purpose and parameters.",
+                        item_type
+                    ),
                     code_changes: vec![], // Would need more sophisticated insertion
                     confidence: 0.5,
                     impact: SuggestionImpact::Low,
-                    rationale: "Docstrings improve code documentation and developer experience".to_string(),
+                    rationale: "Docstrings improve code documentation and developer experience"
+                        .to_string(),
                     file_path: file_path.to_path_buf(),
                     line_range: Some((i, i)),
                 });
@@ -728,7 +838,8 @@ fn js_const_usage_rule(content: &str, file_path: &Path) -> Result<Vec<CodeSugges
             suggestions.push(CodeSuggestion {
                 suggestion_type: SuggestionType::BestPractice,
                 title: "Use const or let instead of var".to_string(),
-                description: "Prefer const for variables that don't change, let for those that do.".to_string(),
+                description: "Prefer const for variables that don't change, let for those that do."
+                    .to_string(),
                 code_changes: vec![], // Would need more sophisticated replacement
                 confidence: 0.7,
                 impact: SuggestionImpact::Low,
@@ -751,7 +862,8 @@ fn js_async_await_rule(content: &str, file_path: &Path) -> Result<Vec<CodeSugges
             suggestions.push(CodeSuggestion {
                 suggestion_type: SuggestionType::BestPractice,
                 title: "Consider using async/await instead of promises".to_string(),
-                description: "async/await syntax is generally more readable than promise chains.".to_string(),
+                description: "async/await syntax is generally more readable than promise chains."
+                    .to_string(),
                 code_changes: vec![], // Would need AST analysis for proper conversion
                 confidence: 0.6,
                 impact: SuggestionImpact::Medium,
@@ -804,7 +916,9 @@ mod tests {
 
         // Test that default rules are loaded
         assert!(engine.suggestion_rules.contains_key(&LanguageSupport::Rust));
-        assert!(engine.suggestion_rules.contains_key(&LanguageSupport::Python));
+        assert!(engine
+            .suggestion_rules
+            .contains_key(&LanguageSupport::Python));
     }
 
     #[test]
@@ -815,7 +929,10 @@ mod tests {
 
         let engine = ContextSuggestionEngine::new(file_ops, tree_sitter);
 
-        let suggestions = engine.generate_rust_completions("print", "print", 1, 5).await.unwrap();
+        let suggestions = engine
+            .generate_rust_completions("print", "print", 1, 5)
+            .await
+            .unwrap();
 
         assert!(!suggestions.is_empty());
         assert!(suggestions.iter().any(|s| s.title.contains("println!")));

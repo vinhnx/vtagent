@@ -22,7 +22,7 @@ impl LanguageQueries {
             LanguageSupport::TypeScript => Self::typescript_queries(),
             LanguageSupport::Go => Self::go_queries(),
             LanguageSupport::Java => Self::java_queries(),
-            LanguageSupport::Swift => Self::swift_queries()
+            LanguageSupport::Swift => Self::swift_queries(),
         }
     }
 
@@ -506,7 +506,14 @@ impl LanguageAnalyzer {
                         SymbolKind::Function
                     },
                     position: name_node.start_position.clone(),
-                    scope: Some(if node.kind.contains("method") { "method" } else { "function" }.to_string()),
+                    scope: Some(
+                        if node.kind.contains("method") {
+                            "method"
+                        } else {
+                            "function"
+                        }
+                        .to_string(),
+                    ),
                     signature: self.extract_signature(node),
                     documentation: self.extract_documentation(node),
                 };
@@ -653,7 +660,9 @@ impl LanguageAnalyzer {
 
         // Preceding sibling comments collected on the node
         for c in &node.leading_comments {
-            if !c.is_empty() { docs.push(c.clone()); }
+            if !c.is_empty() {
+                docs.push(c.clone());
+            }
         }
 
         // Immediate child comments
@@ -661,10 +670,16 @@ impl LanguageAnalyzer {
             let kind = child.kind.to_lowercase();
             if kind.contains("comment") {
                 let t = child.text.trim();
-                if !t.is_empty() { docs.push(t.to_string()); }
+                if !t.is_empty() {
+                    docs.push(t.to_string());
+                }
             }
         }
 
-        if docs.is_empty() { None } else { Some(docs.join("\n")) }
+        if docs.is_empty() {
+            None
+        } else {
+            Some(docs.join("\n"))
+        }
     }
 }

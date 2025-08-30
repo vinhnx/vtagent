@@ -32,7 +32,7 @@ The project uses several GitHub Actions workflows to ensure code quality and aut
 **Jobs:**
 
 - **Format Check**: Comprehensive rustfmt checking
-- **Lint Check**: Minimal research-preview clippy linting with all targets and features
+- **Lint Check**: Research-preview clippy linting with all targets and features
 - **Unused Dependencies**: Checks for unused dependencies
 - **Outdated Dependencies**: Identifies outdated dependencies
 - **MSRV**: Minimum Supported Rust Version verification

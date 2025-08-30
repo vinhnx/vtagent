@@ -1,7 +1,7 @@
 //! Statistics and reporting structures for compaction system
 
-use serde::{Deserialize, Serialize};
 use crate::agent::types::MessagePriority;
+use serde::{Deserialize, Serialize};
 
 /// Compaction operation result
 #[derive(Debug, Clone, Serialize, Deserialize)]

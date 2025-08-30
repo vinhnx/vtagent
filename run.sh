@@ -5,7 +5,7 @@
 
 set -e
 
-echo "VTAGENT - Minimal research-preview Rust Coding Agent"
+echo "VTAGENT - Research-preview Rust Coding Agent"
 echo "=================================================="
 
 # Check if API key is set

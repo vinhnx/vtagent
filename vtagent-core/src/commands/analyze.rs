@@ -140,22 +140,26 @@ pub async fn handle_analyze_command(
         }
     }
 
-    // Step 6: Minimal research-preview code analysis with tree-sitter (for deep analysis)
+    // Step 6: Research-preview code analysis with tree-sitter (for deep analysis)
     if matches!(depth, AnalysisDepth::Deep) {
         println!(
             "{}",
-            style("6. Minimal research-preview code analysis with tree-sitter...").yellow()
+            style("6. Research-preview code analysis with tree-sitter...").yellow()
         );
         match perform_tree_sitter_analysis(&config).await {
-            Ok(_) => println!("   {} Tree-sitter analysis complete", style("Complete").green()),
-            Err(e) => println!("   {} Tree-sitter analysis failed: {}", style("Failed").red(), e),
+            Ok(_) => println!(
+                "   {} Tree-sitter analysis complete",
+                style("Complete").green()
+            ),
+            Err(e) => println!(
+                "   {} Tree-sitter analysis failed: {}",
+                style("Failed").red(),
+                e
+            ),
         }
     }
 
-    println!(
-        "{}",
-        style("Workspace analysis complete!").green().bold()
-    );
+    println!("{}", style("Workspace analysis complete!").green().bold());
     println!(
         "{}",
         style("You can now ask me specific questions about the codebase.").dim()
@@ -164,14 +168,15 @@ pub async fn handle_analyze_command(
     if matches!(depth, AnalysisDepth::Deep) {
         println!(
             "{}",
-            style("Minimal research-preview analysis available with tree-sitter integration.").dim()
+            style("Research-preview analysis available with tree-sitter integration.")
+                .dim()
         );
     }
 
     Ok(())
 }
 
-/// Perform Minimal research-preview code analysis using tree-sitter
+/// Perform Research-preview code analysis using tree-sitter
 async fn perform_tree_sitter_analysis(config: &AgentConfig) -> Result<()> {
     use crate::tree_sitter::analyzer::LanguageSupport;
 
@@ -210,20 +215,13 @@ async fn perform_tree_sitter_analysis(config: &AgentConfig) -> Result<()> {
                                     );
 
                                     if !analysis.issues.is_empty() {
-                                        println!(
-                                            "       {} issues found",
-                                            analysis.issues.len()
-                                        );
+                                        println!("       {} issues found", analysis.issues.len());
                                     }
                                 }
                             }
                             Err(e) => {
                                 if config.verbose {
-                                    println!(
-                                        "     Failed to analyze {}: {}",
-                                        path,
-                                        e
-                                    );
+                                    println!("     Failed to analyze {}: {}", path, e);
                                 }
                             }
                         }
@@ -234,9 +232,7 @@ async fn perform_tree_sitter_analysis(config: &AgentConfig) -> Result<()> {
             if analyzed_files > 0 {
                 println!(
                     "     Analyzed {} files: {} total lines, {} functions",
-                    analyzed_files,
-                    total_lines,
-                    total_functions
+                    analyzed_files, total_lines, total_functions
                 );
 
                 // Calculate quality metrics for the project
@@ -252,9 +248,7 @@ async fn perform_tree_sitter_analysis(config: &AgentConfig) -> Result<()> {
                 );
 
                 if avg_lines_per_function > 50.0 {
-                    println!(
-                        "       Consider breaking down large functions"
-                    );
+                    println!("       Consider breaking down large functions");
                 }
             }
         }

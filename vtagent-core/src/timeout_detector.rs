@@ -143,7 +143,10 @@ impl TimeoutDetector {
 
         // Set default configurations for different operation types
         configs.insert(OperationType::ApiCall, TimeoutConfig::api_call());
-        configs.insert(OperationType::FileOperation, TimeoutConfig::file_operation());
+        configs.insert(
+            OperationType::FileOperation,
+            TimeoutConfig::file_operation(),
+        );
         configs.insert(OperationType::CodeAnalysis, TimeoutConfig::analysis());
         configs.insert(OperationType::ToolExecution, TimeoutConfig::default());
         configs.insert(OperationType::NetworkRequest, TimeoutConfig::api_call());
@@ -169,7 +172,11 @@ impl TimeoutDetector {
     }
 
     /// Start monitoring an operation
-    pub async fn start_operation(&self, operation_id: String, operation_type: OperationType) -> TimeoutHandle {
+    pub async fn start_operation(
+        &self,
+        operation_id: String,
+        operation_type: OperationType,
+    ) -> TimeoutHandle {
         let config = self.get_config(&operation_type).await;
 
         let event = TimeoutEvent {
@@ -237,8 +244,10 @@ impl TimeoutDetector {
             let mut stats = self.stats.write().await;
             // Update average timeout duration
             if stats.total_operations > 0 {
-                let total_duration = stats.average_timeout_duration * (stats.total_operations - 1) as u32;
-                stats.average_timeout_duration = (total_duration + duration) / stats.total_operations as u32;
+                let total_duration =
+                    stats.average_timeout_duration * (stats.total_operations - 1) as u32;
+                stats.average_timeout_duration =
+                    (total_duration + duration) / stats.total_operations as u32;
             }
         }
     }
@@ -249,14 +258,19 @@ impl TimeoutDetector {
     }
 
     /// Calculate retry delay with exponential backoff and optional jitter
-    pub async fn calculate_retry_delay(&self, operation_type: &OperationType, attempt: u32) -> Duration {
+    pub async fn calculate_retry_delay(
+        &self,
+        operation_type: &OperationType,
+        attempt: u32,
+    ) -> Duration {
         let config = self.get_config(operation_type).await;
 
         let base_delay = config.initial_retry_delay.as_millis() as f64;
         let multiplier = config.backoff_multiplier.powi(attempt as i32);
         let delay_ms = (base_delay * multiplier) as u64;
 
-        let mut delay = Duration::from_millis(delay_ms.min(config.max_retry_delay.as_millis() as u64));
+        let mut delay =
+            Duration::from_millis(delay_ms.min(config.max_retry_delay.as_millis() as u64));
 
         // Add jitter if enabled
         if config.use_jitter {
@@ -274,7 +288,12 @@ impl TimeoutDetector {
     }
 
     /// Determine if an error should trigger a retry
-    pub async fn should_retry(&self, operation_type: &OperationType, error: &anyhow::Error, attempt: u32) -> bool {
+    pub async fn should_retry(
+        &self,
+        operation_type: &OperationType,
+        error: &anyhow::Error,
+        attempt: u32,
+    ) -> bool {
         let config = self.get_config(operation_type).await;
 
         if attempt >= config.max_retries {
@@ -314,13 +333,26 @@ impl TimeoutDetector {
         let _last_error: Option<anyhow::Error> = None;
 
         loop {
-            let handle = self.start_operation(format!("{}_{}", operation_id, attempt), operation_type.clone()).await;
+            let handle = self
+                .start_operation(
+                    format!("{}_{}", operation_id, attempt),
+                    operation_type.clone(),
+                )
+                .await;
 
             let result = match time::timeout(config.timeout_duration, operation()).await {
                 Ok(result) => result,
                 Err(_) => {
-                    self.record_timeout(&handle.operation_id, Some("Operation timed out".to_string())).await;
-                    Err(anyhow::anyhow!("Operation '{}' timed out after {:?}", operation_id, config.timeout_duration))
+                    self.record_timeout(
+                        &handle.operation_id,
+                        Some("Operation timed out".to_string()),
+                    )
+                    .await;
+                    Err(anyhow::anyhow!(
+                        "Operation '{}' timed out after {:?}",
+                        operation_id,
+                        config.timeout_duration
+                    ))
                 }
             };
 
@@ -329,7 +361,8 @@ impl TimeoutDetector {
             match result {
                 Ok(value) => {
                     if attempt > 0 {
-                        self.record_successful_retry(&format!("{}_{}", operation_id, attempt)).await;
+                        self.record_successful_retry(&format!("{}_{}", operation_id, attempt))
+                            .await;
                     }
                     return Ok(value);
                 }
@@ -338,16 +371,21 @@ impl TimeoutDetector {
 
                     if !should_retry_op {
                         if attempt > 0 {
-                            self.record_failed_retry(&format!("{}_{}", operation_id, attempt)).await;
+                            self.record_failed_retry(&format!("{}_{}", operation_id, attempt))
+                                .await;
                         }
                         return Err(error);
                     }
 
                     attempt += 1;
-                    self.record_failed_retry(&format!("{}_{}", operation_id, attempt)).await;
+                    self.record_failed_retry(&format!("{}_{}", operation_id, attempt))
+                        .await;
 
                     let delay = self.calculate_retry_delay(&operation_type, attempt).await;
-                    eprintln!("Operation '{}' failed (attempt {}/{}), retrying in {:?}", operation_id, attempt, config.max_retries, delay);
+                    eprintln!(
+                        "Operation '{}' failed (attempt {}/{}), retrying in {:?}",
+                        operation_id, attempt, config.max_retries, delay
+                    );
                     time::sleep(delay).await;
                 }
             }
@@ -418,14 +456,16 @@ mod tests {
 
         detector.set_config(OperationType::ApiCall, config).await;
 
-        let result = detector.execute_with_timeout_retry(
-            "test_operation".to_string(),
-            OperationType::ApiCall,
-            || async {
-                sleep(Duration::from_millis(20)).await;
-                Ok("success")
-            }
-        ).await;
+        let result = detector
+            .execute_with_timeout_retry(
+                "test_operation".to_string(),
+                OperationType::ApiCall,
+                || async {
+                    sleep(Duration::from_millis(20)).await;
+                    Ok("success")
+                },
+            )
+            .await;
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("timed out"));
@@ -446,22 +486,24 @@ mod tests {
         detector.set_config(OperationType::ApiCall, config).await;
 
         let mut call_count = 0;
-        let result = detector.execute_with_timeout_retry(
-            "test_retry".to_string(),
-            OperationType::ApiCall,
-            || async {
-                call_count += 1;
-                if call_count == 1 {
-                    // First call fails with timeout
-                    sleep(Duration::from_millis(60)).await;
-                    Ok("should not reach here")
-                } else {
-                    // Second call succeeds
-                    sleep(Duration::from_millis(10)).await;
-                    Ok("success")
-                }
-            }
-        ).await;
+        let result = detector
+            .execute_with_timeout_retry(
+                "test_retry".to_string(),
+                OperationType::ApiCall,
+                || async {
+                    call_count += 1;
+                    if call_count == 1 {
+                        // First call fails with timeout
+                        sleep(Duration::from_millis(60)).await;
+                        Ok("should not reach here")
+                    } else {
+                        // Second call succeeds
+                        sleep(Duration::from_millis(10)).await;
+                        Ok("success")
+                    }
+                },
+            )
+            .await;
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "success");
@@ -476,10 +518,14 @@ mod tests {
     async fn test_calculate_retry_delay() {
         let detector = TimeoutDetector::new();
 
-        let delay = detector.calculate_retry_delay(&OperationType::ApiCall, 0).await;
+        let delay = detector
+            .calculate_retry_delay(&OperationType::ApiCall, 0)
+            .await;
         assert!(delay >= Duration::from_millis(200)); // Initial delay for API calls
 
-        let delay2 = detector.calculate_retry_delay(&OperationType::ApiCall, 1).await;
+        let delay2 = detector
+            .calculate_retry_delay(&OperationType::ApiCall, 1)
+            .await;
         assert!(delay2 > delay); // Should increase with backoff
     }
 }

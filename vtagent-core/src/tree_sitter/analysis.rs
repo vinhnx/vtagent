@@ -212,8 +212,8 @@ impl CodeAnalyzer {
                 self.extract_java_dependencies(&tree.root, &mut dependencies);
             }
             LanguageSupport::Swift => {
-                  self.extract_swift_dependencies(&tree.root, &mut dependencies);
-              }
+                self.extract_swift_dependencies(&tree.root, &mut dependencies);
+            }
         }
 
         dependencies

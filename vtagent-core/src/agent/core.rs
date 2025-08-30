@@ -1,5 +1,6 @@
 //! Core agent implementation and orchestration
 
+use crate::agent::compaction::CompactionEngine;
 use crate::conversation_summarizer::ConversationSummarizer;
 use crate::decision_tracker::DecisionTracker;
 use crate::error_recovery::{ErrorRecoveryManager, ErrorType};
@@ -7,7 +8,6 @@ use crate::llm::{make_client, AnyClient};
 use crate::tools::{build_function_declarations, ToolRegistry};
 use crate::tree_sitter::{CodeAnalysis, TreeSitterAnalyzer};
 use crate::types::*;
-use crate::agent::compaction::CompactionEngine;
 use anyhow::{anyhow, Result};
 use console::style;
 use std::sync::Arc;
@@ -184,7 +184,9 @@ impl Agent {
     }
 
     /// Get model-agnostic client reference
-    pub fn llm(&self) -> &AnyClient { &self.client }
+    pub fn llm(&self) -> &AnyClient {
+        &self.client
+    }
 
     /// Get tree-sitter analyzer reference
     pub fn tree_sitter_analyzer(&self) -> &TreeSitterAnalyzer {
@@ -202,7 +204,9 @@ impl Agent {
     }
 
     /// Make intelligent compaction decision using context analysis
-    pub async fn make_intelligent_compaction_decision(&self) -> Result<crate::agent::intelligence::CompactionDecision> {
+    pub async fn make_intelligent_compaction_decision(
+        &self,
+    ) -> Result<crate::agent::intelligence::CompactionDecision> {
         // Minimal implementation - return a simple decision since the compaction engine is minimal
         Ok(crate::agent::intelligence::CompactionDecision {
             should_compact: false,
@@ -231,7 +235,11 @@ impl Agent {
     }
 
     /// Perform context compaction
-    pub async fn compact_context(&self, _context_key: &str, _context_data: &mut std::collections::HashMap<String, serde_json::Value>) -> Result<crate::agent::compaction::CompactionResult> {
+    pub async fn compact_context(
+        &self,
+        _context_key: &str,
+        _context_data: &mut std::collections::HashMap<String, serde_json::Value>,
+    ) -> Result<crate::agent::compaction::CompactionResult> {
         // Minimal implementation
         Ok(crate::agent::compaction::CompactionResult {
             messages_processed: 0,
@@ -244,7 +252,9 @@ impl Agent {
     }
 
     /// Get compaction statistics
-    pub async fn get_compaction_stats(&self) -> Result<crate::agent::compaction::CompactionStatistics> {
+    pub async fn get_compaction_stats(
+        &self,
+    ) -> Result<crate::agent::compaction::CompactionStatistics> {
         // Minimal implementation
         Ok(crate::agent::compaction::CompactionStatistics {
             total_messages: 0,

@@ -8,10 +8,10 @@ use std::path::PathBuf;
 #[command(
     name = "vtagent",
     version,
-    about = "**Minimal research-preview Rust coding agent** powered by Gemini with Anthropic-inspired architecture\n\n**Features:**\n• Interactive AI coding assistant with Minimal research-preview tool-calling\n• Multi-language support (Rust, Python, JavaScript, TypeScript, Go, Java)\n• Real-time diff rendering and async file operations\n• Rate limiting and tool call management\n• Markdown rendering for chat responses\n\n**Quick Start:**\n  export GEMINI_API_KEY=\"your_key\"\n  vtagent chat"
+    about = "**Research-preview Rust coding agent** powered by Gemini with Anthropic-inspired architecture\n\n**Features:**\n• Interactive AI coding assistant with Research-preview tool-calling\n• Multi-language support (Rust, Python, JavaScript, TypeScript, Go, Java)\n• Real-time diff rendering and async file operations\n• Rate limiting and tool call management\n• Markdown rendering for chat responses\n\n**Quick Start:**\n  export GEMINI_API_KEY=\"your_key\"\n  vtagent chat"
 )]
 pub struct Cli {
-    /// **Gemini model ID** (e.g., `gemini-2.5-flash-lite`, `gemini-2.5-flash`, `gemini-pro`)\n\n**Available models:**\n• `gemini-2.5-flash-lite` - Fastest, most cost-effective\n• `gemini-2.5-flash` - Fast, cost-effective\n• `gemini-pro` - More capable, slower\n• `gemini-2.5-pro` - Latest, most Minimal research-preview
+    /// **Gemini model ID** (e.g., `gemini-2.5-flash-lite`, `gemini-2.5-flash`, `gemini-pro`)\n\n**Available models:**\n• `gemini-2.5-flash-lite` - Fastest, most cost-effective\n• `gemini-2.5-flash` - Fast, cost-effective\n• `gemini-pro` - More capable, slower\n• `gemini-2.5-pro` - Latest, most Research-preview
     #[arg(long, global = true, default_value = "gemini-2.5-flash-lite")]
     pub model: String,
 
@@ -66,7 +66,7 @@ pub struct Cli {
 /// Available commands with comprehensive features
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    /// **Interactive AI coding assistant** with Minimal research-preview tool-calling capabilities\n\n**Features:**\n• Real-time code generation and editing\n• Multi-language support\n• File system operations\n• Async processing\n\n**Usage:** vtagent chat
+    /// **Interactive AI coding assistant** with Research-preview tool-calling capabilities\n\n**Features:**\n• Real-time code generation and editing\n• Multi-language support\n• File system operations\n• Async processing\n\n**Usage:** vtagent chat
     Chat,
 
     /// **Single prompt mode** - prints model reply without tools\n\n**Perfect for:**\n• Quick questions\n• Code explanations\n• Simple queries\n\n**Example:** vtagent ask "Explain Rust ownership"
@@ -253,7 +253,9 @@ impl Cli {
             // Remove surrounding quotes if present
             let unquote = |s: &str| -> String {
                 let s = s.trim();
-                if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
+                if (s.starts_with('"') && s.ends_with('"'))
+                    || (s.starts_with('\'') && s.ends_with('\''))
+                {
                     s[1..s.len() - 1].to_string()
                 } else {
                     s.to_string()

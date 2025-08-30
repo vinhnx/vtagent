@@ -1,4 +1,4 @@
-//! VTAgent - Minimal research-preview Rust coding agent
+//! VTAgent - Research-preview Rust coding agent
 //!
 //! This is the main binary entry point for vtagent.
 
@@ -6,17 +6,18 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use console::style;
 use regex::Regex;
+use serde_json::json;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use vtagent_core::{
-    gemini::{Content, FunctionResponse, GenerateContentRequest, Part, Tool, ToolConfig},
-    prompts::system::generate_system_instruction_with_guidelines,
-    types::AgentConfig as CoreAgentConfig,
-};
 use vtagent_core::llm::{make_client, BackendKind};
 use vtagent_core::tools::{build_function_declarations, ToolRegistry};
-use serde_json::json;
+use vtagent_core::{
+    config::{ConfigManager, ToolPolicy, VTAgentConfig},
+    gemini::{Content, FunctionResponse, GenerateContentRequest, Part, Tool, ToolConfig},
+    prompts::system::{generate_system_instruction_with_config, SystemPromptConfig},
+    types::AgentConfig as CoreAgentConfig,
+};
 use walkdir::WalkDir;
 
 /// Main CLI structure for vtagent
@@ -24,7 +25,7 @@ use walkdir::WalkDir;
 #[command(
     name = "vtagent",
     version,
-    about = "**Minimal research-preview Rust coding agent** powered by Gemini with Anthropic-inspired architecture"
+    about = "**Research-preview Rust coding agent** powered by Gemini with Anthropic-inspired architecture"
 )]
 pub struct Cli {
     /// Gemini model ID (e.g., gemini-2.5-flash-lite)
@@ -60,6 +61,21 @@ pub enum Commands {
     Analyze,
     /// Display performance metrics
     Performance,
+    /// Initialize vtagent configuration files in current directory
+    Init {
+        /// Force overwrite existing files
+        #[arg(long, default_value_t = false)]
+        force: bool,
+    },
+    /// Generate a sample vtagent.toml configuration file
+    Config {
+        /// Output path for the configuration file
+        #[arg(long, default_value = "vtagent.toml")]
+        output: PathBuf,
+        /// Overwrite existing file
+        #[arg(long, default_value_t = false)]
+        force: bool,
+    },
     /// Search code using the built-in ripgrep-like tool
     Search {
         /// Pattern to search for (regex by default)
@@ -80,8 +96,18 @@ pub enum Commands {
 async fn main() -> Result<()> {
     let args = Cli::parse();
 
-    println!("{}", style("[VTAgent]").green().bold());
-    println!("Welcome to VTAgent - Minimal research-preview Rust coding agent\n");
+    println!("{}", style("================================================================================").dim());
+    println!("{}", style("
+
+    ██╗   ██╗ ████████╗  █████╗   ██████╗  ███████╗ ███╗   ██╗ ████████╗
+    ██║   ██║ ╚══██╔══╝ ██╔══██╗ ██╔════╝  ██╔════╝ ████╗  ██║ ╚══██╔══╝
+    ██║   ██║    ██║    ███████║ ██║  ███╗ █████╗   ██╔██╗ ██║    ██║
+    ╚██╗ ██╔╝    ██║    ██╔══██║ ██║   ██║ ██╔══╝   ██║╚██╗██║    ██║
+     ╚████╔╝     ██║    ██║  ██║ ╚██████╔╝ ███████╗ ██║ ╚████║    ██║
+      ╚═══╝      ╚═╝    ╚═╝  ╚═╝  ╚═════╝  ╚══════╝ ╚═╝  ╚═══╝    ╚═╝
+    ").bold());
+    println!("{}", style("================================================================================").dim());
+    println!("{}", style("Welcome to VTAgent - Research-preview Rust coding agent\n").cyan().bold());
 
     // Get API key from environment, inferred by backend from model if not explicitly set
     let api_key = if let Ok(v) = std::env::var(&args.api_key_env) {
@@ -133,7 +159,60 @@ async fn main() -> Result<()> {
             println!("This would show system performance metrics.");
             println!("(Not implemented in minimal version)");
         }
-        Commands::Search { pattern, path, file_type, case_sensitive } => {
+        Commands::Init { force } => {
+            match VTAgentConfig::bootstrap_project(&config.workspace, force) {
+                Ok(created_files) => {
+                    if created_files.is_empty() {
+                        println!("{} Configuration files already exist",
+                                 style("INFO").cyan().bold());
+                        println!("Use --force to overwrite existing files");
+                    } else {
+                        println!("{} VTAgent project initialized successfully!",
+                                 style("SUCCESS").green().bold());
+                        println!("Created files:");
+                        for file in &created_files {
+                            println!("  ✓ {}", style(file).green());
+                        }
+                        println!("\nNext steps:");
+                        println!("1. Review and customize vtagent.toml for your project");
+                        println!("2. Adjust .vtagentgitignore to control agent file access");
+                        println!("3. Run 'vtagent chat' to start the interactive agent");
+                    }
+                }
+                Err(e) => {
+                    eprintln!("{} Failed to initialize project: {}",
+                              style("ERROR").red().bold(), e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        Commands::Config { output, force } => {
+            if output.exists() && !force {
+                eprintln!("Error: Configuration file already exists at {}", output.display());
+                eprintln!("Use --force to overwrite");
+                std::process::exit(1);
+            }
+
+            match VTAgentConfig::create_sample_config(&output) {
+                Ok(_) => {
+                    println!("{} Created sample configuration at: {}",
+                             style("SUCCESS").green().bold(),
+                             output.display());
+                    println!("Edit this file to customize agent behavior, tool policies, and command permissions.");
+                }
+                Err(e) => {
+                    eprintln!("{} Failed to create configuration: {}",
+                              style("ERROR").red().bold(), e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        Commands::Search {
+            pattern,
+            path,
+            file_type,
+            case_sensitive,
+        } => {
             // Initialize tools and run code_search directly
             let registry = ToolRegistry::new(config.workspace.clone());
             registry.initialize_async().await?;
@@ -164,19 +243,20 @@ async fn main() -> Result<()> {
         println!("  API Key Source: {}", args.api_key_env);
     }
 
-    println!("\n{}", style("Ready to assist with your coding tasks!").cyan().bold());
+    println!(
+        "\n{}",
+        style("Ready to assist with your coding tasks!")
+            .cyan()
+            .bold()
+    );
 
     Ok(())
 }
 
 /// Handle the chat command
 async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
-    println!("Interactive chat mode selected");
+    println!("{}", style("Interactive chat mode selected").blue().bold());
     let key_preview_len = config.api_key.len().min(8);
-    println!(
-        "API Key: {}...",
-        &config.api_key[..key_preview_len]
-    );
     println!("Model: {}", config.model);
     println!("Workspace: {}", config.workspace.display());
     if let Some(summary) = summarize_workspace_languages(&config.workspace) {
@@ -191,18 +271,25 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
     let tool_registry = ToolRegistry::new(config.workspace.clone());
     tool_registry.initialize_async().await?;
     let function_declarations = build_function_declarations();
-    let tools = vec![Tool { function_declarations }];
+    let tools = vec![Tool {
+        function_declarations,
+    }];
 
-    // Create system instruction
-    let system_config = vtagent_core::prompts::system::SystemPromptConfig::default();
-    let long_sys = generate_system_instruction_with_guidelines(&system_config, &config.workspace);
+    // Load configuration from vtagent.toml first
+    let config_manager = ConfigManager::new(&config.workspace)
+        .context("Failed to load configuration")?;
+    let vtagent_config = config_manager.config();
+
+    // Create system instruction with configuration awareness
+    let system_config = SystemPromptConfig::default();
+    let long_sys = generate_system_instruction_with_config(&system_config, &config.workspace, Some(vtagent_config));
 
     // Incorporate project context so the agent is aware of the current repo
     let mut sys_text = long_sys
         .parts
         .get(0)
         .and_then(|p| p.as_text())
-        .unwrap_or("You are a helpful coding assistant.")
+        .unwrap_or(&vtagent_config.agent.default_system_instruction)
         .to_string();
 
     if let Some(project_overview) = build_project_overview(&config.workspace) {
@@ -218,36 +305,70 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
     // Conversation history (without system message)
     let mut conversation: Vec<Content> = vec![];
 
-    println!("{} Type your message (or 'exit' to quit):", style("Chat").cyan().bold());
+    println!(
+        "{} Type your message (or 'exit' to quit):",
+        style("Chat").cyan().bold()
+    );
 
-    // Tool policy: load from .vtagent/tool-policy.json and merge with env overrides
-    #[derive(serde::Deserialize, Default)]
-    struct ToolPolicy { #[serde(default)] prompt: Vec<String>, #[serde(default)] deny: Vec<String>, #[serde(default)] auto: Vec<String> }
-    fn to_set(v: Vec<String>) -> std::collections::HashSet<String> { v.into_iter().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect() }
-    let mut policy = ToolPolicy::default();
-    let policy_path = config.workspace.join(".vtagent").join("tool-policy.json");
-    if let Ok(txt) = std::fs::read_to_string(&policy_path) {
-        if let Ok(p) = serde_json::from_str::<ToolPolicy>(&txt) { policy = p; }
-    }
-    // Defaults
-    if policy.prompt.is_empty() { policy.prompt = vec!["delete_file".into()]; }
-    // Env overrides
-    if let Ok(s) = std::env::var("VTAGENT_TOOL_PROMPT") { policy.prompt = s.split(',').map(|t| t.to_string()).collect(); }
-    if let Ok(s) = std::env::var("VTAGENT_TOOL_DENY") { policy.deny = s.split(',').map(|t| t.to_string()).collect(); }
-    if let Ok(s) = std::env::var("VTAGENT_TOOL_AUTO") { policy.auto = s.split(',').map(|t| t.to_string()).collect(); }
-    let prompt_list = to_set(policy.prompt);
-    let deny_list = to_set(policy.deny);
-    let auto_list = to_set(policy.auto);
+    // Load configuration from vtagent.toml first
+    let config_manager = ConfigManager::new(&config.workspace)
+        .context("Failed to load configuration")?;
+    let vtagent_config = config_manager.config();
 
-    loop {
+    // Safety: Track overall conversation metrics to prevent runaway sessions
+    let mut total_turns = 0;
+    let max_conversation_turns = vtagent_config.agent.max_conversation_turns;
+    let session_start = std::time::Instant::now();
+    let max_session_duration = vtagent_config.session_duration();
+
+    // Show configuration info
+    if let Some(config_path) = config_manager.config_path() {
+        println!("{} Loaded configuration from: {}",
+                 style("CONFIG").dim(),
+                 config_path.display());
+    } else {
+        println!("{} Using default configuration (no vtagent.toml found)",
+                 style("CONFIG").dim());
+    }    loop {
+        // Safety checks: prevent runaway sessions
+        total_turns += 1;
+        if total_turns >= max_conversation_turns {
+            println!("{}", style("Maximum conversation turns reached. Session ending for safety.").red().bold());
+            break;
+        }
+
+        if session_start.elapsed() >= max_session_duration {
+            println!("{}", style("Maximum session duration reached. Session ending for safety.").red().bold());
+            break;
+        }
+
         // Print prompt
         print!("{} ", style("You:").green().bold());
         io::stdout().flush()?;
 
-        // Read user input
+        // Read user input with timeout safeguard
         let mut input = String::new();
-        io::stdin().read_line(&mut input)?;
+        let bytes_read = match io::stdin().read_line(&mut input) {
+            Ok(n) => n,
+            Err(e) => {
+                println!("\n{} Input error: {}", style("Error:").red().bold(), e);
+                break;
+            }
+        };
+
+        // Handle EOF (when stdin is closed or reaches end)
+        if bytes_read == 0 {
+            println!("\n{}", style("EOF reached. Goodbye!").yellow());
+            break;
+        }
+
         let input = input.trim();
+
+        // Safety: prevent extremely long inputs that could cause issues
+        if input.len() > 10000 {
+            println!("{}", style("Input too long (max 10,000 characters). Please shorten your message.").red());
+            continue;
+        }
 
         if input.is_empty() {
             continue;
@@ -261,9 +382,38 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
         // Add user message to conversation
         conversation.push(Content::user_text(input));
 
-        // Tool-calling loop: allow the model to request tools up to 5 steps
+        // Safety: prevent conversation history from growing too large
+        let max_conversation_history = vtagent_config.agent.max_conversation_history;
+        if conversation.len() > max_conversation_history {
+            // Keep the first few and last few messages, removing middle ones
+            let keep_start = 5;
+            let keep_end = 5;
+            if conversation.len() > keep_start + keep_end {
+                let middle_start = keep_start;
+                let middle_end = conversation.len() - keep_end;
+                conversation.drain(middle_start..middle_end);
+                println!("{}", style("(conversation history trimmed for memory management)").dim());
+            }
+        }
+
+        // Tool-calling loop: allow the model to request tools up to configured steps
         let mut steps = 0;
+        let mut consecutive_empty_responses = 0;
+        let max_steps = vtagent_config.agent.max_steps;
+        let max_empty_responses = vtagent_config.agent.max_empty_responses;
+
         'outer: loop {
+            // Safety check: prevent infinite loops
+            if steps >= max_steps {
+                println!("{}", style("(tool-call limit reached)").dim());
+                break 'outer;
+            }
+
+            if consecutive_empty_responses >= max_empty_responses {
+                println!("{}", style("(too many empty responses, stopping)").dim().red());
+                break 'outer;
+            }
+
             let request = GenerateContentRequest {
                 contents: conversation.clone(),
                 tools: Some(tools.clone()),
@@ -280,53 +430,169 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
 
             let response = match client.generate_content(&request).await {
                 Ok(r) => r,
-                Err(e) => { println!("Error: {}", e); break 'outer; }
+                Err(e) => {
+                    println!("Error: {}", e);
+                    break 'outer;
+                }
             };
 
             if let Some(candidate) = response.candidates.first() {
                 let mut had_tool_call = false;
                 let mut printed_any_text = false;
+                let mut had_any_content = false;
+
+                // Check if response has any meaningful content
+                let has_meaningful_content = candidate.content.parts.iter().any(|part| {
+                    match part {
+                        Part::Text { text } => !text.trim().is_empty(),
+                        Part::FunctionCall { .. } => true,
+                        Part::FunctionResponse { .. } => true,
+                    }
+                });
+
+                if !has_meaningful_content {
+                    consecutive_empty_responses += 1;
+                    println!("{}", style("(received empty response)").dim().yellow());
+                } else {
+                    consecutive_empty_responses = 0; // Reset counter on meaningful content
+                }
 
                 for part in &candidate.content.parts {
                     match part {
                         Part::Text { text } => {
+                            had_any_content = true;
                             if !text.trim().is_empty() {
                                 if !printed_any_text {
                                     println!("{}", text);
                                     printed_any_text = true;
                                 }
-                                conversation.push(Content { role: "model".to_string(), parts: vec![Part::Text { text: text.clone() }] });
+                                conversation.push(Content {
+                                    role: "model".to_string(),
+                                    parts: vec![Part::Text { text: text.clone() }],
+                                });
+                            } else {
+                                // Handle empty text responses to prevent infinite loops
+                                conversation.push(Content {
+                                    role: "model".to_string(),
+                                    parts: vec![Part::Text { text: "".to_string() }],
+                                });
                             }
                         }
                         Part::FunctionCall { function_call } => {
                             had_tool_call = true;
                             let tool_name = &function_call.name;
                             let args = function_call.args.clone();
-                            println!("{} {} {}", style("[TOOL]").magenta().bold(), tool_name, args);
-                            // Policy evaluation
-                            if deny_list.contains(tool_name) {
+                            println!(
+                                "{} {} {}",
+                                style("[TOOL]").magenta().bold(),
+                                tool_name,
+                                args
+                            );
+
+                            // Get tool policy from configuration
+                            let tool_policy = vtagent_config.get_tool_policy(tool_name);
+
+                            // Check if tool is denied
+                            if tool_policy == ToolPolicy::Deny {
                                 let denied = json!({ "ok": false, "error": "user_denied", "message": "Denied by policy" });
-                                conversation.push(Content::user_parts(vec![Part::FunctionResponse {
-                                    function_response: FunctionResponse { name: tool_name.clone(), response: denied.clone() }
-                                }]));
+                                conversation.push(Content::user_parts(vec![
+                                    Part::FunctionResponse {
+                                        function_response: FunctionResponse {
+                                            name: tool_name.clone(),
+                                            response: denied.clone(),
+                                        },
+                                    },
+                                ]));
                                 continue;
                             }
 
-                            // Confirmation gate
+                            // Special handling for terminal commands
                             let mut args_to_use = args.clone();
-                            let needs_prompt = prompt_list.contains(tool_name) && !auto_list.contains(tool_name);
-                            if needs_prompt {
-                                let target_desc = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
-                                print!("Confirm '{}'{path}? [y/N] ", tool_name, path=if target_desc.is_empty(){String::new()}else{format!(": {}", target_desc)});
+                            let needs_prompt = tool_policy == ToolPolicy::Prompt;
+
+                            // Check if this is a terminal command and evaluate command permissions
+                            if tool_name == "run_terminal_cmd" {
+                                if let Some(command) = args.get("command").and_then(|v| v.as_str()) {
+                                    // Check if command is in allow list
+                                    if vtagent_config.is_command_allowed(command) {
+                                        // Command is allowed, execute without prompting
+                                        println!("{} Command is in allow list: {}",
+                                                style("[ALLOWED]").green(), command);
+                                    } else if vtagent_config.is_command_dangerous(command) {
+                                        // Dangerous command - require extra confirmation
+                                        print!(
+                                            "{} DANGEROUS command '{}' - Are you sure? [y/N] ",
+                                            style("[WARNING]").red().bold(),
+                                            command
+                                        );
+                                        io::stdout().flush()?;
+                                        let mut line = String::new();
+                                        io::stdin().read_line(&mut line)?;
+                                        let resp = line.trim().to_lowercase();
+                                        if resp != "y" && resp != "yes" {
+                                            let denied = json!({ "ok": false, "error": "user_denied", "message": "User denied dangerous command" });
+                                            conversation.push(Content::user_parts(vec![
+                                                Part::FunctionResponse {
+                                                    function_response: FunctionResponse {
+                                                        name: tool_name.clone(),
+                                                        response: denied.clone(),
+                                                    },
+                                                },
+                                            ]));
+                                            continue;
+                                        }
+                                    } else if vtagent_config.security.human_in_the_loop {
+                                        // Command not in allow list - require confirmation
+                                        print!(
+                                            "{} Execute command '{}'? [y/N] ",
+                                            style("[CONFIRM]").yellow(),
+                                            command
+                                        );
+                                        io::stdout().flush()?;
+                                        let mut line = String::new();
+                                        io::stdin().read_line(&mut line)?;
+                                        let resp = line.trim().to_lowercase();
+                                        if resp != "y" && resp != "yes" {
+                                            let denied = json!({ "ok": false, "error": "user_denied", "message": "User denied command execution" });
+                                            conversation.push(Content::user_parts(vec![
+                                                Part::FunctionResponse {
+                                                    function_response: FunctionResponse {
+                                                        name: tool_name.clone(),
+                                                        response: denied.clone(),
+                                                    },
+                                                },
+                                            ]));
+                                            continue;
+                                        }
+                                    }
+                                }
+                            } else if needs_prompt {
+                                // Non-terminal tools that need prompting
+                                let target_desc =
+                                    args.get("path").and_then(|v| v.as_str()).unwrap_or("");
+                                print!(
+                                    "Confirm '{}'{path}? [y/N] ",
+                                    tool_name,
+                                    path = if target_desc.is_empty() {
+                                        String::new()
+                                    } else {
+                                        format!(": {}", target_desc)
+                                    }
+                                );
                                 io::stdout().flush()?;
                                 let mut line = String::new();
                                 io::stdin().read_line(&mut line)?;
                                 let resp = line.trim().to_lowercase();
                                 if resp != "y" && resp != "yes" {
                                     let denied = json!({ "ok": false, "error": "user_denied", "message": "User denied by prompt" });
-                                    conversation.push(Content::user_parts(vec![Part::FunctionResponse {
-                                        function_response: FunctionResponse { name: tool_name.clone(), response: denied.clone() }
-                                    }]));
+                                    conversation.push(Content::user_parts(vec![
+                                        Part::FunctionResponse {
+                                            function_response: FunctionResponse {
+                                                name: tool_name.clone(),
+                                                response: denied.clone(),
+                                            },
+                                        },
+                                    ]));
                                     continue;
                                 }
                                 // Some tools require explicit confirm flag
@@ -335,29 +601,67 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                                 args_to_use = json!(m);
                             }
 
-                            let tool_result = match tool_registry.execute_tool(tool_name, args_to_use).await {
-                                Ok(val) => { println!("{} {}", style("[TOOL OK]").green().bold(), tool_name); json!({ "ok": true, "result": val }) }
-                                Err(err) => { println!("{} {} - {}", style("[TOOL ERROR]").red().bold(), tool_name, err); json!({ "ok": false, "error": err.to_string() }) }
+                            let tool_result = match tool_registry
+                                .execute_tool(tool_name, args_to_use)
+                                .await
+                            {
+                                Ok(val) => {
+                                    println!("{} {}", style("[TOOL OK]").green().bold(), tool_name);
+                                    json!({ "ok": true, "result": val })
+                                }
+                                Err(err) => {
+                                    println!(
+                                        "{} {} - {}",
+                                        style("[TOOL ERROR]").red().bold(),
+                                        tool_name,
+                                        err
+                                    );
+                                    json!({ "ok": false, "error": err.to_string() })
+                                }
                             };
                             conversation.push(Content::user_parts(vec![Part::FunctionResponse {
-                                function_response: FunctionResponse { name: tool_name.clone(), response: tool_result }
+                                function_response: FunctionResponse {
+                                    name: tool_name.clone(),
+                                    response: tool_result,
+                                },
                             }]));
                         }
                         Part::FunctionResponse { .. } => {
-                            conversation.push(Content { role: "user".to_string(), parts: vec![part.clone()] });
+                            conversation.push(Content {
+                                role: "user".to_string(),
+                                parts: vec![part.clone()],
+                            });
                         }
                     }
                 }
 
                 if had_tool_call {
                     steps += 1;
-                    if steps >= 5 { println!("{}", style("(tool-call limit reached)").dim()); break 'outer; }
+                    if steps >= max_steps {
+                        println!("{}", style("(tool-call limit reached)").dim());
+                        break 'outer;
+                    }
                     continue 'outer;
+                } else if had_any_content {
+                    // Model provided text response, conversation turn is complete
+                    break 'outer;
                 } else {
+                    // No content at all - this shouldn't happen but prevents infinite loops
+                    consecutive_empty_responses += 1;
+                    println!("{}", style("(empty response from model)").dim());
+                    if consecutive_empty_responses >= max_empty_responses {
+                        println!("{}", style("(too many consecutive empty responses, stopping)").dim().red());
+                        break 'outer;
+                    }
                     break 'outer;
                 }
             } else {
-                println!("No response from model");
+                consecutive_empty_responses += 1;
+                println!("{}", style("(no response candidate from model)").dim().red());
+                if consecutive_empty_responses >= max_empty_responses {
+                    println!("{}", style("(too many failed responses, stopping)").dim().red());
+                    break 'outer;
+                }
                 break 'outer;
             }
         }
@@ -384,10 +688,14 @@ impl ProjectOverview {
             out.push_str(&format!("Project: {}", name));
         }
         if let Some(ver) = &self.version {
-            if !out.is_empty() { out.push_str(" "); }
+            if !out.is_empty() {
+                out.push_str(" ");
+            }
             out.push_str(&format!("v{}", ver));
         }
-        if !out.is_empty() { out.push('\n'); }
+        if !out.is_empty() {
+            out.push('\n');
+        }
         if let Some(desc) = &self.description {
             out.push_str(desc);
             out.push('\n');
@@ -411,7 +719,9 @@ impl ProjectOverview {
         if let Some(excerpt) = &self.readme_excerpt {
             s.push_str("- README Excerpt: \n");
             s.push_str(excerpt);
-            if !excerpt.ends_with('\n') { s.push('\n'); }
+            if !excerpt.ends_with('\n') {
+                s.push('\n');
+            }
         }
         s
     }
@@ -441,7 +751,11 @@ fn build_project_overview(root: &Path) -> Option<ProjectOverview> {
         overview.readme_excerpt = Some(extract_readme_excerpt(&readme, 1200));
     } else {
         // Fallback to QUICKSTART.md or user-context.md if present
-        for alt in ["QUICKSTART.md", "user-context.md", "docs/project/ROADMAP.md"] {
+        for alt in [
+            "QUICKSTART.md",
+            "user-context.md",
+            "docs/project/ROADMAP.md",
+        ] {
             let path = root.join(alt);
             if let Ok(txt) = fs::read_to_string(&path) {
                 overview.readme_excerpt = Some(extract_readme_excerpt(&txt, 800));
@@ -485,7 +799,9 @@ fn extract_readme_excerpt(md: &str, max_len: usize) -> String {
     let mut excerpt = String::new();
     for line in md.lines() {
         // Stop if we reach a deep section far into the doc
-        if excerpt.len() > max_len { break; }
+        if excerpt.len() > max_len {
+            break;
+        }
         excerpt.push_str(line);
         excerpt.push('\n');
         // Prefer stopping after an initial overview section
@@ -500,7 +816,6 @@ fn extract_readme_excerpt(md: &str, max_len: usize) -> String {
     excerpt
 }
 
-
 fn summarize_workspace_languages(root: &std::path::Path) -> Option<String> {
     use std::collections::HashMap;
     let analyzer = match vtagent_core::tree_sitter::analyzer::TreeSitterAnalyzer::new() {
@@ -509,7 +824,11 @@ fn summarize_workspace_languages(root: &std::path::Path) -> Option<String> {
     };
     let mut counts: HashMap<String, usize> = HashMap::new();
     let mut total = 0usize;
-    for entry in WalkDir::new(root).max_depth(4).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(root)
+        .max_depth(4)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         let path = entry.path();
         if path.is_file() {
             if let Ok(lang) = analyzer.detect_language_from_path(path) {
@@ -517,10 +836,17 @@ fn summarize_workspace_languages(root: &std::path::Path) -> Option<String> {
                 total += 1;
             }
         }
-        if total > 5000 { break; }
+        if total > 5000 {
+            break;
+        }
     }
-    if counts.is_empty() { None } else {
-        let mut parts: Vec<String> = counts.into_iter().map(|(k,v)| format!("{}:{}", k, v)).collect();
+    if counts.is_empty() {
+        None
+    } else {
+        let mut parts: Vec<String> = counts
+            .into_iter()
+            .map(|(k, v)| format!("{}:{}", k, v))
+            .collect();
         parts.sort();
         Some(parts.join(", "))
     }

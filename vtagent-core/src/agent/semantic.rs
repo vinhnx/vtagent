@@ -1,6 +1,6 @@
 //! Semantic analysis for message content
 
-use crate::agent::types::{MessageType, MessagePriority};
+use crate::agent::types::{MessagePriority, MessageType};
 
 /// Semantic analyzer for message content
 #[derive(Debug)]
@@ -45,7 +45,11 @@ impl SemanticAnalyzer {
     }
 
     /// Analyze message priority based on content and type
-    pub fn analyze_message_priority(&self, content: &str, message_type: &MessageType) -> MessagePriority {
+    pub fn analyze_message_priority(
+        &self,
+        content: &str,
+        message_type: &MessageType,
+    ) -> MessagePriority {
         // Security-related content is always critical
         if self.contains_security_keywords(content) {
             return MessagePriority::Critical;
@@ -115,16 +119,22 @@ impl SemanticAnalyzer {
 
     fn contains_security_keywords(&self, content: &str) -> bool {
         let content_lower = content.to_lowercase();
-        self.security_keywords.iter().any(|keyword| content_lower.contains(keyword))
+        self.security_keywords
+            .iter()
+            .any(|keyword| content_lower.contains(keyword))
     }
 
     fn contains_code_keywords(&self, content: &str) -> bool {
         let content_lower = content.to_lowercase();
-        self.code_keywords.iter().any(|keyword| content_lower.contains(keyword))
+        self.code_keywords
+            .iter()
+            .any(|keyword| content_lower.contains(keyword))
     }
 
     fn contains_decision_keywords(&self, content: &str) -> bool {
         let content_lower = content.to_lowercase();
-        self.decision_keywords.iter().any(|keyword| content_lower.contains(keyword))
+        self.decision_keywords
+            .iter()
+            .any(|keyword| content_lower.contains(keyword))
     }
 }

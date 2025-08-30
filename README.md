@@ -2,6 +2,10 @@
 
 vtagent is a minimal terminal-based coding agent that implements modern agent architecture patterns. It combines Anthropic's agent-building principles with Cognition's context engineering approach to provide a reliable, long-running coding assistant.
 
+<div align="center">
+  <img src="screenshots/vtagent.png" alt="vtagent screenshot" width="800">
+</div>
+
 ## Architecture & Design Principles
 
 ### Core Architecture
@@ -481,7 +485,9 @@ cargo build   # Prompts: "Execute command 'cargo build'? [y/N]"
 
 # Dangerous commands show warnings
 rm -f file    # Prompts: "[WARNING] DANGEROUS command - Are you sure? [y/N]"
-```### Specialized Modes
+```
+
+### Specialized Modes
 
 ```bash
 # Analyze workspace structure

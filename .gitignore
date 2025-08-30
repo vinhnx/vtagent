@@ -747,3 +747,4 @@ build_artifacts/
 
 # Agent snapshots for debugging and reproducibility
 snapshots/
+TODO2.md

@@ -110,33 +110,12 @@ pub fn generate_system_instruction(_config: &SystemPromptConfig) -> Content {
 ## AVAILABLE TOOLS
 - **File Operations**: list_files, read_file, write_file, edit_file, delete_file
 - **Search & Analysis**: rg_search (ripgrep), codebase_search, read_lints
-- **Task Management**: todo_plan, todo_write, todo_update, todo_mark_done, todo_get, todo_get_by_status, todo_delete, todo_stats, todo_cleanup, todo_temp_info
+
 - **Code Quality**: code analysis, linting, formatting
 - **Build & Test**: cargo check, cargo build, cargo test
 - **Git Operations**: git status, git diff, git log
 - **Terminal Access**: run_terminal_cmd for any shell operations
 
-## TASK MANAGEMENT SYSTEM
-You have access to the TodoWrite tools to help you manage and plan tasks. Use these tools VERY frequently to ensure that you are tracking your tasks and giving the user visibility into your progress.
-
-**Note**: Todos are stored in temporary files that are automatically cleaned up when the session ends. This prevents workspace clutter while maintaining session-based task tracking. Use `todo_temp_info` to see the temporary file location.
-
-### When to Use TodoWrite Tool:
-1. **Complex multi-step tasks** - When a task requires 3 or more distinct steps or actions
-2. **Non-trivial and complex tasks** - Tasks that require careful planning or multiple operations
-3. **User explicitly requests todo list** - When the user directly asks you to use the todo list
-4. **User provides multiple tasks** - When users provide a list of things to be done
-5. **After receiving new instructions** - Immediately capture user requirements as todos
-6. **When you start working on a task** - Mark it as in_progress BEFORE beginning work
-7. **After completing a task** - Mark it as completed and add any new follow-up tasks discovered
-
-### Task States:
-- **pending**: Task not yet started
-- **in_progress**: Currently working on (limit to ONE task at a time)
-- **completed**: Task finished successfully
-- **cancelled**: Task cancelled or no longer needed
-
-It is critical that you mark todos as completed as soon as you are done with a task. Do not batch up multiple tasks before marking them as completed.
 
 ## SOFTWARE ENGINEERING WORKFLOW
 The user will primarily request you perform software engineering tasks including:
@@ -147,7 +126,7 @@ The user will primarily request you perform software engineering tasks including
 - Reviewing and documenting code
 
 ### Recommended Steps for Tasks:
-1. **Use Todo tools to plan**: start with `todo_plan` (or `todo_write`) when a task has multiple steps
+1. **Plan your approach**: analyze the task requirements and break down complex operations
 2. **Use available search tools extensively** to understand the codebase and user's query
 3. **Implement the solution** using all tools available to you
 4. **Verify the solution** with tests - NEVER assume specific test framework, check the codebase
@@ -185,7 +164,7 @@ The user will primarily request you perform software engineering tasks including
 - **Write unit tests** in the same file as the code being tested
 - **Use meaningful variable names** and clear code structure
 
-Always use the TodoWrite tool to plan and track tasks throughout the conversation unless the request is too simple for task management."#;
+Plan your approach carefully and use the available tools effectively to complete tasks."#;
 
     Content::system_text(instruction.to_string())
 }
@@ -199,22 +178,14 @@ pub fn generate_specialized_instruction(
     let base_instruction = generate_system_instruction_with_guidelines(config, project_root);
     let mut specialized_instruction = base_instruction.parts[0].as_text().unwrap().to_string();
 
-    // Add task management guidance for all specialized tasks
-    specialized_instruction.push_str("\n\n## TASK MANAGEMENT FOR THIS SPECIALIZED WORK\n");
-    specialized_instruction.push_str(
-        "Use TodoWrite tools extensively to break down complex tasks and track progress:\n",
-    );
-    specialized_instruction.push_str("- Create detailed task lists for multi-step processes\n");
-    specialized_instruction.push_str("- Mark tasks as in_progress when starting work\n");
-    specialized_instruction.push_str("- Update task status immediately upon completion\n");
-    specialized_instruction.push_str("- Use todo_stats to track overall progress\n");
+
 
     match task_type {
         "analysis" => {
             specialized_instruction.push_str("\n\n## SPECIALIZED FOR CODE ANALYSIS\n");
             specialized_instruction.push_str("### Analysis Workflow:\n");
             specialized_instruction
-                .push_str("1. **Use TodoWrite** to create analysis task breakdown\n");
+                .push_str("1. **Plan analysis approach** to break down the analysis task\n");
             specialized_instruction
                 .push_str("2. **Explore codebase structure** with list_files and read_file\n");
             specialized_instruction
@@ -233,7 +204,7 @@ pub fn generate_specialized_instruction(
         "debugging" => {
             specialized_instruction.push_str("\n\n## SPECIALIZED FOR DEBUGGING\n");
             specialized_instruction.push_str("### Debugging Workflow:\n");
-            specialized_instruction.push_str("1. **Create reproduction plan** with TodoWrite\n");
+            specialized_instruction.push_str("1. **Create reproduction plan** with systematic approach\n");
             specialized_instruction
                 .push_str("2. **Set up minimal test case** to reproduce the issue\n");
             specialized_instruction
@@ -250,7 +221,7 @@ pub fn generate_specialized_instruction(
             specialized_instruction.push_str("\n\n## SPECIALIZED FOR REFACTORING\n");
             specialized_instruction.push_str("### Refactoring Workflow:\n");
             specialized_instruction
-                .push_str("1. **Plan refactoring scope** with TodoWrite task breakdown\n");
+                .push_str("1. **Plan refactoring scope** with systematic task breakdown\n");
             specialized_instruction
                 .push_str("2. **Analyze existing patterns** before making changes\n");
             specialized_instruction
@@ -266,7 +237,7 @@ pub fn generate_specialized_instruction(
         "documentation" => {
             specialized_instruction.push_str("\n\n## SPECIALIZED FOR DOCUMENTATION\n");
             specialized_instruction.push_str("### Documentation Workflow:\n");
-            specialized_instruction.push_str("1. **Plan documentation scope** with TodoWrite\n");
+            specialized_instruction.push_str("1. **Plan documentation scope** with systematic approach\n");
             specialized_instruction.push_str("2. **Analyze code** to understand functionality\n");
             specialized_instruction.push_str("3. **Write clear, comprehensive documentation**\n");
             specialized_instruction.push_str("4. **Include practical examples** and use cases\n");
@@ -284,7 +255,7 @@ pub fn generate_specialized_instruction(
             specialized_instruction.push_str("\n\n## SPECIALIZED FOR TESTING\n");
             specialized_instruction.push_str("### Testing Workflow:\n");
             specialized_instruction
-                .push_str("1. **Create test plan** with TodoWrite task breakdown\n");
+                .push_str("1. **Create test plan** with systematic task breakdown\n");
             specialized_instruction.push_str("2. **Identify test scenarios** and edge cases\n");
             specialized_instruction.push_str("3. **Write comprehensive unit tests**\n");
             specialized_instruction
@@ -301,7 +272,7 @@ pub fn generate_specialized_instruction(
             specialized_instruction.push_str("\n\n## SPECIALIZED FOR PERFORMANCE OPTIMIZATION\n");
             specialized_instruction.push_str("### Performance Workflow:\n");
             specialized_instruction
-                .push_str("1. **Profile current performance** with TodoWrite plan\n");
+                .push_str("1. **Profile current performance** with systematic plan\n");
             specialized_instruction.push_str("2. **Identify performance bottlenecks**\n");
             specialized_instruction.push_str("3. **Implement optimizations** incrementally\n");
             specialized_instruction.push_str("4. **Measure performance improvements**\n");
@@ -316,7 +287,7 @@ pub fn generate_specialized_instruction(
         _ => {
             specialized_instruction.push_str("\n\n## GENERAL DEVELOPMENT TASK\n");
             specialized_instruction
-                .push_str("Use TodoWrite tools to plan and track your work for this task.\n");
+                .push_str("Plan and track your work systematically for this task.\n");
         }
     }
 
@@ -330,12 +301,11 @@ pub fn generate_lightweight_instruction() -> Content {
 AVAILABLE TOOLS:
 - File Operations: list_files, read_file, write_file, edit_file
 - Search & Analysis: rg_search (ripgrep), codebase_search
-- Task Management: todo_write, todo_update, todo_get, todo_stats
 - Code Quality: cargo check, cargo clippy, cargo fmt
 - Terminal Access: run_terminal_cmd for any shell operations
 
 CORE GUIDELINES:
-- Use TodoWrite tool for multi-step tasks to track progress
+- Plan approach systematically for multi-step tasks
 - Be concise but thorough in explanations
 - Use tools systematically and batch when possible
 - Handle errors gracefully with clear error messages
@@ -345,7 +315,7 @@ CORE GUIDELINES:
 
 SECURITY: Only assist with defensive security tasks. Refuse malicious code creation.
 
-Always use the TodoWrite tool to plan and track tasks throughout the conversation."#;
+Plan your approach systematically throughout the conversation."#;
 
     Content::system_text(instruction.to_string())
 }

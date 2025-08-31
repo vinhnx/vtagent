@@ -164,14 +164,18 @@ impl Default for RetryConfig {
     fn default() -> Self {
         Self {
             max_attempts: 3,
-            initial_delay: Duration::from_millis(100),
-            max_delay: Duration::from_secs(10),
+            initial_delay: Duration::from_millis(500), // Increased initial delay
+            max_delay: Duration::from_secs(30), // Increased max delay for server errors
             backoff_multiplier: 2.0,
             retryable_errors: vec![
                 "timeout".to_string(),
                 "connection".to_string(),
                 "rate_limit".to_string(),
                 "server_error".to_string(),
+                "internal_error".to_string(),
+                "bad_gateway".to_string(),
+                "service_unavailable".to_string(),
+                "gateway_timeout".to_string(),
             ],
         }
     }
@@ -314,15 +318,19 @@ impl Client {
         }
     }
 
-    /// Calculate retry delay with exponential backoff
+    /// Calculate retry delay with exponential backoff and jitter
     fn calculate_retry_delay(&self, attempt: u32) -> Duration {
         let base_delay = self.retry_config.initial_delay.as_millis() as f64;
         let multiplier = self.retry_config.backoff_multiplier.powi(attempt as i32);
         let delay_ms = (base_delay * multiplier) as u64;
 
+        // Add jitter to prevent thundering herd problem
+        let jitter = (delay_ms as f64 * 0.1) as u64; // 10% jitter
+        let jittered_delay = delay_ms + (rand::random::<u64>() % (jitter * 2)) - jitter;
+
         // Cap at max delay
         let max_delay_ms = self.retry_config.max_delay.as_millis() as u64;
-        Duration::from_millis(delay_ms.min(max_delay_ms))
+        Duration::from_millis(jittered_delay.min(max_delay_ms))
     }
 
     /// Check if an error should be retried
@@ -368,8 +376,10 @@ impl Client {
         req: &GenerateContentRequest,
     ) -> Result<GenerateContentResponse> {
         let url = self.endpoint()?;
-        // Simple retry on 5xx errors
+        // Improved retry logic with exponential backoff for server errors
         let mut attempts = 0u32;
+        let max_attempts = 3u32;
+
         loop {
             let resp = self
                 .http
@@ -383,13 +393,40 @@ impl Client {
             if !resp.status().is_success() {
                 let status = resp.status();
                 let text = resp.text().await.unwrap_or_default();
-                // Retry on server errors
-                if status.is_server_error() && attempts < 2 {
+
+                // Check if this is a retryable server error
+                if status.is_server_error() && attempts < max_attempts {
                     attempts += 1;
-                    let delay_ms = [200u64, 600u64, 1200u64][attempts as usize - 1];
-                    tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
-                    continue;
+
+                    // Special handling for different server error codes
+                    let (should_retry, delay_duration) = match status.as_u16() {
+                        500 => {
+                            // Internal Server Error - retry with longer backoff
+                            (true, self.calculate_retry_delay(attempts))
+                        },
+                        502 | 503 => {
+                            // Bad Gateway or Service Unavailable - retry with shorter delay
+                            (true, self.calculate_retry_delay(attempts - 1))
+                        },
+                        504 => {
+                            // Gateway Timeout - retry with medium delay
+                            (true, self.calculate_retry_delay(attempts))
+                        },
+                        _ => {
+                            // Other 5xx errors - use default retry logic
+                            (true, self.calculate_retry_delay(attempts))
+                        }
+                    };
+
+                    if should_retry {
+                        eprintln!("Server error {} (attempt {}/{}), retrying in {:?}...",
+                                status, attempts, max_attempts, delay_duration);
+                        tokio::time::sleep(delay_duration).await;
+                        continue;
+                    }
                 }
+
+                // Non-retryable error or max attempts reached
                 let msg = format!("Gemini API error: {} - {}", status, text);
                 return Err(anyhow::anyhow!(msg));
             }
@@ -702,12 +739,27 @@ impl Client {
                 StatusCode::UNAUTHORIZED => {
                     return Err(anyhow::anyhow!("API error (401): Authentication failed"));
                 }
-                StatusCode::INTERNAL_SERVER_ERROR
-                | StatusCode::BAD_GATEWAY
-                | StatusCode::SERVICE_UNAVAILABLE => {
+                StatusCode::INTERNAL_SERVER_ERROR => {
                     return Err(anyhow::anyhow!(
-                        "API error ({}): Server error: {}",
-                        status.as_u16(),
+                        "API error (500): Internal server error from Gemini API. This is usually temporary. Please retry your request. Details: {}",
+                        text
+                    ));
+                }
+                StatusCode::BAD_GATEWAY => {
+                    return Err(anyhow::anyhow!(
+                        "API error (502): Bad gateway. The Gemini API service may be experiencing issues. Please try again later. Details: {}",
+                        text
+                    ));
+                }
+                StatusCode::SERVICE_UNAVAILABLE => {
+                    return Err(anyhow::anyhow!(
+                        "API error (503): Service unavailable. The Gemini API is temporarily down for maintenance. Please try again later. Details: {}",
+                        text
+                    ));
+                }
+                StatusCode::GATEWAY_TIMEOUT => {
+                    return Err(anyhow::anyhow!(
+                        "API error (504): Gateway timeout. The request took too long to process. Please try again. Details: {}",
                         text
                     ));
                 }

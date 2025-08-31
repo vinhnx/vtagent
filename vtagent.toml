@@ -42,15 +42,7 @@ cargo_fmt = "allow"
 cargo_build = "prompt"
 cargo_test = "prompt"
 
-# Todo management
-todo_write = "allow"
-todo_update = "allow"
-todo_get = "allow"
-todo_get_by_status = "allow"
-todo_delete = "allow"
-todo_stats = "allow"
-todo_cleanup = "allow"
-todo_temp_info = "allow"
+
 
 # Terminal operations
 run_terminal_cmd = "prompt"

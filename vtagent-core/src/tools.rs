@@ -1,6 +1,4 @@
 use crate::gemini::FunctionDeclaration;
-use crate::todo_write::tool_functions;
-use crate::todo_write::TodoManager;
 use crate::vtagentgitignore::{initialize_vtagent_gitignore, should_exclude_file};
 use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
@@ -429,8 +427,6 @@ pub struct ToolRegistry {
     operation_stats: Arc<RwLock<HashMap<String, OperationStats>>>,
     // Cache configuration
     max_cache_size: usize,
-    // Todo manager for task management
-    todo_manager: Arc<TodoManager>,
 }
 
 /// Tool operation statistics
@@ -515,13 +511,11 @@ fn default_search_path() -> String {
 impl ToolRegistry {
     pub fn new(root: PathBuf) -> Self {
         let cargo_toml_path = root.join("Cargo.toml");
-        let todo_manager = Arc::new(TodoManager::new(root.clone()));
         Self {
             root,
             cargo_toml_path,
             operation_stats: Arc::new(RwLock::new(HashMap::new())),
             max_cache_size: 1000,
-            todo_manager,
         }
     }
 
@@ -529,9 +523,6 @@ impl ToolRegistry {
     pub async fn initialize_async(&self) -> Result<()> {
         // Initialize the vtagentgitignore system
         initialize_vtagent_gitignore().await?;
-
-        // Initialize the todo manager
-        self.todo_manager.initialize().await?;
 
         Ok(())
     }
@@ -546,8 +537,6 @@ impl ToolRegistry {
             "write_file" => self.write_file(args).await,
             "edit_file" => self.edit_file(args).await,
             "delete_file" => self.delete_file(args).await,
-            "todo_plan" => self.todo_plan(args).await,
-            "todo_mark_done" => self.todo_mark_done(args).await,
             "rg_search" => self.rg_search(args).await,
             "code_search" => self.code_search(args).await,
             "codebase_search" => self.codebase_search(args).await,
@@ -555,16 +544,6 @@ impl ToolRegistry {
             "cargo_clippy" => self.cargo_clippy(args).await,
             "cargo_fmt" => self.cargo_fmt(args).await,
             "run_terminal_cmd" => self.run_terminal_cmd(args).await,
-            "todo_write" => tool_functions::write_todos(&self.todo_manager, args).await,
-            "todo_update" => tool_functions::update_todos(&self.todo_manager, args).await,
-            "todo_get" => tool_functions::get_todos(&self.todo_manager, args).await,
-            "todo_get_by_status" => {
-                tool_functions::get_todos_by_status(&self.todo_manager, args).await
-            }
-            "todo_delete" => tool_functions::delete_todos(&self.todo_manager, args).await,
-            "todo_stats" => tool_functions::get_statistics(&self.todo_manager, args).await,
-            "todo_cleanup" => tool_functions::cleanup(&self.todo_manager, args).await,
-            "todo_temp_info" => tool_functions::get_temp_info(&self.todo_manager, args).await,
             _ => Err(anyhow!("Unknown tool: {}", name)),
         }
     }
@@ -764,110 +743,7 @@ impl ToolRegistry {
         Ok(json!({ "success": true, "deleted": true }))
     }
 
-    /// Create an execution plan (todo items) from a free-form task description
-    async fn todo_plan(&self, args: Value) -> Result<Value> {
-        #[derive(Deserialize)]
-        struct PlanInput {
-            task: String,
-            #[serde(default)]
-            merge: bool,
-            #[serde(default)]
-            max_items: Option<usize>,
-            #[serde(default)]
-            auto_in_progress: bool,
-        }
-        let input: PlanInput = serde_json::from_value(args).context("invalid todo_plan args")?;
 
-        let mut raw = input.task.replace('\r', "");
-        for b in ["\n- ", "\n* ", "\n• "] {
-            raw = raw.replace(b, "\n");
-        }
-        let mut parts: Vec<String> = Vec::new();
-        for line in raw.split('\n') {
-            let s = line
-                .trim()
-                .trim_matches(|c: char| c == '-' || c == '*' || c == '•')
-                .trim();
-            if s.is_empty() {
-                continue;
-            }
-            let mut segs: Vec<String> = s
-                .split(|c| c == '.' || c == ';')
-                .flat_map(|seg| seg.split(" and "))
-                .flat_map(|seg| seg.split(','))
-                .map(|seg| seg.trim().to_string())
-                .filter(|seg| !seg.is_empty())
-                .collect();
-            parts.append(&mut segs);
-        }
-
-        if let Some(limit) = input.max_items {
-            if parts.len() > limit {
-                parts.truncate(limit);
-            }
-        }
-        if parts.is_empty() {
-            parts.push(input.task.trim().to_string());
-        }
-
-        let mut todos = Vec::new();
-        for (i, p) in parts.into_iter().enumerate() {
-            let status = if i == 0 && input.auto_in_progress {
-                crate::todo_write::TodoStatus::InProgress
-            } else {
-                crate::todo_write::TodoStatus::Pending
-            };
-            todos.push(crate::todo_write::TodoInput {
-                id: None,
-                content: p,
-                status,
-                notes: None,
-            });
-        }
-
-        let created = self.todo_manager.write_todos(input.merge, todos).await?;
-        let stats = self.todo_manager.get_statistics().await;
-        Ok(json!({ "created": created, "stats": stats }))
-    }
-
-    /// Mark todo items completed by id or content contains substring
-    async fn todo_mark_done(&self, args: Value) -> Result<Value> {
-        #[derive(Deserialize)]
-        struct MarkInput {
-            #[serde(default)]
-            ids: Option<Vec<String>>,
-            #[serde(default)]
-            contains: Option<String>,
-        }
-        let input: MarkInput =
-            serde_json::from_value(args).context("invalid todo_mark_done args")?;
-        let mut updates = Vec::new();
-        if let Some(ids) = input.ids {
-            for id in ids {
-                updates.push(crate::todo_write::TodoUpdate {
-                    id,
-                    content: None,
-                    status: Some(crate::todo_write::TodoStatus::Completed),
-                    notes: None,
-                });
-            }
-        } else if let Some(substr) = input.contains {
-            let all = self.todo_manager.get_todos().await;
-            for item in all.into_iter().filter(|t| t.content.contains(&substr)) {
-                updates.push(crate::todo_write::TodoUpdate {
-                    id: item.id,
-                    content: None,
-                    status: Some(crate::todo_write::TodoStatus::Completed),
-                    notes: None,
-                });
-            }
-        } else {
-            return Err(anyhow!("Provide 'ids' or 'contains' to select todos"));
-        }
-        let updated = self.todo_manager.update_todos(updates).await?;
-        let stats = self.todo_manager.get_statistics().await;
-        Ok(json!({ "updated": updated, "stats": stats }))
-    }
     /// Ripgrep-like high-speed search across the workspace
     async fn rg_search(&self, args: Value) -> Result<Value> {
         let input: RgInput = serde_json::from_value(args).context("invalid rg_search args")?;
@@ -1346,146 +1222,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
                 "required": ["path", "confirm"]
             }),
         },
-        FunctionDeclaration {
-            name: "todo_write".to_string(),
-            description: "Create or update todo items for task management during coding sessions".to_string(),
-            parameters: json!({
-                "type": "object",
-                "properties": {
-                    "merge": {"type": "boolean", "description": "Whether to merge with existing todos (true) or replace (false)", "default": true},
-                    "todos": {
-                        "type": "array",
-                        "description": "List of todo items to create or update",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "content": {"type": "string", "description": "Task description"},
-                                "status": {"type": "string", "enum": ["pending", "in_progress", "completed", "cancelled"], "description": "Task status", "default": "pending"},
-                                "id": {"type": "string", "description": "Optional custom ID (auto-generated if not provided)"},
-                                "notes": {"type": "string", "description": "Optional additional notes"}
-                            },
-                            "required": ["content"]
-                        }
-                    }
-                },
-                "required": ["todos"]
-            }),
-        },
-        FunctionDeclaration {
-            name: "todo_plan".to_string(),
-            description: "Plan and draft a todo list from a free-form task description; uses deterministic breakdown".to_string(),
-            parameters: json!({
-                "type": "object",
-                "properties": {
-                    "task": {"type": "string", "description": "High-level task description to break down"},
-                    "merge": {"type": "boolean", "description": "Merge with existing todos (true) or replace (false)", "default": true},
-                    "max_items": {"type": "integer", "description": "Maximum number of items to create"},
-                    "auto_in_progress": {"type": "boolean", "description": "Mark the first item as in_progress", "default": true}
-                },
-                "required": ["task"]
-            }),
-        },
-        FunctionDeclaration {
-            name: "todo_mark_done".to_string(),
-            description: "Mark todo items as completed by ids or content substring".to_string(),
-            parameters: json!({
-                "type": "object",
-                "properties": {
-                    "ids": {"type": "array", "items": {"type": "string"}, "description": "IDs to mark complete"},
-                    "contains": {"type": "string", "description": "Substring match on content to select items"}
-                },
-                "oneOf": [
-                    {"required": ["ids"]},
-                    {"required": ["contains"]}
-                ]
-            }),
-        },
-        FunctionDeclaration {
-            name: "todo_update".to_string(),
-            description: "Update existing todo items with new content, status, or notes".to_string(),
-            parameters: json!({
-                "type": "object",
-                "properties": {
-                    "todos": {
-                        "type": "array",
-                        "description": "List of todo updates",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "id": {"type": "string", "description": "ID of the todo to update"},
-                                "content": {"type": "string", "description": "New task description"},
-                                "status": {"type": "string", "enum": ["pending", "in_progress", "completed", "cancelled"], "description": "New task status"},
-                                "notes": {"type": "string", "description": "New notes"}
-                            },
-                            "required": ["id"]
-                        }
-                    }
-                },
-                "required": ["todos"]
-            }),
-        },
-        FunctionDeclaration {
-            name: "todo_get".to_string(),
-            description: "Get all todo items with statistics".to_string(),
-            parameters: json!({
-                "type": "object",
-                "properties": {},
-                "required": []
-            }),
-        },
-        FunctionDeclaration {
-            name: "todo_get_by_status".to_string(),
-            description: "Get todo items filtered by status".to_string(),
-            parameters: json!({
-                "type": "object",
-                "properties": {
-                    "status": {"type": "string", "enum": ["pending", "in_progress", "completed", "cancelled"], "description": "Status to filter by"}
-                },
-                "required": ["status"]
-            }),
-        },
-        FunctionDeclaration {
-            name: "todo_delete".to_string(),
-            description: "Delete todo items by their IDs".to_string(),
-            parameters: json!({
-                "type": "object",
-                "properties": {
-                    "ids": {
-                        "type": "array",
-                        "description": "List of todo IDs to delete",
-                        "items": {"type": "string"}
-                    }
-                },
-                "required": ["ids"]
-            }),
-        },
-        FunctionDeclaration {
-            name: "todo_stats".to_string(),
-            description: "Get todo statistics including completion rate and counts by status".to_string(),
-            parameters: json!({
-                "type": "object",
-                "properties": {},
-                "required": []
-            }),
-        },
-        FunctionDeclaration {
-            name: "todo_cleanup".to_string(),
-            description: "Clean up old todo sessions (not applicable for temp files)".to_string(),
-            parameters: json!({
-                "type": "object",
-                "properties": {},
-                "required": []
-            }),
-        },
-        FunctionDeclaration {
-            name: "todo_temp_info".to_string(),
-            description: "Get information about the temporary file used for todo storage in this session".to_string(),
-            parameters: json!({
-                "type": "object",
-                "properties": {},
-                "required": []
-            }),
-        },
+
         FunctionDeclaration {
             name: "cargo_check".to_string(),
             description: "Run 'cargo check' in the workspace".to_string(),

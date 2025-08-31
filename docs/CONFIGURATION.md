@@ -65,6 +65,7 @@ verbose_logging = false             # Enable detailed logging
 ```
 
 **Use Cases:**
+
 - Set conversation limits for safety
 - Control session timeouts
 - Enable debugging output
@@ -93,15 +94,16 @@ run_terminal_cmd = "prompt"
 ```
 
 **Policy Types:**
+
 - **allow**: Execute automatically without confirmation
 - **prompt**: Ask user for confirmation before execution
 - **deny**: Never allow execution
 
 **Common Tool Categories:**
+
 - File operations: `read_file`, `write_file`, `edit_file`, `delete_file`, `list_files`
 - Search: `code_search`, `codebase_search`, `rg_search`
 - Build: `cargo_check`, `cargo_build`, `cargo_test`, `cargo_fmt`, `cargo_clippy`
-- Todo: `todo_write`, `todo_update`, `todo_get`, `todo_delete`, `todo_stats`
 
 ### [commands] - Unix Command Permissions
 
@@ -139,6 +141,7 @@ dangerous_patterns = [
 ```
 
 **Command Processing:**
+
 1. Check `deny_list` first - if match, always block
 2. Check `allow_list` - if match, execute automatically
 3. Check `dangerous_patterns` - if match, show warning and require confirmation
@@ -165,6 +168,7 @@ allowed_file_extensions = [           # Restrict file types
 The configuration enables sophisticated user control over agent actions:
 
 ### Automatic Execution (Allow List)
+
 Commands in the allow list execute without prompting:
 
 ```bash
@@ -173,6 +177,7 @@ VTAgent: [TOOL] run_terminal_cmd {"command": "git status"}
 ```
 
 ### Standard Confirmation (Prompt Policy)
+
 Tools/commands requiring confirmation:
 
 ```bash
@@ -181,6 +186,7 @@ Confirm 'write_file': src/main.rs? [y/N] y
 ```
 
 ### Dangerous Command Warnings
+
 Commands matching dangerous patterns get extra warnings:
 
 ```bash
@@ -189,6 +195,7 @@ VTAgent: [TOOL] run_terminal_cmd {"command": "rm -f old_file.txt"}
 ```
 
 ### Denied Actions
+
 Blocked commands are automatically denied:
 
 ```bash
@@ -199,6 +206,7 @@ VTAgent: [TOOL] run_terminal_cmd {"command": "rm -rf /"}
 ## Example Configurations
 
 ### Development-Friendly Setup
+
 For trusted development environments:
 
 ```toml
@@ -220,6 +228,7 @@ human_in_the_loop = false  # Less prompting for trusted environments
 ```
 
 ### Security-Focused Setup
+
 For sensitive or production environments:
 
 ```toml
@@ -242,6 +251,7 @@ max_file_size_mb = 10      # Smaller file limit
 ```
 
 ### CI/CD Integration
+
 For automated environments:
 
 ```toml
@@ -288,12 +298,14 @@ Certain settings can still be overridden with environment variables for compatib
 ## Best Practices
 
 ### For Development Teams
+
 1. **Commit vtagent.toml** to version control for team consistency
 2. **Use allow lists** for common safe operations to improve workflow
 3. **Set reasonable session limits** to prevent runaway conversations
 4. **Enable logging** for debugging and audit trails
 
 ### For Security-Conscious Environments
+
 1. **Start with restrictive policies** and gradually open up as needed
 2. **Use deny lists** for dangerous command patterns
 3. **Enable all security features** (`human_in_the_loop`, `confirm_destructive_actions`)
@@ -301,6 +313,7 @@ Certain settings can still be overridden with environment variables for compatib
 5. **Set small file size limits** to prevent processing large files
 
 ### For CI/CD Pipelines
+
 1. **Disable terminal commands** in automated environments
 2. **Use shorter session timeouts** for efficiency
 3. **Restrict to read-only operations** where possible
@@ -309,21 +322,25 @@ Certain settings can still be overridden with environment variables for compatib
 ## Troubleshooting
 
 ### Configuration Not Loading
+
 - Check file location (`vtagent.toml` in project root)
 - Verify TOML syntax with `toml-lint` or similar tool
 - Use `--verbose` flag to see what config file is loaded
 
 ### Too Many Prompts
+
 - Add common commands to `commands.allow_list`
 - Change tool policies from "prompt" to "allow" for trusted tools
 - Set `security.human_in_the_loop = false` for development
 
 ### Commands Being Blocked
+
 - Check if command matches patterns in `commands.deny_list`
 - Add to `commands.allow_list` if it's a safe operation
 - Use `commands.dangerous_patterns` for commands needing extra confirmation
 
 ### Agent Not Following Configuration
+
 - Ensure you're using the latest version of VTAgent
 - Check that configuration file syntax is correct
 - Verify the agent is loading the correct config file path

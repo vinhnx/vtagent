@@ -7,29 +7,34 @@ Successfully implemented a comprehensive TOML-based configuration system for VTA
 ## Key Features Implemented
 
 ### 1. TOML Configuration Format
+
 - **Location**: `vtagent.toml` (root) or `.vtagent/vtagent.toml` (fallback)
 - **Sections**: `[agent]`, `[tools]`, `[commands]`, `[security]`
 - **Type-safe**: Full Rust struct definitions with serde deserialization
 - **Validation**: Comprehensive error handling and fallback to defaults
 
 ### 2. Tool Policy System
+
 - **Three policies**: `allow`, `prompt`, `deny`
 - **Per-tool configuration**: Override default policy for specific tools
 - **Backward compatibility**: Still supports old JSON format
 
 ### 3. Command Allow/Deny Lists
+
 - **Allow list**: Commands that execute automatically without prompting
 - **Deny list**: Commands that are always blocked for security
 - **Dangerous patterns**: Commands requiring extra confirmation with warnings
 - **Smart matching**: Pattern-based command classification
 
 ### 4. Human-in-the-Loop Controls
+
 - **Automatic execution**: For commands in allow list
 - **Standard confirmation**: For tools/commands with prompt policy
 - **Enhanced warnings**: For dangerous command patterns
 - **Deny enforcement**: Complete blocking of denied operations
 
 ### 5. CLI Integration
+
 - **`vtagent config`**: Generate sample configuration files
 - **Configuration loading**: Automatic detection and loading on startup
 - **Error handling**: Graceful fallback to defaults if config invalid
@@ -60,6 +65,7 @@ Successfully implemented a comprehensive TOML-based configuration system for VTA
    - `vtagent.toml.example`: Sample configuration file
 
 ### Dependencies Added
+
 - **`toml = "0.8"`**: TOML parsing and serialization
 
 ### Configuration Structure
@@ -93,6 +99,7 @@ allowed_file_extensions = [".rs", ".toml", ".md"]
 ## Human-in-the-Loop Workflow
 
 ### 1. Command Classification
+
 ```rust
 // Check deny list first
 if vtagent_config.is_command_allowed(command) {
@@ -105,6 +112,7 @@ if vtagent_config.is_command_allowed(command) {
 ```
 
 ### 2. Tool Policy Enforcement
+
 ```rust
 let tool_policy = vtagent_config.get_tool_policy(tool_name);
 match tool_policy {
@@ -115,6 +123,7 @@ match tool_policy {
 ```
 
 ### 3. User Interaction Examples
+
 ```bash
 # Automatic (allow list)
 [ALLOWED] Command is in allow list: git status
@@ -132,16 +141,19 @@ Confirm 'write_file': src/main.rs? [y/N]
 ## Security Features
 
 ### Command Security
+
 - **Deny list protection**: Blocks dangerous commands like `rm -rf`, `sudo rm`
 - **Pattern matching**: Detects dangerous patterns in command strings
 - **Allow list optimization**: Safe commands execute without interruption
 
 ### File Security
+
 - **Extension filtering**: Restrict file operations to allowed extensions
 - **Size limits**: Prevent processing of excessively large files
 - **Path validation**: Built-in protections against path traversal
 
 ### Session Security
+
 - **Turn limits**: Prevent runaway conversations
 - **Time limits**: Auto-terminate long sessions
 - **Logging**: Optional command logging for audit trails
@@ -149,11 +161,13 @@ Confirm 'write_file': src/main.rs? [y/N]
 ## Migration Path
 
 ### From JSON to TOML
+
 1. **Backward compatibility**: Old `tool-policy.json` still supported
 2. **Migration tool**: `vtagent config` generates equivalent TOML
 3. **Gradual transition**: Teams can migrate at their own pace
 
 ### Legacy Support
+
 - Environment variables still override specific settings
 - JSON format processing preserved for compatibility
 - Default behaviors maintained for existing workflows
@@ -161,45 +175,51 @@ Confirm 'write_file': src/main.rs? [y/N]
 ## Testing & Validation
 
 ### Compilation Tests
-- ✅ All code compiles without errors
-- ✅ Configuration loading works correctly
-- ✅ CLI integration functional
+
+- All code compiles without errors
+- Configuration loading works correctly
+- CLI integration functional
 
 ### Runtime Tests
-- ✅ Configuration file generation working
-- ✅ File discovery and loading operational
-- ✅ Policy enforcement functional
-- ✅ Human-in-the-loop prompts working
+
+- Configuration file generation working
+- File discovery and loading operational
+- Policy enforcement functional
+- Human-in-the-loop prompts working
 
 ### Example Usage Verification
+
 ```bash
 # Generate config
-vtagent config ✅
+vtagent config
 
 # Load and use config
-vtagent chat ✅
+vtagent chat
 CONFIG Loaded configuration from: /path/to/vtagent.toml
 
 # Policy enforcement working
-[ALLOWED] Command is in allow list: git status ✅
-[CONFIRM] Execute command 'cargo build'? [y/N] ✅
+[ALLOWED] Command is in allow list: git status
+[CONFIRM] Execute command 'cargo build'? [y/N]
 ```
 
 ## Benefits Achieved
 
 ### For Users
+
 - **Granular control** over agent behavior
 - **Security safeguards** against dangerous operations
 - **Workflow optimization** via allow lists
 - **Clear feedback** on why actions require confirmation
 
 ### For Teams
+
 - **Shared configuration** via version control
 - **Consistent policies** across team members
 - **Audit trails** through command logging
 - **Flexible security** for different environments
 
 ### For DevOps
+
 - **CI/CD integration** with restrictive policies
 - **Environment-specific** configurations
 - **Automated safety** controls

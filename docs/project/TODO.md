@@ -23,9 +23,7 @@ code terminal sandbox
 
 --
 
-
 use vercel ai-gateway, cloudflare ai gateway, openrouter or litellm
-
 
 --
 
@@ -404,11 +402,6 @@ Building our own agent revealed several insights about this emerging paradigm:
 
 --
 
-│  Savings Highlight: 664,320 (73.3%) of input tokens were served from the cache, reducing       │
-│  costs.                                                                                        │
-
-how do they do this? for gemini-cli and qwen-code
-
 --
 
 ## Safe Code Sandbox Execution Workflow
@@ -470,8 +463,6 @@ To ensure safe code execution and prevent dangerous operations (such as `rm`, fi
 **Never** allow direct execution of arbitrary shell commands from user input without these safeguards.
 
 ---
-
-[Lance Martin](https://x.com/RLanceMartin)
 
 ### TL;DR
 
@@ -730,11 +721,11 @@ You don’t need to be an AI expert. Just follow along and build step-by-step!
 
 By the end of this workshop, you’ll understand how to:
 
-- ✅ Connect to the Anthropic Claude API
-- ✅ Build a simple AI chatbot
-- ✅ Add tools like reading files, editing code, and running commands
-- ✅ Handle tool requests and errors
-- ✅ Build an agent that gets smarter with each step
+- Connect to the Anthropic Claude API
+- Build a simple AI chatbot
+- Add tools like reading files, editing code, and running commands
+- Handle tool requests and errors
+- Build an agent that gets smarter with each step
 
 ---
 
@@ -832,7 +823,7 @@ graph TB
 
 ## Getting Started
 
-### ✅ Prerequisites
+### Prerequisites
 
 - Go 1.24.2+ or [devenv](https://devenv.sh/) (recommended for easy setup)
 - An [Anthropic API Key](https://www.anthropic.com/product/claude)
@@ -3780,11 +3771,9 @@ hey claude, create fizzbuzz.js that I can run with Nodejs and that has fizzbuzz 
 
 <https://cognition.ai/blog/dont-build-multi-agents>
 
-
 --
 
 fix all the build warnings do not skip
-
 
 ~/Developer/learn-by-doing/vtagent main* ⇡
 1:00:09 ❯ cargo run -- chat

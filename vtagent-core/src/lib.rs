@@ -48,7 +48,6 @@ pub mod performance_profiler;
 pub mod prompts;
 pub mod timeout_detector;
 pub mod timeout_policies;
-pub mod todo_write;
 pub mod tools;
 pub mod tree_sitter;
 pub mod types;
@@ -82,7 +81,6 @@ pub use timeout_detector::{OperationType, TimeoutConfig, TimeoutDetector, TIMEOU
 pub use timeout_policies::{
     NetworkQuality, TimeoutPolicy, TimeoutPolicyConfig, TimeoutPolicyManager, POLICY_MANAGER,
 };
-pub use todo_write::{TodoInput, TodoItem, TodoManager, TodoStatistics, TodoStatus, TodoUpdate};
 pub use tools::{build_function_declarations, ToolError, ToolRegistry};
 pub use tree_sitter::{
     CodeAnalysis, LanguageSupport, SyntaxTree, TreeSitterAnalyzer, TreeSitterError,

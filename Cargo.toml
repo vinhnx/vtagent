@@ -1,11 +1,19 @@
 [package]
 name = "vtagent"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 default-run = "vtagent"
 
 [workspace]
 members = ["vtagent-core"]
+
+[workspace.lints]
+rust = {}
+
+[workspace.lints.clippy]
+expect_used = "deny"
+uninlined_format_args = "deny"
+unwrap_used = "deny"
 
 [dependencies]
 vtagent-core = { path = "vtagent-core" }

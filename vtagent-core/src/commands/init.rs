@@ -1,4 +1,11 @@
-//! Init command implementation - project analysis and AGENTS.md generation
+//! Init command implementation - project analysis and Repository Guidelines generation
+//!
+//! Generates AGENTS.md files following the standardized contributor guide format
+//! as specified in https://github.com/openai/codex/blob/main/codex-rs/tui/prompt_for_init_command.md
+//!
+//! This tool analyzes any repository and generates a concise (200-400 words) AGENTS.md file
+//! that serves as a contributor guide, adapting content based on the specific project structure,
+//! commit history, and detected technologies.
 
 use crate::tools::ToolRegistry;
 use anyhow::Result;
@@ -8,17 +15,33 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Project analysis result
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ProjectAnalysis {
+    // Core project info
+    project_name: String,
     languages: Vec<String>,
     frameworks: Vec<String>,
     build_systems: Vec<String>,
     dependencies: HashMap<String, Vec<String>>,
+
+    // Structure analysis
     source_dirs: Vec<String>,
     test_patterns: Vec<String>,
     config_files: Vec<String>,
     documentation_files: Vec<String>,
-    conventions: Vec<String>,
+
+    // Git analysis
+    commit_patterns: Vec<String>,
+    has_git_history: bool,
+
+    // Project characteristics
+    is_library: bool,
+    is_application: bool,
+    has_ci_cd: bool,
+    has_docker: bool,
+
+    // Content optimization
+    estimated_word_count: usize,
 }
 
 /// Handle the init command - analyze project and generate AGENTS.md
@@ -72,7 +95,14 @@ async fn analyze_project(
     registry: &mut ToolRegistry,
     workspace: &PathBuf,
 ) -> Result<ProjectAnalysis> {
+    let project_name = workspace
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("project")
+        .to_string();
+
     let mut analysis = ProjectAnalysis {
+        project_name,
         languages: Vec::new(),
         frameworks: Vec::new(),
         build_systems: Vec::new(),
@@ -81,7 +111,13 @@ async fn analyze_project(
         test_patterns: Vec::new(),
         config_files: Vec::new(),
         documentation_files: Vec::new(),
-        conventions: Vec::new(),
+        commit_patterns: Vec::new(),
+        has_git_history: false,
+        is_library: false,
+        is_application: false,
+        has_ci_cd: false,
+        has_docker: false,
+        estimated_word_count: 0,
     };
 
     // Analyze root directory structure
@@ -114,6 +150,12 @@ async fn analyze_project(
             analysis.test_patterns.push(pattern.to_string());
         }
     }
+
+    // Analyze git history for commit patterns
+    analyze_git_history(&mut analysis, registry).await?;
+
+    // Analyze project characteristics
+    analyze_project_characteristics(&mut analysis);
 
     Ok(analysis)
 }
@@ -191,17 +233,32 @@ async fn analyze_file(
         }
 
         // Documentation files
-        "README.md" | "CHANGELOG.md" | "CONTRIBUTING.md" => {
+        "README.md" | "CHANGELOG.md" | "CONTRIBUTING.md" | "LICENSE" | "LICENSE.md" => {
             analysis.documentation_files.push(path.to_string());
         }
 
         // Configuration files
-        ".gitignore" | ".editorconfig" | ".prettierrc" | ".eslintrc" => {
+        ".gitignore" | ".editorconfig" | ".prettierrc" | ".eslintrc" | ".eslintrc.js" | ".eslintrc.json" => {
+            analysis.config_files.push(path.to_string());
+        }
+
+        // Docker files
+        "Dockerfile" | "docker-compose.yml" | "docker-compose.yaml" | ".dockerignore" => {
+            analysis.config_files.push(path.to_string());
+        }
+
+        // CI/CD files
+        "Jenkinsfile" | ".travis.yml" | "azure-pipelines.yml" | ".circleci/config.yml" => {
+            analysis.config_files.push(path.to_string());
+        }
+
+        // GitHub workflows (would be detected via directory listing)
+        path if path.starts_with(".github/workflows/") => {
             analysis.config_files.push(path.to_string());
         }
 
         // Source directories
-        "src" | "lib" | "pkg" | "internal" | "cmd" => {
+        "src" | "lib" | "pkg" | "internal" | "cmd" | "app" | "core" => {
             analysis.source_dirs.push(path.to_string());
         }
 
@@ -271,207 +328,248 @@ fn files_contain_pattern(_analysis: &ProjectAnalysis, _pattern: &str) -> bool {
     true // Placeholder
 }
 
+/// Analyze git history to detect commit message patterns
+async fn analyze_git_history(
+    analysis: &mut ProjectAnalysis,
+    registry: &mut ToolRegistry,
+) -> Result<()> {
+    // Check if .git directory exists by trying to list it
+    let git_check = registry
+        .execute_tool("list_files", json!({"path": ".git", "max_items": 1}))
+        .await;
+
+    if git_check.is_ok() {
+        analysis.has_git_history = true;
+
+        // Try to get recent commit messages to analyze patterns
+        let git_log_result = registry
+            .execute_tool(
+                "run_terminal_cmd",
+                json!({
+                    "command": "git log --oneline -20 --pretty=format:'%s'",
+                    "timeout": 5000
+                }),
+            )
+            .await;
+
+        if let Ok(output) = git_log_result {
+            if let Some(stdout) = output.get("stdout").and_then(|s| s.as_str()) {
+                let mut conventional_count = 0;
+                let mut total_commits = 0;
+
+                for line in stdout.lines() {
+                    total_commits += 1;
+                    let line = line.trim();
+
+                    // Check for conventional commit patterns
+                    if line.contains("feat:")
+                        || line.contains("fix:")
+                        || line.contains("docs:")
+                        || line.contains("style:")
+                        || line.contains("refactor:")
+                        || line.contains("test:")
+                        || line.contains("chore:")
+                    {
+                        conventional_count += 1;
+                    }
+                }
+
+                // If more than 50% use conventional commits, note this pattern
+                if total_commits > 0 && (conventional_count * 100 / total_commits) > 50 {
+                    analysis.commit_patterns.push("Conventional Commits".to_string());
+                } else {
+                    analysis.commit_patterns.push("Standard commit messages".to_string());
+                }
+            }
+        } else {
+            // Fallback if git command fails - assume standard commits
+            analysis.commit_patterns.push("Standard commit messages".to_string());
+        }
+    } else {
+        // No git repository found
+        analysis.has_git_history = false;
+        analysis.commit_patterns.push("No version control detected".to_string());
+    }
+
+    Ok(())
+}
+
+/// Analyze project characteristics to determine what type of project this is
+fn analyze_project_characteristics(analysis: &mut ProjectAnalysis) {
+    // Determine if it's a library or application
+    analysis.is_library = analysis.config_files.iter().any(|f| {
+        f == "Cargo.toml" && analysis.languages.contains(&"Rust".to_string())
+            || f == "package.json" && analysis.languages.contains(&"JavaScript/TypeScript".to_string())
+            || f == "setup.py" || f == "pyproject.toml"
+    });
+
+    analysis.is_application = analysis.source_dirs.contains(&"src".to_string())
+        || analysis.source_dirs.contains(&"cmd".to_string())
+        || analysis.source_dirs.contains(&"app".to_string());
+
+    // Check for CI/CD files
+    analysis.has_ci_cd = analysis.config_files.iter().any(|f| {
+        f.contains(".github/workflows")
+            || f.contains(".gitlab-ci")
+            || f.contains(".travis")
+            || f == "Jenkinsfile"
+            || f == ".circleci/config.yml"
+            || f == "azure-pipelines.yml"
+    });
+
+    // Check for Docker files
+    analysis.has_docker = analysis.config_files.iter().any(|f| {
+        f == "Dockerfile"
+            || f == "docker-compose.yml"
+            || f == "docker-compose.yaml"
+            || f == ".dockerignore"
+    });
+}
+
 /// Generate AGENTS.md content based on project analysis
 fn generate_agents_md(analysis: &ProjectAnalysis) -> Result<String> {
     let mut content = String::new();
+    let mut word_count = 0;
 
-    // Header
-    content.push_str("# AGENTS.md\n\n");
-    content.push_str("## Project Context\n\n");
+    // Header - Title the document "Repository Guidelines"
+    content.push_str("# Repository Guidelines\n\n");
+    word_count += 2;
 
-    // Languages
-    if !analysis.languages.is_empty() {
-        content.push_str("This is a ");
-        content.push_str(&analysis.languages.join("/"));
-        content.push_str(" project");
+    // Brief introduction - keep concise
+    let intro = format!(
+        "This document serves as a contributor guide for the {} repository.\n\n",
+        analysis.project_name
+    );
+    content.push_str(&intro);
+    word_count += intro.split_whitespace().count();
 
-        if !analysis.frameworks.is_empty() {
-            content.push_str(" using ");
-            content.push_str(&analysis.frameworks.join(", "));
-        }
-        content.push_str(".\n\n");
-    }
+    // Project Structure & Module Organization - prioritize based on detected structure
+    if !analysis.source_dirs.is_empty() || !analysis.languages.is_empty() {
+        content.push_str("## Project Structure & Module Organization\n\n");
+        word_count += 5;
 
-    // Build systems
-    if !analysis.build_systems.is_empty() {
-        content.push_str("### Build Systems\n");
-        for system in &analysis.build_systems {
-            content.push_str(&format!("- {}\n", system));
-        }
-        content.push_str("\n");
-    }
-
-    // Dependencies
-    if !analysis.dependencies.is_empty() {
-        content.push_str("### Key Dependencies\n");
-        for (category, deps) in &analysis.dependencies {
-            content.push_str(&format!("**{}:**\n", category));
-            for dep in deps.iter().take(10) {
-                // Limit to first 10
-                content.push_str(&format!("- {}\n", dep));
+        // Only show relevant source directories
+        if !analysis.source_dirs.is_empty() {
+            for dir in &analysis.source_dirs {
+                let line = format!("- `{}/` - Source code\n", dir);
+                content.push_str(&line);
+                word_count += line.split_whitespace().count();
             }
-            if deps.len() > 10 {
-                content.push_str(&format!("- ... and {} more\n", deps.len() - 10));
-            }
-            content.push_str("\n");
         }
-    }
 
-    // Code Style and Standards
-    content.push_str("## Code Style and Standards\n\n");
-
-    if analysis.languages.contains(&"Rust".to_string()) {
-        content.push_str("### Rust Conventions\n");
-        content.push_str("- Follow standard Rust naming conventions (snake_case for functions/variables, PascalCase for types)\n");
-        content.push_str("- Use `anyhow` for error handling with descriptive error messages\n");
-        content.push_str("- Prefer `thiserror` for custom error types when needed\n");
-        content.push_str("- Use `clap` with derive macros for CLI argument parsing\n");
-        content.push_str("- Follow the Rust API guidelines for public APIs\n\n");
-    }
-
-    if analysis
-        .languages
-        .contains(&"JavaScript/TypeScript".to_string())
-    {
-        content.push_str("### JavaScript/TypeScript Conventions\n");
-        content.push_str("- Use camelCase for variables and functions\n");
-        content.push_str("- Use PascalCase for classes and interfaces\n");
-        content.push_str("- Follow ESLint configuration for code style\n");
-        content.push_str("- Use TypeScript for type safety\n\n");
-    }
-
-    if analysis.languages.contains(&"Python".to_string()) {
-        content.push_str("### Python Conventions\n");
-        content.push_str("- Follow PEP 8 style guidelines\n");
-        content.push_str("- Use snake_case for variables and functions\n");
-        content.push_str("- Use PascalCase for classes\n");
-        content.push_str("- Include docstrings for functions and classes\n\n");
-    }
-
-    if analysis.languages.contains(&"Go".to_string()) {
-        content.push_str("### Go Conventions\n");
-        content.push_str("- Follow standard Go formatting (gofmt)\n");
-        content.push_str("- Use goimports for import organization\n");
-        content.push_str("- Follow Go naming conventions\n");
-        content.push_str("- Use go mod for dependency management\n\n");
-    }
-
-    // Code Organization
-    content.push_str("### Code Organization\n");
-
-    if !analysis.source_dirs.is_empty() {
-        content.push_str("- Source code is organized in: ");
-        content.push_str(&analysis.source_dirs.join(", "));
-        content.push_str("\n");
-    }
-
-    if !analysis.test_patterns.is_empty() {
-        content.push_str("- Test files follow patterns: ");
-        content.push_str(&analysis.test_patterns.join(", "));
-        content.push_str("\n");
-    }
-
-    content.push_str("- Keep modules focused and cohesive\n");
-    content.push_str("- Use clear separation of concerns\n");
-    content.push_str("- Document public APIs with comments\n\n");
-
-    // Dependencies Management
-    if !analysis.build_systems.is_empty() {
-        content.push_str("### Dependencies\n");
-        for system in &analysis.build_systems {
-            match system.as_str() {
-                "Cargo" => {
-                    content.push_str("- Use `cargo add` to add dependencies\n");
-                    content.push_str("- Run `cargo update` to update dependencies\n");
-                    content.push_str("- Use `cargo tree` to visualize dependency tree\n");
+        // Add language-specific structure info - only for detected languages
+        for language in &analysis.languages {
+            match language.as_str() {
+                "Rust" => {
+                    content.push_str("- `tests/` - Integration tests\n- `examples/` - Usage examples\n");
+                    word_count += 8;
                 }
-                "npm/yarn/pnpm" => {
-                    content.push_str(
-                        "- Use `npm install`/`yarn add`/`pnpm add` to add dependencies\n",
-                    );
-                    content.push_str("- Keep package.json and lock files in sync\n");
-                    content.push_str("- Use `npm audit` to check for security vulnerabilities\n");
+                "JavaScript/TypeScript" => {
+                    content.push_str("- `test/` or `__tests__/` - Test files\n- `dist/` - Built assets\n");
+                    word_count += 10;
                 }
-                "pip/poetry" => {
-                    content.push_str("- Use `pip install` or `poetry add` to add dependencies\n");
-                    content.push_str("- Keep requirements.txt/pyproject.toml up to date\n");
-                    content.push_str("- Use virtual environments for isolation\n");
-                }
-                "Go Modules" => {
-                    content.push_str("- Use `go get` to add dependencies\n");
-                    content.push_str("- Keep go.mod and go.sum consistent\n");
-                    content.push_str("- Use `go mod tidy` to clean up dependencies\n");
-                }
-                "Maven/Gradle" => {
-                    content.push_str("- Use Maven or Gradle for dependency management\n");
-                    content.push_str("- Keep build files synchronized\n");
-                    content.push_str("- Use dependency check tools for security\n");
+                "Python" => {
+                    content.push_str("- `tests/` - Test files\n- Package modules in root\n");
+                    word_count += 9;
                 }
                 _ => {}
             }
         }
-        content.push_str("\n");
+        content.push('\n');
     }
 
-    // Development Guidelines
-    content.push_str("## Development Guidelines\n\n");
+    // Build, Test, and Development Commands - only include relevant ones
+    if !analysis.build_systems.is_empty() && word_count < 300 {
+        content.push_str("## Build, Test, and Development Commands\n\n");
+        word_count += 6;
 
-    content.push_str("### Error Handling\n");
-    content.push_str("- Provide meaningful error messages with context\n");
-    content.push_str("- Use appropriate error types for different scenarios\n");
-    content.push_str("- Log errors appropriately for debugging\n\n");
-
-    content.push_str("### Testing\n");
-    if !analysis.test_patterns.is_empty() {
-        content.push_str("- Write tests following established patterns\n");
+        for system in &analysis.build_systems {
+            match system.as_str() {
+                "Cargo" => {
+                    content.push_str("- `cargo build` - Build project\n- `cargo test` - Run tests\n- `cargo run` - Run application\n");
+                    word_count += 15;
+                }
+                "npm/yarn/pnpm" => {
+                    content.push_str("- `npm install` - Install dependencies\n- `npm test` - Run tests\n- `npm run build` - Build for production\n");
+                    word_count += 18;
+                }
+                "pip/poetry" => {
+                    content.push_str("- `python -m pytest` - Run tests\n- `pip install -r requirements.txt` - Install dependencies\n");
+                    word_count += 15;
+                }
+                _ => {}
+            }
+        }
+        content.push('\n');
     }
-    content.push_str("- Include unit tests for critical functionality\n");
-    content.push_str("- Write integration tests for complex workflows\n");
-    content.push_str("- Use descriptive test names that explain the expected behavior\n\n");
 
-    content.push_str("### Documentation\n");
-    if !analysis.documentation_files.is_empty() {
-        content.push_str("- Maintain documentation in: ");
-        content.push_str(&analysis.documentation_files.join(", "));
-        content.push_str("\n");
+    // Coding Style & Naming Conventions - concise, language-specific
+    if !analysis.languages.is_empty() && word_count < 350 {
+        content.push_str("## Coding Style & Naming Conventions\n\n");
+        word_count += 5;
+
+        for language in &analysis.languages {
+            match language.as_str() {
+                "Rust" => {
+                    content.push_str("- **Indentation:** 4 spaces\n- **Naming:** snake_case functions, PascalCase types\n- **Formatting:** `cargo fmt`\n\n");
+                    word_count += 15;
+                }
+                "JavaScript/TypeScript" => {
+                    content.push_str("- **Indentation:** 2 spaces\n- **Naming:** camelCase variables, PascalCase classes\n- **Formatting:** Prettier\n\n");
+                    word_count += 14;
+                }
+                "Python" => {
+                    content.push_str("- **Style:** PEP 8\n- **Indentation:** 4 spaces\n- **Formatting:** Black\n\n");
+                    word_count += 10;
+                }
+                _ => {}
+            }
+        }
     }
-    content.push_str("- Document public APIs and complex logic\n");
-    content.push_str("- Keep README and other docs up to date\n");
-    content.push_str("- Include code comments for non-obvious implementations\n\n");
 
-    // File Organization
-    content.push_str("## File Organization\n\n");
-    content.push_str("- Group related functionality together\n");
-    content.push_str("- Use consistent directory structure\n");
-    content.push_str("- Separate source code, tests, and configuration\n");
-    content.push_str("- Use clear naming conventions for files and directories\n\n");
+    // Testing Guidelines - brief and relevant
+    if !analysis.test_patterns.is_empty() && word_count < 370 {
+        content.push_str("## Testing Guidelines\n\n");
+        word_count += 3;
 
-    // When Making Changes
-    content.push_str("## When Making Changes\n\n");
-    content.push_str("- Ensure all tests pass before committing\n");
-    content.push_str("- Follow established code style guidelines\n");
-    content.push_str("- Update documentation when changing APIs\n");
-    content.push_str("- Consider backward compatibility\n");
-    content.push_str("- Test changes in a development environment first\n");
-    content.push_str("- Use version control appropriately (meaningful commit messages)\n\n");
+        let test_info = format!("- Test files: {}\n- Run tests using build system commands above\n\n",
+                               analysis.test_patterns.join(", "));
+        content.push_str(&test_info);
+        word_count += test_info.split_whitespace().count();
+    }
 
-    // Tool Integration
-    content.push_str("## Tool Integration\n\n");
-    content.push_str("This project is designed to work with AI coding assistants like vtagent.\n");
-    content.push_str("The guidelines in this document help ensure consistent and maintainable code generation.\n\n");
+    // Commit & Pull Request Guidelines - use detected patterns
+    if word_count < 380 {
+        content.push_str("## Commit & Pull Request Guidelines\n\n");
+        word_count += 5;
 
-    content.push_str("### AI Assistant Guidelines\n");
-    content.push_str("- Follow the established code style and conventions\n");
-    content.push_str("- Use the specified build systems and dependency management tools\n");
-    content.push_str("- Maintain the existing file organization structure\n");
-    content.push_str("- Include appropriate error handling and logging\n");
-    content.push_str("- Write tests for new functionality\n");
-    content.push_str("- Update documentation when making significant changes\n\n");
+        if analysis.commit_patterns.contains(&"Conventional Commits".to_string()) {
+            content.push_str("- Use conventional commit format: `type(scope): description`\n");
+            content.push_str("- Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`\n");
+            word_count += 14;
+        } else {
+            content.push_str("- Write clear, descriptive commit messages\n");
+            content.push_str("- Use imperative mood: \"Add feature\" not \"Added feature\"\n");
+            word_count += 13;
+        }
 
-    // Footer
-    content.push_str("---\n\n");
-    content.push_str("*This AGENTS.md file was auto-generated by vtagent init command.*\n");
-    content.push_str("*Last updated: Auto-generated*\n");
+        content.push_str("- Link issues with `Fixes #123` or `Closes #123`\n");
+        content.push_str("- Ensure tests pass before submitting PRs\n\n");
+        word_count += 12;
+    }
+
+    // Agent-Specific Instructions - always include if space allows
+    if word_count < 390 {
+        content.push_str("## Agent-Specific Instructions\n\n");
+        content.push_str("- Follow established patterns above\n");
+        content.push_str("- Include tests for new functionality\n");
+        content.push_str("- Update documentation for API changes\n");
+        word_count += 15;
+    }
+
+    // Store estimated word count for future optimization
+    let mut updated_analysis = analysis.clone();
+    updated_analysis.estimated_word_count = word_count;
 
     Ok(content)
 }

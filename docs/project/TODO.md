@@ -3773,239 +3773,151 @@ hey claude, create fizzbuzz.js that I can run with Nodejs and that has fizzbuzz 
 
 --
 
-fix all the build warnings do not skip
+<https://github.com/openai/codex/blob/main/codex-rs/tui/prompt_for_init_command.md>
+Generate a file named AGENTS.md that serves as a contributor guide for this repository.
+Your goal is to produce a clear, concise, and well-structured document with descriptive headings and actionable explanations for each section.
+Follow the outline below, but adapt as needed — add sections if relevant, and omit those that do not apply to this project.
 
-~/Developer/learn-by-doing/vtagent main* ⇡
-1:00:09 ❯ cargo run -- chat
-   Compiling vtagent-core v0.1.0 (/Users/vinh.nguyenxuan/Developer/learn-by-doing/vtagent/vtagent-core)
-warning: unused doc comment
-   --> vtagent-core/src/code_completion.rs:720:1
-    |
-720 | /// Global completion engine instance
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
-    |
-    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
-    = note: `#[warn(unused_doc_comments)]` on by default
+Document Requirements
 
-warning: unused doc comment
-   --> vtagent-core/src/performance_monitor.rs:249:1
-    |
-249 | /// Global performance monitor instance
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ rustdoc does not generate documentation for macro invocations
-    |
-    = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+-   Title the document "Repository Guidelines".
+-   Use Markdown headings (#, ##, etc.) for structure.
+-   Keep the document concise. 200-400 words is optimal.
+-   Keep explanations short, direct, and specific to this repository.
+-   Provide examples where helpful (commands, directory paths, naming patterns).
+-   Maintain a professional, instructional tone.
 
-warning: value assigned to `last_error` is never read
-   --> vtagent-core/src/gemini.rs:507:17
-    |
-507 | ...   let mut last_error: Option<anyh...
-    |               ^^^^^^^^^^
-    |
-    = help: maybe it is overwritten before being read?
-    = note: `#[warn(unused_assignments)]` on by default
+Recommended Sections
 
-warning: value assigned to `changes` is never read
-   --> vtagent-core/src/diff_renderer.rs:180:17
-    |
-180 |         let mut changes = 0;
-    |                 ^^^^^^^
-    |
-    = help: maybe it is overwritten before being read?
+Project Structure & Module Organization
 
-warning: type `OptimizationStrategy` is more private than the item `ResponseOptimizer::get_optimization_strategy`
-   --> vtagent-core/src/agent/performance.rs:383:5
-    |
-383 |     pub asy...ptimizationStrategy {
-    |     ^^^^^^^...^^^^^^^^^^^^^^^^^^^ method `ResponseOptimizer::get_optimization_strategy` is reachable at visibility `pub`
-    |
-note: but type `OptimizationStrategy` is only usable at visibility `pub(self)`
-   --> vtagent-core/src/agent/performance.rs:350:1
-    |
-350 | enum OptimizationStrategy {
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^
-    = note: `#[warn(private_interfaces)]` on by default
+-   Outline the project structure, including where the source code, tests, and assets are located.
 
-warning: field `config` is never read
-  --> vtagent-core/src/agent/engine.rs:15:5
-   |
-14 | pub struct CompactionEngine {
-   |            ---------------- field in this struct
-15 |     config: Arc<RwLock<CompactionConfi...
-   |     ^^^^^^
-   |
-   = note: `CompactionEngine` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
-   = note: `#[warn(dead_code)]` on by default
+Build, Test, and Development Commands
 
-warning: fields `compaction_engine` and `intelligence_metrics` are never read
-   --> vtagent-core/src/agent/intelligence.rs:142:5
-    |
-137 | pub struct IntelligenceEngine {
-    |            ------------------ fields in this struct
-...
-142 |     compaction_engine: Arc<Compaction...
-    |     ^^^^^^^^^^^^^^^^^
-143 |     intelligence_metrics: Arc<RwLock<...
-    |     ^^^^^^^^^^^^^^^^^^^^
+-   List key commands for building, testing, and running locally (e.g., npm test, make build).
+-   Briefly explain what each command does.
 
-warning: variants `ReducePayloadSize` and `StreamResponse` are never constructed
-   --> vtagent-core/src/agent/performance.rs:354:5
-    |
-350 | enum OptimizationStrategy {
-    |      -------------------- variants in this enum
-...
-354 |     ReducePayloadSize,
-    |     ^^^^^^^^^^^^^^^^^
-355 |     StreamResponse,
-    |     ^^^^^^^^^^^^^^
-    |
-    = note: `OptimizationStrategy` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+Coding Style & Naming Conventions
 
-warning: field `analyzers` is never read
-  --> vtagent-core/src/code_completion.rs:56:5
-   |
-55 | pub struct CodeCompletionEngine {
-   |            -------------------- field in this struct
-56 |     analyzers: HashMap<String, TreeSit...
-   |     ^^^^^^^^^
+-   Specify indentation rules, language-specific style preferences, and naming patterns.
+-   Include any formatting or linting tools used.
 
-warning: field `conventions` is never read
-  --> vtagent-core/src/commands/init.rs:21:5
-   |
-12 | struct ProjectAnalysis {
-   |        --------------- field in this struct
-...
-21 |     conventions: Vec<String>,
-   |     ^^^^^^^^^^^
-   |
-   = note: `ProjectAnalysis` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+Testing Guidelines
 
-warning: methods `classify_error`, `calculate_retry_delay`, and `should_retry` are never used
-   --> vtagent-core/src/gemini.rs:255:8
-    |
-201 | impl Client {
-    | ----------- methods in this implementation
-...
-255 |     fn classify_error(&self, error: &...
-    |        ^^^^^^^^^^^^^^
-...
-318 |     fn calculate_retry_delay(&self, a...
-    |        ^^^^^^^^^^^^^^^^^^^^^
-...
-329 |     fn should_retry(&self, error: &St...
-    |        ^^^^^^^^^^^^
+-   Identify testing frameworks and coverage requirements.
+-   State test naming conventions and how to run tests.
 
-warning: field `total_memory_start` is never read
-  --> vtagent-core/src/performance_profiler.rs:31:5
-   |
-28 | pub struct PerformanceProfiler {
-   |            ------------------- field in this struct
-...
-31 |     total_memory_start: AtomicU64,
-   |     ^^^^^^^^^^^^^^^^^^
+Commit & Pull Request Guidelines
 
-warning: fields `evictions`, `memory_evictions`, `expired_evictions`, and `total_memory_saved` are never read
-  --> vtagent-core/src/tools.rs:74:5
-   |
-65 | pub struct EnhancedCacheStats {
-   |            ------------------ fields in this struct
-...
-74 |     evictions: usize,
-   |     ^^^^^^^^^
-75 |     memory_evictions: usize,
-   |     ^^^^^^^^^^^^^^^^
-76 |     expired_evictions: usize,
-   |     ^^^^^^^^^^^^^^^^^
-77 |     total_memory_saved: usize,
-   |     ^^^^^^^^^^^^^^^^^^
-   |
-   = note: `EnhancedCacheStats` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+-   Summarize commit message conventions found in the project’s Git history.
+-   Outline pull request requirements (descriptions, linked issues, screenshots, etc.).
 
-warning: fields `cargo_toml_path`, `operation_stats`, and `max_cache_size` are never read
-   --> vtagent-core/src/tools.rs:410:5
-    |
-408 | pub struct ToolRegistry {
-    |            ------------ fields in this struct
-409 |     root: PathBuf,
-410 |     cargo_toml_path: PathBuf,
-    |     ^^^^^^^^^^^^^^^
-411 |     // Performance monitoring
-412 |     operation_stats: Arc<RwLock<HashM...
-    |     ^^^^^^^^^^^^^^^
-413 |     // Cache configuration
-414 |     max_cache_size: usize,
-    |     ^^^^^^^^^^^^^^
+(Optional) Add other sections if relevant, such as Security & Configuration Tips, Architecture Overview, or Agent-Specific Instructions.
 
-warning: field `encoding` is never read
-   --> vtagent-core/src/tools.rs:436:5
-    |
-431 | struct Input {
-    |        ----- field in this struct
-...
-436 |     encoding: Option<String>,
-    |     ^^^^^^^^
-    |
-    = note: `Input` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+--
 
-warning: field `encoding` is never read
-   --> vtagent-core/src/tools.rs:444:5
-    |
-440 | struct WriteInput {
-    |        ---------- field in this struct
-...
-444 |     encoding: Option<String>,
-    |     ^^^^^^^^
-    |
-    = note: `WriteInput` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+implement Ask (just chat) vs Agent mode (read files, run bash, edit files and command in workspace)
 
-warning: field `encoding` is never read
-   --> vtagent-core/src/tools.rs:453:5
-    |
-448 | struct EditInput {
-    |        --------- field in this struct
-...
-453 |     encoding: Option<String>,
-    |     ^^^^^^^^
-    |
-    = note: `EditInput` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+--
 
-warning: field `original` is never read
-  --> vtagent-core/src/vtagentgitignore.rs:21:5
-   |
-19 | struct CompiledPattern {
-   |        --------------- field in this struct
-20 |     /// Original patt...
-21 |     original: String,
-   |     ^^^^^^^^
-   |
-   = note: `CompiledPattern` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+serena mcp refactor and extract @main.rs @main.rs core logic into small modular peice of works. the main core is too large now
 
-   Compiling vtagent v0.1.0 (/Users/vinh.nguyenxuan/Developer/learn-by-doing/vtagent)
-warning: `vtagent-core` (lib) generated 18 warnings
-warning: variable does not need to be mutable
-   --> src/main.rs:142:9
-    |
-142 | ...et mut client = Client::new(config...
-    |       ----^^^^^^
-    |       |
-    |       help: remove this `mut`
-    |
-    = note: `#[warn(unused_mut)]` on by default
+--
 
-warning: unused variable: `next`
-   --> src/main.rs:368:21
-    |
-368 | ...f let Some(next) = rest.find('\n') {
-    |               ^^^^ help: if this is intentional, prefix it with an underscore: `_next`
-    |
-    = note: `#[warn(unused_variables)]` on by default
+https://github.com/openai/codex/blob/main/codex-rs/tui/prompt_for_init_command.md
 
-warning: `vtagent` (bin "vtagent") generated 2 warnings (run `cargo fix --bin "vtagent"` to apply 1 suggestion)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.67s
-     Running `target/debug/vtagent chat`
-[VTAgent]
-Welcome to VTAgent - Research-preview Rust coding agent
+Generate a file named AGENTS.md that serves as a contributor guide for this repository.
+Your goal is to produce a clear, concise, and well-structured document with descriptive headings and actionable explanations for each section.
+Follow the outline below, but adapt as needed — add sections if relevant, and omit those that do not apply to this project.
 
-Interactive chat mode selected
-API Key: AIzaSyAJ...
-Model: gemini-2.5-flash-lite
-Workspace: /Users/vinh.nguyenxuan/Developer/learn-by-doing/vtagent
+Document Requirements
+
+-   Title the document "Repository Guidelines".
+-   Use Markdown headings (#, ##, etc.) for structure.
+-   Keep the document concise. 200-400 words is optimal.
+-   Keep explanations short, direct, and specific to this repository.
+-   Provide examples where helpful (commands, directory paths, naming patterns).
+-   Maintain a professional, instructional tone.
+
+Recommended Sections
+
+Project Structure & Module Organization
+
+-   Outline the project structure, including where the source code, tests, and assets are located.
+
+Build, Test, and Development Commands
+
+-   List key commands for building, testing, and running locally (e.g., npm test, make build).
+-   Briefly explain what each command does.
+
+Coding Style & Naming Conventions
+
+-   Specify indentation rules, language-specific style preferences, and naming patterns.
+-   Include any formatting or linting tools used.
+
+Testing Guidelines
+
+-   Identify testing frameworks and coverage requirements.
+-   State test naming conventions and how to run tests.
+
+Commit & Pull Request Guidelines
+
+-   Summarize commit message conventions found in the project’s Git history.
+-   Outline pull request requirements (descriptions, linked issues, screenshots, etc.).
+
+(Optional) Add other sections if relevant, such as Security & Configuration Tips, Architecture Overview, or Agent-Specific Instructions.
+
+--
+
+https://github.com/ratatui/ratatui
+
+integlligently fetch use these as source and port the tui implementation from bubbletea-rs to ratatui-rs completely, don't make demo or example, integrate mainly in the main core chat agent
+
+--
+
+1. https://github.com/whit3rabbit/bubbletea-rs/blob/main/examples/window-ize/README.md fix window auto sizing
+2. migrate Index status/build/query into the Program model via additional Msg variants and Commands next.
+3. Port Index features (status/build/query/results + preview) into the Program model with a View switch and Commands (like examples: list-default/file-picker/pager).
+4. Consolidate color/theme usage from [ui.highlight] into the Program view.
+   Remove the remaining dead/unused functions in tui_app.rs if you want a clean tree.
+
+--
+
+Want me to:
+
+Remove unused legacy highlight*\* free functions to reduce dead_code warnings?
+Tie the legacy highlight*\* to the theme too or remove them entirely?
+
+--
+
+fix error
+
+You: list the files
+
+Assistant: Error: invalid response JSON from Gemini API: missing field `content` at line 6 column 5
+
+--
+
+research claude code and apply
+https://claudelog.com/
+
+--
+
+codex
+https://github.com/openai/codex/tree/main/codex-rs
+
+--
+
+---
+
+--
+
+--
+
+fix the chat window is too small, not full size
+
+--
+
+port from bubbletea to https://github.com/ratatui/ratatui
+

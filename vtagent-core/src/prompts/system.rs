@@ -68,6 +68,16 @@ pub fn generate_system_instruction_with_config(
             instruction.push_str(&format!("- **Denied commands**: {} commands in deny list\n", cfg.commands.deny_list.len()));
         }
 
+        // Add PTY configuration info
+        if cfg.is_pty_enabled() {
+            instruction.push_str("- **PTY functionality**: Enabled\n");
+            let (rows, cols) = cfg.get_default_terminal_size();
+            instruction.push_str(&format!("- **Default terminal size**: {} rows × {} columns\n", rows, cols));
+            instruction.push_str(&format!("- **PTY command timeout**: {} seconds\n", cfg.get_pty_timeout_seconds()));
+        } else {
+            instruction.push_str("- **PTY functionality**: Disabled\n");
+        }
+
         instruction.push_str("\n**IMPORTANT**: Respect these configuration policies. Commands not in the allow list will require user confirmation. Always inform users when actions require confirmation due to security policies.\n");
     }
 
@@ -114,7 +124,39 @@ pub fn generate_system_instruction(_config: &SystemPromptConfig) -> Content {
 - **Code Quality**: code analysis, linting, formatting
 - **Build & Test**: cargo check, cargo build, cargo test
 - **Git Operations**: git status, git diff, git log
-- **Terminal Access**: run_terminal_cmd for any shell operations
+- **Terminal Access**: run_terminal_cmd for basic shell operations
+- **PTY Access**: run_pty_cmd, run_pty_cmd_streaming for full terminal emulation (use for interactive commands, shells, REPLs, SSH sessions, etc.)
+
+## INTELLIGENT PTY USAGE
+The agent should intelligently decide when to use PTY vs regular terminal commands based on the nature of the command:
+
+Use run_terminal_cmd for:
+- Simple, non-interactive commands (ls, cat, grep, find, ps, etc.)
+- Commands that produce plain text output
+- Batch operations where you just need the result
+- Commands that don't require terminal emulation
+
+Use run_pty_cmd for:
+- Interactive applications, shells, REPLs (python -i, node -i, bash, zsh)
+- Commands that require a TTY interface
+- Applications that check for terminal presence
+- Commands that produce colored or formatted output
+- SSH sessions or remote connections
+- Complex CLI tools that behave differently in a terminal
+
+Use run_pty_cmd_streaming for:
+- Long-running commands where you want to see output in real-time
+- Commands where progress monitoring is important
+- Interactive sessions where you want to see results as they happen
+
+Examples of when to use PTY:
+- Running shells (bash, zsh, python -i, node -i)
+- Interactive CLI tools (less, vim, nano)
+- SSH sessions or remote connections
+- Applications that check for TTY presence
+- Commands that produce colored or formatted output
+- Docker commands that need terminal interaction
+- Git commands with interactive prompts (git commit, git rebase -i)
 
 
 ## SOFTWARE ENGINEERING WORKFLOW

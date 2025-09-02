@@ -5,6 +5,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tokio::time;
@@ -485,21 +486,25 @@ mod tests {
 
         detector.set_config(OperationType::ApiCall, config).await;
 
-        let mut call_count = 0;
+        let call_count = Arc::new(AtomicUsize::new(0));
+        let call_count_clone = call_count.clone();
         let result = detector
             .execute_with_timeout_retry(
                 "test_retry".to_string(),
                 OperationType::ApiCall,
-                || async {
-                    call_count += 1;
-                    if call_count == 1 {
-                        // First call fails with timeout
-                        sleep(Duration::from_millis(60)).await;
-                        Ok("should not reach here")
-                    } else {
-                        // Second call succeeds
-                        sleep(Duration::from_millis(10)).await;
-                        Ok("success")
+                move || {
+                    let call_count = call_count_clone.clone();
+                    async move {
+                        let count = call_count.fetch_add(1, Ordering::SeqCst) + 1;
+                        if count == 1 {
+                            // First call fails with timeout
+                            sleep(Duration::from_millis(60)).await;
+                            Ok("should not reach here")
+                        } else {
+                            // Second call succeeds
+                            sleep(Duration::from_millis(10)).await;
+                            Ok("success")
+                        }
                     }
                 },
             )
@@ -507,7 +512,7 @@ mod tests {
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "success");
-        assert_eq!(call_count, 2);
+        assert_eq!(call_count.load(Ordering::SeqCst), 2);
 
         let stats = detector.get_stats().await;
         assert_eq!(stats.successful_retries, 1);

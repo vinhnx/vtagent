@@ -27,6 +27,10 @@ pub struct VTAgentConfig {
     /// Security settings
     #[serde(default)]
     pub security: SecurityConfig,
+
+    /// PTY settings
+    #[serde(default)]
+    pub pty: PtyConfig,
 }
 
 /// Agent-wide configuration
@@ -119,6 +123,30 @@ pub struct SecurityConfig {
     pub allowed_file_extensions: Vec<String>,
 }
 
+/// PTY configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PtyConfig {
+    /// Enable PTY functionality
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+
+    /// Default terminal rows
+    #[serde(default = "default_pty_rows")]
+    pub default_rows: u16,
+
+    /// Default terminal columns
+    #[serde(default = "default_pty_cols")]
+    pub default_cols: u16,
+
+    /// Maximum PTY sessions allowed
+    #[serde(default = "default_max_pty_sessions")]
+    pub max_sessions: usize,
+
+    /// Timeout for PTY commands in seconds
+    #[serde(default = "default_pty_timeout_seconds")]
+    pub command_timeout_seconds: u64,
+}
+
 /// Tool execution policy
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -138,6 +166,7 @@ impl Default for VTAgentConfig {
             tools: ToolsConfig::default(),
             commands: CommandsConfig::default(),
             security: SecurityConfig::default(),
+            pty: PtyConfig::default(),
         }
     }
 }
@@ -180,11 +209,23 @@ impl Default for CommandsConfig {
 impl Default for SecurityConfig {
     fn default() -> Self {
         Self {
-            human_in_the_loop: true,
-            confirm_destructive_actions: true,
-            log_all_commands: true,
+            human_in_the_loop: default_true(),
+            confirm_destructive_actions: default_true(),
+            log_all_commands: default_true(),
             max_file_size_mb: default_max_file_size_mb(),
-            allowed_file_extensions: default_allowed_extensions(),
+            allowed_file_extensions: vec![],
+        }
+    }
+}
+
+impl Default for PtyConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_true(),
+            default_rows: default_pty_rows(),
+            default_cols: default_pty_cols(),
+            max_sessions: default_max_pty_sessions(),
+            command_timeout_seconds: default_pty_timeout_seconds(),
         }
     }
 }
@@ -201,6 +242,14 @@ fn default_system_instruction() -> String { "You are a helpful coding assistant.
 fn default_tool_policy() -> ToolPolicy { ToolPolicy::Prompt }
 fn default_true() -> bool { true }
 fn default_max_file_size_mb() -> u64 { 50 }
+
+fn default_pty_rows() -> u16 { 24 }
+
+fn default_pty_cols() -> u16 { 80 }
+
+fn default_max_pty_sessions() -> usize { 10 }
+
+fn default_pty_timeout_seconds() -> u64 { 300 }
 
 fn default_allow_list() -> Vec<String> {
     vec![
@@ -300,20 +349,39 @@ impl VTAgentConfig {
             }
         }
 
-        false
+        // If no explicit allow list, default to allowed
+        self.commands.allow_list.is_empty()
     }
 
-    /// Check if a command contains dangerous patterns
+    /// Check if a command is considered dangerous
     pub fn is_command_dangerous(&self, command: &str) -> bool {
         let command_lower = command.to_lowercase();
-
         for pattern in &self.commands.dangerous_patterns {
             if command_lower.contains(&pattern.to_lowercase()) {
                 return true;
             }
         }
-
         false
+    }
+
+    /// Check if PTY functionality is enabled
+    pub fn is_pty_enabled(&self) -> bool {
+        self.pty.enabled
+    }
+
+    /// Get the default terminal size for PTY sessions
+    pub fn get_default_terminal_size(&self) -> (u16, u16) {
+        (self.pty.default_rows, self.pty.default_cols)
+    }
+
+    /// Get the maximum number of PTY sessions allowed
+    pub fn get_max_pty_sessions(&self) -> usize {
+        self.pty.max_sessions
+    }
+
+    /// Get the timeout for PTY commands
+    pub fn get_pty_timeout_seconds(&self) -> u64 {
+        self.pty.command_timeout_seconds
     }
 
     /// Get session duration as std::time::Duration

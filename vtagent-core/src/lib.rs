@@ -46,6 +46,7 @@ pub mod markdown_renderer;
 pub mod performance_monitor;
 pub mod performance_profiler;
 pub mod prompts;
+pub mod pty_renderer;
 pub mod timeout_detector;
 pub mod timeout_policies;
 pub mod tools;
@@ -142,5 +143,62 @@ mod tests {
         // Test that error types are properly exported and usable
         let tool_error = ToolError::TextNotFound("test.txt".to_string());
         assert!(format!("{}", tool_error).contains("test.txt"));
+    }
+
+    #[tokio::test]
+    async fn test_pty_basic_command() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace = temp_dir.path().to_path_buf();
+        let registry = ToolRegistry::new(workspace.clone());
+
+        // Test a simple PTY command
+        let args = serde_json::json!({
+            "command": "echo",
+            "args": ["Hello, PTY!"]
+        });
+
+        let result = registry.execute_tool("run_pty_cmd", args).await;
+        assert!(result.is_ok());
+        let response: serde_json::Value = result.unwrap();
+        assert_eq!(response["success"], true);
+        assert_eq!(response["code"], 0);
+        assert!(response["output"].as_str().unwrap().contains("Hello, PTY!"));
+    }
+
+    #[tokio::test]
+    async fn test_pty_session_management() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace = temp_dir.path().to_path_buf();
+        let registry = ToolRegistry::new(workspace.clone());
+
+        // Test creating a PTY session
+        let args = serde_json::json!({
+            "session_id": "test_session",
+            "command": "bash"
+        });
+
+        let result = registry.execute_tool("create_pty_session", args).await;
+        assert!(result.is_ok());
+        let response: serde_json::Value = result.unwrap();
+        assert_eq!(response["success"], true);
+        assert_eq!(response["session_id"], "test_session");
+
+        // Test listing PTY sessions
+        let args = serde_json::json!({});
+        let result = registry.execute_tool("list_pty_sessions", args).await;
+        assert!(result.is_ok());
+        let response: serde_json::Value = result.unwrap();
+        assert!(response["sessions"].as_array().unwrap().contains(&"test_session".into()));
+
+        // Test closing a PTY session
+        let args = serde_json::json!({
+            "session_id": "test_session"
+        });
+
+        let result = registry.execute_tool("close_pty_session", args).await;
+        assert!(result.is_ok());
+        let response: serde_json::Value = result.unwrap();
+        assert_eq!(response["success"], true);
+        assert_eq!(response["session_id"], "test_session");
     }
 }

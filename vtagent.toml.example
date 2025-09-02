@@ -46,6 +46,8 @@ cargo_test = "prompt"
 
 # Terminal operations
 run_terminal_cmd = "prompt"
+run_pty_cmd = "prompt"
+run_pty_cmd_streaming = "prompt"
 
 [commands]
 # Commands that can be executed automatically without user confirmation
@@ -78,6 +80,17 @@ dangerous_patterns = [
     "docker system prune", "npm install -g",
     "pip install", "cargo install"
 ]
+
+[pty]
+# Enable PTY functionality
+enabled = true
+# Default terminal size
+default_rows = 24
+default_cols = 80
+# Maximum number of concurrent PTY sessions
+max_sessions = 10
+# Timeout for PTY commands in seconds
+command_timeout_seconds = 300
 
 [security]
 # Require human confirmation for critical actions

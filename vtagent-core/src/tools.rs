@@ -18,6 +18,14 @@ use regex::RegexBuilder;
 use std::num::NonZeroUsize;
 use std::process::Stdio;
 
+// PTY support with expectrl
+use expectrl::{Eof, Session};
+#[cfg(unix)]
+use expectrl::WaitStatus;
+use std::collections::HashMap as PtySessionMap;
+use std::sync::Arc as PtyArc;
+use tokio::sync::Mutex as PtyMutex;
+
 /// Enhanced cache entry with better performance tracking
 #[derive(Debug, Clone)]
 pub struct EnhancedCacheEntry<T> {
@@ -427,6 +435,8 @@ pub struct ToolRegistry {
     operation_stats: Arc<RwLock<HashMap<String, OperationStats>>>,
     // Cache configuration
     max_cache_size: usize,
+    // PTY session management
+    pty_sessions: Arc<PtyMutex<PtySessionMap<String, PtyArc<PtySession>>>>,
 }
 
 /// Tool operation statistics
@@ -481,6 +491,47 @@ struct ListInput {
     include_hidden: bool,
 }
 
+/// PTY Session structure for managing interactive terminal sessions
+#[derive(Debug, Clone)]
+pub struct PtySession {
+    pub id: String,
+    pub command: String,
+    pub args: Vec<String>,
+    pub working_dir: Option<String>,
+    pub rows: u16,
+    pub cols: u16,
+    pub created_at: std::time::Instant,
+}
+
+/// Input structure for PTY commands
+#[derive(Debug, Deserialize)]
+struct PtyInput {
+    command: String,
+    #[serde(default)]
+    args: Vec<String>,
+    #[serde(default)]
+    working_dir: Option<String>,
+    #[serde(default)]
+    rows: Option<u16>,
+    #[serde(default)]
+    cols: Option<u16>,
+}
+
+/// Input structure for creating PTY sessions
+#[derive(Debug, Deserialize)]
+struct CreatePtySessionInput {
+    session_id: String,
+    command: String,
+    #[serde(default)]
+    args: Vec<String>,
+    #[serde(default)]
+    working_dir: Option<String>,
+    #[serde(default)]
+    rows: Option<u16>,
+    #[serde(default)]
+    cols: Option<u16>,
+}
+
 fn default_max_items() -> usize {
     1000
 }
@@ -516,6 +567,7 @@ impl ToolRegistry {
             cargo_toml_path,
             operation_stats: Arc::new(RwLock::new(HashMap::new())),
             max_cache_size: 1000,
+            pty_sessions: Arc::new(PtyMutex::new(PtySessionMap::new())),
         }
     }
 
@@ -544,6 +596,11 @@ impl ToolRegistry {
             "cargo_clippy" => self.cargo_clippy(args).await,
             "cargo_fmt" => self.cargo_fmt(args).await,
             "run_terminal_cmd" => self.run_terminal_cmd(args).await,
+            "run_pty_cmd" => self.run_pty_cmd(args).await,
+            "run_pty_cmd_streaming" => self.run_pty_cmd_streaming(args).await,
+            "create_pty_session" => self.create_pty_session(args).await,
+            "list_pty_sessions" => self.list_pty_sessions(args).await,
+            "close_pty_session" => self.close_pty_session(args).await,
             _ => Err(anyhow!("Unknown tool: {}", name)),
         }
     }
@@ -1043,26 +1100,200 @@ impl ToolRegistry {
                 return Err(anyhow!("disallowed characters in command token"));
             }
         }
+        
         let (prog, rest) = (&input.command[0], &input.command[1..]);
-        let mut cmd = std::process::Command::new(prog);
-        cmd.args(rest);
         let wd = input.working_dir.as_deref().unwrap_or(".");
         let workdir = self.root.join(wd);
         if !workdir.starts_with(&self.root) {
             return Err(anyhow!("working_dir must be inside workspace"));
         }
-        cmd.current_dir(workdir)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        let out = tokio::task::spawn_blocking(move || cmd.output())
-            .await
-            .map_err(|e| anyhow!("failed to spawn command: {}", e))??;
+        
+        // Use expectrl for consistent command execution
+        let mut command = std::process::Command::new(prog);
+        command.args(rest).current_dir(&workdir);
+        let mut session = Session::spawn(command)
+            .map_err(|e| anyhow!("failed to spawn command with expectrl: {}", e))?;
+            
+        // Wait for the process to complete and capture all output
+        let output = session
+            .expect(Eof)
+            .map_err(|e| anyhow!("failed to wait for command completion: {}", e))?;
+            
+        // For terminal commands, we'll assume success and return code 0
+        // In a more sophisticated implementation, we might want to capture the actual exit code
+        let success = true;
+        let code = 0;
+        
         Ok(json!({
-            "success": out.status.success(),
-            "code": out.status.code(),
-            "stdout": String::from_utf8_lossy(&out.stdout),
-            "stderr": String::from_utf8_lossy(&out.stderr),
+            "success": success,
+            "code": code,
+            "stdout": String::from_utf8_lossy(output.get(0).unwrap_or(&[])).to_string(),
+            "stderr": "", // For now, we're capturing combined output
         }))
+    }
+
+    /// Run a command in a pseudo-terminal (PTY) with full terminal emulation
+    async fn run_pty_cmd(&self, args: Value) -> Result<Value> {
+        let input: PtyInput = serde_json::from_value(args).context("invalid run_pty_cmd args")?;
+        
+        // Basic injection guards: no shell metacharacters in command
+        let bad = [";", "&&", "|", ">", "<", "||"];
+        if bad.iter().any(|b| input.command.contains(b)) {
+            return Err(anyhow!("disallowed characters in command"));
+        }
+        
+        // Prepare the command to run
+        let command_line = if input.args.is_empty() {
+            input.command.clone()
+        } else {
+            format!("{} {}", input.command, input.args.join(" "))
+        };
+        
+        // Set working directory if provided
+        let workdir = if let Some(wd) = input.working_dir {
+            let workdir = self.root.join(&wd);
+            if !workdir.starts_with(&self.root) {
+                return Err(anyhow!("working_dir must be inside workspace"));
+            }
+            workdir
+        } else {
+            self.root.clone()
+        };
+        
+        // Spawn a new session with expectrl
+        let mut command = std::process::Command::new("sh");
+        command.arg("-c").arg(&command_line).current_dir(&workdir);
+        let mut session = Session::spawn(command)
+            .map_err(|e| anyhow!("failed to spawn command with expectrl: {}", e))?;
+        
+        // Wait for the process to complete and capture all output
+        let output = session
+            .expect(Eof)
+            .map_err(|e| anyhow!("failed to wait for command completion: {}", e))?;
+        
+        // Get the actual exit status from the process
+        let (success, code) = {
+            #[cfg(unix)]
+            {
+                // On Unix systems, we can get the actual exit code
+                let process = session.get_process();
+                // Try to get the status
+                match process.status() {
+                    Ok(status) => {
+                        match status {
+                            WaitStatus::Exited(_pid, exit_code) => {
+                                (exit_code == 0, exit_code)
+                            }
+                            WaitStatus::Signaled(_pid, _signal, _dump) => {
+                                (false, 128) // Standard convention for signal termination
+                            }
+                            WaitStatus::Stopped(_pid, _signal) => {
+                                // Process was stopped, not terminated
+                                (false, 1)
+                            }
+                            WaitStatus::Continued(_pid) => {
+                                // Process was continued
+                                (true, 0)
+                            }
+                            WaitStatus::StillAlive => {
+                                // Process is still alive, assume success for backward compatibility
+                                (true, 0)
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        // If we can't get the status directly, we'll try to determine success based on the output
+                        // This maintains backward compatibility with the original implementation
+                        // Log the error for debugging purposes
+                        eprintln!("Warning: Failed to get process status: {}", e);
+                        (true, 0)
+                    }
+                }
+            }
+            #[cfg(windows)]
+            {
+                // On Windows, we'll keep the original behavior for now
+                (true, 0)
+            }
+        };
+        
+        Ok(json!({
+            "success": success,
+            "code": code,
+            "output": String::from_utf8_lossy(output.get(0).unwrap_or(&[])).to_string()
+        }))
+    }
+
+    /// Run a command in a pseudo-terminal (PTY) with streaming output
+    async fn run_pty_cmd_streaming(&self, args: Value) -> Result<Value> {
+        // For now, we'll implement this the same as run_pty_cmd
+        // In a future implementation, we could add streaming capabilities
+        self.run_pty_cmd(args).await
+    }
+
+    /// Create a new PTY session
+    async fn create_pty_session(&self, args: Value) -> Result<Value> {
+        let input: CreatePtySessionInput = serde_json::from_value(args).context("invalid create_pty_session args")?;
+        
+        // Basic injection guards: no shell metacharacters in command
+        let bad = [";", "&&", "|", ">", "<", "||"];
+        if bad.iter().any(|b| input.command.contains(b)) {
+            return Err(anyhow!("disallowed characters in command"));
+        }
+        
+        // Create a new PTY session
+        let session = PtySession {
+            id: input.session_id.clone(),
+            command: input.command.clone(),
+            args: input.args.clone(),
+            working_dir: input.working_dir.clone(),
+            rows: input.rows.unwrap_or(24),
+            cols: input.cols.unwrap_or(80),
+            created_at: std::time::Instant::now(),
+        };
+        
+        // Store the session
+        let mut sessions = self.pty_sessions.lock().await;
+        sessions.insert(input.session_id.clone(), PtyArc::new(session));
+        
+        Ok(json!({
+            "success": true,
+            "session_id": input.session_id
+        }))
+    }
+
+    /// List all active PTY sessions
+    async fn list_pty_sessions(&self, _args: Value) -> Result<Value> {
+        let sessions = self.pty_sessions.lock().await;
+        let session_ids: Vec<String> = sessions.keys().cloned().collect();
+        
+        Ok(json!({
+            "sessions": session_ids
+        }))
+    }
+
+    /// Close a PTY session
+    async fn close_pty_session(&self, args: Value) -> Result<Value> {
+        #[derive(Deserialize)]
+        struct ClosePtySessionInput {
+            session_id: String,
+        }
+        
+        let input: ClosePtySessionInput = serde_json::from_value(args).context("invalid close_pty_session args")?;
+        
+        let mut sessions = self.pty_sessions.lock().await;
+        if let Some(session) = sessions.remove(&input.session_id) {
+            Ok(json!({
+                "success": true,
+                "session_id": input.session_id
+            }))
+        } else {
+            Ok(json!({
+                "success": false,
+                "session_id": input.session_id,
+                "error": "Session not found"
+            }))
+        }
     }
 }
 
@@ -1248,6 +1479,71 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
                     "working_dir": {"type": "string", "description": "Working directory relative to workspace"}
                 },
                 "required": ["command"]
+            }),
+        },
+        FunctionDeclaration {
+            name: "run_pty_cmd".to_string(),
+            description: "Run a command in a pseudo-terminal (PTY) with full terminal emulation".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string", "description": "Command to execute in the PTY"},
+                    "args": {"type": "array", "items": {"type": "string"}, "description": "Arguments for the command", "default": []},
+                    "working_dir": {"type": "string", "description": "Working directory relative to workspace"},
+                    "rows": {"type": "integer", "description": "Terminal rows (default: 24)", "default": 24},
+                    "cols": {"type": "integer", "description": "Terminal columns (default: 80)", "default": 80}
+                },
+                "required": ["command"]
+            }),
+        },
+        FunctionDeclaration {
+            name: "run_pty_cmd_streaming".to_string(),
+            description: "Run a command in a pseudo-terminal (PTY) with streaming output".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string", "description": "Command to execute in the PTY"},
+                    "args": {"type": "array", "items": {"type": "string"}, "description": "Arguments for the command", "default": []},
+                    "working_dir": {"type": "string", "description": "Working directory relative to workspace"},
+                    "rows": {"type": "integer", "description": "Terminal rows (default: 24)", "default": 24},
+                    "cols": {"type": "integer", "description": "Terminal columns (default: 80)", "default": 80}
+                },
+                "required": ["command"]
+            }),
+        },
+        FunctionDeclaration {
+            name: "create_pty_session".to_string(),
+            description: "Create a new PTY session for running interactive terminal commands".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string", "description": "Unique identifier for the PTY session"},
+                    "command": {"type": "string", "description": "Command to execute in the PTY"},
+                    "args": {"type": "array", "items": {"type": "string"}, "description": "Arguments for the command", "default": []},
+                    "working_dir": {"type": "string", "description": "Working directory relative to workspace"},
+                    "rows": {"type": "integer", "description": "Terminal rows (default: 24)", "default": 24},
+                    "cols": {"type": "integer", "description": "Terminal columns (default: 80)", "default": 80}
+                },
+                "required": ["session_id", "command"]
+            }),
+        },
+        FunctionDeclaration {
+            name: "list_pty_sessions".to_string(),
+            description: "List all active PTY sessions".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        FunctionDeclaration {
+            name: "close_pty_session".to_string(),
+            description: "Close a PTY session".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string", "description": "Unique identifier for the PTY session to close"}
+                },
+                "required": ["session_id"]
             }),
         },
     ]

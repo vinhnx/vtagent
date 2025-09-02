@@ -92,13 +92,7 @@ event handling and turn based management for agent loop
 
 --
 
-https://unix.stackexchange.com/questions/21147/what-are-pseudo-terminals-pty-tty#21149
 
---
-
-https://github.com/haasonsaas/spectertty
-
---
 
 https://github.com/rust-cli/roff-rs
 
@@ -109,13 +103,7 @@ https://github.com/rust-cli/env_logger
 --
 
 https://github.com/rust-cli/confy
-
 --
-
-https://github.com/zhiburt/expectrl
-https://github.com/zhiburt/expectrl/tree/main/examples
---
-
 https://github.com/zhiburt/tabled
 
 --
@@ -123,4 +111,11 @@ https://github.com/zhiburt/tabled
 https://github.com/zhiburt/ansi-str
 
 https://github.com/zhiburt/ansi-str/tree/master/examples
-No newline at end of file
+
+---
+
+https://github.com/Danau5tin/multi-agent-coding-system
+
+---
+
+https://github.com/Danau5tin/multi-agent-coding-system/blob/main/PROJECT_STRUCTURE.md

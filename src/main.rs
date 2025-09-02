@@ -511,7 +511,7 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                             let needs_prompt = tool_policy == ToolPolicy::Prompt;
 
                             // Check if this is a terminal command and evaluate command permissions
-                            if tool_name == "run_terminal_cmd" {
+                            if tool_name == "run_terminal_cmd" || tool_name == "run_pty_cmd" || tool_name == "run_pty_cmd_streaming" {
                                 if let Some(command) = args.get("command").and_then(|v| v.as_str()) {
                                     // Check if command is in allow list
                                     if vtagent_config.is_command_allowed(command) {
@@ -607,6 +607,22 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                             {
                                 Ok(val) => {
                                     println!("{} {}", style("[TOOL OK]").green().bold(), tool_name);
+                                    
+                                    // Special handling for PTY tools to render output
+                                    if tool_name == "run_pty_cmd" || tool_name == "run_pty_cmd_streaming" {
+                                        if let Some(output) = val.get("output").and_then(|v| v.as_str()) {
+                                            let title = if tool_name == "run_pty_cmd" {
+                                                "PTY Command Output"
+                                            } else {
+                                                "PTY Streaming Output"
+                                            };
+                                            if let Err(e) = render_pty_output(output, title) {
+                                                eprintln!("{} Failed to render PTY output: {}", 
+                                                    style("[ERROR]").red().bold(), e);
+                                            }
+                                        }
+                                    }
+                                    
                                     json!({ "ok": true, "result": val })
                                 }
                                 Err(err) => {
@@ -669,6 +685,16 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
         println!(); // Empty line for readability
     }
 
+    Ok(())
+}
+
+/// Render PTY output in a terminal-like interface
+fn render_pty_output(output: &str, title: &str) -> Result<()> {
+    // For now, we'll just print the output with a header
+    // In a future implementation, we could use our bubbletea renderer
+    println!("{}", style(format!("=== PTY Output: {} ===", title)).blue().bold());
+    println!("{}", output);
+    println!("{}", style("=== End PTY Output ===").blue().bold());
     Ok(())
 }
 

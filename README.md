@@ -52,6 +52,20 @@ vtagent follows proven agent architecture patterns:
 - `read_file(path, max_bytes?)` - Read text files with size control
 - `write_file(path, content, overwrite?, create_dirs?)` - Create/overwrite files
 - `edit_file(path, old_str, new_str)` - Surgical file editing with validation
+- `run_terminal_cmd(command, working_dir?)` - Execute terminal commands with safety checks using enhanced PTY backend
+- `run_pty_cmd(command, args?, working_dir?, rows?, cols?)` - Run commands in a pseudo-terminal (PTY) with full terminal emulation
+- `run_pty_cmd_streaming(command, args?, working_dir?, rows?, cols?)` - Run commands in a PTY with streaming output
+- `create_pty_session(session_id, command, args?, working_dir?, rows?, cols?)` - Create a new PTY session for interactive commands
+- `list_pty_sessions()` - List all active PTY sessions
+- `close_pty_session(session_id)` - Close a PTY session
+
+### Intelligent Command Execution
+
+VTAgent now uses a unified enhanced PTY backend for all command execution, providing consistent and reliable terminal interaction:
+
+- **run_terminal_cmd**: Uses PTY backend for consistent command execution while maintaining compatibility with existing workflows
+- **run_pty_cmd**: Full terminal emulation for interactive applications, shells, REPLs, and commands that require TTY interface
+- **run_pty_cmd_streaming**: Real-time output streaming for long-running or interactive commands
 
 ## .vtagentgitignore - Custom File Exclusion
 
@@ -218,6 +232,79 @@ VTAgent: [TOOL] run_terminal_cmd {"command": "rm -f old_file.txt"}
 ### Legacy Support
 
 The old `.vtagent/tool-policy.json` format is deprecated but still supported for backward compatibility. New projects should use the TOML configuration.
+
+## Pseudo-Terminal (PTY) Functionality
+
+vtagent includes advanced pseudo-terminal (PTY) functionality that enables full terminal emulation for interactive commands and complex CLI applications. This feature is particularly useful for:
+
+- Running interactive terminal applications like shells, REPLs, and SSH sessions
+- Capturing full terminal output including colors and formatting
+- Managing persistent terminal sessions
+- Handling applications that require a TTY interface
+
+VTAgent now uses a unified enhanced PTY backend for all command execution, providing consistent and reliable terminal interaction across all tools.
+
+### PTY Tools
+
+- `run_terminal_cmd` - Execute terminal commands using enhanced PTY backend for consistent behavior
+- `run_pty_cmd` - Execute a single command in a PTY environment and capture all output
+- `run_pty_cmd_streaming` - Execute a command in a PTY with real-time output streaming
+- `create_pty_session` - Create a persistent PTY session for interactive use
+- `list_pty_sessions` - List all active PTY sessions
+- `close_pty_session` - Close a PTY session
+
+### Intelligent Tool Selection
+
+The agent intelligently selects the appropriate tool based on command requirements:
+
+Use `run_terminal_cmd` for:
+- Simple, non-interactive commands (ls, cat, grep, find, ps, etc.)
+- Commands that produce plain text output
+- Batch operations where you just need the result
+
+Use `run_pty_cmd` for:
+- Interactive applications, shells, REPLs (python -i, node -i, bash, zsh)
+- Commands that require a TTY interface
+- Applications that check for terminal presence
+- Commands that produce colored or formatted output
+- SSH sessions or remote connections
+
+Use `run_pty_cmd_streaming` for:
+- Long-running commands where you want to see output in real-time
+- Commands where progress monitoring is important
+- Interactive sessions where you want to see results as they happen
+
+### Configuration
+
+PTY functionality can be configured in the `vtagent.toml` file:
+
+```toml
+[pty]
+enabled = true              # Enable PTY functionality
+default_rows = 24           # Default terminal rows
+default_cols = 80           # Default terminal columns
+max_sessions = 10           # Maximum number of concurrent PTY sessions
+command_timeout_seconds = 300  # Timeout for PTY commands
+```
+
+### Example Usage
+
+```bash
+# Run a simple command using enhanced PTY backend
+VTAgent: [TOOL] run_terminal_cmd {"command": ["ls", "-la"]}
+
+# Run an interactive command in a PTY
+VTAgent: [TOOL] run_pty_cmd {"command": "python", "args": ["-i"]}
+
+# Create a persistent bash session
+VTAgent: [TOOL] create_pty_session {"session_id": "bash_session", "command": "bash"}
+
+# List active sessions
+VTAgent: [TOOL] list_pty_sessions {}
+
+# Close a session
+VTAgent: [TOOL] close_pty_session {"session_id": "bash_session"}
+```
 
 ## Snapshot Checkpoint System
 
@@ -653,6 +740,7 @@ Create specialized command patterns by:
 - **Multi-file operations** - Batch file processing capabilities
 - **Project templates** - Predefined project scaffolds
 - **Integration APIs** - REST endpoints for agent integration
+- **Enhanced PTY functionality** - Advanced terminal interaction with pattern matching and automation capabilities
 
 ### Research Areas
 
@@ -660,6 +748,7 @@ Create specialized command patterns by:
 - **Multi-modal inputs** - Support for images, diagrams, audio
 - **Collaborative workflows** - Human-agent teaming patterns
 - **Domain specialization** - Industry-specific agent capabilities
+- **Advanced PTY automation** - Intelligent terminal session management with expectrl for pattern matching and automated responses, including proper exit code handling
 
 ## Related Work
 

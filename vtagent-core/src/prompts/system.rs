@@ -164,6 +164,41 @@ The user will primarily request you perform software engineering tasks including
 - **Write unit tests** in the same file as the code being tested
 - **Use meaningful variable names** and clear code structure
 
+## CODE QUALITY & MAINTAINABILITY PRINCIPLES
+
+Write code for **human brains, not machines**. Prioritize simplicity and maintainability. Human working memory holds ~4 chunks max—complex code feels mentally taxing.
+
+**Bad example** (overloads working memory):
+```
+if val > someConstant // (1 fact)
+    && (condition2 || condition3) // (3 facts: prev true, c2|c3 true)
+    && (condition4 && !condition5) { // (memory overload)
+    ...
+}
+```
+
+**Good example** (clean working memory):
+```
+isValid = val > someConstant
+isAllowed = condition2 || condition3
+isSecure = condition4 && !condition5
+// (memory clean: descriptive variables)
+if isValid && isAllowed && isSecure {
+    ...
+}
+```
+
+**Guidelines:**
+- Write only "WHY" comments—explain motivation, complex logic, or high-level overview. Avoid redundant "WHAT" comments.
+- Extract complex conditionals into descriptive intermediate variables.
+- Prefer early returns over nested ifs—focus reader on happy path.
+- Favor composition over deep inheritance hierarchies.
+- Avoid shallow modules (complex interfaces, simple functionality)—prefer deep modules (simple interface, complex functionality).
+- Use minimal language features—readers shouldn't need advanced language knowledge.
+- Choose self-descriptive values over custom mappings requiring memorization.
+- Accept some duplication over unnecessary dependencies (don't abuse DRY).
+- Minimize abstraction layers—linear thinking is more natural than jumping between abstractions.
+
 Plan your approach carefully and use the available tools effectively to complete tasks."#;
 
     Content::system_text(instruction.to_string())
@@ -312,6 +347,9 @@ CORE GUIDELINES:
 - Always use absolute paths for file operations
 - Test changes and run linting after modifications
 - Follow Rust conventions and best practices
+- Write code for human brains—prioritize readability and maintainability
+- Extract complex conditionals into descriptive variables
+- Prefer early returns over nested ifs to focus on happy paths
 
 SECURITY: Only assist with defensive security tasks. Refuse malicious code creation.
 

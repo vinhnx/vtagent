@@ -1,6 +1,6 @@
-//! VTAgent - Research-preview Rust coding agent
+//! VT Code - Research-preview Rust coding agent
 //!
-//! This is the main binary entry point for vtagent.
+//! This is the main binary entry point for VT Code.
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -11,20 +11,20 @@ use serde_json::json;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use vtagent_core::llm::{make_client, BackendKind};
-use vtagent_core::tools::{build_function_declarations, ToolRegistry};
-use vtagent_core::{
-    config::{ConfigManager, ToolPolicy, VTAgentConfig},
+use vtcode_core::llm::{make_client, BackendKind};
+use vtcode_core::tools::{build_function_declarations, ToolRegistry};
+use vtcode_core::{
+    config::{ConfigManager, ToolPolicy, VTCodeConfig},
     gemini::{Content, FunctionResponse, GenerateContentRequest, Part, Tool, ToolConfig},
     prompts::system::{generate_system_instruction_with_config, SystemPromptConfig},
     types::AgentConfig as CoreAgentConfig,
 };
 use walkdir::WalkDir;
 
-/// Main CLI structure for vtagent
+/// Main CLI structure for VT Code
 #[derive(Parser, Debug)]
 #[command(
-    name = "vtagent",
+    name = "vtcode",
     version,
     about = "**Research-preview Rust coding agent** powered by Gemini with Anthropic-inspired architecture"
 )]
@@ -62,7 +62,7 @@ pub enum Commands {
     Analyze,
     /// Display performance metrics
     Performance,
-    /// Initialize vtagent configuration files in current directory
+    /// Initialize VT Code configuration files in current directory
     Init {
         /// Force overwrite existing files
         #[arg(long, default_value_t = false)]
@@ -162,14 +162,14 @@ async fn main() -> Result<()> {
             println!("(Not implemented in minimal version)");
         }
         Commands::Init { force } => {
-            match VTAgentConfig::bootstrap_project(&config.workspace, force) {
+            match VTCodeConfig::bootstrap_project(&config.workspace, force) {
                 Ok(created_files) => {
                     if created_files.is_empty() {
                         println!("{} Configuration files already exist",
                                  style("INFO").cyan().bold());
                         println!("Use --force to overwrite existing files");
                     } else {
-                        println!("{} VTAgent project initialized successfully!",
+                        println!("{} VT Code project initialized successfully!",
                                  style("SUCCESS").green().bold());
                         println!("Created files:");
                         for file in &created_files {
@@ -178,7 +178,7 @@ async fn main() -> Result<()> {
                         println!("\nNext steps:");
                         println!("1. Review and customize vtagent.toml for your project");
                         println!("2. Adjust .vtagentgitignore to control agent file access");
-                        println!("3. Run 'vtagent chat' to start the interactive agent");
+                        println!("3. Run 'vtcode chat' to start the interactive agent");
                     }
                 }
                 Err(e) => {
@@ -195,7 +195,7 @@ async fn main() -> Result<()> {
                 std::process::exit(1);
             }
 
-            match VTAgentConfig::create_sample_config(&output) {
+            match VTCodeConfig::create_sample_config(&output) {
                 Ok(_) => {
                     println!("{} Created sample configuration at: {}",
                              style("SUCCESS").green().bold(),
@@ -280,18 +280,18 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
     // Load configuration from vtagent.toml first
     let config_manager = ConfigManager::new(&config.workspace)
         .context("Failed to load configuration")?;
-    let vtagent_config = config_manager.config();
+    let vtcode_config = config_manager.config();
 
     // Create system instruction with configuration awareness
     let system_config = SystemPromptConfig::default();
-    let long_sys = generate_system_instruction_with_config(&system_config, &config.workspace, Some(vtagent_config));
+    let long_sys = generate_system_instruction_with_config(&system_config, &config.workspace, Some(vtcode_config));
 
     // Incorporate project context so the agent is aware of the current repo
     let mut sys_text = long_sys
         .parts
         .get(0)
         .and_then(|p| p.as_text())
-        .unwrap_or(&vtagent_config.agent.default_system_instruction)
+        .unwrap_or(&vtcode_config.agent.default_system_instruction)
         .to_string();
 
     if let Some(project_overview) = build_project_overview(&config.workspace) {
@@ -315,13 +315,13 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
     // Load configuration from vtagent.toml first
     let config_manager = ConfigManager::new(&config.workspace)
         .context("Failed to load configuration")?;
-    let vtagent_config = config_manager.config();
+    let vtcode_config = config_manager.config();
 
     // Safety: Track overall conversation metrics to prevent runaway sessions
     let mut total_turns = 0;
-    let max_conversation_turns = vtagent_config.agent.max_conversation_turns;
+    let max_conversation_turns = vtcode_config.agent.max_conversation_turns;
     let session_start = std::time::Instant::now();
-    let max_session_duration = vtagent_config.session_duration();
+    let max_session_duration = vtcode_config.session_duration();
 
     // Show configuration info
     if let Some(config_path) = config_manager.config_path() {
@@ -388,7 +388,7 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
         conversation.push(Content::user_text(input));
 
         // Safety: prevent conversation history from growing too large
-        let max_conversation_history = vtagent_config.agent.max_conversation_history;
+        let max_conversation_history = vtcode_config.agent.max_conversation_history;
         if conversation.len() > max_conversation_history {
             // Keep the first few and last few messages, removing middle ones
             let keep_start = 5;
@@ -404,8 +404,8 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
         // Tool-calling loop: allow the model to request tools up to configured steps
         let mut steps = 0;
         let mut consecutive_empty_responses = 0;
-        let max_steps = vtagent_config.agent.max_steps;
-        let max_empty_responses = vtagent_config.agent.max_empty_responses;
+        let max_steps = vtcode_config.agent.max_steps;
+        let max_empty_responses = vtcode_config.agent.max_empty_responses;
 
         'outer: loop {
             // Safety check: prevent infinite loops
@@ -429,7 +429,7 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
 
             // Send to Gemini
             if steps == 0 {
-                print!("{} ", style("VTAgent:").blue().bold());
+                print!("{} ", style("VT Code:").blue().bold());
                 io::stdout().flush()?;
             }
 
@@ -502,7 +502,7 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                             );
 
                             // Get tool policy from configuration
-                            let tool_policy = vtagent_config.get_tool_policy(tool_name);
+                            let tool_policy = vtcode_config.get_tool_policy(tool_name);
 
                             // Check if tool is denied
                             if tool_policy == ToolPolicy::Deny {
@@ -526,11 +526,11 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                             if tool_name == "run_terminal_cmd" || tool_name == "run_pty_cmd" || tool_name == "run_pty_cmd_streaming" {
                                 if let Some(command) = args.get("command").and_then(|v| v.as_str()) {
                                     // Check if command is in allow list
-                                    if vtagent_config.is_command_allowed(command) {
+                                    if vtcode_config.is_command_allowed(command) {
                                         // Command is allowed, execute without prompting
                                         println!("{} Command is in allow list: {}",
                                                 style("[ALLOWED]").green(), command);
-                                    } else if vtagent_config.is_command_dangerous(command) {
+                                    } else if vtcode_config.is_command_dangerous(command) {
                                         // Dangerous command - require extra confirmation
                                         print!(
                                             "{} DANGEROUS command '{}' - Are you sure? [y/N] ",
@@ -553,7 +553,7 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                                             ]));
                                             continue;
                                         }
-                                    } else if vtagent_config.security.human_in_the_loop {
+                                    } else if vtcode_config.security.human_in_the_loop {
                                         // Command not in allow list - require confirmation
                                         print!(
                                             "{} Execute command '{}'? [y/N] ",
@@ -877,7 +877,7 @@ fn extract_toml_str(content: &str, key: &str) -> Option<String> {
         content
     };
 
-    // Example target: name = "vtagent"
+    // Example target: name = "vtcode"
     let pattern = format!(r#"(?m)^\s*{}\s*=\s*"([^"]+)"\s*$"#, regex::escape(key));
     let re = Regex::new(&pattern).ok()?;
     re.captures(pkg_section)
@@ -909,7 +909,7 @@ fn extract_readme_excerpt(md: &str, max_len: usize) -> String {
 
 fn summarize_workspace_languages(root: &std::path::Path) -> Option<String> {
     use std::collections::HashMap;
-    let analyzer = match vtagent_core::tree_sitter::analyzer::TreeSitterAnalyzer::new() {
+    let analyzer = match vtcode_core::tree_sitter::analyzer::TreeSitterAnalyzer::new() {
         Ok(a) => a,
         Err(_) => return None,
     };

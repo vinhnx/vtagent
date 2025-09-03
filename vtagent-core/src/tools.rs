@@ -465,6 +465,8 @@ struct WriteInput {
     content: String,
     #[serde(default)]
     encoding: Option<String>,
+    #[serde(default)]
+    mode: Option<String>, // "overwrite", "append", "skip_if_exists"
 }
 
 #[derive(Debug, Deserialize)]
@@ -727,10 +729,50 @@ impl ToolRegistry {
         Ok(json!({ "content": content }))
     }
 
-    /// Enhanced write_file with async I/O and performance monitoring
+    /// Enhanced write_file with intelligent file handling and mode support
     async fn write_file(&self, args: Value) -> Result<Value> {
         let input: WriteInput = serde_json::from_value(args).context("invalid write_file args")?;
         let path = self.root.join(&input.path);
+
+        // Check if file should be excluded by .vtagentgitignore
+        if should_exclude_file(&path).await {
+            return Err(anyhow!(
+                "File '{}' is excluded by .vtagentgitignore",
+                input.path
+            ));
+        }
+
+        // Determine write mode
+        let mode = input.mode.as_deref().unwrap_or("overwrite");
+        
+        // Check if file exists and handle according to mode
+        if path.exists() {
+            match mode {
+                "skip_if_exists" => {
+                    return Ok(json!({ "success": true, "written": false, "reason": "file_exists" }));
+                }
+                "append" => {
+                    // Append to existing file
+                    use tokio::io::AsyncWriteExt;
+                    let mut file = tokio::fs::OpenOptions::new()
+                        .append(true)
+                        .open(&path)
+                        .await
+                        .with_context(|| format!("Failed to open file for appending: {}", path.display()))?;
+                    
+                    file.write_all(input.content.as_bytes())
+                        .await
+                        .with_context(|| format!("Failed to append to file: {}", path.display()))?;
+                    
+                    let prefix = format!("read_file:{}:", input.path);
+                    FILE_CACHE.invalidate_prefix(&prefix).await;
+                    return Ok(json!({ "success": true, "written": true, "mode": "append" }));
+                }
+                "overwrite" | _ => {
+                    // Continue with overwrite (default behavior)
+                }
+            }
+        }
 
         // Create parent directories if needed
         if let Some(parent) = path.parent() {
@@ -745,7 +787,7 @@ impl ToolRegistry {
             .with_context(|| format!("Failed to write file: {}", path.display()))?;
         let prefix = format!("read_file:{}:", input.path);
         FILE_CACHE.invalidate_prefix(&prefix).await;
-        Ok(json!({ "success": true }))
+        Ok(json!({ "success": true, "written": true, "mode": mode }))
     }
 
     /// Enhanced edit_file with intelligent caching invalidation
@@ -1081,83 +1123,87 @@ impl ToolRegistry {
     }
 
     /// Run a terminal command with basic safety checks
-    async fn run_terminal_cmd(&self, args: Value) -> Result<Value> {
+    /// This unified function handles both run_terminal_cmd and run_pty_cmd formats
+    async fn run_terminal_command(&self, args: Value, is_pty: bool) -> Result<Value> {
+        // Support both input formats
         #[derive(Deserialize)]
-        struct CmdInput {
+        struct TerminalCmdInput {
+            #[serde(default)]
             command: Vec<String>,
             #[serde(default)]
             working_dir: Option<String>,
         }
-        let input: CmdInput =
-            serde_json::from_value(args).context("invalid run_terminal_cmd args")?;
-        if input.command.is_empty() {
-            return Err(anyhow!("command cannot be empty"));
+        
+        #[derive(Deserialize)]
+        struct PtyCmdInput {
+            command: String,
+            #[serde(default)]
+            args: Vec<String>,
+            #[serde(default)]
+            working_dir: Option<String>,
+            #[serde(default)]
+            rows: Option<u16>,
+            #[serde(default)]
+            cols: Option<u16>,
         }
-        // Basic injection guards: no shell metacharacters in tokens
-        let bad = [";", "&&", "|", ">", "<", "||"];
-        for tok in &input.command {
-            if bad.iter().any(|b| tok.contains(b)) {
-                return Err(anyhow!("disallowed characters in command token"));
+        
+        // Parse input based on format
+        let (command_line, workdir) = if is_pty {
+            let input: PtyCmdInput = serde_json::from_value(args).context("invalid run_pty_cmd args")?;
+            
+            // Basic injection guards: no shell metacharacters in command
+            let bad = [";", "&&", "|", ">", "<", "||"];
+            if bad.iter().any(|b| input.command.contains(b)) {
+                return Err(anyhow!("disallowed characters in command"));
             }
-        }
-        
-        let (prog, rest) = (&input.command[0], &input.command[1..]);
-        let wd = input.working_dir.as_deref().unwrap_or(".");
-        let workdir = self.root.join(wd);
-        if !workdir.starts_with(&self.root) {
-            return Err(anyhow!("working_dir must be inside workspace"));
-        }
-        
-        // Use expectrl for consistent command execution
-        let mut command = std::process::Command::new(prog);
-        command.args(rest).current_dir(&workdir);
-        let mut session = Session::spawn(command)
-            .map_err(|e| anyhow!("failed to spawn command with expectrl: {}", e))?;
             
-        // Wait for the process to complete and capture all output
-        let output = session
-            .expect(Eof)
-            .map_err(|e| anyhow!("failed to wait for command completion: {}", e))?;
+            // Prepare the command to run
+            let command_line = if input.args.is_empty() {
+                input.command.clone()
+            } else {
+                format!("{} {}", input.command, input.args.join(" "))
+            };
             
-        // For terminal commands, we'll assume success and return code 0
-        // In a more sophisticated implementation, we might want to capture the actual exit code
-        let success = true;
-        let code = 0;
-        
-        Ok(json!({
-            "success": success,
-            "code": code,
-            "stdout": String::from_utf8_lossy(output.get(0).unwrap_or(&[])).to_string(),
-            "stderr": "", // For now, we're capturing combined output
-        }))
-    }
-
-    /// Run a command in a pseudo-terminal (PTY) with full terminal emulation
-    async fn run_pty_cmd(&self, args: Value) -> Result<Value> {
-        let input: PtyInput = serde_json::from_value(args).context("invalid run_pty_cmd args")?;
-        
-        // Basic injection guards: no shell metacharacters in command
-        let bad = [";", "&&", "|", ">", "<", "||"];
-        if bad.iter().any(|b| input.command.contains(b)) {
-            return Err(anyhow!("disallowed characters in command"));
-        }
-        
-        // Prepare the command to run
-        let command_line = if input.args.is_empty() {
-            input.command.clone()
+            // Set working directory if provided
+            let workdir = if let Some(wd) = input.working_dir {
+                let workdir = self.root.join(&wd);
+                if !workdir.starts_with(&self.root) {
+                    return Err(anyhow!("working_dir must be inside workspace"));
+                }
+                workdir
+            } else {
+                self.root.clone()
+            };
+            
+            (command_line, workdir)
         } else {
-            format!("{} {}", input.command, input.args.join(" "))
-        };
-        
-        // Set working directory if provided
-        let workdir = if let Some(wd) = input.working_dir {
-            let workdir = self.root.join(&wd);
+            let input: TerminalCmdInput = serde_json::from_value(args).context("invalid run_terminal_cmd args")?;
+            if input.command.is_empty() {
+                return Err(anyhow!("command cannot be empty"));
+            }
+            
+            // Basic injection guards: no shell metacharacters in tokens
+            let bad = [";", "&&", "|", ">", "<", "||"];
+            for tok in &input.command {
+                if bad.iter().any(|b| tok.contains(b)) {
+                    return Err(anyhow!("disallowed characters in command token"));
+                }
+            }
+            
+            let (prog, rest) = (&input.command[0], &input.command[1..]);
+            let command_line = if rest.is_empty() {
+                prog.clone()
+            } else {
+                format!("{} {}", prog, rest.join(" "))
+            };
+            
+            let wd = input.working_dir.as_deref().unwrap_or(".");
+            let workdir = self.root.join(wd);
             if !workdir.starts_with(&self.root) {
                 return Err(anyhow!("working_dir must be inside workspace"));
             }
-            workdir
-        } else {
-            self.root.clone()
+            
+            (command_line, workdir)
         };
         
         // Spawn a new session with expectrl
@@ -1217,11 +1263,31 @@ impl ToolRegistry {
             }
         };
         
-        Ok(json!({
-            "success": success,
-            "code": code,
-            "output": String::from_utf8_lossy(output.get(0).unwrap_or(&[])).to_string()
-        }))
+        // Return appropriate response format based on command type
+        if is_pty {
+            Ok(json!({
+                "success": success,
+                "code": code,
+                "output": String::from_utf8_lossy(output.get(0).unwrap_or(&[])).to_string()
+            }))
+        } else {
+            Ok(json!({
+                "success": success,
+                "code": code,
+                "stdout": String::from_utf8_lossy(output.get(0).unwrap_or(&[])).to_string(),
+                "stderr": "" // For now, we're capturing combined output
+            }))
+        }
+    }
+    
+    /// Run a terminal command with basic safety checks (legacy)
+    async fn run_terminal_cmd(&self, args: Value) -> Result<Value> {
+        self.run_terminal_command(args, false).await
+    }
+
+    /// Run a command in a pseudo-terminal (PTY) with full terminal emulation (legacy)
+    async fn run_pty_cmd(&self, args: Value) -> Result<Value> {
+        self.run_terminal_command(args, true).await
     }
 
     /// Run a command in a pseudo-terminal (PTY) with streaming output
@@ -1415,13 +1481,14 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         },
         FunctionDeclaration {
             name: "write_file".to_string(),
-            description: "Write content to a file".to_string(),
+            description: "Write content to a file with various modes (overwrite, append, skip_if_exists)".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "Path to the file to write"},
                     "content": {"type": "string", "description": "Content to write to the file"},
-                    "encoding": {"type": "string", "description": "Text encoding", "default": "utf-8"}
+                    "encoding": {"type": "string", "description": "Text encoding", "default": "utf-8"},
+                    "mode": {"type": "string", "description": "Write mode: overwrite, append, or skip_if_exists", "default": "overwrite", "enum": ["overwrite", "append", "skip_if_exists"]}
                 },
                 "required": ["path", "content"]
             }),

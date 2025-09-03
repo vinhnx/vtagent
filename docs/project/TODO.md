@@ -119,3 +119,12 @@ https://github.com/Danau5tin/multi-agent-coding-system
 ---
 
 https://github.com/Danau5tin/multi-agent-coding-system/blob/main/PROJECT_STRUCTURE.md
+
+
+--
+
+port https://github.com/rust-cli/rexpect
+
+--
+
+remove run_terminal_cmd and use run_pty_cmd tool 

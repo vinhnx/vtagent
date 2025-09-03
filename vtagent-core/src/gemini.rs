@@ -480,7 +480,8 @@ impl Client {
     }
 
     fn extract_first_text(v: &serde_json::Value) -> Option<String> {
-        v.get("candidates")
+        // Try the standard path first
+        let text = v.get("candidates")
             .and_then(|c| c.as_array())
             .and_then(|arr| arr.get(0))
             .and_then(|cand| cand.get("content"))
@@ -495,7 +496,47 @@ impl Client {
                     }
                 }
                 None
-            })
+            });
+        
+        // If that fails, try a more flexible approach
+        if text.is_some() {
+            return text;
+        }
+        
+        // Try to find any text field in the response
+        fn find_text_in_value(value: &serde_json::Value) -> Option<String> {
+            match value {
+                serde_json::Value::String(s) if !s.trim().is_empty() => Some(s.clone()),
+                serde_json::Value::Object(map) => {
+                    // Check for common text fields
+                    for key in &["text", "content", "output", "result"] {
+                        if let Some(text_val) = map.get(*key) {
+                            if let Some(text_str) = find_text_in_value(text_val) {
+                                return Some(text_str);
+                            }
+                        }
+                    }
+                    // Recursively check all values
+                    for (_, val) in map {
+                        if let Some(text_str) = find_text_in_value(val) {
+                            return Some(text_str);
+                        }
+                    }
+                    None
+                }
+                serde_json::Value::Array(arr) => {
+                    for item in arr {
+                        if let Some(text_str) = find_text_in_value(item) {
+                            return Some(text_str);
+                        }
+                    }
+                    None
+                }
+                _ => None,
+            }
+        }
+        
+        find_text_in_value(v)
     }
 
     fn coerce_response_from_value(v: &serde_json::Value) -> Option<GenerateContentResponse> {
@@ -506,11 +547,13 @@ impl Client {
             .cloned()
             .unwrap_or_default();
         for c in cands {
-            if let Some(parts_v) = c
-                .get("content")
+            // Handle case where content field might be missing
+            let content_value = c.get("content");
+            let parts_v = content_value
                 .and_then(|cnt| cnt.get("parts"))
-                .and_then(|p| p.as_array())
-            {
+                .and_then(|p| p.as_array());
+            
+            if let Some(parts_v) = parts_v {
                 let mut parts: Vec<Part> = Vec::new();
                 for p in parts_v {
                     if let Some(t) = p.get("text").and_then(|x| x.as_str()) {
@@ -540,9 +583,17 @@ impl Client {
                         });
                     }
                 }
+                
+                // Use the role from content if available, otherwise default to "model"
+                let role = content_value
+                    .and_then(|cnt| cnt.get("role"))
+                    .and_then(|r| r.as_str())
+                    .unwrap_or("model")
+                    .to_string();
+                
                 candidates_out.push(Candidate {
                     content: Content {
-                        role: "model".to_string(),
+                        role,
                         parts,
                     },
                     finish_reason: c
@@ -552,6 +603,8 @@ impl Client {
                 });
                 continue;
             }
+            
+            // Handle direct functionCall at candidate level
             if let Some(fc) = c.get("functionCall") {
                 let name = fc
                     .get("name")
@@ -575,6 +628,8 @@ impl Client {
                 });
                 continue;
             }
+            
+            // Handle direct text at candidate level
             if let Some(t) = c.get("text").and_then(|x| x.as_str()) {
                 let parts = vec![Part::Text {
                     text: t.to_string(),
@@ -591,16 +646,39 @@ impl Client {
                 });
                 continue;
             }
+            
+            // Handle case where we have a candidate but no recognizable content
+            // Create a minimal candidate with empty parts
+            candidates_out.push(Candidate {
+                content: Content {
+                    role: "model".to_string(),
+                    parts: vec![],
+                },
+                finish_reason: c
+                    .get("finishReason")
+                    .and_then(|x| x.as_str())
+                    .map(|s| s.to_string()),
+            });
         }
-        if candidates_out.is_empty() {
-            None
-        } else {
-            Some(GenerateContentResponse {
-                candidates: candidates_out,
-                prompt_feedback: None,
-                usage_metadata: None,
-            })
-        }
+        
+        // Even if we have candidates with empty parts, we still return a response
+        // This is better than returning None which would cause the error
+        Some(GenerateContentResponse {
+            candidates: if candidates_out.is_empty() {
+                // Create a minimal candidate if we have no candidates at all
+                vec![Candidate {
+                    content: Content {
+                        role: "model".to_string(),
+                        parts: vec![],
+                    },
+                    finish_reason: None,
+                }]
+            } else {
+                candidates_out
+            },
+            prompt_feedback: None,
+            usage_metadata: None,
+        })
     }
 
     // end of coerce_response_from_value

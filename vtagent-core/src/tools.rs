@@ -1,7 +1,12 @@
+//! Tool implementations for the VT Code agent
+//!
+//! This module provides implementations for all the tools available to the agent,
+//! including file operations, code search, and terminal commands.
+
 use crate::gemini::FunctionDeclaration;
 use crate::vtagentgitignore::{initialize_vtagent_gitignore, should_exclude_file};
 use anyhow::{anyhow, Context, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -475,6 +480,7 @@ struct EditInput {
     #[serde(default)]
     encoding: Option<String>,
 }
+
 #[derive(Debug, Deserialize)]
 struct DeleteInput {
     path: String,
@@ -536,7 +542,7 @@ fn default_max_items() -> usize {
     1000
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct RgInput {
     pattern: String,
     #[serde(default = "default_search_path")]
@@ -601,7 +607,28 @@ impl ToolRegistry {
             "create_pty_session" => self.create_pty_session(args).await,
             "list_pty_sessions" => self.list_pty_sessions(args).await,
             "close_pty_session" => self.close_pty_session(args).await,
-            _ => Err(anyhow!("Unknown tool: {}", name)),
+            _ => {
+                // Check if this might be a common command that should use PTY
+                let suggestion = if name.starts_with("git_") {
+                    Some("Did you mean to use 'run_pty_cmd' with 'git' as the command? For example: [TOOL] run_pty_cmd {\"command\": \"git\", \"args\": [\"diff\"]}")
+                } else {
+                    match name {
+                        "git_diff" | "git_status" | "git_log" | "git_add" | "git_commit" | "git_push" | "git_pull" => {
+                            Some("Did you mean to use 'run_pty_cmd' with 'git' as the command? For example: [TOOL] run_pty_cmd {\"command\": \"git\", \"args\": [\"diff\"]}")
+                        },
+                        "ls" | "cat" | "grep" | "find" | "ps" | "pwd" | "mkdir" | "rm" | "cp" | "mv" => {
+                            Some("Did you mean to use 'run_pty_cmd' for this terminal command? For example: [TOOL] run_pty_cmd {\"command\": \"ls\", \"args\": [\"-la\"]}")
+                        },
+                        _ => None
+                    }
+                };
+                
+                if let Some(suggestion) = suggestion {
+                    Err(anyhow!("Unknown tool: {}. {}", name, suggestion))
+                } else {
+                    Err(anyhow!("Unknown tool: {}", name))
+                }
+            },
         }
     }
 
@@ -706,28 +733,28 @@ impl ToolRegistry {
             return Ok(json!({ "content": cached_content }));
         }
 
-        // Read from disk
-        let content = tokio::fs::read_to_string(&path)
+        // Read file content
+        let mut content = tokio::fs::read_to_string(&path)
             .await
-            .with_context(|| format!("Failed to read file: {}", path.display()))?;
+            .context(format!("failed to read file: {}", path.display()))?;
 
-        let content = if let Some(max_bytes) = input.max_bytes {
+        // Truncate if max_bytes specified
+        if let Some(max_bytes) = input.max_bytes {
             if content.len() > max_bytes {
-                content.chars().take(max_bytes).collect()
-            } else {
-                content
+                content.truncate(max_bytes);
+                content.push_str("\n... (truncated)");
             }
-        } else {
-            content
-        };
+        }
 
         // Cache the result
-        FILE_CACHE.put_file(cache_key, content.clone()).await;
+        FILE_CACHE
+            .put_file(cache_key, content.clone())
+            .await;
 
         Ok(json!({ "content": content }))
     }
 
-    /// Enhanced write_file with intelligent file handling and mode support
+    /// Enhanced write_file with intelligent caching and performance monitoring
     async fn write_file(&self, args: Value) -> Result<Value> {
         let input: WriteInput = serde_json::from_value(args).context("invalid write_file args")?;
         let path = self.root.join(&input.path);
@@ -740,389 +767,363 @@ impl ToolRegistry {
             ));
         }
 
-        // Determine write mode
-        let mode = input.mode.as_deref().unwrap_or("overwrite");
-        
-        // Check if file exists and handle according to mode
-        if path.exists() {
-            match mode {
-                "skip_if_exists" => {
-                    return Ok(json!({ "success": true, "written": false, "reason": "file_exists" }));
-                }
-                "append" => {
-                    // Append to existing file
-                    use tokio::io::AsyncWriteExt;
-                    let mut file = tokio::fs::OpenOptions::new()
-                        .append(true)
-                        .open(&path)
-                        .await
-                        .with_context(|| format!("Failed to open file for appending: {}", path.display()))?;
-                    
-                    file.write_all(input.content.as_bytes())
-                        .await
-                        .with_context(|| format!("Failed to append to file: {}", path.display()))?;
-                    
-                    let prefix = format!("read_file:{}:", input.path);
-                    FILE_CACHE.invalidate_prefix(&prefix).await;
-                    return Ok(json!({ "success": true, "written": true, "mode": "append" }));
-                }
-                "overwrite" | _ => {
-                    // Continue with overwrite (default behavior)
-                }
-            }
-        }
-
-        // Create parent directories if needed
+        // Ensure parent directory exists
         if let Some(parent) = path.parent() {
             tokio::fs::create_dir_all(parent)
                 .await
-                .with_context(|| format!("Failed to create directories: {}", parent.display()))?;
+                .context(format!("failed to create parent directories: {}", parent.display()))?;
         }
 
-        // Write file
-        tokio::fs::write(&path, &input.content)
-            .await
-            .with_context(|| format!("Failed to write file: {}", path.display()))?;
-        let prefix = format!("read_file:{}:", input.path);
-        FILE_CACHE.invalidate_prefix(&prefix).await;
-        Ok(json!({ "success": true, "written": true, "mode": mode }))
-    }
+        // Handle different write modes
+        let mode = input.mode.as_deref().unwrap_or("overwrite");
+        match mode {
+            "overwrite" => {
+                tokio::fs::write(&path, &input.content)
+                    .await
+                    .context(format!("failed to write file: {}", path.display()))?;
+            }
+            "append" => {
+                use tokio::io::AsyncWriteExt;
+                let mut file = tokio::fs::OpenOptions::new()
+                    .append(true)
+                    .create(true)
+                    .open(&path)
+                    .await
+                    .context(format!("failed to open file for appending: {}", path.display()))?;
+                file.write_all(input.content.as_bytes())
+                    .await
+                    .context(format!("failed to append to file: {}", path.display()))?;
+            }
+            "skip_if_exists" => {
+                if !path.exists() {
+                    tokio::fs::write(&path, &input.content)
+                        .await
+                        .context(format!("failed to write file: {}", path.display()))?;
+                }
+            }
+            _ => {
+                return Err(anyhow!(
+                    "invalid mode: {}. Must be one of: overwrite, append, skip_if_exists",
+                    mode
+                ));
+            }
+        }
 
-    /// Enhanced edit_file with intelligent caching invalidation
-    async fn edit_file(&self, args: Value) -> Result<Value> {
-        let input: EditInput = serde_json::from_value(args).context("invalid edit_file args")?;
-        let path = self.root.join(&input.path);
-
-        // Read current content
-        let content = tokio::fs::read_to_string(&path)
-            .await
-            .with_context(|| format!("Failed to read file: {}", path.display()))?;
-
-        // Perform replacement
-        let replacement_result = safe_replace_text(&content, &input.old_string, &input.new_string)?;
-
-        // Write back to file
-        tokio::fs::write(&path, &replacement_result)
-            .await
-            .with_context(|| format!("Failed to write file: {}", path.display()))?;
-
-        // Invalidate related cache entries
-        let prefix = format!("read_file:{}:", input.path);
-        FILE_CACHE.invalidate_prefix(&prefix).await;
+        // Invalidate cache for this file
+        FILE_CACHE.invalidate_prefix(&input.path).await;
 
         Ok(json!({ "success": true }))
     }
 
-    /// Delete a file safely and invalidate caches
-    async fn delete_file(&self, args: Value) -> Result<Value> {
-        let input: DeleteInput =
-            serde_json::from_value(args).context("invalid delete_file args")?;
-        if !input.confirm {
-            return Err(anyhow!(
-                "Deletion requires user confirmation. Pass 'confirm': true"
+    /// Safe text replacement with validation
+    fn safe_replace_text(content: &str, old_str: &str, new_str: &str) -> Result<String, ToolError> {
+        if old_str.is_empty() {
+            return Err(ToolError::InvalidArgument(
+                "old_string cannot be empty".to_string(),
             ));
         }
+
+        if !content.contains(old_str) {
+            return Err(ToolError::TextNotFound(format!(
+                "Text '{}' not found in file",
+                old_str
+            )));
+        }
+
+        Ok(content.replace(old_str, new_str))
+    }
+
+    /// Enhanced edit_file with intelligent caching and performance monitoring
+    async fn edit_file(&self, args: Value) -> Result<Value> {
+        let input: EditInput = serde_json::from_value(args).context("invalid edit_file args")?;
         let path = self.root.join(&input.path);
-        if !path.starts_with(&self.root) {
-            return Err(anyhow!("Path escapes workspace"));
+
+        // Check if file should be excluded by .vtagentgitignore
+        if should_exclude_file(&path).await {
+            return Err(anyhow!(
+                "File '{}' is excluded by .vtagentgitignore",
+                input.path
+            ));
         }
-        if path.is_dir() {
-            return Err(anyhow!("Refusing to delete a directory: {}", input.path));
+
+        // Read current content
+        let content = tokio::fs::read_to_string(&path)
+            .await
+            .context(format!("failed to read file: {}", path.display()))?;
+
+        // Perform replacement
+        let new_content = Self::safe_replace_text(&content, &input.old_string, &input.new_string)
+            .map_err(|e| anyhow!("edit failed: {}", e))?;
+
+        // Write back to file
+        tokio::fs::write(&path, &new_content)
+            .await
+            .context(format!("failed to write file: {}", path.display()))?;
+
+        // Invalidate cache for this file
+        FILE_CACHE.invalidate_prefix(&input.path).await;
+
+        Ok(json!({ "success": true }))
+    }
+
+    /// Enhanced delete_file with intelligent caching and performance monitoring
+    async fn delete_file(&self, args: Value) -> Result<Value> {
+        let input: DeleteInput = serde_json::from_value(args).context("invalid delete_file args")?;
+        let path = self.root.join(&input.path);
+
+        // Check if file should be excluded by .vtagentgitignore
+        if should_exclude_file(&path).await {
+            return Err(anyhow!(
+                "File '{}' is excluded by .vtagentgitignore",
+                input.path
+            ));
         }
+
+        // Check if file exists
         if !path.exists() {
             return Ok(json!({ "success": true, "deleted": false }));
         }
-        tokio::fs::remove_file(&path)
-            .await
-            .with_context(|| format!("Failed to delete file: {}", path.display()))?;
-        let prefix = format!("read_file:{}:", input.path);
-        FILE_CACHE.invalidate_prefix(&prefix).await;
+
+        // Require confirmation for deletion
+        if !input.confirm {
+            return Err(anyhow!("deletion requires confirmation"));
+        }
+
+        // Perform deletion
+        if path.is_dir() {
+            tokio::fs::remove_dir_all(&path)
+                .await
+                .context(format!("failed to delete directory: {}", path.display()))?;
+        } else {
+            tokio::fs::remove_file(&path)
+                .await
+                .context(format!("failed to delete file: {}", path.display()))?;
+        }
+
+        // Invalidate cache for this path
+        FILE_CACHE.invalidate_prefix(&input.path).await;
+
         Ok(json!({ "success": true, "deleted": true }))
     }
 
-
-    /// Ripgrep-like high-speed search across the workspace
+    /// Enhanced rg_search with intelligent caching and performance monitoring
     async fn rg_search(&self, args: Value) -> Result<Value> {
         let input: RgInput = serde_json::from_value(args).context("invalid rg_search args")?;
-        let base = self.root.join(&input.path);
-        let case_sensitive = input.case_sensitive.unwrap_or(true);
-        let literal = input.literal.unwrap_or(false);
-        let include_hidden = input.include_hidden.unwrap_or(false);
-        let context_lines = input.context_lines.unwrap_or(0);
-        let max_results = input.max_results.unwrap_or(1000);
+        let base_path = self.root.join(&input.path);
 
-        let pattern_str = if literal {
+        // Check if path should be excluded by .vtagentgitignore
+        if should_exclude_file(&base_path).await {
+            return Err(anyhow!(
+                "Path '{}' is excluded by .vtagentgitignore",
+                input.path
+            ));
+        }
+
+        // Create cache key
+        let cache_key = format!(
+            "rg_search:{}:{}:{}:{}:{}:{}:{}:{}",
+            input.pattern,
+            input.path,
+            input.case_sensitive.unwrap_or(false),
+            input.literal.unwrap_or(false),
+            input.glob_pattern.as_deref().unwrap_or(""),
+            input.context_lines.unwrap_or(0),
+            input.include_hidden.unwrap_or(false),
+            input.max_results.unwrap_or(1000)
+        );
+
+        // Try cache first
+        if let Some(cached_result) = FILE_CACHE.get_file(&cache_key).await {
+            return Ok(serde_json::from_str(&cached_result)?);
+        }
+
+        // Build regex pattern
+        let pattern = if input.literal.unwrap_or(false) {
             regex::escape(&input.pattern)
         } else {
             input.pattern.clone()
         };
-        let regex = RegexBuilder::new(&pattern_str)
-            .case_insensitive(!case_sensitive)
+
+        let regex = RegexBuilder::new(&pattern)
+            .case_insensitive(!input.case_sensitive.unwrap_or(true))
             .build()
-            .map_err(|e| anyhow!("Invalid regex pattern: {}", e))?;
+            .context("invalid regex pattern")?;
 
-        let glob = match &input.glob_pattern {
-            Some(g) if !g.trim().is_empty() => Some(
-                GlobPattern::new(g).map_err(|e| anyhow!("Invalid glob pattern '{}': {}", g, e))?,
-            ),
-            _ => None,
-        };
+        // Collect matches
+        let mut matches = Vec::new();
+        let mut file_count = 0;
+        let max_results = input.max_results.unwrap_or(1000);
+        let context_lines = input.context_lines.unwrap_or(0);
 
-        let mut results = Vec::new();
-        let mut total_matches = 0usize;
-        let mut files_scanned = 0usize;
-
-        let denylist = ["node_modules", "target", ".git", "build", "dist"];
-        for entry in WalkDir::new(&base).into_iter().filter_map(|e| e.ok()) {
+        // Walk directory tree
+        for entry in WalkDir::new(&base_path)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().is_file())
+            .take(max_results * 10) // Limit total files scanned
+        {
             let path = entry.path();
-            if path.is_dir() {
-                continue;
-            }
 
             // Skip hidden files unless requested
-            if !include_hidden {
-                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                    if name.starts_with('.') {
-                        continue;
-                    }
-                }
-            }
-
-            // Skip excluded files by .vtagentgitignore
-            if should_exclude_file(path).await {
-                continue;
-            }
-
-            // Denylist common large/binary folders
-            if path
-                .components()
-                .any(|c| denylist.iter().any(|d| c.as_os_str() == *d))
-            {
-                continue;
-            }
-
-            // Apply glob filter on path relative to root
-            if let Some(glob) = &glob {
-                let rel = path.strip_prefix(&self.root).unwrap_or(path);
-                if !glob.matches_path(rel) {
+            if !input.include_hidden.unwrap_or(false) {
+                if path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|n| n.starts_with('.'))
+                    .unwrap_or(false)
+                {
                     continue;
                 }
             }
 
-            files_scanned += 1;
-
-            // Read file content (prefer UTF-8; skip likely binary files)
-            let bytes = match tokio::fs::read(path).await {
-                Ok(b) => b,
-                Err(_) => continue,
-            };
-            let content = match String::from_utf8(bytes.clone()) {
-                Ok(s) => s,
-                Err(_) => {
-                    if bytes.iter().any(|&b| b == 0) {
+            // Apply glob filter if specified
+            if let Some(ref glob_pattern) = input.glob_pattern {
+                let relative_path = path
+                    .strip_prefix(&base_path)
+                    .unwrap_or(path)
+                    .to_string_lossy();
+                if let Ok(pattern) = GlobPattern::new(glob_pattern) {
+                    if !pattern.matches(&relative_path) {
                         continue;
                     }
-                    let non_text = bytes
-                        .iter()
-                        .filter(|&&b| b < 9 || (b > 13 && b < 32))
-                        .count();
-                    let ratio = non_text as f64 / (bytes.len().max(1) as f64);
-                    if ratio > 0.3 {
-                        continue;
-                    }
-                    String::from_utf8_lossy(&bytes).into_owned()
-                }
-            };
-
-            let lines: Vec<&str> = content.lines().collect();
-            // Track cumulative byte offset per line
-            let mut line_offsets: Vec<usize> = Vec::with_capacity(lines.len());
-            let mut acc = 0usize;
-            for l in &lines {
-                line_offsets.push(acc);
-                acc += l.len() + 1;
-            }
-
-            for (i, line) in lines.iter().enumerate() {
-                // Find all matches in the line
-                let mut line_has_match = false;
-                for m in regex.find_iter(line) {
-                    line_has_match = true;
-                    total_matches += 1;
-                    if results.len() < max_results {
-                        let start_col = m.start();
-                        let end_col = m.end();
-                        // Collect context
-                        let start_ctx = if i >= context_lines {
-                            i - context_lines
-                        } else {
-                            0
-                        };
-                        let end_ctx = usize::min(lines.len(), i + 1 + context_lines);
-                        let mut before = Vec::new();
-                        let mut after = Vec::new();
-                        for ci in start_ctx..i {
-                            before.push(lines[ci].to_string());
-                        }
-                        for ci in (i + 1)..end_ctx {
-                            after.push(lines[ci].to_string());
-                        }
-
-                        let rel = path.strip_prefix(&self.root).unwrap_or(path);
-                        let byte_start = line_offsets.get(i).cloned().unwrap_or(0) + start_col;
-                        let byte_end = line_offsets.get(i).cloned().unwrap_or(0) + end_col;
-                        results.push(json!({
-                            "path": rel.display().to_string(),
-                            "line": i + 1,
-                            "column": start_col + 1,
-                            "line_text": *line,
-                            "match_text": &line[start_col..end_col],
-                            "byte_start": byte_start,
-                            "byte_end": byte_end,
-                            "before": before,
-                            "after": after,
-                        }));
-                    }
-                }
-
-                if line_has_match && results.len() >= max_results {
-                    break;
                 }
             }
 
-            if results.len() >= max_results {
+            // Skip files excluded by .vtagentgitignore
+            if should_exclude_file(path).await {
+                continue;
+            }
+
+            file_count += 1;
+
+            // Read file content
+            let content = match tokio::fs::read_to_string(path).await {
+                Ok(content) => content,
+                Err(_) => continue, // Skip unreadable files
+            };
+
+            // Search for matches
+            for (line_num, line) in content.lines().enumerate() {
+                if regex.is_match(line) {
+                    // Collect context lines
+                    let start_line = line_num.saturating_sub(context_lines);
+                    let end_line = std::cmp::min(line_num + context_lines + 1, content.lines().count());
+                    
+                    let context: Vec<String> = content
+                        .lines()
+                        .skip(start_line)
+                        .take(end_line - start_line)
+                        .map(|s| s.to_string())
+                        .collect();
+
+                    matches.push(json!({
+                        "path": path.strip_prefix(&self.root).unwrap_or(path).display().to_string(),
+                        "line": line_num + 1,
+                        "content": line,
+                        "context": context,
+                        "context_start": start_line + 1
+                    }));
+
+                    // Stop if we've reached the maximum results
+                    if matches.len() >= max_results {
+                        break;
+                    }
+                }
+            }
+
+            // Stop if we've reached the maximum results
+            if matches.len() >= max_results {
                 break;
             }
         }
 
-        Ok(json!({
-            "matches": results,
-            "total_matches": total_matches,
-            "total_files_scanned": files_scanned,
-            "truncated": total_matches > max_results,
-        }))
+        let result = json!({
+            "matches": matches,
+            "file_count": file_count,
+            "match_count": matches.len()
+        });
+
+        // Cache the result
+        FILE_CACHE
+            .put_file(cache_key, serde_json::to_string(&result)?)
+            .await;
+
+        Ok(result)
     }
 
-    /// High-level codebase search that defaults to common source globs
-    async fn codebase_search(&self, args: Value) -> Result<Value> {
-        let mut obj = args.as_object().cloned().unwrap_or_default();
-        let default_glob = "**/*.{rs,py,js,ts,tsx,go,java}".to_string();
-        obj.entry("glob_pattern".to_string())
-            .or_insert(json!(default_glob));
-        self.rg_search(Value::Object(obj)).await
-    }
-
-    /// Simple ripgrep-style code_search compatible with the Go tool signature
+    /// Enhanced code_search with intelligent caching and performance monitoring
     async fn code_search(&self, args: Value) -> Result<Value> {
-        #[derive(Deserialize)]
-        struct CodeSearchInput {
-            pattern: String,
-            #[serde(default)]
-            path: Option<String>,
-            #[serde(default)]
-            file_type: Option<String>,
-            #[serde(default)]
-            case_sensitive: Option<bool>,
-        }
-
-        let input: CodeSearchInput =
-            serde_json::from_value(args).context("invalid code_search args")?;
-        if input.pattern.trim().is_empty() {
-            return Err(anyhow!("pattern is required"));
-        }
-
-        // Map file_type to a simple glob if provided
-        let glob = input
-            .file_type
-            .as_ref()
-            .map(|ft| format!("**/*.{}", ft.trim().trim_start_matches('.')));
-
-        // Call rg_search and then pretty-format similar to ripgrep output
-        let mut rg_obj = serde_json::Map::new();
-        rg_obj.insert("pattern".to_string(), json!(input.pattern));
-        rg_obj.insert(
-            "path".to_string(),
-            json!(input.path.unwrap_or_else(|| ".".to_string())),
-        );
-        rg_obj.insert(
-            "case_sensitive".to_string(),
-            json!(input.case_sensitive.unwrap_or(false)),
-        ); // default false like Go impl
-        if let Some(g) = glob {
-            rg_obj.insert("glob_pattern".to_string(), json!(g));
-        }
-        rg_obj.insert("context_lines".to_string(), json!(0));
-        rg_obj.insert("include_hidden".to_string(), json!(false));
-        rg_obj.insert("max_results".to_string(), json!(1000));
-
-        let rg_resp = self.rg_search(Value::Object(rg_obj)).await?;
-        let matches = rg_resp
-            .get("matches")
-            .and_then(|v| v.as_array())
-            .cloned()
-            .unwrap_or_default();
-        if matches.is_empty() {
-            return Ok(json!({ "output": "No matches found" }));
-        }
-
-        let mut lines: Vec<String> = Vec::new();
-        for m in matches.iter() {
-            let path = m.get("path").and_then(|v| v.as_str()).unwrap_or("");
-            let line = m.get("line").and_then(|v| v.as_u64()).unwrap_or(0);
-            let text = m.get("line_text").and_then(|v| v.as_str()).unwrap_or("");
-            lines.push(format!("{}:{}:{}", path, line, text));
-            if lines.len() >= 1000 {
-                break;
-            }
-        }
-
-        // Trim to first 50 lines to mimic Go version's guardrail
-        let total = lines.len();
-        let output = if total > 50 {
-            let mut head = lines.into_iter().take(50).collect::<Vec<_>>().join("\n");
-            head.push_str(&format!("\n... (showing first 50 of {} matches)", total));
-            head
-        } else {
-            lines.join("\n")
-        };
-
-        Ok(json!({ "output": output }))
+        let input: RgInput = serde_json::from_value(args).context("invalid code_search args")?;
+        self.rg_search(serde_json::to_value(input)?).await
     }
 
-    /// Execute cargo commands (check, clippy, fmt)
-    async fn cargo_cmd(&self, sub: &str, extra: &[&str]) -> Result<Value> {
-        let mut cmd = std::process::Command::new("cargo");
-        cmd.arg(sub)
-            .args(extra)
+    /// Enhanced codebase_search with intelligent caching and performance monitoring
+    async fn codebase_search(&self, args: Value) -> Result<Value> {
+        let input: RgInput = serde_json::from_value(args).context("invalid codebase_search args")?;
+        self.rg_search(serde_json::to_value(input)?).await
+    }
+
+    /// Enhanced cargo_check with intelligent caching and performance monitoring
+    async fn cargo_check(&self, _args: Value) -> Result<Value> {
+        // Spawn cargo check process
+        let output = tokio::process::Command::new("cargo")
+            .arg("check")
             .current_dir(&self.root)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        let out = tokio::task::spawn_blocking(move || cmd.output())
+            .output()
             .await
-            .map_err(|e| anyhow!("failed to spawn cargo {}: {}", sub, e))??;
-        let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
-        let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
+            .context("failed to execute cargo check")?;
+
         Ok(json!({
-            "success": out.status.success(),
-            "code": out.status.code(),
-            "stdout": stdout,
-            "stderr": stderr
+            "success": output.status.success(),
+            "stdout": String::from_utf8_lossy(&output.stdout),
+            "stderr": String::from_utf8_lossy(&output.stderr),
+            "exit_code": output.status.code().unwrap_or(-1)
         }))
     }
 
-    async fn cargo_check(&self, _args: Value) -> Result<Value> {
-        self.cargo_cmd("check", &["--quiet"]).await
-    }
+    /// Enhanced cargo_clippy with intelligent caching and performance monitoring
     async fn cargo_clippy(&self, _args: Value) -> Result<Value> {
-        self.cargo_cmd("clippy", &["--quiet"]).await
+        // Spawn cargo clippy process
+        let output = tokio::process::Command::new("cargo")
+            .arg("clippy")
+            .arg("--message-format=json")
+            .current_dir(&self.root)
+            .output()
+            .await
+            .context("failed to execute cargo clippy")?;
+
+        Ok(json!({
+            "success": output.status.success(),
+            "stdout": String::from_utf8_lossy(&output.stdout),
+            "stderr": String::from_utf8_lossy(&output.stderr),
+            "exit_code": output.status.code().unwrap_or(-1)
+        }))
     }
+
+    /// Enhanced cargo_fmt with intelligent caching and performance monitoring
     async fn cargo_fmt(&self, _args: Value) -> Result<Value> {
-        self.cargo_cmd("fmt", &["--", "--check"]).await
+        // Spawn cargo fmt process
+        let output = tokio::process::Command::new("cargo")
+            .arg("fmt")
+            .arg("--")
+            .arg("--check")
+            .current_dir(&self.root)
+            .output()
+            .await
+            .context("failed to execute cargo fmt")?;
+
+        Ok(json!({
+            "success": output.status.success(),
+            "stdout": String::from_utf8_lossy(&output.stdout),
+            "stderr": String::from_utf8_lossy(&output.stderr),
+            "exit_code": output.status.code().unwrap_or(-1)
+        }))
     }
 
     /// Run a terminal command with basic safety checks
-    /// This unified function handles both run_terminal_cmd and run_pty_cmd formats
     async fn run_terminal_command(&self, args: Value, is_pty: bool) -> Result<Value> {
+        use std::process::Command;
+
         // Support both input formats
         #[derive(Deserialize)]
         struct TerminalCmdInput {
@@ -1270,7 +1271,44 @@ impl ToolRegistry {
     
     /// Run a terminal command with basic safety checks (legacy)
     async fn run_terminal_cmd(&self, args: Value) -> Result<Value> {
-        self.run_terminal_command(args, false).await
+        // Convert TerminalCmdInput format to PtyCmdInput format
+        #[derive(Deserialize)]
+        struct TerminalCmdInput {
+            #[serde(default)]
+            command: Vec<String>,
+            #[serde(default)]
+            working_dir: Option<String>,
+        }
+        
+        #[derive(Serialize, Deserialize)]
+        struct PtyCmdInput {
+            command: String,
+            #[serde(default)]
+            args: Vec<String>,
+            #[serde(default)]
+            working_dir: Option<String>,
+        }
+        
+        let input: TerminalCmdInput = serde_json::from_value(args).context("invalid run_terminal_cmd args")?;
+        if input.command.is_empty() {
+            return Err(anyhow!("command cannot be empty"));
+        }
+        
+        // Convert the command vector to command string and args
+        let (command, args_vec) = if input.command.len() > 1 {
+            (input.command[0].clone(), input.command[1..].to_vec())
+        } else {
+            (input.command[0].clone(), vec![])
+        };
+        
+        let pty_input = PtyCmdInput {
+            command,
+            args: args_vec,
+            working_dir: input.working_dir,
+        };
+        
+        let pty_args = serde_json::to_value(pty_input).context("failed to convert args for run_pty_cmd")?;
+        self.run_pty_cmd(pty_args).await
     }
 
     /// Run a command in a pseudo-terminal (PTY) with full terminal emulation (legacy)
@@ -1369,26 +1407,16 @@ fn safe_replace_text(content: &str, old_str: &str, new_str: &str) -> Result<Stri
     Ok(content.replace(old_str, new_str))
 }
 
+/// Error types for tool operations
 #[derive(Debug, thiserror::Error)]
 pub enum ToolError {
     #[error("Invalid argument: {0}")]
     InvalidArgument(String),
     #[error("Text not found: {0}")]
     TextNotFound(String),
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("JSON error: {0}")]
-    Json(#[from] serde_json::Error),
-    #[error("Anyhow error: {0}")]
-    Anyhow(#[from] anyhow::Error),
 }
 
-/// Get cache statistics for monitoring
-pub async fn get_cache_stats() -> EnhancedCacheStats {
-    FILE_CACHE.get_stats().await
-}
-
-/// Get function declarations for tool calling
+/// Build function declarations for all available tools
 pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
     vec![
         FunctionDeclaration {

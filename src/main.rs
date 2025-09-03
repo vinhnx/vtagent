@@ -11,10 +11,10 @@ use serde_json::json;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use vtcode_core::llm::{make_client, BackendKind};
-use vtcode_core::tools::{build_function_declarations, ToolRegistry};
-use vtcode_core::{
-    config::{ConfigManager, ToolPolicy, VTCodeConfig},
+use vtagent_core::llm::{make_client, BackendKind};
+use vtagent_core::tools::{build_function_declarations, ToolRegistry};
+use vtagent_core::{
+    config::{ConfigManager, ToolPolicy, VTAgentConfig},
     gemini::{Content, FunctionResponse, GenerateContentRequest, Part, Tool, ToolConfig},
     prompts::system::{generate_system_instruction_with_config, SystemPromptConfig},
     types::AgentConfig as CoreAgentConfig,
@@ -162,7 +162,7 @@ async fn main() -> Result<()> {
             println!("(Not implemented in minimal version)");
         }
         Commands::Init { force } => {
-            match VTCodeConfig::bootstrap_project(&config.workspace, force) {
+            match VTAgentConfig::bootstrap_project(&config.workspace, force) {
                 Ok(created_files) => {
                     if created_files.is_empty() {
                         println!("{} Configuration files already exist",
@@ -195,7 +195,7 @@ async fn main() -> Result<()> {
                 std::process::exit(1);
             }
 
-            match VTCodeConfig::create_sample_config(&output) {
+            match VTAgentConfig::create_sample_config(&output) {
                 Ok(_) => {
                     println!("{} Created sample configuration at: {}",
                              style("SUCCESS").green().bold(),
@@ -909,7 +909,7 @@ fn extract_readme_excerpt(md: &str, max_len: usize) -> String {
 
 fn summarize_workspace_languages(root: &std::path::Path) -> Option<String> {
     use std::collections::HashMap;
-    let analyzer = match vtcode_core::tree_sitter::analyzer::TreeSitterAnalyzer::new() {
+    let analyzer = match vtagent_core::tree_sitter::analyzer::TreeSitterAnalyzer::new() {
         Ok(a) => a,
         Err(_) => return None,
     };

@@ -748,7 +748,7 @@ Create specialized command patterns by:
 - **Multi-modal inputs** - Support for images, diagrams, audio
 - **Collaborative workflows** - Human-agent teaming patterns
 - **Domain specialization** - Industry-specific agent capabilities
-- **Advanced PTY automation** - Intelligent terminal session management with expectrl for pattern matching and automated responses, including proper exit code handling
+- **Advanced PTY automation** - Intelligent terminal session management with rexpect for pattern matching and automated responses, including proper exit code handling
 
 ## Related Work
 

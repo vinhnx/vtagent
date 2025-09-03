@@ -18,10 +18,8 @@ use regex::RegexBuilder;
 use std::num::NonZeroUsize;
 use std::process::Stdio;
 
-// PTY support with expectrl
-use expectrl::{Eof, Session};
-#[cfg(unix)]
-use expectrl::WaitStatus;
+// PTY support with rexpect
+use rexpect::spawn as spawn_pty;
 use std::collections::HashMap as PtySessionMap;
 use std::sync::Arc as PtyArc;
 use tokio::sync::Mutex as PtyMutex;
@@ -436,7 +434,7 @@ pub struct ToolRegistry {
     // Cache configuration
     max_cache_size: usize,
     // PTY session management
-    pty_sessions: Arc<PtyMutex<PtySessionMap<String, PtyArc<PtySession>>>>,
+    pty_sessions: Arc<PtyMutex<PtySessionMap<String, PtyArc<VtagentPtySession>>>>,
 }
 
 /// Tool operation statistics
@@ -495,7 +493,7 @@ struct ListInput {
 
 /// PTY Session structure for managing interactive terminal sessions
 #[derive(Debug, Clone)]
-pub struct PtySession {
+pub struct VtagentPtySession {
     pub id: String,
     pub command: String,
     pub args: Vec<String>,
@@ -1206,52 +1204,42 @@ impl ToolRegistry {
             (command_line, workdir)
         };
         
-        // Spawn a new session with expectrl
-        let mut command = std::process::Command::new("sh");
-        command.arg("-c").arg(&command_line).current_dir(&workdir);
-        let mut session = Session::spawn(command)
-            .map_err(|e| anyhow!("failed to spawn command with expectrl: {}", e))?;
+        // Spawn a new session with rexpect
+        let mut session = spawn_pty(&format!("sh -c 'cd {} && {}'", workdir.display(), command_line), Some(30000))
+            .map_err(|e| anyhow!("failed to spawn command with rexpect: {}", e))?;
         
         // Wait for the process to complete and capture all output
-        let output = session
-            .expect(Eof)
+        let output = session.exp_eof()
             .map_err(|e| anyhow!("failed to wait for command completion: {}", e))?;
         
         // Get the actual exit status from the process
         let (success, code) = {
             #[cfg(unix)]
             {
-                // On Unix systems, we can get the actual exit code
-                let process = session.get_process();
-                // Try to get the status
-                match process.status() {
-                    Ok(status) => {
-                        match status {
-                            WaitStatus::Exited(_pid, exit_code) => {
-                                (exit_code == 0, exit_code)
-                            }
-                            WaitStatus::Signaled(_pid, _signal, _dump) => {
-                                (false, 128) // Standard convention for signal termination
-                            }
-                            WaitStatus::Stopped(_pid, _signal) => {
-                                // Process was stopped, not terminated
-                                (false, 1)
-                            }
-                            WaitStatus::Continued(_pid) => {
-                                // Process was continued
-                                (true, 0)
-                            }
-                            WaitStatus::StillAlive => {
-                                // Process is still alive, assume success for backward compatibility
-                                (true, 0)
-                            }
-                        }
+                // On Unix systems, we can get the actual exit code from rexpect
+                match session.process.wait() {
+                    Ok(rexpect::process::wait::WaitStatus::Exited(_, exit_code)) => {
+                        (exit_code == 0, exit_code)
+                    }
+                    Ok(rexpect::process::wait::WaitStatus::Signaled(_, signal, _)) => {
+                        (false, 128 + signal as i32) // Standard convention for signal termination
+                    }
+                    Ok(rexpect::process::wait::WaitStatus::Stopped(_, _)) => {
+                        // Process was stopped, not terminated
+                        (false, 1)
+                    }
+                    Ok(rexpect::process::wait::WaitStatus::Continued(_)) => {
+                        // Process was continued
+                        (true, 0)
+                    }
+                    Ok(rexpect::process::wait::WaitStatus::StillAlive) => {
+                        // Process is still alive, assume success for backward compatibility
+                        (true, 0)
                     }
                     Err(e) => {
                         // If we can't get the status directly, we'll try to determine success based on the output
                         // This maintains backward compatibility with the original implementation
-                        // Log the error for debugging purposes
-                        eprintln!("Warning: Failed to get process status: {}", e);
+                        eprintln!("Warning: Failed to get process status from rexpect: {}", e);
                         (true, 0)
                     }
                 }
@@ -1268,13 +1256,13 @@ impl ToolRegistry {
             Ok(json!({
                 "success": success,
                 "code": code,
-                "output": String::from_utf8_lossy(output.get(0).unwrap_or(&[])).to_string()
+                "output": output
             }))
         } else {
             Ok(json!({
                 "success": success,
                 "code": code,
-                "stdout": String::from_utf8_lossy(output.get(0).unwrap_or(&[])).to_string(),
+                "stdout": output,
                 "stderr": "" // For now, we're capturing combined output
             }))
         }
@@ -1308,7 +1296,7 @@ impl ToolRegistry {
         }
         
         // Create a new PTY session
-        let session = PtySession {
+        let session = VtagentPtySession {
             id: input.session_id.clone(),
             command: input.command.clone(),
             args: input.args.clone(),

@@ -127,4 +127,8 @@ port https://github.com/rust-cli/rexpect
 
 --
 
-remove run_terminal_cmd and use run_pty_cmd tool 
+run_terminal_cmd should use run_pty_cmd tool entirely for context and have follow up response -> so invoke run_pty_cmd in run_terminal_cmd
+
+--
+
+│ > remove vtagent to vtcode or "VT Code" for welcome message and every reference to vtagent as "VT Code".                                      │

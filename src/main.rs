@@ -5,6 +5,7 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use console::style;
+
 use regex::Regex;
 use serde_json::json;
 use std::fs;
@@ -329,7 +330,10 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
     } else {
         println!("{} Using default configuration (no vtagent.toml found)",
                  style("CONFIG").dim());
-    }    loop {
+    }
+    
+    // Track if the last tool call was a PTY command to suppress model echo
+    let mut last_tool_was_pty = false;    loop {
         // Safety checks: prevent runaway sessions
         total_turns += 1;
         if total_turns >= max_conversation_turns {
@@ -462,9 +466,16 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                         Part::Text { text } => {
                             had_any_content = true;
                             if !text.trim().is_empty() {
-                                if !printed_any_text {
-                                    println!("{}", text);
-                                    printed_any_text = true;
+                                // Check if this is a model response after a PTY command
+                                if last_tool_was_pty {
+                                    // For PTY commands, we suppress the model's text response
+                                    // but we still add it to the conversation history
+                                    last_tool_was_pty = false; // Reset the flag
+                                } else {
+                                    if !printed_any_text {
+                                        println!("{}", text);
+                                        printed_any_text = true;
+                                    }
                                 }
                                 conversation.push(Content {
                                     role: "model".to_string(),
@@ -610,20 +621,52 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                                     
                                     // Special handling for PTY tools to render output
                                     if tool_name == "run_pty_cmd" || tool_name == "run_pty_cmd_streaming" {
-                                        if let Some(output) = val.get("output").and_then(|v| v.as_str()) {
+                                        // Handle both "output" and "stdout" fields for compatibility
+                                        let output = val.get("output").and_then(|v| v.as_str())
+                                            .or_else(|| val.get("stdout").and_then(|v| v.as_str()));
+                                        
+                                        if let Some(output_str) = output {
                                             let title = if tool_name == "run_pty_cmd" {
                                                 "PTY Command Output"
                                             } else {
                                                 "PTY Streaming Output"
                                             };
-                                            if let Err(e) = render_pty_output(output, title) {
+                                            
+                                            // Extract command for display
+                                            let command_str = args.get("command").and_then(|v| v.as_str())
+                                                .map(|cmd| {
+                                                    if let Some(args_arr) = args.get("args").and_then(|v| v.as_array()) {
+                                                        let args_str: Vec<String> = args_arr.iter()
+                                                            .filter_map(|arg| arg.as_str())
+                                                            .map(|s| s.to_string())
+                                                            .collect();
+                                                        if args_str.is_empty() {
+                                                            cmd.to_string()
+                                                        } else {
+                                                            format!("{} {}", cmd, args_str.join(" "))
+                                                        }
+                                                    } else {
+                                                        cmd.to_string()
+                                                    }
+                                                });
+                                            
+                                            if let Err(e) = render_pty_output_fn(output_str, title, command_str.as_deref()) {
                                                 eprintln!("{} Failed to render PTY output: {}", 
                                                     style("[ERROR]").red().bold(), e);
                                             }
+                                        } else {
+                                            // If no output field, try to display the full response for debugging
+                                            eprintln!("{} PTY command completed with response: {:?}", 
+                                                style("[DEBUG]").yellow().bold(), val);
                                         }
+                                        
+                                        // For PTY commands, we don't want the model to echo the output again
+                                        // So we return a minimal response and set the flag
+                                        last_tool_was_pty = true;
+                                        json!({ "ok": true, "result": { "status": "completed" } })
+                                    } else {
+                                        json!({ "ok": true, "result": val })
                                     }
-                                    
-                                    json!({ "ok": true, "result": val })
                                 }
                                 Err(err) => {
                                     println!(
@@ -689,12 +732,33 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
 }
 
 /// Render PTY output in a terminal-like interface
-fn render_pty_output(output: &str, title: &str) -> Result<()> {
-    // For now, we'll just print the output with a header
-    // In a future implementation, we could use our bubbletea renderer
-    println!("{}", style(format!("=== PTY Output: {} ===", title)).blue().bold());
-    println!("{}", output);
-    println!("{}", style("=== End PTY Output ===").blue().bold());
+fn render_pty_output_fn(output: &str, title: &str, command: Option<&str>) -> Result<()> {
+    use console::style;
+    use std::io::Write;
+    
+    // Print top border
+    println!("{}", style("=".repeat(80)).dim());
+    
+    // Print title
+    println!("{} {}", style("==").blue().bold(), style(title).blue().bold());
+    
+    // Print command if available
+    if let Some(cmd) = command {
+        println!("{}", style(format!("> {}", cmd)).dim());
+    }
+    
+    // Print separator
+    println!("{}", style("-".repeat(80)).dim());
+    
+    // Print the output
+    print!("{}", output);
+    std::io::stdout().flush()?;
+    
+    // Print bottom border
+    println!("{}", style("-".repeat(80)).dim());
+    println!("{}", style("==").blue().bold());
+    println!("{}", style("=".repeat(80)).dim());
+    
     Ok(())
 }
 

@@ -234,8 +234,11 @@ impl Default for PtyConfig {
 fn default_max_conversation_turns() -> usize { 1000 }
 fn default_max_session_duration_minutes() -> u64 { 60 }
 fn default_max_conversation_history() -> usize { 100 }
-fn default_max_steps() -> usize { 5 }
-fn default_max_empty_responses() -> usize { 3 }
+/// Maximum tool calls allowed per turn
+pub const MAX_TOOL_CALLS_PER_TURN: usize = 30;
+
+fn default_max_steps() -> usize { MAX_TOOL_CALLS_PER_TURN }
+fn default_max_empty_responses() -> usize { 10 }
 fn default_model() -> String { "gemini-2.5-flash-lite".to_string() }
 fn default_api_key_env() -> String { "GEMINI_API_KEY".to_string() }
 fn default_system_instruction() -> String { "You are a helpful coding assistant.".to_string() }

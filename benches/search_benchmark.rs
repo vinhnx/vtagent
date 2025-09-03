@@ -25,7 +25,7 @@ fn benchmark_search_performance(c: &mut Criterion) {
                 "pattern": "fn main",
                 "path": "."
             });
-            let _ = futures::executor::block_on(registry.execute_tool("rg_search", args));
+            let _ = futures::executor::block_on(registry.execute_tool("rp_search", args));
         });
     });
 
@@ -36,7 +36,7 @@ fn benchmark_search_performance(c: &mut Criterion) {
                 "pattern": "\\bfunction\\b",
                 "path": "."
             });
-            let _ = futures::executor::block_on(registry.execute_tool("rg_search", args));
+            let _ = futures::executor::block_on(registry.execute_tool("rp_search", args));
         });
     });
 
@@ -48,7 +48,7 @@ fn benchmark_search_performance(c: &mut Criterion) {
                 "path": ".",
                 "case_sensitive": false
             });
-            let _ = futures::executor::block_on(registry.execute_tool("rg_search", args));
+            let _ = futures::executor::block_on(registry.execute_tool("rp_search", args));
         });
     });
 
@@ -60,7 +60,7 @@ fn benchmark_search_performance(c: &mut Criterion) {
                 "path": ".",
                 "context_lines": 3
             });
-            let _ = futures::executor::block_on(registry.execute_tool("rg_search", args));
+            let _ = futures::executor::block_on(registry.execute_tool("rp_search", args));
         });
     });
 
@@ -72,7 +72,7 @@ fn benchmark_search_performance(c: &mut Criterion) {
                 "path": ".",
                 "glob_pattern": "**/*.rs"
             });
-            let _ = futures::executor::block_on(registry.execute_tool("rg_search", args));
+            let _ = futures::executor::block_on(registry.execute_tool("rp_search", args));
         });
     });
 
@@ -135,7 +135,7 @@ fn benchmark_file_operations(c: &mut Criterion) {
 fn create_test_files(temp_dir: &TempDir) {
     // Create a large file for performance testing
     let large_content = format!(
-        "fn main() {{\n    println!(\"Hello, world!\");\n}}\n\n{}",
+        "fn main() {\n    println!(\"Hello, world!\");\n}\n\n{}",
         "line content\n".repeat(1000)
     );
     std::fs::write(temp_dir.path().join("large_file.txt"), large_content).unwrap();

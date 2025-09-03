@@ -102,7 +102,7 @@ cargo run -- create-project my-api axum,serde,tokio,sqlx
 
 # Search the codebase using ripgrep-like tool (via chat)
 # Ask in chat: "Search for TODO and FIXME with 2 lines of context in Rust files"
-# The agent will use rg_search with appropriate arguments
+# The agent will use rp_search with appropriate arguments
 ```
 
 ### 4. Verify Everything Works

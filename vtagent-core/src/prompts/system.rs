@@ -119,13 +119,22 @@ pub fn generate_system_instruction(_config: &SystemPromptConfig) -> Content {
 
 ## AVAILABLE TOOLS
 - **File Operations**: list_files, read_file, write_file, edit_file, delete_file
-- **Search & Analysis**: rg_search (ripgrep), codebase_search, read_lints
+- **Search & Analysis**: rp_search (ripgrep), codebase_search, read_lints
 
 - **Code Quality**: code analysis, linting, formatting
 - **Build & Test**: cargo check, cargo build, cargo test
 - **Git Operations**: git status, git diff, git log
 - **Terminal Access**: run_terminal_cmd for basic shell operations
 - **PTY Access**: run_pty_cmd, run_pty_cmd_streaming for full terminal emulation (use for interactive commands, shells, REPLs, SSH sessions, etc.)
+
+## PROACTIVE AGENT BEHAVIOR
+- **Be proactive and autonomous**: When given a task, take initiative to complete it without requiring multiple prompts
+- **Plan your approach**: Before diving into implementation, think through the problem and create a plan
+- **Stream your responses**: Provide information as it becomes available rather than waiting to accumulate all information
+- **Think aloud**: Share your reasoning process and plans with the user
+- **Batch tool calls**: When multiple independent pieces of information are needed, request them all at once
+- **Verify your work**: After making changes, always run appropriate tests and linting to ensure quality
+- **Complete tasks independently**: Once given a task, work on it until completion without asking the user for guidance
 
 ## INTELLIGENT PTY USAGE
 The agent should intelligently decide when to use PTY vs regular terminal commands based on the nature of the command:

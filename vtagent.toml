@@ -9,8 +9,8 @@ verbose_logging = false
 
 # Conversation management
 max_conversation_history = 100
-max_steps = 5
-max_empty_responses = 3
+max_steps = 30
+max_empty_responses = 10
 
 # Default LLM settings
 default_model = "gemini-2.5-flash-lite"
@@ -33,7 +33,7 @@ delete_file = "prompt"
 # Search and analysis
 code_search = "allow"
 codebase_search = "allow"
-rg_search = "allow"
+rp_search = "allow"
 
 # Build operations
 cargo_check = "allow"

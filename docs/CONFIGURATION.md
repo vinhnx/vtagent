@@ -102,7 +102,7 @@ run_terminal_cmd = "prompt"
 **Common Tool Categories:**
 
 - File operations: `read_file`, `write_file`, `edit_file`, `delete_file`, `list_files`
-- Search: `code_search`, `codebase_search`, `rg_search`
+- Search: `code_search`, `codebase_search`, `rp_search`
 - Build: `cargo_check`, `cargo_build`, `cargo_test`, `cargo_fmt`, `cargo_clippy`
 
 ### [commands] - Unix Command Permissions

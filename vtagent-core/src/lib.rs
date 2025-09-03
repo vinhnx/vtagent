@@ -24,21 +24,20 @@ The agent follows proven patterns for reliable, long-running coding assistance:
 //! - **Error Recovery**: Intelligent error handling with context preservation
 //! - **Conversation Summarization**: Automatic compression for long sessions
 
-pub mod advanced_code_editing;
+//! VT Code Core Library
+//!
+//! This crate provides the core functionality for the VT Code agent,
+//! including tool implementations, LLM integration, and utility functions.
+
+// Public modules
 pub mod agent;
-pub mod async_file_ops;
 pub mod cli;
 pub mod code_completion;
-pub mod code_quality_tools;
 pub mod commands;
 pub mod config;
-pub mod context_analyzer;
-pub mod context_suggestions;
 pub mod conversation_summarizer;
 pub mod decision_tracker;
 pub mod diff_renderer;
-pub mod enhanced_file_ops;
-pub mod enhanced_tools;
 pub mod error_recovery;
 pub mod gemini;
 pub mod llm;
@@ -46,50 +45,32 @@ pub mod markdown_renderer;
 pub mod performance_monitor;
 pub mod performance_profiler;
 pub mod prompts;
-pub mod pty_renderer;
+pub mod rp_search;
 pub mod timeout_detector;
-pub mod timeout_policies;
 pub mod tools;
 pub mod tree_sitter;
 pub mod types;
-pub mod ui;
 pub mod vtagentgitignore;
 
-// Re-export commonly used types for convenience
-pub use advanced_code_editing::{EditPlan, MinimalCodeEditor, RefactorOperation};
-pub use agent::core::{Agent, AgentBuilder};
-pub use agent::snapshots::{AgentSnapshot, SnapshotConfig, SnapshotInfo, SnapshotManager};
-pub use cli::{Cli, Commands};
-pub use code_completion::{
-    CodeCompletionEngine, CompletionContext, CompletionSuggestion, COMPLETION_ENGINE,
-};
-pub use code_quality_tools::{CodeQualityManager, QualityAssessment, QualityGrade};
-pub use config::{
-    AgentConfig, CommandsConfig, ConfigManager, SecurityConfig, ToolPolicy, ToolsConfig,
-    VTAgentConfig,
-};
-pub use context_suggestions::{CodeSuggestion, ContextSuggestionEngine, SuggestionType};
-pub use conversation_summarizer::ConversationSummarizer;
-pub use decision_tracker::{Action, DecisionOutcome, DecisionTracker, ResponseType};
-pub use enhanced_file_ops::{EnhancedFileOps, EnhancedFileResult, FileOperationStats};
-pub use error_recovery::{ErrorContext, ErrorRecoveryManager, ErrorType};
-pub use gemini::{
-    Candidate, Client, Content, FunctionCall, FunctionResponse, GenerateContentRequest, Part, Tool,
-    ToolConfig,
-};
-pub use performance_monitor::{PerformanceMetrics, PerformanceMonitor, PERFORMANCE_MONITOR};
-pub use timeout_detector::{OperationType, TimeoutConfig, TimeoutDetector, TIMEOUT_DETECTOR};
-pub use timeout_policies::{
-    NetworkQuality, TimeoutPolicy, TimeoutPolicyConfig, TimeoutPolicyManager, POLICY_MANAGER,
-};
-pub use tools::{build_function_declarations, ToolError, ToolRegistry};
-pub use tree_sitter::{
-    CodeAnalysis, LanguageSupport, SyntaxTree, TreeSitterAnalyzer, TreeSitterError,
-};
+// Re-exports for convenience
+pub use agent::*;
+pub use cli::*;
+pub use code_completion::*;
+pub use commands::*;
+pub use config::*;
+pub use diff_renderer::*;
+pub use gemini::*;
+pub use llm::*;
+pub use markdown_renderer::*;
+pub use performance_monitor::*;
+pub use performance_profiler::*;
+pub use prompts::*;
+pub use rp_search::*;
+pub use timeout_detector::*;
+pub use tools::*;
+pub use tree_sitter::*;
 pub use types::*;
-pub use vtagentgitignore::{
-    filter_paths, initialize_vtagent_gitignore, should_exclude_file, VtagentGitignore,
-};
+pub use vtagentgitignore::*;
 
 #[cfg(test)]
 mod tests {

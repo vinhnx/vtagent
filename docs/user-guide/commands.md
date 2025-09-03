@@ -2,7 +2,7 @@
 
 This guide summarizes common actions and how to invoke them with vtagent. The agent exposes a suite of tools to the LLM; you interact with them via chat. When you ask to search, read, or edit files, the agent chooses an appropriate tool.
 
-## rg_search (ripgrep-like)
+## rp_search (ripgrep-like)
 
 High-speed code search with glob filters, context lines, and optional literal/regex matching.
 
@@ -26,7 +26,7 @@ High-speed code search with glob filters, context lines, and optional literal/re
 
 ```
 Ask: Search for TODO|FIXME across the repo with 2 lines of context in .rs files
-(Agent uses rg_search with)
+(Agent uses rp_search with)
 {
   "pattern": "TODO|FIXME",
   "path": ".",
@@ -64,5 +64,5 @@ Ask: Search for TODO|FIXME across the repo with 2 lines of context in .rs files
 ## Tips
 
 - The agent respects `.vtagentgitignore` to exclude files from search and I/O.
-- Prefer `rg_search` for fast, focused searches with glob filters and context.
+- Prefer `rp_search` for fast, focused searches with glob filters and context.
 - Ask for “N lines of context” when searching to understand usage in-place.

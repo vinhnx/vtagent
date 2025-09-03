@@ -54,7 +54,7 @@ https://gerred.github.io/building-an-agentic-system/index.html
 
 --
 
-cfonts "vtagent"
+cfonts "VT Code"
 
 
  ██╗   ██╗ ████████╗  █████╗   ██████╗  ███████╗ ███╗   ██╗ ████████╗
@@ -92,8 +92,6 @@ event handling and turn based management for agent loop
 
 --
 
-
-
 https://github.com/rust-cli/roff-rs
 
 --
@@ -120,15 +118,26 @@ https://github.com/Danau5tin/multi-agent-coding-system
 
 https://github.com/Danau5tin/multi-agent-coding-system/blob/main/PROJECT_STRUCTURE.md
 
-
---
-
-port https://github.com/rust-cli/rexpect
-
 --
 
 run_terminal_cmd should use run_pty_cmd tool entirely for context and have follow up response -> so invoke run_pty_cmd in run_terminal_cmd
 
 --
 
-│ > remove vtagent to vtcode or "VT Code" for welcome message and every reference to vtagent as "VT Code".                                      │
+long term plan: https://agentclientprotocol.com/overview/introduction for IDE integration
+
+--
+
+implement agent event loop, currently it just run once and return the turn. it should be a loop with event handling and turn based management like another ai coding agent
+
+---
+
+handle agent output text streaming
+
+---
+
+implement edit_tools if not exist in config, add to config with prompt.
+
+check if old_string and new_string are the same, if so, skip edit
+
+---

@@ -97,18 +97,19 @@ pub enum Commands {
 async fn main() -> Result<()> {
     let args = Cli::parse();
 
-    println!("{}", style("================================================================================").dim());
+    println!("{}", style("===================================================================").dim());
     println!("{}", style("
 
-    ██╗   ██╗ ████████╗  █████╗   ██████╗  ███████╗ ███╗   ██╗ ████████╗
-    ██║   ██║ ╚══██╔══╝ ██╔══██╗ ██╔════╝  ██╔════╝ ████╗  ██║ ╚══██╔══╝
-    ██║   ██║    ██║    ███████║ ██║  ███╗ █████╗   ██╔██╗ ██║    ██║
-    ╚██╗ ██╔╝    ██║    ██╔══██║ ██║   ██║ ██╔══╝   ██║╚██╗██║    ██║
-     ╚████╔╝     ██║    ██║  ██║ ╚██████╔╝ ███████╗ ██║ ╚████║    ██║
-      ╚═══╝      ╚═╝    ╚═╝  ╚═╝  ╚═════╝  ╚══════╝ ╚═╝  ╚═══╝    ╚═╝
+    ██╗   ██╗ ████████╗      ██████╗  ██████╗  ██████╗  ███████╗
+    ██║   ██║ ╚══██╔══╝     ██╔════╝ ██╔═══██╗ ██╔══██╗ ██╔════╝
+    ██║   ██║    ██║        ██║      ██║   ██║ ██║  ██║ █████╗
+    ╚██╗ ██╔╝    ██║        ██║      ██║   ██║ ██║  ██║ ██╔══╝
+     ╚████╔╝     ██║        ╚██████╗ ╚██████╔╝ ██████╔╝ ███████╗
+      ╚═══╝      ╚═╝         ╚═════╝  ╚═════╝  ╚═════╝  ╚══════╝
+
     ").bold());
-    println!("{}", style("================================================================================").dim());
-    println!("{}", style("Welcome to VTAgent - Research-preview Rust coding agent\n").cyan().bold());
+    println!("{}", style("===================================================================").dim());
+    println!("{}", style("Welcome to VT Code - Research-preview Rust coding agent\n").cyan().bold());
 
     // Get API key from environment, inferred by backend from model if not explicitly set
     let api_key = if let Ok(v) = std::env::var(&args.api_key_env) {
@@ -331,7 +332,7 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
         println!("{} Using default configuration (no vtagent.toml found)",
                  style("CONFIG").dim());
     }
-    
+
     // Track if the last tool call was a PTY command to suppress model echo
     let mut last_tool_was_pty = false;    loop {
         // Safety checks: prevent runaway sessions
@@ -618,20 +619,20 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                             {
                                 Ok(val) => {
                                     println!("{} {}", style("[TOOL OK]").green().bold(), tool_name);
-                                    
+
                                     // Special handling for PTY tools to render output
                                     if tool_name == "run_pty_cmd" || tool_name == "run_pty_cmd_streaming" {
                                         // Handle both "output" and "stdout" fields for compatibility
                                         let output = val.get("output").and_then(|v| v.as_str())
                                             .or_else(|| val.get("stdout").and_then(|v| v.as_str()));
-                                        
+
                                         if let Some(output_str) = output {
                                             let title = if tool_name == "run_pty_cmd" {
                                                 "PTY Command Output"
                                             } else {
                                                 "PTY Streaming Output"
                                             };
-                                            
+
                                             // Extract command for display
                                             let command_str = args.get("command").and_then(|v| v.as_str())
                                                 .map(|cmd| {
@@ -649,17 +650,17 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                                                         cmd.to_string()
                                                     }
                                                 });
-                                            
+
                                             if let Err(e) = render_pty_output_fn(output_str, title, command_str.as_deref()) {
-                                                eprintln!("{} Failed to render PTY output: {}", 
+                                                eprintln!("{} Failed to render PTY output: {}",
                                                     style("[ERROR]").red().bold(), e);
                                             }
                                         } else {
                                             // If no output field, try to display the full response for debugging
-                                            eprintln!("{} PTY command completed with response: {:?}", 
+                                            eprintln!("{} PTY command completed with response: {:?}",
                                                 style("[DEBUG]").yellow().bold(), val);
                                         }
-                                        
+
                                         // For PTY commands, we don't want the model to echo the output again
                                         // So we return a minimal response and set the flag
                                         last_tool_was_pty = true;
@@ -735,30 +736,30 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
 fn render_pty_output_fn(output: &str, title: &str, command: Option<&str>) -> Result<()> {
     use console::style;
     use std::io::Write;
-    
+
     // Print top border
     println!("{}", style("=".repeat(80)).dim());
-    
+
     // Print title
     println!("{} {}", style("==").blue().bold(), style(title).blue().bold());
-    
+
     // Print command if available
     if let Some(cmd) = command {
         println!("{}", style(format!("> {}", cmd)).dim());
     }
-    
+
     // Print separator
     println!("{}", style("-".repeat(80)).dim());
-    
+
     // Print the output
     print!("{}", output);
     std::io::stdout().flush()?;
-    
+
     // Print bottom border
     println!("{}", style("-".repeat(80)).dim());
     println!("{}", style("==").blue().bold());
     println!("{}", style("=".repeat(80)).dim());
-    
+
     Ok(())
 }
 

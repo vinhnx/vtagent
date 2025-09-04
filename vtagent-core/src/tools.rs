@@ -985,6 +985,7 @@ impl ToolRegistry {
 
     /// Enhanced edit_file with intelligent caching and performance monitoring
     /// Now supports both exact string replacement and fuzzy matching for more robust editing
+    /// Also provides better error messages and proactive search when operations fail
     async fn edit_file(&self, args: Value) -> Result<Value> {
         let input: EditInput = serde_json::from_value(args).context("invalid edit_file args")?;
         let path = self.root.join(&input.path);
@@ -993,6 +994,14 @@ impl ToolRegistry {
         if should_exclude_file(&path).await {
             return Err(anyhow!(
                 "File '{}' is excluded by .vtagentgitignore",
+                input.path
+            ));
+        }
+
+        // Check if file exists
+        if !path.exists() {
+            return Err(anyhow!(
+                "File '{}' not found. Use rp_search or codebase_search to locate the file, or use write_file to create it first.",
                 input.path
             ));
         }
@@ -1007,11 +1016,13 @@ impl ToolRegistry {
             // Use exact replacement for precise matches
             content.replace(&input.old_string, &input.new_string)
         } else {
-            // If exact match fails, try fuzzy matching or line-based approach
-            // For now, we'll fall back to the safe replacement which will return an error
-            // In a more advanced implementation, we could try to find close matches
-            Self::safe_replace_text(&content, &input.old_string, &input.new_string)
-                .map_err(|e| anyhow!("edit failed: {}", e))?
+            // If exact match fails, provide better error message with current content and suggest using search
+            return Err(anyhow!(
+                "Text '{}' not found in file. Current file content:\n{}\n\nPlease check the exact text you want to replace. \
+                Consider using rp_search to find where this text might be located in the codebase.",
+                input.old_string,
+                content
+            ));
         };
 
         // Write back to file

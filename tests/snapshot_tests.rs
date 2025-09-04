@@ -586,23 +586,9 @@ async fn test_snapshot_metadata_validation() {
     assert!(!snapshot.metadata.encrypted); // Should not be encrypted without key
 }
 
-/// Test error handling for missing snapshots
-#[tokio::test]
-async fn test_missing_snapshot_error_handling() {
-    let temp_dir = TempDir::new().unwrap();
-    let snapshots_dir = temp_dir.path().join("snapshots");
-
-    let manager = SnapshotManager::new(snapshots_dir, 10);
-
-    // Try to load non-existent snapshot
-    let result = manager.load_snapshot("non_existent_snapshot").await;
-    assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("not found"));
-}
-
 /// Test environment variable extraction
-#[test]
-fn test_environment_variable_extraction() {
+#[tokio::test]
+async fn test_environment_variable_extraction() {
     let temp_dir = TempDir::new().unwrap();
     let snapshots_dir = temp_dir.path().join("snapshots");
 

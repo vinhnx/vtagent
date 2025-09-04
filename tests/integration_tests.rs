@@ -2,7 +2,7 @@ use serde_json::json;
 use std::env;
 use std::path::PathBuf;
 use tempfile::TempDir;
-use vtagent::tools::ToolRegistry;
+use vtagent_core::tools::ToolRegistry;
 
 #[cfg(test)]
 mod integration_tests {
@@ -117,12 +117,13 @@ fn calculate_sum(a: i32, b: i32) -> i32 {
             "type": "regex"
         });
 
-        let result = registry.execute("grep_search", args).await;
+        let result = registry.execute("rp_search", args).await;
         assert!(result.is_ok());
 
         let response: serde_json::Value = result.unwrap();
-        assert!(response["results"]["matches"].is_array());
-        let matches = response["results"]["matches"].as_array().unwrap();
+        println!("Response: {:#?}", response);
+        assert!(response["matches"].is_array());
+        let matches = response["matches"].as_array().unwrap();
         assert!(!matches.is_empty());
     }
 }

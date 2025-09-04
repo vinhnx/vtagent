@@ -1,4 +1,38 @@
-Refactor and extract the core logic from #file:main.rs, #file:main_tui.rs, and #file:tea_chat.rs into small, modular pieces of work. The main core has become too large. Run jscpd to detect duplicated code and fix any identified duplications. Ensure the refactored modules are well-organized, maintainable, and follow best practices for code separation.
+Refactor and extract the core logic from #file:main.rs, #file:main_tui.rs, and #file:tea_chat.rs into small, modular pieces of work. The main core✅ **COMPLETED**: ast-grep Integration - The Unstoppable Coding Monster
+
+AST-grep has been successfully integrated into vtagent, transforming it into an "unstoppable coding monster" with syntax-aware code operations:
+
+**New Tools Added:**
+- `ast_grep_search`: Advanced AST-based pattern matching (e.g., find all console.log statements)
+- `ast_grep_transform`: Safe code transformations using structural patterns
+- `ast_grep_lint`: Rule-based code analysis for quality checks
+- `ast_grep_refactor`: Intelligent refactoring suggestions
+
+**Key Features:**
+- Syntax-aware code operations that understand code structure
+- Multi-language support (Rust, Python, JavaScript, TypeScript, Go, Java, C/C++, etc.)
+- Safe transformations that preserve code semantics
+- Pattern-based search using AST syntax like `"console.log($msg)"`, `"function $name($params) { $$$ }"`
+- Intelligent refactoring suggestions for code improvements
+
+**Implementation:**
+- CLI-based integration to avoid dependency conflicts
+- Comprehensive error handling and fallback mechanisms
+- Full integration with existing tool system
+- Updated system prompts with AST-grep capabilities
+- Created comprehensive usage guide (AST_GREP_GUIDE.md)
+
+**Why it's an "Unstoppable Coding Monster":**
+- Precision: AST-based matching eliminates false positives
+- Safety: Transformations preserve code structure
+- Scale: Process entire codebases with confidence
+- Intelligence: Understand code semantics, not just text
+- Flexibility: Create custom rules and patterns
+- Speed: Fast pattern matching on large codebases
+
+The integration successfully avoids tree-sitter version conflicts by using the ast-grep CLI interface, making it a robust and maintainable solution.
+
+---come too large. Run jscpd to detect duplicated code and fix any identified duplications. Ensure the refactored modules are well-organized, maintainable, and follow best practices for code separation.
 
 ---
 <https://github.com/laude-institute/terminal-bench?tab=readme-ov-file#submit-to-our-leaderboard>
@@ -139,16 +173,6 @@ to .md for human readable. let the vtagent read from .md system prompt. then we 
 
 https://ast-grep.github.io/guide/introduction.html
 
----
-
-enhance
-
-"write_file" => self.write_file(args).await,
-"edit_file" => self.edit_file(args).await,
-use these for reference
-> https://github.com/openai/codex/blob/main/codex-rs/core/src/tool_apply_patch.rs
-> https://github.com/openai/codex/blob/main/codex-rs/apply-patch/apply_patch_tool_instructions.md
-
 --
 
 >https://github.com/openai/codex/blob/main/codex-rs/core/src/prompt_for_compact_command.md
@@ -211,3 +235,48 @@ no, don't create find_similar_files function use rp_search      │
 │   prompt is compact concise and short but enought                 │
 │   information. then remove prompt/system.md only use              │
 │   system.rs
+
+--
+
+✅ **COMPLETED**: Search Text Tools Implementation
+
+I have successfully implemented comprehensive search text tools for vtagent:
+
+**New Advanced Search Tools Added:**
+- `fuzzy_search`: Advanced fuzzy text search that finds approximate matches across files
+- `similarity_search`: Content-based similarity search to find files with similar structure/patterns
+- `multi_pattern_search`: Boolean logic search (AND, OR, NOT) with multiple patterns
+- `extract_text_patterns`: Smart extraction of URLs, emails, TODOs, credentials, etc.
+
+**Enhanced File Operations with AST-grep Integration:**
+- `list_files`: Optional AST pattern filter to list only files containing specific patterns
+- `read_file`: Optional AST pattern extraction from file content
+- `write_file`/`edit_file`: Optional lint/refactor analysis after write operations
+- `delete_file`: Optional warning when deleting files with important AST patterns
+
+**Key Features:**
+- **Fuzzy Search**: Approximate matching with configurable similarity thresholds
+- **Similarity Search**: Find related files based on imports, functions, structure, or all patterns
+- **Boolean Logic Search**: Complex multi-pattern searches with AND, OR, NOT operations
+- **Pattern Extraction**: Automatically extract and categorize specific text patterns
+- **AST-aware File Ops**: Intelligent file operations with syntax awareness
+- **Smart Content Analysis**: Extract function names, imports, class definitions automatically
+
+**Why This Makes vtagent More Powerful:**
+- **Intelligent Discovery**: Find related code even when exact terms are unknown
+- **Pattern Recognition**: Automatically identify important code structures and patterns
+- **Content Analysis**: Extract meaningful information from codebases (TODOs, credentials, etc.)
+- **Contextual Operations**: File operations that understand code structure
+- **Advanced Filtering**: Powerful search capabilities beyond simple text matching
+
+The implementation leverages ripgrep for high-performance text search while adding intelligent content analysis and AST-aware capabilities through ast-grep integration.
+
+---
+
+--
+
+https://github.com/openai/codex/blob/234c0a0469db222f05df08d00ae5032312f77427/codex-rs/core/prompt.md?plain=1#L5
+
+--
+
+Conduct a comprehensive audit of the tools registry: First, compile a complete list of all registered tools, including their names, versions, descriptions, and dependencies. Then, systematically test each tool by executing its primary functions with sample inputs, verifying outputs against expected results, and checking for errors, performance issues, or compatibility problems. For each identified issue, document the problem details, root cause, and potential impact. Finally, implement fixes such as updating code, resolving dependencies, or removing obsolete tools, and re-test to confirm resolution before updating the registry.

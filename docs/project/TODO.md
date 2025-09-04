@@ -190,6 +190,10 @@ Key combos for common tasks:
 8. `/vibe`
 
 ---
+
 https://davidlattimore.github.io/posts/2025/09/02/rustforge-wild-performance-tricks.html
 
 --
+
+support llama.ccp, ollama, lmstudio local model
+

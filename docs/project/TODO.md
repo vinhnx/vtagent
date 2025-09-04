@@ -197,3 +197,17 @@ https://davidlattimore.github.io/posts/2025/09/02/rustforge-wild-performance-tri
 
 support llama.ccp, ollama, lmstudio local model
 
+
+---
+
+make the vtagent to be like: "Would you like me to do this for you? of every of the turn follow up"
+
+---
+
+no, don't create find_similar_files function use rp_search      │
+│   tool instead. don't create search grep folders files by         │
+│   yourself.  review @vtagent-core/src/prompts/system.rs  and      │
+│   @vtagent-core/src/prompts/system.md . make sure the system      │
+│   prompt is compact concise and short but enought                 │
+│   information. then remove prompt/system.md only use              │
+│   system.rs

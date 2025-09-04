@@ -31,6 +31,7 @@ The agent follows proven patterns for reliable, long-running coding assistance:
 
 // Public modules
 pub mod agent;
+pub mod apply_patch;
 pub mod cli;
 pub mod code_completion;
 pub mod commands;
@@ -41,7 +42,6 @@ pub mod diff_renderer;
 pub mod error_recovery;
 pub mod gemini;
 pub mod llm;
-pub mod markdown_renderer;
 pub mod performance_monitor;
 pub mod performance_profiler;
 pub mod prompts;
@@ -61,8 +61,6 @@ pub use config::*;
 pub use diff_renderer::*;
 pub use gemini::*;
 pub use llm::*;
-pub use markdown_renderer::*;
-pub use performance_monitor::*;
 pub use performance_profiler::*;
 pub use prompts::*;
 pub use rp_search::*;

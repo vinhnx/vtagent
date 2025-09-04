@@ -32,6 +32,7 @@ The agent follows proven patterns for reliable, long-running coding assistance:
 // Public modules
 pub mod agent;
 pub mod apply_patch;
+pub mod ast_grep;
 pub mod cli;
 pub mod code_completion;
 pub mod commands;

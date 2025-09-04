@@ -666,7 +666,28 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                                         last_tool_was_pty = true;
                                         json!({ "ok": true, "result": { "status": "completed" } })
                                     } else {
-                                        json!({ "ok": true, "result": val })
+                                        // For search tools, we want to format the response in a way that's easy for the LLM to understand
+                                        if tool_name == "code_search" || tool_name == "rp_search" || tool_name == "codebase_search" {
+                                            // Format search results in a more readable way
+                                            if let Some(matches) = val.get("matches").and_then(|m| m.as_array()) {
+                                                let mut formatted_results = String::new();
+                                                formatted_results.push_str("Search Results:\n");
+                                                for (i, m) in matches.iter().enumerate() {
+                                                    if let (Some(path), Some(line), Some(content)) = (
+                                                        m.get("path").and_then(|p| p.as_str()),
+                                                        m.get("line").and_then(|l| l.as_u64()),
+                                                        m.get("content").and_then(|c| c.as_str())
+                                                    ) {
+                                                        formatted_results.push_str(&format!("{}. {}:{}: {}\n", i+1, path, line, content));
+                                                    }
+                                                }
+                                                json!({ "ok": true, "result": { "search_completed": true, "results": formatted_results, "match_count": matches.len() } })
+                                            } else {
+                                                json!({ "ok": true, "result": val })
+                                            }
+                                        } else {
+                                            json!({ "ok": true, "result": val })
+                                        }
                                     }
                                 }
                                 Err(err) => {
@@ -685,6 +706,11 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                                     response: tool_result,
                                 },
                             }]));
+                            
+                            // Proactively suggest next steps for search tools
+                            if tool_name == "code_search" || tool_name == "rp_search" || tool_name == "codebase_search" {
+                                println!("{} Would you like me to explain the search results or perform another search?", style("[SUGGESTION]").cyan().bold());
+                            }
                         }
                         Part::FunctionResponse { .. } => {
                             conversation.push(Content {

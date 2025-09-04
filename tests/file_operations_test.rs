@@ -2,7 +2,7 @@ use anyhow::Result;
 use serde_json::json;
 use std::fs;
 use tempfile::TempDir;
-use vtagent::tools::{build_function_declarations, ToolRegistry};
+use vtagent_core::tools::{build_function_declarations, ToolRegistry};
 
 #[tokio::test]
 async fn test_tool_availability() -> Result<()> {

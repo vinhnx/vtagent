@@ -1,7 +1,7 @@
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
-use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
+use std::sync::atomic::AtomicU64;
 use std::time::{Duration, Instant};
 
 /// Performance metrics for different operations

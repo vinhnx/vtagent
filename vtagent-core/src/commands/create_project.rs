@@ -2,7 +2,7 @@
 
 use crate::tools::ToolRegistry;
 use crate::types::AgentConfig;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use console::style;
 use serde_json::json;
 

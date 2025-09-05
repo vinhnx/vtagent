@@ -22,40 +22,46 @@ pub async fn handle_compress_context_command(
     // Create a sample long conversation history to compress
     let sample_conversation = vec![
         Content::user_text("I want to create a Rust web application with user authentication"),
-        Content::system_text("I'll help you create a Rust web application with authentication. Let me start by exploring the current directory structure."),
+        Content::system_text(
+            "I'll help you create a Rust web application with authentication. Let me start by exploring the current directory structure.",
+        ),
         Content::user_parts(vec![Part::FunctionResponse {
             function_response: FunctionResponse {
                 name: "list_files".to_string(),
-                response: json!({"path": ".", "files": ["Cargo.toml", "src/main.rs"], "directories": ["src", "tests"]})
-            }
+                response: json!({"path": ".", "files": ["Cargo.toml", "src/main.rs"], "directories": ["src", "tests"]}),
+            },
         }]),
-        Content::system_text("I can see you already have a basic Rust project. Let me check what's in the main.rs file."),
+        Content::system_text(
+            "I can see you already have a basic Rust project. Let me check what's in the main.rs file.",
+        ),
         Content::user_parts(vec![Part::FunctionResponse {
             function_response: FunctionResponse {
                 name: "read_file".to_string(),
-                response: json!({"path": "src/main.rs", "content": "fn main() {\n    println!(\"Hello World!\");\n}", "metadata": {"size": 45}})
-            }
+                response: json!({"path": "src/main.rs", "content": "fn main() {\n    println!(\"Hello World!\");\n}", "metadata": {"size": 45}}),
+            },
         }]),
-        Content::system_text("Now I need to add web framework dependencies. I'll update Cargo.toml to include Axum and other necessary crates."),
+        Content::system_text(
+            "Now I need to add web framework dependencies. I'll update Cargo.toml to include Axum and other necessary crates.",
+        ),
         Content::user_parts(vec![Part::FunctionResponse {
             function_response: FunctionResponse {
                 name: "edit_file".to_string(),
-                response: json!({"status": "modified", "path": "Cargo.toml", "action": {"replacements_made": 1}})
-            }
+                response: json!({"status": "modified", "path": "Cargo.toml", "action": {"replacements_made": 1}}),
+            },
         }]),
         Content::system_text("Good! Now let me create the authentication module structure."),
         Content::user_parts(vec![Part::FunctionResponse {
             function_response: FunctionResponse {
                 name: "write_file".to_string(),
-                response: json!({"status": "created", "path": "src/auth.rs", "bytes_written": 234})
-            }
+                response: json!({"status": "created", "path": "src/auth.rs", "bytes_written": 234}),
+            },
         }]),
         Content::system_text("Now I'll create the main web server with authentication endpoints."),
         Content::user_parts(vec![Part::FunctionResponse {
             function_response: FunctionResponse {
                 name: "edit_file".to_string(),
-                response: json!({"status": "modified", "path": "src/main.rs", "action": {"replacements_made": 3}})
-            }
+                response: json!({"status": "modified", "path": "src/main.rs", "action": {"replacements_made": 3}}),
+            },
         }]),
     ];
 

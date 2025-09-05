@@ -6,7 +6,7 @@
 //! - Manage snapshot lifecycle and cleanup
 //! - Support compression and encryption
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -244,24 +244,35 @@ impl SnapshotManager {
             let entry = entry?;
             let path = entry.path();
 
-            if path.extension().and_then(|s| s.to_str()) == Some("json") {
-                if let Some(filename) = path.file_stem().and_then(|s| s.to_str()) {
-                    if let Some(turn_str) = filename.strip_prefix("turn_") {
-                        if let Ok(turn_number) = turn_str.parse::<usize>() {
-                            let metadata = fs::metadata(&path)?;
-                            snapshots.push(SnapshotInfo {
-                                turn_number,
-                                filename: filename.to_string(),
-                                size_bytes: metadata.len() as usize,
-                                created_at: metadata
-                                    .created()?
-                                    .duration_since(std::time::UNIX_EPOCH)?
-                                    .as_secs(),
-                            });
-                        }
-                    }
-                }
+            if path.extension().and_then(|s| s.to_str()) != Some("json") {
+                continue;
             }
+
+            let filename = match path.file_stem().and_then(|s| s.to_str()) {
+                Some(name) => name,
+                None => continue,
+            };
+
+            let turn_str = match filename.strip_prefix("turn_") {
+                Some(turn) => turn,
+                None => continue,
+            };
+
+            let turn_number = match turn_str.parse::<usize>() {
+                Ok(num) => num,
+                Err(_) => continue,
+            };
+
+            let metadata = fs::metadata(&path)?;
+            snapshots.push(SnapshotInfo {
+                turn_number,
+                filename: filename.to_string(),
+                size_bytes: metadata.len() as usize,
+                created_at: metadata
+                    .created()?
+                    .duration_since(std::time::UNIX_EPOCH)?
+                    .as_secs(),
+            });
         }
 
         snapshots.sort_by(|a, b| b.turn_number.cmp(&a.turn_number));

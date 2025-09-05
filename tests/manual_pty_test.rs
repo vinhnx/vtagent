@@ -9,19 +9,19 @@ use vtagent_core::tools::ToolRegistry;
 #[tokio::main]
 async fn main() -> Result<()> {
     println!("Testing PTY functionality...");
-    
+
     // Create a temporary directory for testing
     let temp_dir = TempDir::new()?;
     let workspace = temp_dir.path().to_path_buf();
     let registry = ToolRegistry::new(workspace.clone());
-    
+
     // Test 1: Basic PTY command
     println!("\n=== Test 1: Basic PTY command ===");
     let args = json!({
         "command": "echo",
         "args": ["Hello, PTY!"]
     });
-    
+
     match registry.execute_tool("run_pty_cmd", args).await {
         Ok(result) => {
             println!("Success: {:?}", result);
@@ -35,24 +35,29 @@ async fn main() -> Result<()> {
             return Err(e.into());
         }
     }
-    
+
     // Test 2: PTY command with working directory
     println!("\n=== Test 2: PTY command with working directory ===");
-    
+
     // Create a test file
     std::fs::write(workspace.join("test.txt"), "Hello, PTY from file!")?;
-    
+
     let args = json!({
         "command": "cat",
         "args": ["test.txt"]
     });
-    
+
     match registry.execute_tool("run_pty_cmd", args).await {
         Ok(result) => {
             println!("Success: {:?}", result);
             assert_eq!(result["success"], true);
             assert_eq!(result["code"], 0);
-            assert!(result["output"].as_str().unwrap().contains("Hello, PTY from file!"));
+            assert!(
+                result["output"]
+                    .as_str()
+                    .unwrap()
+                    .contains("Hello, PTY from file!")
+            );
             println!("✓ Test 2 passed");
         }
         Err(e) => {
@@ -60,16 +65,16 @@ async fn main() -> Result<()> {
             return Err(e.into());
         }
     }
-    
+
     // Test 3: PTY session management
     println!("\n=== Test 3: PTY session management ===");
-    
+
     // Create a PTY session
     let args = json!({
         "session_id": "test_session",
         "command": "bash"
     });
-    
+
     match registry.execute_tool("create_pty_session", args).await {
         Ok(result) => {
             println!("Create session result: {:?}", result);
@@ -82,13 +87,18 @@ async fn main() -> Result<()> {
             return Err(e.into());
         }
     }
-    
+
     // List PTY sessions
     let args = json!({});
     match registry.execute_tool("list_pty_sessions", args).await {
         Ok(result) => {
             println!("List sessions result: {:?}", result);
-            assert!(result["sessions"].as_array().unwrap().contains(&"test_session".into()));
+            assert!(
+                result["sessions"]
+                    .as_array()
+                    .unwrap()
+                    .contains(&"test_session".into())
+            );
             println!("✓ Session listed");
         }
         Err(e) => {
@@ -96,12 +106,12 @@ async fn main() -> Result<()> {
             return Err(e.into());
         }
     }
-    
+
     // Close PTY session
     let args = json!({
         "session_id": "test_session"
     });
-    
+
     match registry.execute_tool("close_pty_session", args).await {
         Ok(result) => {
             println!("Close session result: {:?}", result);
@@ -114,7 +124,7 @@ async fn main() -> Result<()> {
             return Err(e.into());
         }
     }
-    
+
     println!("\n=== All tests passed! ===");
     Ok(())
 }

@@ -67,7 +67,12 @@ async fn test_pty_session_management() -> Result<()> {
     // Test listing PTY sessions
     let args = json!({});
     let result = registry.execute_tool("list_pty_sessions", args).await?;
-    assert!(result["sessions"].as_array().unwrap().contains(&"test_session".into()));
+    assert!(
+        result["sessions"]
+            .as_array()
+            .unwrap()
+            .contains(&"test_session".into())
+    );
 
     // Test closing a PTY session
     let args = json!({

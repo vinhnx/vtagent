@@ -56,7 +56,7 @@ pub struct RpSearchResult {
 }
 
 /// State machine for rp_search orchestration.
-pub(crate) struct RpSearchManager {
+pub struct RpSearchManager {
     /// Unified state guarded by one mutex.
     state: Arc<Mutex<SearchState>>,
 
@@ -157,12 +157,7 @@ impl RpSearchManager {
                 query
             };
 
-            RpSearchManager::spawn_rp_search(
-                query,
-                search_dir,
-                cancellation_token,
-                state,
-            );
+            RpSearchManager::spawn_rp_search(query, search_dir, cancellation_token, state);
         });
     }
 
@@ -174,12 +169,12 @@ impl RpSearchManager {
     ) {
         // In a real implementation, this would perform the actual ripgrep search
         // For now, we'll just simulate the search completion
-        
+
         // Simulate search work
         thread::spawn(move || {
             // Simulate some work being done
             thread::sleep(Duration::from_millis(100));
-            
+
             let is_cancelled = cancellation_token.load(Ordering::Relaxed);
             if !is_cancelled {
                 // In a real implementation, this would send the search results
@@ -201,12 +196,12 @@ impl RpSearchManager {
             }
         });
     }
-    
+
     /// Perform an actual ripgrep search with the given input parameters
     pub async fn perform_search(&self, _input: RpSearchInput) -> Result<RpSearchResult> {
         // This would be implemented to actually call ripgrep
         // For now, returning a placeholder result
-        
+
         Ok(RpSearchResult {
             query: "test".to_string(),
             matches: vec![],

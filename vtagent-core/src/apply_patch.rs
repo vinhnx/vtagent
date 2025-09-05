@@ -3,15 +3,20 @@
 //! This module provides functionality to parse and apply patches in the format
 //! used by OpenAI Codex, which is designed to be easy to parse and safe to apply.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 /// Represents a patch operation
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PatchOperation {
-    AddFile { path: String, content: String },
-    DeleteFile { path: String },
+    AddFile {
+        path: String,
+        content: String,
+    },
+    DeleteFile {
+        path: String,
+    },
     UpdateFile {
         path: String,
         new_path: Option<String>,
@@ -180,9 +185,10 @@ impl Patch {
                 PatchOperation::AddFile { path, content } => {
                     let full_path = root.join(path);
                     if let Some(parent) = full_path.parent() {
-                        tokio::fs::create_dir_all(parent)
-                            .await
-                            .context(format!("failed to create parent directories: {}", parent.display()))?;
+                        tokio::fs::create_dir_all(parent).await.context(format!(
+                            "failed to create parent directories: {}",
+                            parent.display()
+                        ))?;
                     }
                     tokio::fs::write(&full_path, content)
                         .await
@@ -195,20 +201,28 @@ impl Patch {
                         if full_path.is_dir() {
                             tokio::fs::remove_dir_all(&full_path)
                                 .await
-                                .context(format!("failed to delete directory: {}", full_path.display()))?;
+                                .context(format!(
+                                    "failed to delete directory: {}",
+                                    full_path.display()
+                                ))?;
                         } else {
-                            tokio::fs::remove_file(&full_path)
-                                .await
-                                .context(format!("failed to delete file: {}", full_path.display()))?;
+                            tokio::fs::remove_file(&full_path).await.context(format!(
+                                "failed to delete file: {}",
+                                full_path.display()
+                            ))?;
                         }
                         results.push(format!("Deleted file: {}", path));
                     } else {
                         results.push(format!("File not found, skipped deletion: {}", path));
                     }
                 }
-                PatchOperation::UpdateFile { path, new_path, hunks } => {
+                PatchOperation::UpdateFile {
+                    path,
+                    new_path,
+                    hunks,
+                } => {
                     let full_path = root.join(path);
-                    
+
                     // Read existing content
                     let existing_content = if full_path.exists() {
                         tokio::fs::read_to_string(&full_path)
@@ -225,15 +239,17 @@ impl Patch {
                     let target_path = if let Some(new_path_str) = new_path {
                         let new_full_path = root.join(new_path_str);
                         if let Some(parent) = new_full_path.parent() {
-                            tokio::fs::create_dir_all(parent)
-                                .await
-                                .context(format!("failed to create parent directories: {}", parent.display()))?;
+                            tokio::fs::create_dir_all(parent).await.context(format!(
+                                "failed to create parent directories: {}",
+                                parent.display()
+                            ))?;
                         }
                         // Remove old file if path changed
                         if full_path.exists() {
-                            tokio::fs::remove_file(&full_path)
-                                .await
-                                .context(format!("failed to remove old file: {}", full_path.display()))?;
+                            tokio::fs::remove_file(&full_path).await.context(format!(
+                                "failed to remove old file: {}",
+                                full_path.display()
+                            ))?;
                         }
                         new_full_path
                     } else {
@@ -243,7 +259,7 @@ impl Patch {
                     tokio::fs::write(&target_path, new_content)
                         .await
                         .context(format!("failed to write file: {}", target_path.display()))?;
-                    
+
                     if let Some(new_path_str) = new_path {
                         results.push(format!("Updated file: {} -> {}", path, new_path_str));
                     } else {
@@ -261,13 +277,13 @@ impl Patch {
         let original_lines: Vec<&str> = content.lines().collect();
         let ends_with_newline = content.ends_with('\n');
         let mut lines: Vec<String> = original_lines.into_iter().map(|s| s.to_string()).collect();
-        
+
         // Apply hunks in reverse order to maintain line numbers
         for hunk in hunks.iter().rev() {
             // Find the position where this hunk should be applied
             // For simplicity, we'll just try to match the first few lines
             let mut line_index = 0;
-            
+
             // Try to find where the hunk should be applied by matching context
             if !hunk.lines.is_empty() {
                 // Look for the first non-context line to match
@@ -278,7 +294,10 @@ impl Patch {
                             if let Some(pos) = lines.iter().position(|l| l == text) {
                                 line_index = pos;
                                 // Adjust for context lines before this
-                                let context_lines_before = hunk.lines[..idx].iter().filter(|l| matches!(l, PatchLine::Context(_))).count();
+                                let context_lines_before = hunk.lines[..idx]
+                                    .iter()
+                                    .filter(|l| matches!(l, PatchLine::Context(_)))
+                                    .count();
                                 line_index = line_index.saturating_sub(context_lines_before);
                             }
                             break;
@@ -287,7 +306,7 @@ impl Patch {
                     }
                 }
             }
-            
+
             // Apply the lines in this hunk
             let mut i = line_index;
             for line in &hunk.lines {
@@ -319,7 +338,7 @@ impl Patch {
                 }
             }
         }
-        
+
         // Join lines with newlines, preserving the original trailing newline
         let result = lines.join("\n");
         if ends_with_newline && !result.is_empty() && !result.ends_with('\n') {
@@ -345,7 +364,7 @@ mod tests {
 
         let patch = Patch::parse(patch_str).unwrap();
         assert_eq!(patch.operations.len(), 1);
-        
+
         match &patch.operations[0] {
             PatchOperation::AddFile { path, content } => {
                 assert_eq!(path, "test.txt");
@@ -359,25 +378,25 @@ mod tests {
     async fn test_apply_add_file() -> Result<()> {
         let temp_dir = TempDir::new()?;
         let workspace = temp_dir.path().to_path_buf();
-        
+
         let patch_str = r#"*** Begin Patch
 *** Add File: hello.txt
 +Hello, world!
 +This is a test.
 *** End Patch"#;
-        
+
         let patch = Patch::parse(patch_str)?;
         let results = patch.apply(&workspace).await?;
-        
+
         assert_eq!(results.len(), 1);
         assert!(results[0].contains("Added file: hello.txt"));
-        
+
         let file_path = workspace.join("hello.txt");
         assert!(file_path.exists());
-        
+
         let content = tokio::fs::read_to_string(&file_path).await?;
         assert_eq!(content, "Hello, world!\nThis is a test.");
-        
+
         Ok(())
     }
 
@@ -385,22 +404,22 @@ mod tests {
     async fn test_apply_delete_file() -> Result<()> {
         let temp_dir = TempDir::new()?;
         let workspace = temp_dir.path().to_path_buf();
-        
+
         // Create a file to delete
         let file_path = workspace.join("to_delete.txt");
         tokio::fs::write(&file_path, "This file will be deleted").await?;
-        
+
         let patch_str = r#"*** Begin Patch
 *** Delete File: to_delete.txt
 *** End Patch"#;
-        
+
         let patch = Patch::parse(patch_str)?;
         let results = patch.apply(&workspace).await?;
-        
+
         assert_eq!(results.len(), 1);
         assert!(results[0].contains("Deleted file: to_delete.txt"));
         assert!(!file_path.exists());
-        
+
         Ok(())
     }
 }

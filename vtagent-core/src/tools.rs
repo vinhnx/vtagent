@@ -3,15 +3,17 @@
 //! This module provides implementations for all the tools available to the agent,
 //! including file operations, code search, and terminal commands.
 
+use crate::ast_grep::AstGrepEngine;
+use crate::file_search::{FileSearchConfig, FileSearcher};
+
 use crate::gemini::FunctionDeclaration;
 use crate::rp_search::RpSearchManager;
 use crate::vtagentgitignore::{initialize_vtagent_gitignore, should_exclude_file};
-use crate::ast_grep::AstGrepEngine;
-use anyhow::{anyhow, Context, Result};
-use std::env;
+use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
+use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -22,6 +24,8 @@ use dashmap::DashMap;
 use lru::LruCache;
 use once_cell::sync::Lazy;
 use std::num::NonZeroUsize;
+// Regex for pattern matching
+use regex;
 
 // PTY support with rexpect
 // use rexpect::spawn as spawn_pty;
@@ -636,19 +640,27 @@ impl ToolRegistry {
             "similarity_search" => self.similarity_search(args).await,
             "multi_pattern_search" => self.multi_pattern_search(args).await,
             "extract_text_patterns" => self.extract_text_patterns(args).await,
+            "find_config_file" => self.find_config_file(args).await,
+            "recursive_file_search" => self.recursive_file_search(args).await,
+            "search_files_with_content" => self.search_files_with_content(args).await,
+            "find_file_by_name" => self.find_file_by_name(args).await,
             _ => {
                 // Check if this might be a common command that should use PTY
                 let suggestion = if name.starts_with("git_") {
-                    Some("Did you mean to use 'run_pty_cmd' with 'git' as the command? For example: [TOOL] run_pty_cmd {\"command\": \"git\", \"args\": [\"diff\"]}")
+                    Some(
+                        "Did you mean to use 'run_pty_cmd' with 'git' as the command? For example: [TOOL] run_pty_cmd {\"command\": \"git\", \"args\": [\"diff\"]}",
+                    )
                 } else {
                     match name {
-                        "git_diff" | "git_status" | "git_log" | "git_add" | "git_commit" | "git_push" | "git_pull" => {
-                            Some("Did you mean to use 'run_pty_cmd' with 'git' as the command? For example: [TOOL] run_pty_cmd {\"command\": \"git\", \"args\": [\"diff\"]}")
-                        },
-                        "ls" | "cat" | "grep" | "find" | "ps" | "pwd" | "mkdir" | "rm" | "cp" | "mv" => {
-                            Some("Did you mean to use 'run_pty_cmd' for this terminal command? For example: [TOOL] run_pty_cmd {\"command\": \"ls\", \"args\": [\"-la\"]}")
-                        },
-                        _ => None
+                        "git_diff" | "git_status" | "git_log" | "git_add" | "git_commit"
+                        | "git_push" | "git_pull" => Some(
+                            "Did you mean to use 'run_pty_cmd' with 'git' as the command? For example: [TOOL] run_pty_cmd {\"command\": \"git\", \"args\": [\"diff\"]}",
+                        ),
+                        "ls" | "cat" | "grep" | "find" | "ps" | "pwd" | "mkdir" | "rm" | "cp"
+                        | "mv" => Some(
+                            "Did you mean to use 'run_pty_cmd' for this terminal command? For example: [TOOL] run_pty_cmd {\"command\": \"ls\", \"args\": [\"-la\"]}",
+                        ),
+                        _ => None,
                     }
                 };
 
@@ -657,7 +669,7 @@ impl ToolRegistry {
                 } else {
                     Err(anyhow!("Unknown tool: {}", name))
                 }
-            },
+            }
         }
     }
 
@@ -810,16 +822,14 @@ impl ToolRegistry {
 
         // If ast_grep_pattern is provided, extract AST matches
         // TODO: Implement AST-grep pattern extraction when engine is available
-        let mut ast_grep_matches: Option<Vec<String>> = None;
+        let ast_grep_matches: Option<Vec<String>> = None;
         // if let Some(pattern) = ast_grep_pattern {
         //     ast_grep_matches = self.ast_grep_engine.extract_matches(&path, &pattern).await.ok();
         // }
 
         // Cache the result (only if no ast_grep)
         if ast_grep_pattern.is_none() {
-            FILE_CACHE
-                .put_file(cache_key, content.clone())
-                .await;
+            FILE_CACHE.put_file(cache_key, content.clone()).await;
         }
 
         Ok(json!({ "content": content, "ast_grep_matches": ast_grep_matches }))
@@ -842,9 +852,10 @@ impl ToolRegistry {
 
         // Ensure parent directory exists
         if let Some(parent) = path.parent() {
-            tokio::fs::create_dir_all(parent)
-                .await
-                .context(format!("failed to create parent directories: {}", parent.display()))?;
+            tokio::fs::create_dir_all(parent).await.context(format!(
+                "failed to create parent directories: {}",
+                parent.display()
+            ))?;
         }
 
         // Handle different write modes
@@ -862,7 +873,10 @@ impl ToolRegistry {
                     .create(true)
                     .open(&path)
                     .await
-                    .context(format!("failed to open file for appending: {}", path.display()))?;
+                    .context(format!(
+                        "failed to open file for appending: {}",
+                        path.display()
+                    ))?;
                 file.write_all(input.content.as_bytes())
                     .await
                     .context(format!("failed to append to file: {}", path.display()))?;
@@ -889,8 +903,9 @@ impl ToolRegistry {
                 };
 
                 // Apply patch
-                let new_content = Self::apply_patch_enhanced(&existing_content, &input.content, true)
-                    .map_err(|e| anyhow!("patch application failed: {}", e))?;
+                let new_content =
+                    Self::apply_patch_enhanced(&existing_content, &input.content, true)
+                        .map_err(|e| anyhow!("patch application failed: {}", e))?;
 
                 // Write the patched content
                 tokio::fs::write(&path, &new_content)
@@ -909,8 +924,8 @@ impl ToolRegistry {
         FILE_CACHE.invalidate_prefix(&input.path).await;
 
         // Optionally run ast-grep lint/refactor
-        let mut lint_results: Option<Vec<String>> = None;
-        let mut refactor_results: Option<Vec<String>> = None;
+        let lint_results: Option<Vec<String>> = None;
+        let refactor_results: Option<Vec<String>> = None;
         // TODO: Implement AST-grep lint/refactor when engine is available
         // if ast_grep_lint {
         //     lint_results = self.ast_grep_engine.lint_file(&path).await.ok();
@@ -919,7 +934,9 @@ impl ToolRegistry {
         //     refactor_results = self.ast_grep_engine.refactor_file(&path).await.ok();
         // }
 
-        Ok(json!({ "success": true, "lint_results": lint_results, "refactor_results": refactor_results }))
+        Ok(
+            json!({ "success": true, "lint_results": lint_results, "refactor_results": refactor_results }),
+        )
     }
 
     /// Safe text replacement with validation
@@ -998,13 +1015,19 @@ impl ToolRegistry {
 
     /// Enhanced patch application with validation and error handling
     /// This implements a more robust approach similar to OpenAI Codex
-    fn apply_patch_enhanced(content: &str, patch: &str, validation: bool) -> Result<String, ToolError> {
+    fn apply_patch_enhanced(
+        content: &str,
+        patch: &str,
+        validation: bool,
+    ) -> Result<String, ToolError> {
         // For a production implementation, we would use a proper diff library
         // For now, we'll implement a simplified version
 
         // Basic validation - check if patch is empty
         if patch.trim().is_empty() {
-            return Err(ToolError::InvalidArgument("Patch cannot be empty".to_string()));
+            return Err(ToolError::InvalidArgument(
+                "Patch cannot be empty".to_string(),
+            ));
         }
 
         // Try to apply the patch
@@ -1019,7 +1042,7 @@ impl ToolRegistry {
                     // If result is empty but original wasn't, that's likely an error
                     if result_lines.is_empty() && !original_lines.is_empty() {
                         return Err(ToolError::InvalidArgument(
-                            "Patch would result in empty file".to_string()
+                            "Patch would result in empty file".to_string(),
                         ));
                     }
 
@@ -1030,8 +1053,8 @@ impl ToolRegistry {
                     }
                 }
                 Ok(result)
-            },
-            Err(e) => Err(e)
+            }
+            Err(e) => Err(e),
         }
     }
 
@@ -1041,9 +1064,9 @@ impl ToolRegistry {
         let lines: Vec<&str> = patch.lines().collect();
 
         // A valid patch should have at least some structure
-        let has_patch_indicators = lines.iter().any(|line| {
-            line.starts_with("@@") || line.starts_with("+") || line.starts_with("-")
-        });
+        let has_patch_indicators = lines
+            .iter()
+            .any(|line| line.starts_with("@@") || line.starts_with("+") || line.starts_with("-"));
 
         if !has_patch_indicators && lines.len() > 10 {
             // If it's long but has no patch indicators, it might be incorrect
@@ -1057,9 +1080,10 @@ impl ToolRegistry {
             // Check for malformed hunk headers
             if line.starts_with("@@") {
                 if !line.contains("@@") || line.matches("@@").count() < 2 {
-                    return Err(ToolError::InvalidArgument(
-                        format!("Malformed hunk header: {}", line)
-                    ));
+                    return Err(ToolError::InvalidArgument(format!(
+                        "Malformed hunk header: {}",
+                        line
+                    )));
                 }
             }
         }
@@ -1102,8 +1126,8 @@ impl ToolRegistry {
         FILE_CACHE.invalidate_prefix(&input.path).await;
 
         // Optionally run ast-grep lint/refactor
-        let mut lint_results: Option<Vec<String>> = None;
-        let mut refactor_results: Option<Vec<String>> = None;
+        let lint_results: Option<Vec<String>> = None;
+        let refactor_results: Option<Vec<String>> = None;
         // TODO: Implement AST-grep lint/refactor when engine is available
         // if ast_grep_lint {
         //     lint_results = self.ast_grep_engine.lint_file(&path).await.ok();
@@ -1112,13 +1136,15 @@ impl ToolRegistry {
         //     refactor_results = self.ast_grep_engine.refactor_file(&path).await.ok();
         // }
 
-        Ok(json!({ "success": true, "lint_results": lint_results, "refactor_results": refactor_results }))
+        Ok(
+            json!({ "success": true, "lint_results": lint_results, "refactor_results": refactor_results }),
+        )
     }
-
 
     /// Enhanced delete_file with intelligent caching and performance monitoring
     async fn delete_file(&self, args: Value) -> Result<Value> {
-        let input: DeleteInput = serde_json::from_value(args).context("invalid delete_file args")?;
+        let input: DeleteInput =
+            serde_json::from_value(args).context("invalid delete_file args")?;
         let path = self.root.join(&input.path);
         let ast_grep_warn_pattern = input.ast_grep_warn_pattern.clone();
 
@@ -1136,7 +1162,7 @@ impl ToolRegistry {
         }
 
         // If ast_grep_warn_pattern is provided, scan file for matches and warn if found
-        let mut ast_grep_matches: Option<Vec<String>> = None;
+        let ast_grep_matches: Option<Vec<String>> = None;
         if let Some(_pattern) = ast_grep_warn_pattern {
             // TODO: Implement AST-grep scanning when engine is available
             // ast_grep_matches = self.ast_grep_engine.extract_matches(&path, &pattern).await.ok();
@@ -1197,7 +1223,7 @@ impl ToolRegistry {
     /// Search using ripgrep
     async fn rg_search_with_ripgrep(&self, input: &RgInput) -> Result<Value> {
         let base_path = self.root.join(&input.path);
-        
+
         // Determine the working directory - it should be a directory, not a file
         let working_dir = if base_path.is_file() {
             // If base_path is a file, use its parent directory as the working directory
@@ -1211,18 +1237,14 @@ impl ToolRegistry {
         // Use full path to rg to avoid PATH issues
         let rg_path = env::var("RG_PATH").unwrap_or_else(|_| {
             // Check if rg exists in common locations, otherwise fallback to "rg"
-            let common_paths = [
-                "/opt/homebrew/bin/rg",
-                "/usr/local/bin/rg",
-                "/usr/bin/rg",
-            ];
-            
+            let common_paths = ["/opt/homebrew/bin/rg", "/usr/local/bin/rg", "/usr/bin/rg"];
+
             for path in &common_paths {
                 if std::fs::metadata(path).is_ok() {
                     return path.to_string();
                 }
             }
-            
+
             // Fallback to just "rg"
             "rg".to_string()
         });
@@ -1268,16 +1290,21 @@ impl ToolRegistry {
         }
 
         // Execute ripgrep with timeout
-        let output = match tokio::time::timeout(std::time::Duration::from_secs(30), cmd.output()).await {
-            Ok(Ok(output)) => output,
-            Ok(Err(e)) => return Err(anyhow!("failed to execute ripgrep: {}", e)),
-            Err(_) => return Err(anyhow!("ripgrep execution timed out")),
-        };
+        let output =
+            match tokio::time::timeout(std::time::Duration::from_secs(30), cmd.output()).await {
+                Ok(Ok(output)) => output,
+                Ok(Err(e)) => return Err(anyhow!("failed to execute ripgrep: {}", e)),
+                Err(_) => return Err(anyhow!("ripgrep execution timed out")),
+            };
 
         // Check if ripgrep executed successfully
         // Exit code 1 means no matches found, which is not an error
         if !output.status.success() && output.status.code() != Some(1) {
-            return Err(anyhow!("ripgrep failed with exit code: {:?}, stderr: {}", output.status.code(), String::from_utf8_lossy(&output.stderr)));
+            return Err(anyhow!(
+                "ripgrep failed with exit code: {:?}, stderr: {}",
+                output.status.code(),
+                String::from_utf8_lossy(&output.stderr)
+            ));
         }
 
         // Parse ripgrep JSON output
@@ -1310,12 +1337,22 @@ impl ToolRegistry {
                     }
                     Some("match") => {
                         if let Some(data) = value.get("data") {
-                            if let Some(line_number) = data.get("line_number").and_then(|n| n.as_u64()) {
-                                if let Some(submatches) = data.get("submatches").and_then(|s| s.as_array()) {
+                            if let Some(line_number) =
+                                data.get("line_number").and_then(|n| n.as_u64())
+                            {
+                                if let Some(submatches) =
+                                    data.get("submatches").and_then(|s| s.as_array())
+                                {
                                     if let Some(first_match) = submatches.first() {
-                                        if let Some(match_text) = first_match.get("match").and_then(|m| m.get("text")).and_then(|t| t.as_str()) {
+                                        if let Some(match_text) = first_match
+                                            .get("match")
+                                            .and_then(|m| m.get("text"))
+                                            .and_then(|t| t.as_str())
+                                        {
                                             // Get context lines
-                                            let context_start = line_number.saturating_sub(input.context_lines.unwrap_or(0) as u64);
+                                            let context_start = line_number.saturating_sub(
+                                                input.context_lines.unwrap_or(0) as u64,
+                                            );
                                             // For simplicity, we'll just store the match line and its context as the full content
                                             // A more complete implementation would fetch the actual context lines
                                             let context: Vec<String> = vec![match_text.to_string()];
@@ -1345,8 +1382,6 @@ impl ToolRegistry {
         }))
     }
 
-
-
     /// Enhanced code_search with intelligent caching and performance monitoring
     async fn code_search(&self, args: Value) -> Result<Value> {
         let input: RgInput = serde_json::from_value(args).context("invalid code_search args")?;
@@ -1355,7 +1390,8 @@ impl ToolRegistry {
 
     /// Enhanced codebase_search with intelligent caching and performance monitoring
     async fn codebase_search(&self, args: Value) -> Result<Value> {
-        let input: RgInput = serde_json::from_value(args).context("invalid codebase_search args")?;
+        let input: RgInput =
+            serde_json::from_value(args).context("invalid codebase_search args")?;
         self.rp_search(serde_json::to_value(input)?).await
     }
 
@@ -1368,8 +1404,9 @@ impl ToolRegistry {
             working_dir: Option<String>,
         }
 
-        let input: TerminalCommandInput = serde_json::from_value(args).context("invalid terminal command args")?;
-        
+        let input: TerminalCommandInput =
+            serde_json::from_value(args).context("invalid terminal command args")?;
+
         if input.command.is_empty() {
             return Err(anyhow!("command array cannot be empty"));
         }
@@ -1392,7 +1429,9 @@ impl ToolRegistry {
         if is_pty {
             // TODO: Implement proper PTY support using rexpect
             // For now, we'll fall back to regular command execution
-            println!("PTY support not fully implemented, falling back to regular command execution");
+            println!(
+                "PTY support not fully implemented, falling back to regular command execution"
+            );
         }
 
         let output = cmd.output().await.context("failed to execute command")?;
@@ -1445,22 +1484,29 @@ impl ToolRegistry {
     async fn ast_grep_search(&self, args: Value) -> Result<Value> {
         // If AST-grep engine is available, use it; otherwise fall back to rp_search
         if let Some(ref engine) = self.ast_grep_engine {
-            let args_obj = args.as_object().ok_or_else(|| anyhow!("Invalid arguments"))?;
+            let args_obj = args
+                .as_object()
+                .ok_or_else(|| anyhow!("Invalid arguments"))?;
             let pattern = args_obj
                 .get("pattern")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow!("Missing pattern argument"))?;
-            let path = args_obj
-                .get("path")
-                .and_then(|v| v.as_str())
-                .unwrap_or(".");
-            let language = args_obj
-                .get("language")
-                .and_then(|v| v.as_str());
-                
-            return engine.search(pattern, path, language).await;
+            let path = args_obj.get("path").and_then(|v| v.as_str()).unwrap_or(".");
+            let language = args_obj.get("language").and_then(|v| v.as_str());
+            let context_lines = args_obj
+                .get("context_lines")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize);
+            let max_results = args_obj
+                .get("max_results")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize);
+
+            return engine
+                .search(pattern, path, language, context_lines, max_results)
+                .await;
         }
-        
+
         // Fall back to regular rp_search if AST-grep is not available
         self.rp_search(args).await
     }
@@ -1468,7 +1514,9 @@ impl ToolRegistry {
     /// Transform code using AST-grep patterns
     async fn ast_grep_transform(&self, args: Value) -> Result<Value> {
         if let Some(ref engine) = self.ast_grep_engine {
-            let args_obj = args.as_object().ok_or_else(|| anyhow!("Invalid arguments"))?;
+            let args_obj = args
+                .as_object()
+                .ok_or_else(|| anyhow!("Invalid arguments"))?;
             let pattern = args_obj
                 .get("pattern")
                 .and_then(|v| v.as_str())
@@ -1477,134 +1525,618 @@ impl ToolRegistry {
                 .get("replacement")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow!("Missing replacement argument"))?;
-            let path = args_obj
-                .get("path")
-                .and_then(|v| v.as_str())
-                .unwrap_or(".");
-            let language = args_obj
-                .get("language")
-                .and_then(|v| v.as_str());
+            let path = args_obj.get("path").and_then(|v| v.as_str()).unwrap_or(".");
+            let language = args_obj.get("language").and_then(|v| v.as_str());
             let preview_only = args_obj
                 .get("preview_only")
                 .and_then(|v| v.as_bool())
                 .unwrap_or(true);
-                
-            return engine.transform(pattern, replacement, path, language, preview_only).await;
+            let update_all = args_obj
+                .get("update_all")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+
+            return engine
+                .transform(
+                    pattern,
+                    replacement,
+                    path,
+                    language,
+                    preview_only,
+                    update_all,
+                )
+                .await;
         }
-        
+
         Ok(json!({ "success": false, "error": "ast-grep engine not available" }))
     }
 
     /// Lint code using AST-grep
     async fn ast_grep_lint(&self, args: Value) -> Result<Value> {
         if let Some(ref engine) = self.ast_grep_engine {
-            let args_obj = args.as_object().ok_or_else(|| anyhow!("Invalid arguments"))?;
-            let path = args_obj
-                .get("path")
-                .and_then(|v| v.as_str())
-                .unwrap_or(".");
-            let language = args_obj
-                .get("language")
-                .and_then(|v| v.as_str());
-                
-            return engine.lint(path, language).await;
+            let args_obj = args
+                .as_object()
+                .ok_or_else(|| anyhow!("Invalid arguments"))?;
+            let path = args_obj.get("path").and_then(|v| v.as_str()).unwrap_or(".");
+            let language = args_obj.get("language").and_then(|v| v.as_str());
+            let severity_filter = args_obj.get("severity_filter").and_then(|v| v.as_str());
+
+            return engine.lint(path, language, severity_filter, None).await;
         }
-        
+
         Ok(json!({ "success": false, "error": "ast-grep engine not available" }))
     }
 
     /// Refactor code using AST-grep
     async fn ast_grep_refactor(&self, args: Value) -> Result<Value> {
         if let Some(ref engine) = self.ast_grep_engine {
-            let args_obj = args.as_object().ok_or_else(|| anyhow!("Invalid arguments"))?;
-            let path = args_obj
-                .get("path")
-                .and_then(|v| v.as_str())
-                .unwrap_or(".");
-            let language = args_obj
-                .get("language")
-                .and_then(|v| v.as_str());
+            let args_obj = args
+                .as_object()
+                .ok_or_else(|| anyhow!("Invalid arguments"))?;
+            let path = args_obj.get("path").and_then(|v| v.as_str()).unwrap_or(".");
+            let language = args_obj.get("language").and_then(|v| v.as_str());
             let refactor_type = args_obj
                 .get("refactor_type")
                 .and_then(|v| v.as_str())
                 .unwrap_or("all");
-                
+
             return engine.refactor(path, language, refactor_type).await;
         }
-        
+
         Ok(json!({ "success": false, "error": "ast-grep engine not available" }))
     }
 
     /// Fuzzy search functionality
     async fn fuzzy_search(&self, args: Value) -> Result<Value> {
-        self.rp_search(args).await
+        let args_obj = args
+            .as_object()
+            .ok_or_else(|| anyhow!("Invalid arguments"))?;
+        let query = args_obj
+            .get("query")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("Missing query argument"))?;
+        let path = args_obj.get("path").and_then(|v| v.as_str()).unwrap_or(".");
+        let max_results = args_obj
+            .get("max_results")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as usize)
+            .unwrap_or(50);
+        let _threshold = args_obj
+            .get("threshold")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.6);
+        let case_sensitive = args_obj
+            .get("case_sensitive")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+        // For fuzzy search, we'll use a more relaxed pattern matching
+        // This is a simple implementation that uses regex with word boundaries
+        // A more sophisticated implementation would use a dedicated fuzzy search library
+
+        // Convert the query to a regex pattern that allows for some flexibility
+        let mut regex_pattern = String::new();
+        for ch in query.chars() {
+            if ch.is_alphanumeric() {
+                regex_pattern.push(ch);
+                // Allow for optional characters between query characters for fuzzy matching
+                regex_pattern.push_str(".*?");
+            } else {
+                regex_pattern.push_str(&regex::escape(&ch.to_string()));
+            }
+        }
+
+        // Create ripgrep search input with the fuzzy pattern
+        let rg_input = json!({
+            "pattern": regex_pattern,
+            "path": path,
+            "max_results": max_results,
+            "case_sensitive": case_sensitive,
+        });
+
+        self.rp_search(rg_input).await
     }
 
     /// Similarity-based search
     async fn similarity_search(&self, args: Value) -> Result<Value> {
-        self.rp_search(args).await
+        let args_obj = args
+            .as_object()
+            .ok_or_else(|| anyhow!("Invalid arguments"))?;
+        let reference_file = args_obj
+            .get("reference_file")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("Missing reference_file argument"))?;
+        let search_path = args_obj
+            .get("search_path")
+            .and_then(|v| v.as_str())
+            .unwrap_or(".");
+        let max_results = args_obj
+            .get("max_results")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as usize)
+            .unwrap_or(20);
+        let content_type = args_obj
+            .get("content_type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("all");
+
+        // Read the reference file to extract patterns
+        let reference_path = self.root.join(reference_file);
+        if !reference_path.exists() {
+            return Err(anyhow!("Reference file not found: {}", reference_file));
+        }
+
+        let reference_content = tokio::fs::read_to_string(&reference_path)
+            .await
+            .context(format!("Failed to read reference file: {}", reference_file))?;
+
+        // Extract patterns based on content type
+        let patterns = match content_type {
+            "structure" => extract_structure_patterns(&reference_content),
+            "imports" => extract_import_patterns(&reference_content),
+            "functions" => extract_function_patterns(&reference_content),
+            _ => extract_all_patterns(&reference_content),
+        };
+
+        // Search for files containing similar patterns
+        let mut all_matches = Vec::new();
+
+        for pattern in patterns.iter().take(5) {
+            // Limit to top 5 patterns
+            // Create a search pattern for this extracted pattern
+            let search_pattern = format!(".*{}.*", regex::escape(pattern));
+
+            // Create ripgrep search input
+            let rg_input = json!({
+                "pattern": search_pattern,
+                "path": search_path,
+                "max_results": max_results / patterns.len().max(1),
+            });
+
+            if let Ok(results) = self.rp_search(rg_input).await {
+                if let Some(matches) = results.get("matches").and_then(|m| m.as_array()) {
+                    for m in matches {
+                        all_matches.push(m.clone());
+                    }
+                }
+            }
+        }
+
+        // Deduplicate matches by file path
+        let mut unique_matches = Vec::new();
+        let mut seen_files = std::collections::HashSet::new();
+
+        for m in all_matches {
+            if let Some(path) = m.get("path").and_then(|p| p.as_str()) {
+                if seen_files.insert(path.to_string()) {
+                    unique_matches.push(m);
+                }
+            }
+        }
+
+        Ok(json!({
+            "success": true,
+            "matches": unique_matches,
+            "count": unique_matches.len(),
+            "reference_file": reference_file,
+            "content_type": content_type
+        }))
     }
 
     /// Multi-pattern search
     async fn multi_pattern_search(&self, args: Value) -> Result<Value> {
-        self.rp_search(args).await
+        let args_obj = args
+            .as_object()
+            .ok_or_else(|| anyhow!("Invalid arguments"))?;
+        let patterns = args_obj
+            .get("patterns")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| anyhow!("Missing patterns argument"))?;
+        let logic = args_obj
+            .get("logic")
+            .and_then(|v| v.as_str())
+            .unwrap_or("AND");
+        let path = args_obj.get("path").and_then(|v| v.as_str()).unwrap_or(".");
+        let max_results = args_obj
+            .get("max_results")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as usize)
+            .unwrap_or(100);
+        let context_lines = args_obj
+            .get("context_lines")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as usize)
+            .unwrap_or(2);
+
+        // Combine patterns based on logic
+        let combined_pattern = match logic {
+            "AND" => {
+                // For AND logic, we need to find files that contain all patterns
+                // This is more complex and requires multiple searches
+                let mut all_matches = Vec::new();
+
+                for pattern in patterns {
+                    if let Some(pattern_str) = pattern.as_str() {
+                        let rg_input = json!({
+                            "pattern": pattern_str,
+                            "path": path,
+                            "max_results": max_results,
+                            "context_lines": context_lines,
+                        });
+
+                        if let Ok(results) = self.rp_search(rg_input).await {
+                            if let Some(matches) = results.get("matches").and_then(|m| m.as_array())
+                            {
+                                for m in matches {
+                                    all_matches.push(m.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Filter matches to only include files that contain all patterns
+                let mut file_counts = std::collections::HashMap::new();
+                for m in &all_matches {
+                    if let Some(file_path) = m.get("path").and_then(|p| p.as_str()) {
+                        *file_counts.entry(file_path.to_string()).or_insert(0) += 1;
+                    }
+                }
+
+                let required_count = patterns.len();
+                let filtered_matches: Vec<_> = all_matches
+                    .into_iter()
+                    .filter(|m| {
+                        if let Some(file_path) = m.get("path").and_then(|p| p.as_str()) {
+                            file_counts
+                                .get(file_path)
+                                .map_or(false, |&count| count == required_count)
+                        } else {
+                            false
+                        }
+                    })
+                    .take(max_results)
+                    .collect();
+
+                return Ok(json!({
+                    "success": true,
+                    "matches": filtered_matches,
+                    "count": filtered_matches.len(),
+                    "logic": logic
+                }));
+            }
+            "OR" => {
+                // For OR logic, create a regex that matches any of the patterns
+                let pattern_strings: Vec<_> = patterns.iter().filter_map(|p| p.as_str()).collect();
+
+                if pattern_strings.is_empty() {
+                    return Err(anyhow!("No valid patterns provided"));
+                }
+
+                format!("({})", pattern_strings.join("|"))
+            }
+            "NOT" => {
+                // For NOT logic, we'll search for the first pattern and exclude matches that contain other patterns
+                if patterns.is_empty() {
+                    return Err(anyhow!("No patterns provided for NOT logic"));
+                }
+
+                if let Some(first_pattern) = patterns.first().and_then(|p| p.as_str()) {
+                    first_pattern.to_string()
+                } else {
+                    return Err(anyhow!("Invalid first pattern for NOT logic"));
+                }
+            }
+            _ => {
+                return Err(anyhow!("Invalid logic value: {}", logic));
+            }
+        };
+
+        // Create ripgrep search input with the combined pattern
+        let rg_input = json!({
+            "pattern": combined_pattern,
+            "path": path,
+            "max_results": max_results,
+            "context_lines": context_lines,
+        });
+
+        self.rp_search(rg_input).await
     }
 
     /// Extract text patterns from files
     async fn extract_text_patterns(&self, args: Value) -> Result<Value> {
-        let _args = args;
-        Ok(json!({ "success": false, "error": "extract_text_patterns not implemented yet" }))
+        let args_obj = args
+            .as_object()
+            .ok_or_else(|| anyhow!("Invalid arguments"))?;
+        let path = args_obj.get("path").and_then(|v| v.as_str()).unwrap_or(".");
+        let pattern_types = args_obj
+            .get("pattern_types")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| anyhow!("Missing pattern_types argument"))?;
+        let max_results = args_obj
+            .get("max_results")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as usize)
+            .unwrap_or(200);
+
+        let mut all_patterns = Vec::new();
+
+        // Use ripgrep to search for patterns
+        for pattern_type in pattern_types {
+            if let Some(pattern_str) = pattern_type.as_str() {
+                let pattern = match pattern_str {
+                    "urls" => r"https?://[^\\s]+",
+                    "emails" => r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}",
+                    "todos" => r"TODO:?[^\n]*",
+                    "fixmes" => r"FIXME:?[^\n]*",
+                    "credentials" => r"(password|passwd|pwd|api_key|secret)\\s*[:=]\\s*[^\\s,;]+",
+                    "ip_addresses" => r"\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b",
+                    "phone_numbers" => {
+                        r"(\\+?1[-.\\s]?)?\\(?[0-9]{3}\\)?[-.\\s]?[0-9]{3}[-.\\s]?[0-9]{4}"
+                    }
+                    "file_paths" => r"[a-zA-Z0-9_\\-/\\\\]+\\.[a-zA-Z0-9]+",
+                    _ => continue,
+                };
+
+                // Create ripgrep search input
+                let rg_input = json!({
+                    "pattern": pattern,
+                    "path": path,
+                    "max_results": max_results,
+                });
+
+                if let Ok(results) = self.rp_search(rg_input).await {
+                    if let Some(matches) = results.get("matches").and_then(|m| m.as_array()) {
+                        for m in matches {
+                            all_patterns.push(m.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(json!({
+            "success": true,
+            "patterns": all_patterns,
+            "count": all_patterns.len()
+        }))
+    }
+
+    /// Find and return the path to the main configuration file (vtagent.toml)
+    async fn find_config_file(&self, _args: Value) -> Result<Value> {
+        let config_paths = [
+            "vtagent.toml",
+            ".vtagent.toml",
+            "config/vtagent.toml",
+            ".config/vtagent.toml",
+        ];
+
+        for path_str in &config_paths {
+            let path = self.root.join(path_str);
+            if path.exists() {
+                return Ok(json!({
+                    "success": true,
+                    "config_path": path_str,
+                    "full_path": path.display().to_string()
+                }));
+            }
+        }
+
+        // If not found in standard locations, search for any .toml file with vtagent in the name
+        let search_result = self
+            .rp_search(json!({
+                "pattern": "vtagent.*\\.toml",
+                "path": ".",
+                "max_results": 5
+            }))
+            .await?;
+
+        if let Some(matches) = search_result.get("matches").and_then(|m| m.as_array()) {
+            if let Some(first_match) = matches.first() {
+                if let Some(path) = first_match.get("path").and_then(|p| p.as_str()) {
+                    return Ok(json!({
+                        "success": true,
+                        "config_path": path,
+                        "full_path": self.root.join(path).display().to_string()
+                    }));
+                }
+            }
+        }
+
+        Ok(json!({
+            "success": false,
+            "error": "No vtagent.toml configuration file found in standard locations",
+            "suggested_locations": config_paths
+        }))
+    }
+
+    /// Recursively search for files in the workspace
+    async fn recursive_file_search(&self, args: Value) -> Result<Value> {
+        let args_obj = args.as_object().ok_or_else(|| anyhow!("Invalid arguments"))?;
+        let pattern = args_obj
+            .get("pattern")
+            .and_then(|v| v.as_str());
+        let path = args_obj
+            .get("path")
+            .and_then(|v| v.as_str())
+            .unwrap_or(".");
+        let max_results = args_obj
+            .get("max_results")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as usize)
+            .unwrap_or(100);
+        let include_hidden = args_obj
+            .get("include_hidden")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let file_extensions = args_obj
+            .get("file_extensions")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>()
+            });
+
+        // Create file searcher configuration
+        let mut config = FileSearchConfig::default();
+        config.max_results = max_results;
+        config.include_hidden = include_hidden;
+        
+        if let Some(extensions) = file_extensions {
+            config.include_extensions.extend(extensions);
+        }
+
+        let search_path = self.root.join(path);
+        let searcher = FileSearcher::new(search_path, config);
+        
+        match searcher.search_files(pattern) {
+            Ok(results) => Ok(FileSearcher::results_to_json(results)),
+            Err(e) => Ok(json!({ 
+                "success": false, 
+                "error": format!("Failed to search files: {}", e) 
+            })),
+        }
+    }
+
+    /// Search for files containing specific content
+    async fn search_files_with_content(&self, args: Value) -> Result<Value> {
+        let args_obj = args.as_object().ok_or_else(|| anyhow!("Invalid arguments"))?;
+        let content_pattern = args_obj
+            .get("content_pattern")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("Missing content_pattern argument"))?;
+        let file_pattern = args_obj
+            .get("file_pattern")
+            .and_then(|v| v.as_str());
+        let path = args_obj
+            .get("path")
+            .and_then(|v| v.as_str())
+            .unwrap_or(".");
+        let max_results = args_obj
+            .get("max_results")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as usize)
+            .unwrap_or(50);
+        let case_sensitive = args_obj
+            .get("case_sensitive")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
+
+        // Create file searcher configuration
+        let mut config = FileSearchConfig::default();
+        config.max_results = max_results;
+        
+        // Handle case sensitivity by converting to lowercase if needed
+        let search_pattern = if case_sensitive {
+            content_pattern.to_string()
+        } else {
+            content_pattern.to_lowercase()
+        };
+
+        let search_path = self.root.join(path);
+        let searcher = FileSearcher::new(search_path, config);
+        
+        match searcher.search_files_with_content(
+            &search_pattern,
+            file_pattern,
+        ) {
+            Ok(results) => Ok(FileSearcher::results_to_json(results)),
+            Err(e) => Ok(json!({ 
+                "success": false, 
+                "error": format!("Failed to search files with content: {}", e) 
+            })),
+        }
+    }
+
+    /// Find a specific file by name recursively
+    async fn find_file_by_name(&self, args: Value) -> Result<Value> {
+        let args_obj = args.as_object().ok_or_else(|| anyhow!("Invalid arguments"))?;
+        let file_name = args_obj
+            .get("file_name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("Missing file_name argument"))?;
+        let path = args_obj
+            .get("path")
+            .and_then(|v| v.as_str())
+            .unwrap_or(".");
+        let case_sensitive = args_obj
+            .get("case_sensitive")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
+
+        // Create file searcher
+        let config = FileSearchConfig::default();
+        let search_path = self.root.join(path);
+        let searcher = FileSearcher::new(search_path, config);
+        
+        match searcher.find_file_by_name(file_name) {
+            Ok(Some(found_path)) => {
+                // Convert to relative path
+                if let Ok(relative_path) = found_path.strip_prefix(&self.root) {
+                    Ok(json!({ 
+                        "success": true, 
+                        "found": true,
+                        "path": relative_path.to_string_lossy()
+                    }))
+                } else {
+                    Ok(json!({ 
+                        "success": true, 
+                        "found": true,
+                        "path": found_path.to_string_lossy()
+                    }))
+                }
+            },
+            Ok(None) => Ok(json!({ 
+                "success": true, 
+                "found": false,
+                "message": format!("File '{}' not found", file_name)
+            })),
+            Err(e) => Ok(json!({ 
+                "success": false, 
+                "error": format!("Failed to find file: {}", e) 
+            })),
+        }
     }
 }
 
 // Helper functions for text pattern extraction
 
+// === SEARCH TEXT TOOLS - Simple Implementations ===
 
-    // === SEARCH TEXT TOOLS - Simple Implementations ===
-
-
-
-
-
-
-
-
-
-
-
-
-            // TODO: Implement AST-grep lint/refactor when engine is available
-        // let lint_results: Option<Vec<String>> = None;
-        // let refactor_results: Option<Vec<String>> = None;
-        // if ast_grep_lint {
-        //     lint_results = self.ast_grep_engine.lint_file(&path).await.ok();
-    // === SEARCH TEXT TOOLS - Simple Implementations ===
-
-    
+// TODO: Implement AST-grep lint/refactor when engine is available
+// let lint_results: Option<Vec<String>> = None;
+// let refactor_results: Option<Vec<String>> = None;
+// if ast_grep_lint {
+//     lint_results = self.ast_grep_engine.lint_file(&path).await.ok();
+// === SEARCH TEXT TOOLS - Simple Implementations ===
 
 // Helper functions for text pattern extraction
 fn extract_import_patterns(content: &str) -> Vec<String> {
     let mut patterns = Vec::new();
     for line in content.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("import ") || trimmed.starts_with("from ") ||
-           trimmed.starts_with("use ") || trimmed.starts_with("#include") {
+        if trimmed.starts_with("import ")
+            || trimmed.starts_with("from ")
+            || trimmed.starts_with("use ")
+            || trimmed.starts_with("#include")
+        {
             patterns.push(trimmed.to_string());
         }
     }
     patterns
 }
 
-    
-
-    
-
 fn extract_function_patterns(content: &str) -> Vec<String> {
     let mut patterns = Vec::new();
     for line in content.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("def ") || trimmed.starts_with("function ") ||
-           trimmed.starts_with("fn ") || trimmed.contains("function(") {
+        if trimmed.starts_with("def ")
+            || trimmed.starts_with("function ")
+            || trimmed.starts_with("fn ")
+            || trimmed.contains("function(")
+        {
             // Extract function names
             if let Some(func_name) = extract_function_name(trimmed) {
                 patterns.push(func_name);
@@ -1618,8 +2150,11 @@ fn extract_structure_patterns(content: &str) -> Vec<String> {
     let mut patterns = Vec::new();
     for line in content.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("class ") || trimmed.starts_with("struct ") ||
-           trimmed.starts_with("interface ") || trimmed.starts_with("enum ") {
+        if trimmed.starts_with("class ")
+            || trimmed.starts_with("struct ")
+            || trimmed.starts_with("interface ")
+            || trimmed.starts_with("enum ")
+        {
             if let Some(name) = extract_type_name(trimmed) {
                 patterns.push(name);
             }
@@ -2027,6 +2562,58 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
                     "max_results": {"type": "integer", "description": "Maximum number of results to return", "default": 200}
                 },
                 "required": ["pattern_types"]
+            }),
+        },
+        FunctionDeclaration {
+            name: "find_config_file".to_string(),
+            description: "Find and return the path to the main VTAgent configuration file (vtagent.toml). Use this when user mentions 'config', 'vtconfig', 'settings', or wants to modify configuration.".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {},
+                "required": []
+            }),
+        },
+        FunctionDeclaration {
+            name: "recursive_file_search".to_string(),
+            description: "Recursively search for files in the workspace by name pattern. More powerful than simple file listing for finding specific files.".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "File name pattern to search for (supports wildcards)"},
+                    "path": {"type": "string", "description": "Directory path to search in", "default": "."},
+                    "max_results": {"type": "integer", "description": "Maximum number of results to return", "default": 100},
+                    "include_hidden": {"type": "boolean", "description": "Include hidden files and directories", "default": false},
+                    "file_extensions": {"type": "array", "items": {"type": "string"}, "description": "Limit search to specific file extensions (e.g., ['rs', 'py', 'js'])"}
+                },
+                "required": []
+            }),
+        },
+        FunctionDeclaration {
+            name: "search_files_with_content".to_string(),
+            description: "Search for files containing specific content patterns. Useful for finding files with specific code patterns or text.".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "content_pattern": {"type": "string", "description": "Text pattern to search for in file contents"},
+                    "file_pattern": {"type": "string", "description": "Optional file name pattern to limit search (e.g., '*.rs')"},
+                    "path": {"type": "string", "description": "Directory path to search in", "default": "."},
+                    "max_results": {"type": "integer", "description": "Maximum number of results to return", "default": 50},
+                    "case_sensitive": {"type": "boolean", "description": "Whether search should be case sensitive", "default": true}
+                },
+                "required": ["content_pattern"]
+            }),
+        },
+        FunctionDeclaration {
+            name: "find_file_by_name".to_string(),
+            description: "Find a specific file by exact name match recursively through the workspace.".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "file_name": {"type": "string", "description": "Exact file name to find"},
+                    "path": {"type": "string", "description": "Directory path to search in", "default": "."},
+                    "case_sensitive": {"type": "boolean", "description": "Whether search should be case sensitive", "default": true}
+                },
+                "required": ["file_name"]
             }),
         },
     ]

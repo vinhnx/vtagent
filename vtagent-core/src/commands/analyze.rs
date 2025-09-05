@@ -168,8 +168,7 @@ pub async fn handle_analyze_command(
     if matches!(depth, AnalysisDepth::Deep) {
         println!(
             "{}",
-            style("Research-preview analysis available with tree-sitter integration.")
-                .dim()
+            style("Research-preview analysis available with tree-sitter integration.").dim()
         );
     }
 

@@ -238,7 +238,8 @@ async fn analyze_file(
         }
 
         // Configuration files
-        ".gitignore" | ".editorconfig" | ".prettierrc" | ".eslintrc" | ".eslintrc.js" | ".eslintrc.json" => {
+        ".gitignore" | ".editorconfig" | ".prettierrc" | ".eslintrc" | ".eslintrc.js"
+        | ".eslintrc.json" => {
             analysis.config_files.push(path.to_string());
         }
 
@@ -376,19 +377,27 @@ async fn analyze_git_history(
 
                 // If more than 50% use conventional commits, note this pattern
                 if total_commits > 0 && (conventional_count * 100 / total_commits) > 50 {
-                    analysis.commit_patterns.push("Conventional Commits".to_string());
+                    analysis
+                        .commit_patterns
+                        .push("Conventional Commits".to_string());
                 } else {
-                    analysis.commit_patterns.push("Standard commit messages".to_string());
+                    analysis
+                        .commit_patterns
+                        .push("Standard commit messages".to_string());
                 }
             }
         } else {
             // Fallback if git command fails - assume standard commits
-            analysis.commit_patterns.push("Standard commit messages".to_string());
+            analysis
+                .commit_patterns
+                .push("Standard commit messages".to_string());
         }
     } else {
         // No git repository found
         analysis.has_git_history = false;
-        analysis.commit_patterns.push("No version control detected".to_string());
+        analysis
+            .commit_patterns
+            .push("No version control detected".to_string());
     }
 
     Ok(())
@@ -399,8 +408,12 @@ fn analyze_project_characteristics(analysis: &mut ProjectAnalysis) {
     // Determine if it's a library or application
     analysis.is_library = analysis.config_files.iter().any(|f| {
         f == "Cargo.toml" && analysis.languages.contains(&"Rust".to_string())
-            || f == "package.json" && analysis.languages.contains(&"JavaScript/TypeScript".to_string())
-            || f == "setup.py" || f == "pyproject.toml"
+            || f == "package.json"
+                && analysis
+                    .languages
+                    .contains(&"JavaScript/TypeScript".to_string())
+            || f == "setup.py"
+            || f == "pyproject.toml"
     });
 
     analysis.is_application = analysis.source_dirs.contains(&"src".to_string())
@@ -461,11 +474,15 @@ fn generate_agents_md(analysis: &ProjectAnalysis) -> Result<String> {
         for language in &analysis.languages {
             match language.as_str() {
                 "Rust" => {
-                    content.push_str("- `tests/` - Integration tests\n- `examples/` - Usage examples\n");
+                    content.push_str(
+                        "- `tests/` - Integration tests\n- `examples/` - Usage examples\n",
+                    );
                     word_count += 8;
                 }
                 "JavaScript/TypeScript" => {
-                    content.push_str("- `test/` or `__tests__/` - Test files\n- `dist/` - Built assets\n");
+                    content.push_str(
+                        "- `test/` or `__tests__/` - Test files\n- `dist/` - Built assets\n",
+                    );
                     word_count += 10;
                 }
                 "Python" => {
@@ -532,8 +549,10 @@ fn generate_agents_md(analysis: &ProjectAnalysis) -> Result<String> {
         content.push_str("## Testing Guidelines\n\n");
         word_count += 3;
 
-        let test_info = format!("- Test files: {}\n- Run tests using build system commands above\n\n",
-                               analysis.test_patterns.join(", "));
+        let test_info = format!(
+            "- Test files: {}\n- Run tests using build system commands above\n\n",
+            analysis.test_patterns.join(", ")
+        );
         content.push_str(&test_info);
         word_count += test_info.split_whitespace().count();
     }
@@ -543,7 +562,10 @@ fn generate_agents_md(analysis: &ProjectAnalysis) -> Result<String> {
         content.push_str("## Commit & Pull Request Guidelines\n\n");
         word_count += 5;
 
-        if analysis.commit_patterns.contains(&"Conventional Commits".to_string()) {
+        if analysis
+            .commit_patterns
+            .contains(&"Conventional Commits".to_string())
+        {
             content.push_str("- Use conventional commit format: `type(scope): description`\n");
             content.push_str("- Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`\n");
             word_count += 14;

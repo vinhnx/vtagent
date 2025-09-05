@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use glob::Pattern;
 use std::path::{Path, PathBuf};
 use tokio::fs;
@@ -213,8 +213,8 @@ pub async fn initialize_vtagent_gitignore() -> Result<()> {
 }
 
 /// Get the global .vtagentgitignore instance
-pub async fn get_global_vtagent_gitignore(
-) -> tokio::sync::RwLockReadGuard<'static, VtagentGitignore> {
+pub async fn get_global_vtagent_gitignore()
+-> tokio::sync::RwLockReadGuard<'static, VtagentGitignore> {
     VTAGENT_GITIGNORE.read().await
 }
 

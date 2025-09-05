@@ -269,7 +269,7 @@ impl MemoryEfficientStorage {
     }
 
     async fn compress_analysis(&self, analysis: CodeAnalysis) -> Result<CompressedAnalysis> {
-        use flate2::{write::GzEncoder, Compression};
+        use flate2::{Compression, write::GzEncoder};
         use std::io::Write;
 
         let serialize_and_compress = |data: &serde_json::Value| -> Result<Vec<u8>> {
@@ -349,7 +349,7 @@ pub struct ResponseOptimizer {
 }
 
 #[derive(Debug, Clone)]
-enum OptimizationStrategy {
+pub enum OptimizationStrategy {
     CacheFrequentlyAccessed,
     PrecomputeResults,
     ParallelProcessing,

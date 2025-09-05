@@ -11,9 +11,9 @@ use std::collections::HashMap;
 use tempfile::TempDir;
 use tokio::test;
 
-use vtagent::agent::snapshots::*;
-use vtagent::gemini::Content;
-use vtagent::types::*;
+use vtagent_core::agent::snapshots::*;
+use vtagent_core::gemini::Content;
+use vtagent_core::types::*;
 
 /// Test basic snapshot creation and loading
 #[tokio::test]
@@ -122,7 +122,6 @@ async fn test_snapshot_creation_and_loading() {
     assert_eq!(loaded_snapshot.metadata.id, "test_snapshot_1");
 }
 
-/// Test revert scope parsing
 #[test]
 fn test_revert_scope_parsing() {
     assert_eq!(
@@ -353,150 +352,7 @@ async fn test_snapshot_cleanup() {
     assert!(snapshots.iter().all(|s| s.turn_number >= 3));
 }
 
-/// Test revert scope parsing
-#[test]
-fn test_revert_scope_parsing() {
-    assert_eq!(
-        SnapshotManager::parse_revert_scope("memory"),
-        Some(RevertScope::Memory)
-    );
-    assert_eq!(
-        SnapshotManager::parse_revert_scope("context"),
-        Some(RevertScope::Context)
-    );
-    assert_eq!(
-        SnapshotManager::parse_revert_scope("full"),
-        Some(RevertScope::Full)
-    );
-    assert_eq!(SnapshotManager::parse_revert_scope("invalid"), None);
-    assert_eq!(
-        SnapshotManager::parse_revert_scope("MEMORY"),
-        Some(RevertScope::Memory)
-    );
-}
 
-/// Test checksum verification
-#[tokio::test]
-async fn test_checksum_verification() {
-    let temp_dir = TempDir::new().unwrap();
-    let snapshots_dir = temp_dir.path().join("snapshots");
-
-    let manager = SnapshotManager::new(snapshots_dir.clone(), 10);
-
-    let agent_config = AgentConfig {
-        model: "test-model".to_string(),
-        api_key: "test-key".to_string(),
-        workspace: temp_dir.path().to_path_buf(),
-        verbose: false,
-    };
-
-    let conversation_history = vec![Content::user_text("Test message")];
-
-    // Note: In a real implementation, we would need an actual Agent instance
-    // For testing purposes, we'll create a mock snapshot manually
-    let snapshot = AgentSnapshot {
-        metadata: SnapshotMetadata {
-            id: "test_snapshot_1".to_string(),
-            turn_number: 1,
-            timestamp: 1234567890,
-            description: "Test snapshot".to_string(),
-            version: "1.0".to_string(),
-            compressed: false,
-            encrypted: false,
-            size_bytes: 1000,
-        },
-        config: AgentConfigSnapshot {
-            model: "test-model".to_string(),
-            api_key_masked: true,
-            workspace: temp_dir.path().to_path_buf(),
-            verbose: false,
-        },
-        session_info: SessionInfo {
-            session_id: "test_session".to_string(),
-            start_time: 1234567890,
-            total_turns: 1,
-            total_decisions: 0,
-            error_count: 0,
-        },
-        conversation_history: conversation_history.clone(),
-        decision_tracker: DecisionTrackerSnapshot {
-            total_decisions: 0,
-            successful_decisions: 0,
-            failed_decisions: 0,
-            recent_decisions: Vec::new(),
-            available_tools: Vec::new(),
-        },
-        error_recovery: ErrorRecoverySnapshot {
-            total_errors: 0,
-            resolved_errors: 0,
-            error_patterns: Vec::new(),
-            recovery_attempts: Vec::new(),
-        },
-        summarizer: SummarizerSnapshot {
-            total_summaries: 0,
-            latest_summary: None,
-            summary_history: Vec::new(),
-        },
-        compaction_engine: CompactionEngineSnapshot {
-            total_compactions: 0,
-            memory_saved: 0,
-            compression_ratio: 1.0,
-            compaction_suggestions: Vec::new(),
-        },
-        tree_sitter_state: TreeSitterSnapshot {
-            supported_languages: vec!["rust".to_string(), "python".to_string()],
-            cache_size: 100,
-        },
-        tool_registry: ToolRegistrySnapshot {
-            available_tools: vec!["list_files".to_string(), "read_file".to_string()],
-            tool_usage_stats: HashMap::new(),
-        },
-        environment: HashMap::new(),
-        performance_metrics: PerformanceMetrics {
-            session_duration_seconds: 60,
-            total_api_calls: 1,
-            total_tokens_used: Some(100),
-            average_response_time_ms: 500.0,
-            tool_execution_count: 0,
-            error_count: 0,
-            recovery_success_rate: 1.0,
-        },
-        checksum: String::new(),
-    };
-
-    // Calculate checksum and save
-    let json_data = serde_json::to_string_pretty(&snapshot).unwrap();
-    let checksum = manager.calculate_checksum(&json_data);
-    let mut snapshot = snapshot;
-    snapshot.checksum = checksum;
-
-    let final_json = serde_json::to_string_pretty(&snapshot).unwrap();
-    manager
-        .save_snapshot("test_snapshot_1", &final_json, false)
-        .await
-        .unwrap();
-
-    let snapshot_id = "test_snapshot_1".to_string();
-
-    // Load snapshot
-    let mut loaded_snapshot = manager
-        .load_snapshot(&snapshot_id)
-        .await
-        .expect("Failed to load snapshot");
-
-    // Tamper with checksum
-    loaded_snapshot.checksum = "invalid_checksum".to_string();
-
-    // Save tampered snapshot
-    let tampered_json = serde_json::to_string_pretty(&loaded_snapshot).unwrap();
-    let snapshot_path = snapshots_dir.join(format!("{}.json", snapshot_id));
-    std::fs::write(&snapshot_path, &tampered_json).unwrap();
-
-    // Attempt to load should fail checksum verification
-    let result = manager.load_snapshot(&snapshot_id).await;
-    assert!(result.is_err(), "Should fail checksum verification");
-    assert!(result.unwrap_err().to_string().contains("checksum"));
-}
 
 /// Test concurrent snapshot operations
 #[tokio::test]

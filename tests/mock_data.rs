@@ -1,4 +1,4 @@
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Mock Gemini API responses for testing
 pub struct MockGeminiResponses;
@@ -89,7 +89,7 @@ impl MockGeminiResponses {
 
     /// Mock streaming response
     pub fn streaming_response(chunks: Vec<&str>) -> Vec<Value> {
-        chunks.into_iter().enumerate().map(|(i, chunk)| {
+        chunks.iter().enumerate().map(|(i, chunk)| {
             json!({
                 "candidates": [{
                     "content": {

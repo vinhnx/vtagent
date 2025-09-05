@@ -4,7 +4,7 @@
 //! It provides a centralized way to manage agent policies, tool permissions, and
 //! command allow lists.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -71,7 +71,8 @@ pub struct AgentConfig {
     /// Default system instruction fallback
     #[serde(default = "default_system_instruction")]
     pub default_system_instruction: String,
-}/// Tools configuration
+}
+/// Tools configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ToolsConfig {
     /// Default policy for tools not explicitly listed
@@ -231,63 +232,121 @@ impl Default for PtyConfig {
 }
 
 // Default value functions
-fn default_max_conversation_turns() -> usize { 1000 }
-fn default_max_session_duration_minutes() -> u64 { 60 }
-fn default_max_conversation_history() -> usize { 100 }
+fn default_max_conversation_turns() -> usize {
+    1000
+}
+fn default_max_session_duration_minutes() -> u64 {
+    60
+}
+fn default_max_conversation_history() -> usize {
+    100
+}
 /// Maximum tool calls allowed per turn
 pub const MAX_TOOL_CALLS_PER_TURN: usize = 30;
 
-fn default_max_steps() -> usize { MAX_TOOL_CALLS_PER_TURN }
-fn default_max_empty_responses() -> usize { 10 }
-fn default_model() -> String { "gemini-2.5-flash-lite".to_string() }
-fn default_api_key_env() -> String { "GEMINI_API_KEY".to_string() }
-fn default_system_instruction() -> String { "You are a helpful coding assistant.".to_string() }
-fn default_tool_policy() -> ToolPolicy { ToolPolicy::Prompt }
-fn default_true() -> bool { true }
-fn default_max_file_size_mb() -> u64 { 50 }
+fn default_max_steps() -> usize {
+    MAX_TOOL_CALLS_PER_TURN
+}
+fn default_max_empty_responses() -> usize {
+    10
+}
+fn default_model() -> String {
+    "gemini-2.5-flash-lite".to_string()
+}
+fn default_api_key_env() -> String {
+    "GEMINI_API_KEY".to_string()
+}
+fn default_system_instruction() -> String {
+    "You are a helpful coding assistant.".to_string()
+}
+fn default_tool_policy() -> ToolPolicy {
+    ToolPolicy::Prompt
+}
+fn default_true() -> bool {
+    true
+}
+fn default_max_file_size_mb() -> u64 {
+    50
+}
 
-fn default_pty_rows() -> u16 { 24 }
+fn default_pty_rows() -> u16 {
+    24
+}
 
-fn default_pty_cols() -> u16 { 80 }
+fn default_pty_cols() -> u16 {
+    80
+}
 
-fn default_max_pty_sessions() -> usize { 10 }
+fn default_max_pty_sessions() -> usize {
+    10
+}
 
-fn default_pty_timeout_seconds() -> u64 { 300 }
+fn default_pty_timeout_seconds() -> u64 {
+    300
+}
 
 fn default_allow_list() -> Vec<String> {
     vec![
-        "ls".to_string(), "pwd".to_string(), "cd".to_string(),
-        "cat".to_string(), "grep".to_string(), "find".to_string(),
-        "head".to_string(), "tail".to_string(), "wc".to_string(),
-        "sort".to_string(), "uniq".to_string(),
-        "git status".to_string(), "git diff".to_string(),
-        "git log".to_string(), "git branch".to_string(), "git show".to_string(),
-        "cargo check".to_string(), "cargo clippy".to_string(), "cargo fmt".to_string(),
+        "ls".to_string(),
+        "pwd".to_string(),
+        "cd".to_string(),
+        "cat".to_string(),
+        "grep".to_string(),
+        "find".to_string(),
+        "head".to_string(),
+        "tail".to_string(),
+        "wc".to_string(),
+        "sort".to_string(),
+        "uniq".to_string(),
+        "git status".to_string(),
+        "git diff".to_string(),
+        "git log".to_string(),
+        "git branch".to_string(),
+        "git show".to_string(),
+        "cargo check".to_string(),
+        "cargo clippy".to_string(),
+        "cargo fmt".to_string(),
     ]
 }
 
 fn default_deny_list() -> Vec<String> {
     vec![
-        "rm -rf".to_string(), "sudo rm".to_string(), "format".to_string(),
-        "shutdown".to_string(), "reboot".to_string(), "halt".to_string(),
-        "curl | sh".to_string(), "wget | sh".to_string(),
-        "chmod 777".to_string(), "passwd".to_string(),
+        "rm -rf".to_string(),
+        "sudo rm".to_string(),
+        "format".to_string(),
+        "shutdown".to_string(),
+        "reboot".to_string(),
+        "halt".to_string(),
+        "curl | sh".to_string(),
+        "wget | sh".to_string(),
+        "chmod 777".to_string(),
+        "passwd".to_string(),
     ]
 }
 
 fn default_dangerous_patterns() -> Vec<String> {
     vec![
-        "rm -f".to_string(), "git reset --hard".to_string(),
-        "git clean -f".to_string(), "docker system prune".to_string(),
-        "npm install -g".to_string(), "pip install".to_string(),
+        "rm -f".to_string(),
+        "git reset --hard".to_string(),
+        "git clean -f".to_string(),
+        "docker system prune".to_string(),
+        "npm install -g".to_string(),
+        "pip install".to_string(),
     ]
 }
 
 fn default_allowed_extensions() -> Vec<String> {
     vec![
-        ".rs".to_string(), ".toml".to_string(), ".json".to_string(),
-        ".md".to_string(), ".txt".to_string(), ".yaml".to_string(), ".yml".to_string(),
-        ".js".to_string(), ".ts".to_string(), ".py".to_string(),
+        ".rs".to_string(),
+        ".toml".to_string(),
+        ".json".to_string(),
+        ".md".to_string(),
+        ".txt".to_string(),
+        ".yaml".to_string(),
+        ".yml".to_string(),
+        ".js".to_string(),
+        ".ts".to_string(),
+        ".py".to_string(),
     ]
 }
 
@@ -328,7 +387,8 @@ impl VTAgentConfig {
 
     /// Get policy for a specific tool
     pub fn get_tool_policy(&self, tool_name: &str) -> ToolPolicy {
-        self.tools.policies
+        self.tools
+            .policies
             .get(tool_name)
             .cloned()
             .unwrap_or_else(|| self.tools.default_policy.clone())
@@ -398,8 +458,12 @@ impl VTAgentConfig {
         let toml_content = toml::to_string_pretty(&sample_config)
             .context("Failed to serialize sample configuration")?;
 
-        std::fs::write(&path, toml_content)
-            .with_context(|| format!("Failed to write sample config to: {}", path.as_ref().display()))?;
+        std::fs::write(&path, toml_content).with_context(|| {
+            format!(
+                "Failed to write sample config to: {}",
+                path.as_ref().display()
+            )
+        })?;
 
         Ok(())
     }
@@ -420,8 +484,12 @@ impl VTAgentConfig {
         let gitignore_path = workspace.join(".vtagentgitignore");
         if !gitignore_path.exists() || force {
             let gitignore_content = Self::default_vtagent_gitignore();
-            std::fs::write(&gitignore_path, gitignore_content)
-                .with_context(|| format!("Failed to write .vtagentgitignore to: {}", gitignore_path.display()))?;
+            std::fs::write(&gitignore_path, gitignore_content).with_context(|| {
+                format!(
+                    "Failed to write .vtagentgitignore to: {}",
+                    gitignore_path.display()
+                )
+            })?;
             created_files.push(".vtagentgitignore".to_string());
         }
 
@@ -483,7 +551,8 @@ vendor/
 !important.log
 !CHANGELOG.md
 !README.md
-"#.to_string()
+"#
+        .to_string()
     }
 }
 

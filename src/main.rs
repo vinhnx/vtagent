@@ -11,12 +11,12 @@ use serde_json::json;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use vtagent_core::llm::{make_client, BackendKind};
-use vtagent_core::tools::{build_function_declarations, ToolRegistry};
+use vtagent_core::llm::{BackendKind, make_client};
+use vtagent_core::tools::{ToolRegistry, build_function_declarations};
 use vtagent_core::{
     config::{ConfigManager, ToolPolicy, VTAgentConfig},
     gemini::{Content, FunctionResponse, GenerateContentRequest, Part, Tool, ToolConfig},
-    prompts::system::{generate_system_instruction_with_config, SystemPromptConfig},
+    prompts::system::{SystemPromptConfig, generate_system_instruction_with_config},
     types::AgentConfig as CoreAgentConfig,
 };
 use walkdir::WalkDir;
@@ -97,8 +97,14 @@ pub enum Commands {
 async fn main() -> Result<()> {
     let args = Cli::parse();
 
-    println!("{}", style("===================================================================").dim());
-    println!("{}", style("
+    println!(
+        "{}",
+        style("===================================================================").dim()
+    );
+    println!(
+        "{}",
+        style(
+            "
 
     ██╗   ██╗ ████████╗      ██████╗  ██████╗  ██████╗  ███████╗
     ██║   ██║ ╚══██╔══╝     ██╔════╝ ██╔═══██╗ ██╔══██╗ ██╔════╝
@@ -107,9 +113,20 @@ async fn main() -> Result<()> {
      ╚████╔╝     ██║        ╚██████╗ ╚██████╔╝ ██████╔╝ ███████╗
       ╚═══╝      ╚═╝         ╚═════╝  ╚═════╝  ╚═════╝  ╚══════╝
 
-    ").bold());
-    println!("{}", style("===================================================================").dim());
-    println!("{}", style("Welcome to VT Code - Research-preview Rust coding agent\n").cyan().bold());
+    "
+        )
+        .bold()
+    );
+    println!(
+        "{}",
+        style("===================================================================").dim()
+    );
+    println!(
+        "{}",
+        style("Welcome to VT Code - Research-preview Rust coding agent\n")
+            .cyan()
+            .bold()
+    );
 
     // Get API key from environment, inferred by backend from model if not explicitly set
     let api_key = if let Ok(v) = std::env::var(&args.api_key_env) {
@@ -165,12 +182,16 @@ async fn main() -> Result<()> {
             match VTAgentConfig::bootstrap_project(&config.workspace, force) {
                 Ok(created_files) => {
                     if created_files.is_empty() {
-                        println!("{} Configuration files already exist",
-                                 style("INFO").cyan().bold());
+                        println!(
+                            "{} Configuration files already exist",
+                            style("INFO").cyan().bold()
+                        );
                         println!("Use --force to overwrite existing files");
                     } else {
-                        println!("{} VT Code project initialized successfully!",
-                                 style("SUCCESS").green().bold());
+                        println!(
+                            "{} VT Code project initialized successfully!",
+                            style("SUCCESS").green().bold()
+                        );
                         println!("Created files:");
                         for file in &created_files {
                             println!("  ✓ {}", style(file).green());
@@ -182,29 +203,42 @@ async fn main() -> Result<()> {
                     }
                 }
                 Err(e) => {
-                    eprintln!("{} Failed to initialize project: {}",
-                              style("ERROR").red().bold(), e);
+                    eprintln!(
+                        "{} Failed to initialize project: {}",
+                        style("ERROR").red().bold(),
+                        e
+                    );
                     std::process::exit(1);
                 }
             }
         }
         Commands::Config { output, force } => {
             if output.exists() && !force {
-                eprintln!("Error: Configuration file already exists at {}", output.display());
+                eprintln!(
+                    "Error: Configuration file already exists at {}",
+                    output.display()
+                );
                 eprintln!("Use --force to overwrite");
                 std::process::exit(1);
             }
 
             match VTAgentConfig::create_sample_config(&output) {
                 Ok(_) => {
-                    println!("{} Created sample configuration at: {}",
-                             style("SUCCESS").green().bold(),
-                             output.display());
-                    println!("Edit this file to customize agent behavior, tool policies, and command permissions.");
+                    println!(
+                        "{} Created sample configuration at: {}",
+                        style("SUCCESS").green().bold(),
+                        output.display()
+                    );
+                    println!(
+                        "Edit this file to customize agent behavior, tool policies, and command permissions."
+                    );
                 }
                 Err(e) => {
-                    eprintln!("{} Failed to create configuration: {}",
-                              style("ERROR").red().bold(), e);
+                    eprintln!(
+                        "{} Failed to create configuration: {}",
+                        style("ERROR").red().bold(),
+                        e
+                    );
                     std::process::exit(1);
                 }
             }
@@ -258,7 +292,7 @@ async fn main() -> Result<()> {
 /// Handle the chat command
 async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
     println!("{}", style("Interactive chat mode selected").blue().bold());
-    let key_preview_len = config.api_key.len().min(8);
+    let _key_preview_len = config.api_key.len().min(8);
     println!("Model: {}", config.model);
     println!("Workspace: {}", config.workspace.display());
     if let Some(summary) = summarize_workspace_languages(&config.workspace) {
@@ -278,13 +312,17 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
     }];
 
     // Load configuration from vtagent.toml first
-    let config_manager = ConfigManager::new(&config.workspace)
-        .context("Failed to load configuration")?;
+    let config_manager =
+        ConfigManager::new(&config.workspace).context("Failed to load configuration")?;
     let vtcode_config = config_manager.config();
 
     // Create system instruction with configuration awareness
     let system_config = SystemPromptConfig::default();
-    let long_sys = generate_system_instruction_with_config(&system_config, &config.workspace, Some(vtcode_config));
+    let long_sys = generate_system_instruction_with_config(
+        &system_config,
+        &config.workspace,
+        Some(vtcode_config),
+    );
 
     // Incorporate project context so the agent is aware of the current repo
     let mut sys_text = long_sys
@@ -313,8 +351,8 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
     );
 
     // Load configuration from vtagent.toml first
-    let config_manager = ConfigManager::new(&config.workspace)
-        .context("Failed to load configuration")?;
+    let config_manager =
+        ConfigManager::new(&config.workspace).context("Failed to load configuration")?;
     let vtcode_config = config_manager.config();
 
     // Safety: Track overall conversation metrics to prevent runaway sessions
@@ -325,25 +363,40 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
 
     // Show configuration info
     if let Some(config_path) = config_manager.config_path() {
-        println!("{} Loaded configuration from: {}",
-                 style("CONFIG").dim(),
-                 config_path.display());
+        println!(
+            "{} Loaded configuration from: {}",
+            style("CONFIG").dim(),
+            config_path.display()
+        );
     } else {
-        println!("{} Using default configuration (no vtagent.toml found)",
-                 style("CONFIG").dim());
+        println!(
+            "{} Using default configuration (no vtagent.toml found)",
+            style("CONFIG").dim()
+        );
     }
 
     // Track if the last tool call was a PTY command to suppress model echo
-    let mut last_tool_was_pty = false;    loop {
+    let mut last_tool_was_pty = false;
+    loop {
         // Safety checks: prevent runaway sessions
         total_turns += 1;
         if total_turns >= max_conversation_turns {
-            println!("{}", style("Maximum conversation turns reached. Session ending for safety.").red().bold());
+            println!(
+                "{}",
+                style("Maximum conversation turns reached. Session ending for safety.")
+                    .red()
+                    .bold()
+            );
             break;
         }
 
         if session_start.elapsed() >= max_session_duration {
-            println!("{}", style("Maximum session duration reached. Session ending for safety.").red().bold());
+            println!(
+                "{}",
+                style("Maximum session duration reached. Session ending for safety.")
+                    .red()
+                    .bold()
+            );
             break;
         }
 
@@ -371,7 +424,10 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
 
         // Safety: prevent extremely long inputs that could cause issues
         if input.len() > 10000 {
-            println!("{}", style("Input too long (max 10,000 characters). Please shorten your message.").red());
+            println!(
+                "{}",
+                style("Input too long (max 10,000 characters). Please shorten your message.").red()
+            );
             continue;
         }
 
@@ -397,7 +453,10 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                 let middle_start = keep_start;
                 let middle_end = conversation.len() - keep_end;
                 conversation.drain(middle_start..middle_end);
-                println!("{}", style("(conversation history trimmed for memory management)").dim());
+                println!(
+                    "{}",
+                    style("(conversation history trimmed for memory management)").dim()
+                );
             }
         }
 
@@ -415,7 +474,10 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
             }
 
             if consecutive_empty_responses >= max_empty_responses {
-                println!("{}", style("(too many empty responses, stopping)").dim().red());
+                println!(
+                    "{}",
+                    style("(too many empty responses, stopping)").dim().red()
+                );
                 break 'outer;
             }
 
@@ -447,13 +509,12 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                 let mut had_any_content = false;
 
                 // Check if response has any meaningful content
-                let has_meaningful_content = candidate.content.parts.iter().any(|part| {
-                    match part {
+                let has_meaningful_content =
+                    candidate.content.parts.iter().any(|part| match part {
                         Part::Text { text } => !text.trim().is_empty(),
                         Part::FunctionCall { .. } => true,
                         Part::FunctionResponse { .. } => true,
-                    }
-                });
+                    });
 
                 if !has_meaningful_content {
                     consecutive_empty_responses += 1;
@@ -486,7 +547,9 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                                 // Handle empty text responses to prevent infinite loops
                                 conversation.push(Content {
                                     role: "model".to_string(),
-                                    parts: vec![Part::Text { text: "".to_string() }],
+                                    parts: vec![Part::Text {
+                                        text: "".to_string(),
+                                    }],
                                 });
                             }
                         }
@@ -523,13 +586,20 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                             let needs_prompt = tool_policy == ToolPolicy::Prompt;
 
                             // Check if this is a terminal command and evaluate command permissions
-                            if tool_name == "run_terminal_cmd" || tool_name == "run_pty_cmd" || tool_name == "run_pty_cmd_streaming" {
-                                if let Some(command) = args.get("command").and_then(|v| v.as_str()) {
+                            if tool_name == "run_terminal_cmd"
+                                || tool_name == "run_pty_cmd"
+                                || tool_name == "run_pty_cmd_streaming"
+                            {
+                                if let Some(command) = args.get("command").and_then(|v| v.as_str())
+                                {
                                     // Check if command is in allow list
                                     if vtcode_config.is_command_allowed(command) {
                                         // Command is allowed, execute without prompting
-                                        println!("{} Command is in allow list: {}",
-                                                style("[ALLOWED]").green(), command);
+                                        println!(
+                                            "{} Command is in allow list: {}",
+                                            style("[ALLOWED]").green(),
+                                            command
+                                        );
                                     } else if vtcode_config.is_command_dangerous(command) {
                                         // Dangerous command - require extra confirmation
                                         print!(
@@ -621,9 +691,13 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                                     println!("{} {}", style("[TOOL OK]").green().bold(), tool_name);
 
                                     // Special handling for PTY tools to render output
-                                    if tool_name == "run_pty_cmd" || tool_name == "run_pty_cmd_streaming" {
+                                    if tool_name == "run_pty_cmd"
+                                        || tool_name == "run_pty_cmd_streaming"
+                                    {
                                         // Handle both "output" and "stdout" fields for compatibility
-                                        let output = val.get("output").and_then(|v| v.as_str())
+                                        let output = val
+                                            .get("output")
+                                            .and_then(|v| v.as_str())
                                             .or_else(|| val.get("stdout").and_then(|v| v.as_str()));
 
                                         if let Some(output_str) = output {
@@ -634,31 +708,50 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                                             };
 
                                             // Extract command for display
-                                            let command_str = args.get("command").and_then(|v| v.as_str())
+                                            let command_str = args
+                                                .get("command")
+                                                .and_then(|v| v.as_str())
                                                 .map(|cmd| {
-                                                    if let Some(args_arr) = args.get("args").and_then(|v| v.as_array()) {
-                                                        let args_str: Vec<String> = args_arr.iter()
+                                                    if let Some(args_arr) =
+                                                        args.get("args").and_then(|v| v.as_array())
+                                                    {
+                                                        let args_str: Vec<String> = args_arr
+                                                            .iter()
                                                             .filter_map(|arg| arg.as_str())
                                                             .map(|s| s.to_string())
                                                             .collect();
                                                         if args_str.is_empty() {
                                                             cmd.to_string()
                                                         } else {
-                                                            format!("{} {}", cmd, args_str.join(" "))
+                                                            format!(
+                                                                "{} {}",
+                                                                cmd,
+                                                                args_str.join(" ")
+                                                            )
                                                         }
                                                     } else {
                                                         cmd.to_string()
                                                     }
                                                 });
 
-                                            if let Err(e) = render_pty_output_fn(output_str, title, command_str.as_deref()) {
-                                                eprintln!("{} Failed to render PTY output: {}",
-                                                    style("[ERROR]").red().bold(), e);
+                                            if let Err(e) = render_pty_output_fn(
+                                                output_str,
+                                                title,
+                                                command_str.as_deref(),
+                                            ) {
+                                                eprintln!(
+                                                    "{} Failed to render PTY output: {}",
+                                                    style("[ERROR]").red().bold(),
+                                                    e
+                                                );
                                             }
                                         } else {
                                             // If no output field, try to display the full response for debugging
-                                            eprintln!("{} PTY command completed with response: {:?}",
-                                                style("[DEBUG]").yellow().bold(), val);
+                                            eprintln!(
+                                                "{} PTY command completed with response: {:?}",
+                                                style("[DEBUG]").yellow().bold(),
+                                                val
+                                            );
                                         }
 
                                         // For PTY commands, we don't want the model to echo the output again
@@ -667,18 +760,29 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                                         json!({ "ok": true, "result": { "status": "completed" } })
                                     } else {
                                         // For search tools, we want to format the response in a way that's easy for the LLM to understand
-                                        if tool_name == "code_search" || tool_name == "rp_search" || tool_name == "codebase_search" {
+                                        if tool_name == "code_search"
+                                            || tool_name == "rp_search"
+                                            || tool_name == "codebase_search"
+                                        {
                                             // Format search results in a more readable way
-                                            if let Some(matches) = val.get("matches").and_then(|m| m.as_array()) {
+                                            if let Some(matches) =
+                                                val.get("matches").and_then(|m| m.as_array())
+                                            {
                                                 let mut formatted_results = String::new();
                                                 formatted_results.push_str("Search Results:\n");
                                                 for (i, m) in matches.iter().enumerate() {
                                                     if let (Some(path), Some(line), Some(content)) = (
                                                         m.get("path").and_then(|p| p.as_str()),
                                                         m.get("line").and_then(|l| l.as_u64()),
-                                                        m.get("content").and_then(|c| c.as_str())
+                                                        m.get("content").and_then(|c| c.as_str()),
                                                     ) {
-                                                        formatted_results.push_str(&format!("{}. {}:{}: {}\n", i+1, path, line, content));
+                                                        formatted_results.push_str(&format!(
+                                                            "{}. {}:{}: {}\n",
+                                                            i + 1,
+                                                            path,
+                                                            line,
+                                                            content
+                                                        ));
                                                     }
                                                 }
                                                 json!({ "ok": true, "result": { "search_completed": true, "results": formatted_results, "match_count": matches.len() } })
@@ -706,10 +810,16 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                                     response: tool_result,
                                 },
                             }]));
-                            
+
                             // Proactively suggest next steps for search tools
-                            if tool_name == "code_search" || tool_name == "rp_search" || tool_name == "codebase_search" {
-                                println!("{} Would you like me to explain the search results or perform another search?", style("[SUGGESTION]").cyan().bold());
+                            if tool_name == "code_search"
+                                || tool_name == "rp_search"
+                                || tool_name == "codebase_search"
+                            {
+                                println!(
+                                    "{} Would you like me to explain the search results or perform another search?",
+                                    style("[SUGGESTION]").cyan().bold()
+                                );
                             }
                         }
                         Part::FunctionResponse { .. } => {
@@ -734,18 +844,51 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                 } else {
                     // No content at all - this shouldn't happen but prevents infinite loops
                     consecutive_empty_responses += 1;
+
+                    // Check if this is a malformed function call error
+                    if let Some(candidate) = response.candidates.first() {
+                        if let Some(finish_reason) = &candidate.finish_reason {
+                            if finish_reason == "MALFORMED_FUNCTION_CALL" {
+                                println!(
+                                    "{}",
+                                    style(
+                                        "(malformed function call - retrying with simpler approach)"
+                                    )
+                                    .dim()
+                                    .yellow()
+                                );
+                                // Add a message to help the model recover
+                                conversation.push(Content::user_text(
+                                    "Please try a simpler approach or use a different tool.",
+                                ));
+                                continue 'outer;
+                            }
+                        }
+                    }
+
                     println!("{}", style("(empty response from model)").dim());
                     if consecutive_empty_responses >= max_empty_responses {
-                        println!("{}", style("(too many consecutive empty responses, stopping)").dim().red());
+                        println!(
+                            "{}",
+                            style("(too many consecutive empty responses, stopping)")
+                                .dim()
+                                .red()
+                        );
                         break 'outer;
                     }
                     break 'outer;
                 }
             } else {
                 consecutive_empty_responses += 1;
-                println!("{}", style("(no response candidate from model)").dim().red());
+                println!(
+                    "{}",
+                    style("(no response candidate from model)").dim().red()
+                );
                 if consecutive_empty_responses >= max_empty_responses {
-                    println!("{}", style("(too many failed responses, stopping)").dim().red());
+                    println!(
+                        "{}",
+                        style("(too many failed responses, stopping)").dim().red()
+                    );
                     break 'outer;
                 }
                 break 'outer;
@@ -767,7 +910,11 @@ fn render_pty_output_fn(output: &str, title: &str, command: Option<&str>) -> Res
     println!("{}", style("=".repeat(80)).dim());
 
     // Print title
-    println!("{} {}", style("==").blue().bold(), style(title).blue().bold());
+    println!(
+        "{} {}",
+        style("==").blue().bold(),
+        style(title).blue().bold()
+    );
 
     // Print command if available
     if let Some(cmd) = command {

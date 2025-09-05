@@ -41,6 +41,7 @@ pub mod conversation_summarizer;
 pub mod decision_tracker;
 pub mod diff_renderer;
 pub mod error_recovery;
+pub mod file_search;
 pub mod gemini;
 pub mod llm;
 pub mod performance_monitor;
@@ -54,22 +55,22 @@ pub mod types;
 pub mod vtagentgitignore;
 
 // Re-exports for convenience
-pub use agent::*;
-pub use cli::*;
-pub use code_completion::*;
-pub use commands::*;
-pub use config::*;
-pub use diff_renderer::*;
-pub use gemini::*;
-pub use llm::*;
-pub use performance_profiler::*;
-pub use prompts::*;
-pub use rp_search::*;
-pub use timeout_detector::*;
-pub use tools::*;
-pub use tree_sitter::*;
-pub use types::*;
-pub use vtagentgitignore::*;
+pub use agent::core::Agent;
+pub use cli::args::{Cli, Commands};
+pub use code_completion::{CodeCompletionEngine, CompletionSuggestion};
+pub use commands::stats::handle_stats_command;
+pub use config::{AgentConfig, VTAgentConfig};
+pub use diff_renderer::DiffRenderer;
+pub use gemini::{Content, FunctionDeclaration, Part};
+pub use llm::{make_client, AnyClient};
+pub use performance_profiler::PerformanceProfiler;
+pub use prompts::{generate_system_instruction, generate_specialized_instruction, generate_lightweight_instruction};
+pub use rp_search::RpSearchManager;
+pub use timeout_detector::TimeoutDetector;
+pub use tools::{ToolRegistry, ToolError};
+pub use tree_sitter::TreeSitterAnalyzer;
+pub use types::{SessionInfo, ToolConfig, ContextConfig, LoggingConfig, CommandResult, AnalysisDepth, OutputFormat, CompressionLevel, PerformanceMetrics};
+pub use vtagentgitignore::initialize_vtagent_gitignore;
 
 #[cfg(test)]
 mod tests {
@@ -168,7 +169,12 @@ mod tests {
         let result = registry.execute_tool("list_pty_sessions", args).await;
         assert!(result.is_ok());
         let response: serde_json::Value = result.unwrap();
-        assert!(response["sessions"].as_array().unwrap().contains(&"test_session".into()));
+        assert!(
+            response["sessions"]
+                .as_array()
+                .unwrap()
+                .contains(&"test_session".into())
+        );
 
         // Test closing a PTY session
         let args = serde_json::json!({

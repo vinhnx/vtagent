@@ -4,11 +4,11 @@ use crate::agent::compaction::CompactionEngine;
 use crate::conversation_summarizer::ConversationSummarizer;
 use crate::decision_tracker::DecisionTracker;
 use crate::error_recovery::{ErrorRecoveryManager, ErrorType};
-use crate::llm::{make_client, AnyClient};
-use crate::tools::{build_function_declarations, ToolRegistry};
+use crate::llm::{AnyClient, make_client};
+use crate::tools::{ToolRegistry, build_function_declarations};
 use crate::tree_sitter::{CodeAnalysis, TreeSitterAnalyzer};
 use crate::types::*;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use console::style;
 use std::sync::Arc;
 

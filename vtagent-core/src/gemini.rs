@@ -165,7 +165,7 @@ impl Default for RetryConfig {
         Self {
             max_attempts: 3,
             initial_delay: Duration::from_millis(500), // Increased initial delay
-            max_delay: Duration::from_secs(30), // Increased max delay for server errors
+            max_delay: Duration::from_secs(30),        // Increased max delay for server errors
             backoff_multiplier: 2.0,
             retryable_errors: vec![
                 "timeout".to_string(),
@@ -351,6 +351,18 @@ impl Client {
         } else {
             format!("models/{}", self.model)
         };
+
+        // Validate model name format
+        if !model.contains("gemini") && !model.contains("models/gemini") {
+            eprintln!(
+                "WARNING: Model name '{}' doesn't contain 'gemini'. This might cause API errors.",
+                self.model
+            );
+            eprintln!(
+                "Common Gemini model names: gemini-2.5-flash, gemini-2.5-flash-lite, gemini-2.0-flash, gemini-1.5-pro"
+            );
+        }
+
         let url = format!(
             "https://generativelanguage.googleapis.com/v1beta/{}:generateContent",
             model
@@ -364,6 +376,18 @@ impl Client {
         } else {
             format!("models/{}", self.model)
         };
+
+        // Validate model name format
+        if !model.contains("gemini") && !model.contains("models/gemini") {
+            eprintln!(
+                "WARNING: Model name '{}' doesn't contain 'gemini'. This might cause API errors.",
+                self.model
+            );
+            eprintln!(
+                "Common Gemini model names: gemini-2.5-flash, gemini-2.5-flash-lite, gemini-2.0-flash, gemini-1.5-pro"
+            );
+        }
+
         let url = format!(
             "https://generativelanguage.googleapis.com/v1beta/{}:streamGenerateContent",
             model
@@ -372,6 +396,57 @@ impl Client {
     }
 
     pub async fn generate_content(
+        &self,
+        req: &GenerateContentRequest,
+    ) -> Result<GenerateContentResponse> {
+        // First try with the current model
+        match self.generate_content_internal(req).await {
+            Ok(response) => Ok(response),
+            Err(e) => {
+                // If the primary model fails, try fallback models
+                eprintln!("Primary model '{}' failed: {}", self.model, e);
+
+                let fallback_models = vec!["gemini-2.5-flash", "gemini-2.0-flash"];
+
+                for fallback_model in &fallback_models {
+                    if fallback_model == &self.model {
+                        continue; // Skip the same model we just tried
+                    }
+
+                    eprintln!("Trying fallback model: {}", fallback_model);
+
+                    // Create a temporary client with the fallback model
+                    let fallback_client = Client::with_config(
+                        self.api_key.clone(),
+                        fallback_model.to_string(),
+                        self.config.clone(),
+                    );
+
+                    match fallback_client.generate_content_internal(req).await {
+                        Ok(response) => {
+                            eprintln!("Successfully used fallback model: {}", fallback_model);
+                            return Ok(response);
+                        }
+                        Err(e) => {
+                            eprintln!("Fallback model '{}' also failed: {}", fallback_model, e);
+                            continue;
+                        }
+                    }
+                }
+
+                // If all fallback models fail, return the original error
+                Err(anyhow::anyhow!(
+                    "All models failed. Primary model '{}' error: {}. \n\
+                    Suggested working models: gemini-2.5-flash, gemini-2.0-flash, gemini-1.5-pro",
+                    self.model,
+                    e
+                ))
+            }
+        }
+    }
+
+    /// Internal method to generate content without fallback logic
+    async fn generate_content_internal(
         &self,
         req: &GenerateContentRequest,
     ) -> Result<GenerateContentResponse> {
@@ -403,15 +478,15 @@ impl Client {
                         500 => {
                             // Internal Server Error - retry with longer backoff
                             (true, self.calculate_retry_delay(attempts))
-                        },
+                        }
                         502 | 503 => {
                             // Bad Gateway or Service Unavailable - retry with shorter delay
                             (true, self.calculate_retry_delay(attempts - 1))
-                        },
+                        }
                         504 => {
                             // Gateway Timeout - retry with medium delay
                             (true, self.calculate_retry_delay(attempts))
-                        },
+                        }
                         _ => {
                             // Other 5xx errors - use default retry logic
                             (true, self.calculate_retry_delay(attempts))
@@ -419,8 +494,10 @@ impl Client {
                     };
 
                     if should_retry {
-                        eprintln!("Server error {} (attempt {}/{}), retrying in {:?}...",
-                                status, attempts, max_attempts, delay_duration);
+                        eprintln!(
+                            "Server error {} (attempt {}/{}), retrying in {:?}...",
+                            status, attempts, max_attempts, delay_duration
+                        );
                         tokio::time::sleep(delay_duration).await;
                         continue;
                     }
@@ -428,12 +505,91 @@ impl Client {
 
                 // Non-retryable error or max attempts reached
                 let msg = format!("Gemini API error: {} - {}", status, text);
+
+                // Check for specific error types and provide better guidance
+                if status.as_u16() == 500 && text.contains("MALFORMED_FUNCTION_CALL") {
+                    return Err(anyhow::anyhow!(
+                        "API error (500): Malformed function call detected. This usually means:\n\
+                        1. The function call format is invalid or incomplete\n\
+                        2. Required parameters are missing or incorrectly formatted\n\
+                        3. The function name or arguments don't match the expected schema\n\n\
+                        Suggestions:\n\
+                        - Check that all required function parameters are provided\n\
+                        - Verify function argument types and formats\n\
+                        - Try simplifying the function call\n\
+                        - Use the tool documentation to verify correct usage\n\n\
+                        Original error: {}",
+                        msg
+                    ));
+                }
+
+                // For certain errors, try fallback models
+                if status.as_u16() == 400 || status.as_u16() == 404 || status.as_u16() == 500 {
+                    eprintln!("Primary model '{}' failed with error: {}", self.model, msg);
+                    eprintln!(
+                        "This might be a model availability issue. Consider trying these models:"
+                    );
+                    eprintln!("- gemini-2.5-flash (recommended fallback)");
+                    eprintln!("- gemini-2.0-flash");
+                    eprintln!("- gemini-1.5-pro");
+                    eprintln!("- gemini-1.5-flash");
+                }
+
                 return Err(anyhow::anyhow!(msg));
             }
 
             let body_text = resp.text().await.unwrap_or_default();
+
+            // Debug: Log the raw response (only in development mode)
+            if cfg!(debug_assertions) {
+                use console::style;
+                eprintln!(
+                    "{} {}",
+                    style("[API DEBUG]").cyan().bold(),
+                    style(&body_text).dim()
+                );
+            }
+
+            // Check for empty response
+            if body_text.trim().is_empty() {
+                return Err(anyhow::anyhow!(
+                    "Empty response from Gemini API. This might indicate:\n\
+                    1. The model '{}' is not available or doesn't exist\n\
+                    2. Your API key doesn't have access to this model\n\
+                    3. The API service is experiencing issues\n\n\
+                    Suggested models to try: gemini-2.5-flash, gemini-2.0-flash, gemini-1.5-pro",
+                    self.model
+                ));
+            }
+
             match serde_json::from_str::<GenerateContentResponse>(&body_text) {
-                Ok(data) => return Ok(data),
+                Ok(data) => {
+                    // Check if response has valid content
+                    if data.candidates.is_empty() {
+                        return Err(anyhow::anyhow!(
+                            "Gemini API returned response with no candidates. This usually means the model '{}' is unavailable or the request was invalid.",
+                            self.model
+                        ));
+                    }
+
+                    // Check if any candidate has actual content
+                    let has_content = data.candidates.iter().any(|candidate| {
+                        candidate.content.parts.iter().any(|part| match part {
+                            Part::Text { text } => !text.trim().is_empty(),
+                            Part::FunctionCall { .. } => true,
+                            Part::FunctionResponse { .. } => true,
+                        })
+                    });
+
+                    if !has_content {
+                        return Err(anyhow::anyhow!(
+                            "Gemini API returned response but all candidates are empty. Model '{}' might be experiencing issues.",
+                            self.model
+                        ));
+                    }
+
+                    return Ok(data);
+                }
                 Err(parse_err) => {
                     match serde_json::from_str::<serde_json::Value>(&body_text) {
                         Ok(v) => {
@@ -481,7 +637,8 @@ impl Client {
 
     fn extract_first_text(v: &serde_json::Value) -> Option<String> {
         // Try the standard path first
-        let text = v.get("candidates")
+        let text = v
+            .get("candidates")
             .and_then(|c| c.as_array())
             .and_then(|arr| arr.get(0))
             .and_then(|cand| cand.get("content"))
@@ -497,12 +654,12 @@ impl Client {
                 }
                 None
             });
-        
+
         // If that fails, try a more flexible approach
         if text.is_some() {
             return text;
         }
-        
+
         // Try to find any text field in the response
         fn find_text_in_value(value: &serde_json::Value) -> Option<String> {
             match value {
@@ -535,7 +692,7 @@ impl Client {
                 _ => None,
             }
         }
-        
+
         find_text_in_value(v)
     }
 
@@ -552,7 +709,7 @@ impl Client {
             let parts_v = content_value
                 .and_then(|cnt| cnt.get("parts"))
                 .and_then(|p| p.as_array());
-            
+
             if let Some(parts_v) = parts_v {
                 let mut parts: Vec<Part> = Vec::new();
                 for p in parts_v {
@@ -583,19 +740,16 @@ impl Client {
                         });
                     }
                 }
-                
+
                 // Use the role from content if available, otherwise default to "model"
                 let role = content_value
                     .and_then(|cnt| cnt.get("role"))
                     .and_then(|r| r.as_str())
                     .unwrap_or("model")
                     .to_string();
-                
+
                 candidates_out.push(Candidate {
-                    content: Content {
-                        role,
-                        parts,
-                    },
+                    content: Content { role, parts },
                     finish_reason: c
                         .get("finishReason")
                         .and_then(|x| x.as_str())
@@ -603,7 +757,7 @@ impl Client {
                 });
                 continue;
             }
-            
+
             // Handle direct functionCall at candidate level
             if let Some(fc) = c.get("functionCall") {
                 let name = fc
@@ -628,7 +782,7 @@ impl Client {
                 });
                 continue;
             }
-            
+
             // Handle direct text at candidate level
             if let Some(t) = c.get("text").and_then(|x| x.as_str()) {
                 let parts = vec![Part::Text {
@@ -646,7 +800,7 @@ impl Client {
                 });
                 continue;
             }
-            
+
             // Handle case where we have a candidate but no recognizable content
             // Create a minimal candidate with empty parts
             candidates_out.push(Candidate {
@@ -660,7 +814,7 @@ impl Client {
                     .map(|s| s.to_string()),
             });
         }
-        
+
         // Even if we have candidates with empty parts, we still return a response
         // This is better than returning None which would cause the error
         Some(GenerateContentResponse {
@@ -819,7 +973,17 @@ impl Client {
                 }
                 StatusCode::INTERNAL_SERVER_ERROR => {
                     return Err(anyhow::anyhow!(
-                        "API error (500): Internal server error from Gemini API. This is usually temporary. Please retry your request. Details: {}",
+                        "API error (500): Internal server error from Gemini API. This usually means:\n\
+                        1. The model name '{}' might be incorrect or unavailable\n\
+                        2. The API service is temporarily experiencing issues\n\
+                        3. Your request format might be invalid\n\n\
+                        Suggestions:\n\
+                        - Verify the model name is correct (try: gemini-2.5-flash-lite, gemini-2.0-flash, gemini-1.5-pro)\n\
+                        - Check if your API key has access to this model\n\
+                        - Wait a few minutes and retry the request\n\
+                        - Try a different model if available\n\n\
+                        Details: {}",
+                        self.model,
                         text
                     ));
                 }

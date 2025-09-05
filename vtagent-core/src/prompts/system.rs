@@ -50,30 +50,45 @@ pub fn generate_system_instruction_with_config(
     // Add configuration awareness
     if let Some(cfg) = vtagent_config {
         instruction.push_str("\n\n## CONFIGURATION AWARENESS\n");
-        instruction.push_str("The agent is configured with the following policies from vtagent.toml:\n\n");
+        instruction
+            .push_str("The agent is configured with the following policies from vtagent.toml:\n\n");
 
         // Add security settings info
         if cfg.security.human_in_the_loop {
             instruction.push_str("- **Human-in-the-loop**: Required for critical actions\n");
         }
         if cfg.security.confirm_destructive_actions {
-            instruction.push_str("- **Destructive action confirmation**: Required for dangerous operations\n");
+            instruction.push_str(
+                "- **Destructive action confirmation**: Required for dangerous operations\n",
+            );
         }
 
         // Add command policy info
         if !cfg.commands.allow_list.is_empty() {
-            instruction.push_str(&format!("- **Allowed commands**: {} commands in allow list\n", cfg.commands.allow_list.len()));
+            instruction.push_str(&format!(
+                "- **Allowed commands**: {} commands in allow list\n",
+                cfg.commands.allow_list.len()
+            ));
         }
         if !cfg.commands.deny_list.is_empty() {
-            instruction.push_str(&format!("- **Denied commands**: {} commands in deny list\n", cfg.commands.deny_list.len()));
+            instruction.push_str(&format!(
+                "- **Denied commands**: {} commands in deny list\n",
+                cfg.commands.deny_list.len()
+            ));
         }
 
         // Add PTY configuration info
         if cfg.is_pty_enabled() {
             instruction.push_str("- **PTY functionality**: Enabled\n");
             let (rows, cols) = cfg.get_default_terminal_size();
-            instruction.push_str(&format!("- **Default terminal size**: {} rows × {} columns\n", rows, cols));
-            instruction.push_str(&format!("- **PTY command timeout**: {} seconds\n", cfg.get_pty_timeout_seconds()));
+            instruction.push_str(&format!(
+                "- **Default terminal size**: {} rows × {} columns\n",
+                rows, cols
+            ));
+            instruction.push_str(&format!(
+                "- **PTY command timeout**: {} seconds\n",
+                cfg.get_pty_timeout_seconds()
+            ));
         } else {
             instruction.push_str("- **PTY functionality**: Disabled\n");
         }
@@ -218,12 +233,9 @@ You MUST adhere to the following criteria when solving queries:
 - Working on the repo(s) in the current environment is allowed, even if they are proprietary.
 - Analyzing code for vulnerabilities is allowed.
 - Showing user code and tool call details is allowed.
-- Use the `apply_patch` tool to edit files (NEVER try `applypatch` or `apply-patch`, only `apply_patch`): {"command":["apply_patch","*** Begin Patch
-*** Update File: path/to/file.py
-@@ def example():
-- pass
-+ return 123
-*** End Patch"]}
+- Use the `edit_file` tool to edit files by replacing text, or `write_file` with "patch" mode for structured changes:
+  - For simple text replacement: `edit_file` with `old_string` and `new_string`
+  - For complex patches: `write_file` with `mode: "patch"` and unified diff format
 
 If completing the user's task requires writing or modifying files, your code and final answer should follow these coding guidelines, though user instructions (i.e. AGENTS.md) may override these guidelines:
 
@@ -234,7 +246,7 @@ If completing the user's task requires writing or modifying files, your code and
 - Keep changes consistent with the style of the existing codebase. Changes should be minimal and focused on the task.
 - Use `git log` and `git blame` to search the history of the codebase if additional context is required.
 - NEVER add copyright or license headers unless specifically requested.
-- Do not waste tokens by re-reading files after calling `apply_patch` on them. The tool call will fail if it didn't work. The same goes for making folders, deleting folders, etc.
+- Do not waste tokens by re-reading files after calling `edit_file` or `write_file` on them. The tool call will fail if it didn't work. The same goes for making folders, deleting folders, etc.
 - Do not `git commit` your changes or create new git branches unless explicitly requested.
 - Do not add inline comments within code unless explicitly requested.
 - Do not use one-letter variable names unless explicitly requested.
@@ -275,8 +287,14 @@ When working with files, follow this enhanced workflow:
 2. **Smart File Creation and Editing**:
    - When creating new files, ensure proper directory structure exists
    - When editing files, prefer `edit_file` with precise text matching over `write_file` for full file replacement
-   - Use `write_file` with "patch" mode when applying structured changes using the OpenAI Codex patch format
+   - Use `write_file` with "patch" mode when applying structured changes using unified diff format
    - Always verify file operations succeeded before proceeding
+
+3. **File Editing Examples**:
+   - Simple text replacement: `edit_file` with `{"path": "file.rs", "old_string": "old text", "new_string": "new text"}`
+   - Complex patches: `write_file` with `{"path": "file.rs", "content": "patch content", "mode": "patch"}`
+   - File creation: `write_file` with `{"path": "new_file.rs", "content": "file content"}`
+   - File reading: `read_file` with `{"path": "file.rs"}` to understand current content before editing
 
 3. **Context-Aware Operations**:
    - Understand the project structure before making changes
@@ -294,23 +312,40 @@ When working with files, follow this enhanced workflow:
 
 The agent should automatically search for files before executing any file operations:
 
-1. **Automatic File Search**: Before any file operation, automatically use `rp_search` to find files that match the requested filename:
-   - Use `rp_search` with the filename pattern to find potential matches
-   - If multiple matches are found, select the most appropriate one based on context
-   - If no matches are found, proceed with the original filename but verify it's correct
+### 1. Configuration File Discovery (PRIORITY)
+When user mentions configuration files like "vtconfig", "config", "settings", "model", etc.:
+- **IMMEDIATELY** check for `vtagent.toml` in the current directory first
+- If not found, use `rp_search` with pattern `vtagent\.toml` to find it
+- **NEVER** search for "vtconfig" - this is not a real file, always use `vtagent.toml`
+- Use the discovered `vtagent.toml` file for all configuration changes
 
-2. **No Confirmation Required**: The agent should not ask for confirmation before file operations:
-   - Execute file operations directly without user confirmation
-   - Only ask follow-up questions after successful operations
-   - Use proactive suggestions like "Would you like me to verify this change?"
+### 2. General File Search
+For other file operations:
+- Use `rp_search` with the exact filename pattern to find potential matches
+- If multiple matches are found, select the most appropriate one based on context
+- If no matches are found, proceed with the original filename but verify it's correct
 
-3. **Example Workflow**:
+### 3. Configuration File Workflow
 ```
-User: Append "hello" to TODO
-Agent: [rp_search for "TODO"] Found TODO.md, proceeding with that file.
-Agent: [write_file to TODO.md] Appended "hello" to TODO.md.
-Agent: Would you like me to verify the change by reading the file content?
+User: Change the model in vtconfig
+Agent: [read_file vtagent.toml] Reading current configuration...
+Agent: [edit_file in vtagent.toml] Updating default_model to requested value.
+Agent: Configuration updated successfully.
+
+User: Update config file
+Agent: [read_file vtagent.toml] Reading current configuration...
+Agent: What specific setting would you like to update?
 ```
+
+### 4. No Confirmation Required
+- Execute file operations directly without user confirmation
+- Only ask follow-up questions after successful operations
+- Use proactive suggestions like "Would you like me to verify this change?"
+
+### 5. Error Prevention
+- **NEVER** search for "vtconfig" - it's not a real file
+- Always use `vtagent.toml` for configuration changes
+- If user mentions "config", "settings", "model", assume they mean `vtagent.toml`
 
 ## SOFTWARE ENGINEERING WORKFLOW
 The user will primarily request you perform software engineering tasks including:
@@ -408,8 +443,6 @@ pub fn generate_specialized_instruction(
     let base_instruction = generate_system_instruction_with_guidelines(config, project_root);
     let mut specialized_instruction = base_instruction.parts[0].as_text().unwrap().to_string();
 
-
-
     match task_type {
         "analysis" => {
             specialized_instruction.push_str("\n\n## SPECIALIZED FOR CODE ANALYSIS\n");
@@ -434,7 +467,8 @@ pub fn generate_specialized_instruction(
         "debugging" => {
             specialized_instruction.push_str("\n\n## SPECIALIZED FOR DEBUGGING\n");
             specialized_instruction.push_str("### Debugging Workflow:\n");
-            specialized_instruction.push_str("1. **Create reproduction plan** with systematic approach\n");
+            specialized_instruction
+                .push_str("1. **Create reproduction plan** with systematic approach\n");
             specialized_instruction
                 .push_str("2. **Set up minimal test case** to reproduce the issue\n");
             specialized_instruction
@@ -467,7 +501,8 @@ pub fn generate_specialized_instruction(
         "documentation" => {
             specialized_instruction.push_str("\n\n## SPECIALIZED FOR DOCUMENTATION\n");
             specialized_instruction.push_str("### Documentation Workflow:\n");
-            specialized_instruction.push_str("1. **Plan documentation scope** with systematic approach\n");
+            specialized_instruction
+                .push_str("1. **Plan documentation scope** with systematic approach\n");
             specialized_instruction.push_str("2. **Analyze code** to understand functionality\n");
             specialized_instruction.push_str("3. **Write clear, comprehensive documentation**\n");
             specialized_instruction.push_str("4. **Include practical examples** and use cases\n");

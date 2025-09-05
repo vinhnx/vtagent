@@ -279,4 +279,58 @@ https://github.com/openai/codex/blob/234c0a0469db222f05df08d00ae5032312f77427/co
 
 --
 
-Conduct a comprehensive audit of the tools registry: First, compile a complete list of all registered tools, including their names, versions, descriptions, and dependencies. Then, systematically test each tool by executing its primary functions with sample inputs, verifying outputs against expected results, and checking for errors, performance issues, or compatibility problems. For each identified issue, document the problem details, root cause, and potential impact. Finally, implement fixes such as updating code, resolving dependencies, or removing obsolete tools, and re-test to confirm resolution before updating the registry.
+https://github.com/whit3rabbit/bubbletea-rs/tree/main/examples/fullscreen
+
+--
+
+https://github.com/whit3rabbit/bubbletea-rs/tree/main/examples/altscreen-toggle
+
+--
+https://github.com/tbillington/kondo
+
+--
+
+
+https://ast-grep.github.io/guide/api-usage/performance-tip.html
+
+--
+
+https://ast-grep.github.io/guide/tools/json.html
+
+--
+
+https://ast-grep.github.io/guide/rewrite/rewriter.html
+
+https://ast-grep.github.io/guide/rewrite/transform.html
+
+--
+
+
+https://corrode.dev/blog/tips-for-faster-rust-compile-times
+
+---
+
+
+Disable Unused Features Of Crate Dependencies
+
+cargo-features-manager is a relatively new tool that helps you to disable unused features of your dependencies.
+
+cargo install cargo-features-manager
+cargo features prune
+
+
+--
+
+Use Cargo Nextest Instead of cargo test
+
+--
+
+I see a lot of overwrought memory systems for agents.
+
+Just use the file system instead.
+
+Agents already know how to use it—you get grep, tail, ls, etc. for free. No complex embeddings needed.
+
+--
+
+"todo.md" implement and update case-insensitive search for file and content

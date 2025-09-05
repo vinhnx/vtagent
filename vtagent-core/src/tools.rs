@@ -6,7 +6,7 @@
 use crate::gemini::FunctionDeclaration;
 use crate::rp_search::RpSearchManager;
 use crate::vtagentgitignore::{initialize_vtagent_gitignore, should_exclude_file};
-// use crate::ast_grep::{AstGrepEngine, CommonPatterns}; // TODO: Implement AST-grep engine
+use crate::ast_grep::AstGrepEngine;
 use anyhow::{anyhow, Context, Result};
 use std::env;
 use serde::{Deserialize, Serialize};
@@ -442,8 +442,8 @@ pub struct ToolRegistry {
     pty_sessions: Arc<PtyMutex<PtySessionMap<String, PtyArc<VtagentPtySession>>>>,
     // RP Search manager for debounce/cancellation logic
     rp_search_manager: Arc<RpSearchManager>,
-    // AST-grep engine for syntax-aware code operations (TODO: Implement)
-    // ast_grep_engine: Option<AstGrepEngine>,
+    // AST-grep engine for syntax-aware code operations
+    ast_grep_engine: Option<AstGrepEngine>,
 }
 
 /// Tool operation statistics
@@ -587,8 +587,8 @@ impl ToolRegistry {
     pub fn new(root: PathBuf) -> Self {
         let cargo_toml_path = root.join("Cargo.toml");
         let rp_search_manager = Arc::new(RpSearchManager::new(root.clone()));
-        // TODO: Initialize AST-grep engine when implemented
-        // let ast_grep_engine = AstGrepEngine::new().expect("Failed to initialize ast-grep engine");
+        // Initialize AST-grep engine when possible
+        let ast_grep_engine = AstGrepEngine::new().ok();
 
         Self {
             root,
@@ -597,7 +597,7 @@ impl ToolRegistry {
             max_cache_size: 1000,
             pty_sessions: Arc::new(PtyMutex::new(PtySessionMap::new())),
             rp_search_manager,
-            // ast_grep_engine: Some(ast_grep_engine),
+            ast_grep_engine,
         }
     }
 
@@ -1443,25 +1443,96 @@ impl ToolRegistry {
 
     /// Search using AST-grep patterns
     async fn ast_grep_search(&self, args: Value) -> Result<Value> {
+        // If AST-grep engine is available, use it; otherwise fall back to rp_search
+        if let Some(ref engine) = self.ast_grep_engine {
+            let args_obj = args.as_object().ok_or_else(|| anyhow!("Invalid arguments"))?;
+            let pattern = args_obj
+                .get("pattern")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow!("Missing pattern argument"))?;
+            let path = args_obj
+                .get("path")
+                .and_then(|v| v.as_str())
+                .unwrap_or(".");
+            let language = args_obj
+                .get("language")
+                .and_then(|v| v.as_str());
+                
+            return engine.search(pattern, path, language).await;
+        }
+        
+        // Fall back to regular rp_search if AST-grep is not available
         self.rp_search(args).await
     }
 
     /// Transform code using AST-grep patterns
     async fn ast_grep_transform(&self, args: Value) -> Result<Value> {
-        let _args = args;
-        Ok(json!({ "success": false, "error": "ast_grep_transform not implemented yet" }))
+        if let Some(ref engine) = self.ast_grep_engine {
+            let args_obj = args.as_object().ok_or_else(|| anyhow!("Invalid arguments"))?;
+            let pattern = args_obj
+                .get("pattern")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow!("Missing pattern argument"))?;
+            let replacement = args_obj
+                .get("replacement")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow!("Missing replacement argument"))?;
+            let path = args_obj
+                .get("path")
+                .and_then(|v| v.as_str())
+                .unwrap_or(".");
+            let language = args_obj
+                .get("language")
+                .and_then(|v| v.as_str());
+            let preview_only = args_obj
+                .get("preview_only")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
+                
+            return engine.transform(pattern, replacement, path, language, preview_only).await;
+        }
+        
+        Ok(json!({ "success": false, "error": "ast-grep engine not available" }))
     }
 
     /// Lint code using AST-grep
     async fn ast_grep_lint(&self, args: Value) -> Result<Value> {
-        let _args = args;
-        Ok(json!({ "success": false, "error": "ast_grep_lint not implemented yet" }))
+        if let Some(ref engine) = self.ast_grep_engine {
+            let args_obj = args.as_object().ok_or_else(|| anyhow!("Invalid arguments"))?;
+            let path = args_obj
+                .get("path")
+                .and_then(|v| v.as_str())
+                .unwrap_or(".");
+            let language = args_obj
+                .get("language")
+                .and_then(|v| v.as_str());
+                
+            return engine.lint(path, language).await;
+        }
+        
+        Ok(json!({ "success": false, "error": "ast-grep engine not available" }))
     }
 
     /// Refactor code using AST-grep
     async fn ast_grep_refactor(&self, args: Value) -> Result<Value> {
-        let _args = args;
-        Ok(json!({ "success": false, "error": "ast_grep_refactor not implemented yet" }))
+        if let Some(ref engine) = self.ast_grep_engine {
+            let args_obj = args.as_object().ok_or_else(|| anyhow!("Invalid arguments"))?;
+            let path = args_obj
+                .get("path")
+                .and_then(|v| v.as_str())
+                .unwrap_or(".");
+            let language = args_obj
+                .get("language")
+                .and_then(|v| v.as_str());
+            let refactor_type = args_obj
+                .get("refactor_type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("all");
+                
+            return engine.refactor(path, language, refactor_type).await;
+        }
+        
+        Ok(json!({ "success": false, "error": "ast-grep engine not available" }))
     }
 
     /// Fuzzy search functionality

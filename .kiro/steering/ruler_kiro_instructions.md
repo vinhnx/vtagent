@@ -1,6 +1,8 @@
 
 
-<!-- Source: AGENTS.md -->
+<!-- Source: .ruler/AGENTS.md -->
+
+# AGENTS.md
 
 # Repository Guidelines
 
@@ -103,12 +105,6 @@ if isValid && isAllowed && isSecure {
 - Use self-descriptive values, avoid custom mappings that require memorization.
 - Don’t abuse DRY, a little duplication is better than unnecessary dependencies.
 - Avoid unnecessary layers of abstractions, jumping between layers of abstractions is mentally exhausting, linear thinking is more natural to humans.
-
-
-
-<!-- Source: .ruler/AGENTS.md -->
-
-# AGENTS.md
 
 ## Project Context
 
@@ -217,4 +213,6 @@ This is a Rust project called "vtagent" that appears to be a code analysis tool 
 - DO NOT USE EMOJI THIS IS IMPORTANT
 - Put all agent's configuration option to vtagent.toml. This is important, every logic should be read from this toml config instead of hardcode.
 - Use MCP tools for enhanced context awareness if needed.
-- Don't explain what you are doing, just do what I asked you.
+- Use `cargo check` instead of `cargo build` whenever possible
+- Use `cargo nextest` Instead of `cargo test
+- Put all markdown documentation files to ./docs folder. don't put any unrelated files in root folder. THIS IS IMPORTANT!

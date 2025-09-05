@@ -7,7 +7,6 @@ default_agents = [
     "copilot",
     "cursor",
     "codex",
-    "kilocode",
     "agentsmd",
     "qwen",
     "gemini",

@@ -67,9 +67,9 @@ pub use performance_profiler::PerformanceProfiler;
 pub use prompts::{generate_system_instruction, generate_specialized_instruction, generate_lightweight_instruction};
 pub use rp_search::RpSearchManager;
 pub use timeout_detector::TimeoutDetector;
-pub use tools::{ToolRegistry, ToolError};
+pub use tools::{ToolRegistry, ToolError, build_function_declarations};
 pub use tree_sitter::TreeSitterAnalyzer;
-pub use types::{SessionInfo, ToolConfig, ContextConfig, LoggingConfig, CommandResult, AnalysisDepth, OutputFormat, CompressionLevel, PerformanceMetrics};
+pub use types::{SessionInfo, ToolConfig, ContextConfig, LoggingConfig, CommandResult, AnalysisDepth, OutputFormat, CompressionLevel, PerformanceMetrics, CapabilityLevel};
 pub use vtagentgitignore::initialize_vtagent_gitignore;
 
 #[cfg(test)]

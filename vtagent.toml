@@ -25,8 +25,8 @@ default_policy = "prompt"
 [tools.policies]
 # File operations
 read_file = "allow"
-write_file = "prompt"
-edit_file = "prompt"
+write_file = "allow"
+edit_file = "allow"
 list_files = "allow"
 delete_file = "prompt"
 
@@ -39,9 +39,8 @@ rp_search = "allow"
 cargo_check = "allow"
 cargo_clippy = "allow"
 cargo_fmt = "allow"
-cargo_build = "prompt"
-cargo_test = "prompt"
-
+cargo_build = "allow"
+cargo_test = "allow"
 
 
 # Terminal operations

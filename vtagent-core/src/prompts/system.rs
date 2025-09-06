@@ -588,6 +588,32 @@ Plan your approach systematically throughout the conversation."#;
     Content::system_text(instruction.to_string())
 }
 
+/// Generate system instruction for different capability levels
+pub fn generate_system_instruction_for_level(level: crate::types::CapabilityLevel) -> Content {
+    let instruction = match level {
+        crate::types::CapabilityLevel::Basic => {
+            "You are a helpful AI coding assistant. You can have conversations with the user but have no access to tools."
+        },
+        crate::types::CapabilityLevel::FileReading => {
+            "You are a helpful AI coding assistant. You can read files in the workspace using the read_file tool."
+        },
+        crate::types::CapabilityLevel::FileListing => {
+            "You are a helpful AI coding assistant. You can read files and list directory contents using the read_file and list_files tools."
+        },
+        crate::types::CapabilityLevel::Bash => {
+            "You are a helpful AI coding assistant. You can read files, list directory contents, and run safe bash commands using the read_file, list_files, and bash tools."
+        },
+        crate::types::CapabilityLevel::Editing => {
+            "You are a helpful AI coding assistant. You can read files, list directory contents, run safe bash commands, and edit files using the read_file, list_files, bash, and edit_file tools."
+        },
+        crate::types::CapabilityLevel::CodeSearch => {
+            "You are a helpful AI coding assistant. You have full file system access and can read files, list directory contents, run safe bash commands, edit files, and search code using the read_file, list_files, bash, edit_file, and code_search tools."
+        },
+    };
+    
+    Content::system_text(instruction.to_string())
+}
+
 /// Prompt template for common scenarios
 pub struct PromptTemplate {
     pub name: String,

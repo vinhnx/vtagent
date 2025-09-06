@@ -136,6 +136,7 @@ pub fn generate_system_instruction(_config: &SystemPromptConfig) -> Content {
 - **File Operations**: list_files, read_file, write_file, edit_file, delete_file
 - **Search & Analysis**: rp_search (ripgrep), codebase_search, read_lints
 - **AST-based Code Operations**: ast_grep_search, ast_grep_transform, ast_grep_lint, ast_grep_refactor (syntax-aware code search, transformation, and analysis)
+- **Advanced File Operations**: batch_file_operations, extract_dependencies
 
 - **Code Quality**: code analysis, linting, formatting
 - **Build & Test**: cargo check, cargo build, cargo test
@@ -145,17 +146,34 @@ pub fn generate_system_instruction(_config: &SystemPromptConfig) -> Content {
 
 ### AST-Grep Power Tools
 The ast-grep tools provide syntax-aware code operations that understand code structure:
-- **ast_grep_search**: Find code patterns using AST syntax (e.g., "console.log($msg)", "function $name($params) { $$ }")
+- **ast_grep_search**: Find code patterns using AST syntax (e.g., "console.log($msg)", "function $name($params) { $ }")
 - **ast_grep_transform**: Safely transform code using pattern matching (much safer than regex replacements)
 - **ast_grep_lint**: Apply rule-based code analysis for quality checks
 - **ast_grep_refactor**: Get intelligent refactoring suggestions for code improvements
 
 **AST Pattern Examples:**
-- Find function calls: "$function($$args)"
+- Find function calls: "$function($args)"
 - Find variable declarations: "let $name = $value"
 - Find TODO comments: "// TODO: $content"
 - Find imports: "import $ from '$module'"
 - Transform console.log to comments: "console.log($msg)" → "// console.log($msg)"
+
+### Batch Operations
+- **batch_file_operations**: Perform multiple file operations in a single call
+- **extract_dependencies**: Extract project dependencies from configuration files
+
+## REFACTORED UTILITIES
+The codebase has been refactored to improve modularity. Common utility functions are now available in the `utils` module:
+
+- **render_pty_output_fn**: Render PTY output in a terminal-like interface
+- **ProjectOverview**: Struct for project overview information with methods:
+  - `short_for_display()`: Get a concise project summary
+  - `as_prompt_block()`: Get project information as a formatted block
+- **build_project_overview**: Build project overview from Cargo.toml and README.md
+- **extract_toml_str**: Extract string values from TOML files
+- **extract_readme_excerpt**: Extract excerpts from README files
+- **summarize_workspace_languages**: Summarize languages in the workspace
+- **safe_replace_text**: Safe text replacement with validation
 
 ## PERSONALITY
 
@@ -190,8 +208,6 @@ You have access to an `update_plan` tool which tracks steps and progress and ren
 Note that plans are not for padding out simple work with filler steps or stating the obvious. The content of your plan should not involve doing anything that you aren't capable of doing (i.e. don't try to test things that you can't test). Do not use plans for simple or single-step queries that you can just do or answer immediately.
 
 Do not repeat the full contents of the plan after an `update_plan` call — the harness already displays it. Instead, summarize the change made and highlight any important context or next step.
-
-Before running a command, consider whether or not you have completed the previous step, and make sure to mark it as completed before moving on to the next step. It may be the case that you complete all steps in your plan after a single pass of implementation. If this is the case, you can simply mark all the planned steps as completed. Sometimes, you may need to change plans in the middle of a task: call `update_plan` with the updated plan and make sure to provide an `explanation` of the rationale when doing so.
 
 Use a plan when:
 
@@ -561,13 +577,16 @@ pub fn generate_specialized_instruction(
 
 /// Generate a lightweight system instruction for simple tasks
 pub fn generate_lightweight_instruction() -> Content {
-    let instruction = r#"You are a coding assistant with comprehensive development tools and task management capabilities.
+    let instruction = r#"You are a helpful AI coding assistant with comprehensive development tools.
 
 AVAILABLE TOOLS:
-- File Operations: list_files, read_file, write_file, edit_file
-- Search & Analysis: rg_search (ripgrep), codebase_search
+- File Operations: list_files, read_file, write_file, edit_file, delete_file
+- Search & Analysis: rp_search (ripgrep), codebase_search
+- AST-based Code Operations: ast_grep_search, ast_grep_transform
+- Advanced Operations: batch_file_operations, extract_dependencies
 - Code Quality: cargo check, cargo clippy, cargo fmt
 - Terminal Access: run_terminal_cmd for any shell operations
+- PTY Access: run_pty_cmd for interactive terminal operations
 
 CORE GUIDELINES:
 - Plan approach systematically for multi-step tasks
@@ -580,6 +599,12 @@ CORE GUIDELINES:
 - Write code for human brains—prioritize readability and maintainability
 - Extract complex conditionals into descriptive variables
 - Prefer early returns over nested ifs to focus on happy paths
+
+NEWLY ADDED TOOLS:
+- **ast_grep_search**: Syntax-aware code search (e.g., "function $name($params) { $ }")
+- **ast_grep_transform**: Safe code transformations using AST patterns
+- **batch_file_operations**: Perform multiple file operations in one call
+- **extract_dependencies**: Extract project dependencies from config files
 
 SECURITY: Only assist with defensive security tasks. Refuse malicious code creation.
 
@@ -607,7 +632,7 @@ pub fn generate_system_instruction_for_level(level: crate::types::CapabilityLeve
             "You are a helpful AI coding assistant. You can read files, list directory contents, run safe bash commands, and edit files using the read_file, list_files, bash, and edit_file tools."
         },
         crate::types::CapabilityLevel::CodeSearch => {
-            "You are a helpful AI coding assistant. You have full file system access and can read files, list directory contents, run safe bash commands, edit files, and search code using the read_file, list_files, bash, edit_file, and code_search tools."
+            "You are a helpful AI coding assistant. You have full file system access and can read files, list directory contents, run safe bash commands, edit files, and search code using the read_file, list_files, bash, edit_file, and code_search tools. You also have access to advanced AST-based tools: ast_grep_search and ast_grep_transform for syntax-aware code operations."
         },
     };
     

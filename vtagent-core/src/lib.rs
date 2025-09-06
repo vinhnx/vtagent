@@ -52,6 +52,7 @@ pub mod timeout_detector;
 pub mod tools;
 pub mod tree_sitter;
 pub mod types;
+pub mod utils;
 pub mod vtagentgitignore;
 
 // Re-exports for convenience

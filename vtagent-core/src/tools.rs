@@ -832,7 +832,11 @@ impl ToolRegistry {
             FILE_CACHE.put_file(cache_key, content.clone()).await;
         }
 
-        Ok(json!({ "content": content, "ast_grep_matches": ast_grep_matches }))
+        // Get file metadata
+        let metadata = tokio::fs::metadata(&path).await.context(format!("failed to get metadata for file: {}", path.display()))?;
+        let size = metadata.len() as usize;
+
+        Ok(json!({ "content": content, "ast_grep_matches": ast_grep_matches, "metadata": { "size": size } }))
     }
 
     /// Enhanced write_file with intelligent caching and performance monitoring
@@ -941,20 +945,7 @@ impl ToolRegistry {
 
     /// Safe text replacement with validation
     fn safe_replace_text(content: &str, old_str: &str, new_str: &str) -> Result<String, ToolError> {
-        if old_str.is_empty() {
-            return Err(ToolError::InvalidArgument(
-                "old_string cannot be empty".to_string(),
-            ));
-        }
-
-        if !content.contains(old_str) {
-            return Err(ToolError::TextNotFound(format!(
-                "Text '{}' not found in file",
-                old_str
-            )));
-        }
-
-        Ok(content.replace(old_str, new_str))
+        crate::utils::safe_replace_text(content, old_str, new_str)
     }
 
     /// Apply a patch to file content using line-based diff approach
@@ -1114,7 +1105,7 @@ impl ToolRegistry {
             .context(format!("failed to read file: {}", path.display()))?;
 
         // Apply text replacement
-        let new_content = safe_replace_text(&content, &input.old_string, &input.new_string)
+        let new_content = Self::safe_replace_text(&content, &input.old_string, &input.new_string)
             .map_err(|e| anyhow!("text replacement failed: {}", e))?;
 
         // Write updated content back to file
@@ -2220,24 +2211,6 @@ async fn process_ripgrep_output(stdout: &[u8], search_type: &str) -> Vec<Value> 
     results
 }
 
-/// Safe text replacement with validation
-fn safe_replace_text(content: &str, old_str: &str, new_str: &str) -> Result<String, ToolError> {
-    if old_str.is_empty() {
-        return Err(ToolError::InvalidArgument(
-            "old_string cannot be empty".to_string(),
-        ));
-    }
-
-    if !content.contains(old_str) {
-        return Err(ToolError::TextNotFound(format!(
-            "Text '{}' not found in file",
-            old_str
-        )));
-    }
-
-    Ok(content.replace(old_str, new_str))
-}
-
 /// Error types for tool operations
 #[derive(Debug, thiserror::Error)]
 pub enum ToolError {
@@ -2648,6 +2621,28 @@ pub fn build_function_declarations_for_level(level: crate::types::CapabilityLeve
                     "case_sensitive": {"type": "boolean", "description": "Whether search should be case sensitive", "default": true}
                 },
                 "required": ["file_name"]
+            }),
+        },
+        FunctionDeclaration {
+            name: "batch_file_operations".to_string(),
+            description: "Perform batch operations on multiple files.".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "operations": {"type": "array", "items": {"type": "object"}, "description": "List of file operations to perform"}
+                },
+                "required": ["operations"]
+            }),
+        },
+        FunctionDeclaration {
+            name: "extract_dependencies".to_string(),
+            description: "Extract project dependencies from configuration files.".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Path to the project directory", "default": "."}
+                },
+                "required": []
             }),
         },
     ]

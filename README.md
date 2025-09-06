@@ -681,16 +681,28 @@ cargo run -- compress-context
 
 ### Adding New Tools
 
-1. Define tool function in `src/tools.rs`
+1. Define tool function in `vtagent-core/src/tools.rs`
 2. Add tool declaration with comprehensive documentation
 3. Register in `build_function_declarations()`
 4. Implement proper error handling and validation
+
+### Utility Functions
+
+Common utility functions have been extracted to `vtagent-core/src/utils.rs`:
+
+- `render_pty_output_fn` - Render PTY output in a terminal-like interface
+- `ProjectOverview` - Struct for project overview information
+- `build_project_overview` - Build project overview from Cargo.toml and README.md
+- `extract_toml_str` - Extract string values from TOML files
+- `extract_readme_excerpt` - Extract excerpts from README files
+- `summarize_workspace_languages` - Summarize languages in the workspace
+- `safe_replace_text` - Safe text replacement with validation
 
 ### Custom Workflows
 
 Create specialized command patterns by:
 
-1. Adding new CLI commands in `main.rs`
+1. Adding new CLI commands in `src/main.rs`
 2. Implementing workflow functions
 3. Following established patterns for context management
 4. Including proper error handling and logging

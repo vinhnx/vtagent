@@ -750,6 +750,10 @@ Create specialized command patterns by:
 - **Domain specialization** - Industry-specific agent capabilities
 - **Advanced PTY automation** - Intelligent terminal session management with rexpect for pattern matching and automated responses, including proper exit code handling
 
+## Workshop Implementation
+
+This repository also includes an implementation of the progressive enhancement pattern from the "Build Your Own Coding Agent" workshop, demonstrating how to build agent capabilities step by step. See [docs/workshop-agent.md](docs/workshop-agent.md) for more details.
+
 ## Related Work
 
 This implementation draws inspiration from:

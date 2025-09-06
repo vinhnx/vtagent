@@ -13,6 +13,23 @@ pub struct AgentConfig {
     pub verbose: bool,
 }
 
+/// Workshop agent capability levels
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum CapabilityLevel {
+    /// Basic chat only
+    Basic,
+    /// Can read files
+    FileReading,
+    /// Can read files and list directories
+    FileListing,
+    /// Can read files, list directories, and run bash commands
+    Bash,
+    /// Can read files, list directories, run bash commands, and edit files
+    Editing,
+    /// Full capabilities including code search
+    CodeSearch,
+}
+
 /// Session information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionInfo {

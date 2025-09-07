@@ -98,6 +98,9 @@ pub enum Commands {
 async fn main() -> Result<()> {
     let args = Cli::parse();
 
+    // Add debug log for application startup
+    eprintln!("[DEBUG] Application startup");
+
     // Debug: Application startup
     eprintln!("[DEBUG] VTAgent starting with command: {:?}", args.command);
     eprintln!("[DEBUG] Model: {}", args.model);

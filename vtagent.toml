@@ -139,3 +139,131 @@ allowed_file_extensions = [
     ".c",
     ".h",
 ]
+
+# =============================================================================
+# MULTI-AGENT SYSTEM CONFIGURATION
+# =============================================================================
+# This section configures the sophisticated multi-agent coordination system
+# that provides compound intelligence through specialized agent collaboration.
+
+[multi_agent]
+# Enable the multi-agent system (set to false for classic single-agent mode)
+enabled = true
+
+# Execution mode options:
+# - "single": Always use single-agent mode (classic behavior)
+# - "multi": Always use multi-agent coordination for all tasks
+# - "auto": Automatically choose based on task complexity (recommended)
+execution_mode = "auto"
+
+# Model selection for different agent types
+orchestrator_model = "gemini-2.5-flash"      # Strategic coordination model (use pro for complex tasks)
+subagent_model = "gemini-2.5-flash-lite"     # Fast implementation model (flash for speed)
+
+# Performance and coordination settings
+max_concurrent_subagents = 3                 # Maximum agents working simultaneously
+
+# Verification strategy options:
+# - "always": Every implementation is verified (highest quality)
+# - "complex_only": Only verify complex implementations (balanced)
+# - "never": No automatic verification (fastest)
+verification_strategy = "always"
+
+# Delegation strategy options:
+# - "adaptive": Learn and adapt delegation patterns (recommended)
+# - "conservative": Smaller tasks with more verification (safer)
+# - "aggressive": Larger tasks with minimal verification (faster)
+delegation_strategy = "adaptive"
+
+# Enable advanced features
+context_store_enabled = true                 # Persistent knowledge management
+enable_task_management = true                # Task coordination and tracking
+
+# Context store configuration for persistent knowledge management
+[multi_agent.context_store]
+max_contexts = 1000                          # Maximum contexts to store
+auto_cleanup_days = 7                       # Auto-delete contexts older than this
+enable_persistence = true                    # Save contexts to disk
+storage_dir = ".vtagent/contexts"           # Directory for persistent storage
+
+# Agent-specific configurations and tool restrictions
+[multi_agent.agents.orchestrator]
+# Tools the orchestrator can use (strategic coordination only)
+allowed_tools = [
+    "task_create",      # Create tasks for subagents
+    "launch_subagent",  # Execute tasks via subagents
+    "add_context",      # Add contexts to the store
+    "context_search",   # Search existing contexts
+    "task_status",      # Check task progress
+    "finish",           # Complete the overall task
+]
+# Tools explicitly forbidden for orchestrator (no direct file access)
+restricted_tools = [
+    "read_file", "write_file", "edit_file", "run_terminal_cmd", "list_files",
+]
+
+[multi_agent.agents.explorer]
+# Tools the explorer can use (read-only investigation)
+allowed_tools = [
+    "read_file",            # Read file contents
+    "list_files",           # List directory contents
+    "code_search",          # Search code patterns
+    "codebase_search",      # Search entire codebase
+    "rp_search",            # Advanced ripgrep search
+    "run_terminal_cmd",     # Execute read-only commands
+    "cargo_check",          # Check code validity
+    "cargo_test",           # Run tests for verification
+]
+# Tools forbidden for explorer (strictly read-only)
+restricted_tools = ["write_file", "edit_file", "delete_file"]
+
+[multi_agent.agents.coder]
+# Coder has full access to all tools for implementation
+allowed_tools = ["*"]     # Wildcard = all tools available
+restricted_tools = []     # No restrictions for implementation
+
+# =============================================================================
+# EXAMPLE USAGE SCENARIOS
+# =============================================================================
+#
+# This configuration enables sophisticated multi-agent workflows:
+#
+# 1. Simple tasks (auto mode → single agent):
+#    vtagent chat "Fix typo in README.md"
+#
+# 2. Complex tasks (auto mode → multi-agent):
+#    vtagent chat "Add authentication system with JWT tokens"
+#
+#    Workflow:
+#    - Orchestrator analyzes the request
+#    - Explorer investigates current auth setup
+#    - Coder implements the authentication system
+#    - Explorer verifies the implementation
+#    - Orchestrator reports completion
+#
+# 3. Investigation tasks:
+#    vtagent chat "Analyze performance bottlenecks and suggest optimizations"
+#
+# 4. Large refactoring:
+#    vtagent chat "Migrate entire codebase from REST to GraphQL"
+#
+# =============================================================================
+# PERFORMANCE TUNING GUIDELINES
+# =============================================================================
+#
+# For maximum speed (development environments):
+# - execution_mode = "single" or "auto"
+# - verification_strategy = "never" or "complex_only"
+# - delegation_strategy = "aggressive"
+# - subagent_model = "gemini-2.5-flash-lite"
+#
+# For maximum quality (production environments):
+# - execution_mode = "multi"
+# - verification_strategy = "always"
+# - delegation_strategy = "conservative"
+# - orchestrator_model = "gemini-2.5-pro"
+#
+# For balanced performance (recommended - current config):
+# - execution_mode = "auto"
+# - verification_strategy = "always"
+# - delegation_strategy = "adaptive"

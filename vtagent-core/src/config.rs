@@ -31,6 +31,10 @@ pub struct VTAgentConfig {
     /// PTY settings
     #[serde(default)]
     pub pty: PtyConfig,
+
+    /// Multi-agent system configuration
+    #[serde(default)]
+    pub multi_agent: MultiAgentSystemConfig,
 }
 
 /// Agent-wide configuration
@@ -148,6 +152,114 @@ pub struct PtyConfig {
     pub command_timeout_seconds: u64,
 }
 
+/// Multi-agent system configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MultiAgentSystemConfig {
+    /// Enable multi-agent execution mode
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Execution mode (single, multi, auto)
+    #[serde(default = "default_execution_mode")]
+    pub execution_mode: String,
+
+    /// Model to use for orchestrator agent
+    #[serde(default = "default_orchestrator_model")]
+    pub orchestrator_model: String,
+
+    /// Model to use for subagents
+    #[serde(default = "default_subagent_model")]
+    pub subagent_model: String,
+
+    /// Maximum concurrent subagents
+    #[serde(default = "default_max_concurrent_subagents")]
+    pub max_concurrent_subagents: usize,
+
+    /// Enable context store
+    #[serde(default = "default_true")]
+    pub context_store_enabled: bool,
+
+    /// Enable task management
+    #[serde(default = "default_true")]
+    pub enable_task_management: bool,
+
+    /// Verification strategy (always, complex_only, never)
+    #[serde(default = "default_verification_strategy")]
+    pub verification_strategy: String,
+
+    /// Delegation strategy (adaptive, conservative, aggressive)
+    #[serde(default = "default_delegation_strategy")]
+    pub delegation_strategy: String,
+
+    /// Context store configuration
+    #[serde(default)]
+    pub context_store: ContextStoreConfiguration,
+
+    /// Agent-specific configurations
+    #[serde(default)]
+    pub agents: AgentSpecificConfigs,
+}
+
+/// Context store configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ContextStoreConfiguration {
+    /// Maximum number of contexts to store
+    #[serde(default = "default_max_contexts")]
+    pub max_contexts: usize,
+
+    /// Auto-cleanup after days
+    #[serde(default = "default_auto_cleanup_days")]
+    pub auto_cleanup_days: u64,
+
+    /// Enable persistence to disk
+    #[serde(default = "default_true")]
+    pub enable_persistence: bool,
+
+    /// Enable context compression
+    #[serde(default = "default_true")]
+    pub compression_enabled: bool,
+
+    /// Storage directory for persistent contexts
+    #[serde(default = "default_storage_dir")]
+    pub storage_dir: String,
+}
+
+/// Agent-specific configurations
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AgentSpecificConfigs {
+    /// Orchestrator agent configuration
+    #[serde(default)]
+    pub orchestrator: AgentTypeConfig,
+
+    /// Explorer agent configuration
+    #[serde(default)]
+    pub explorer: AgentTypeConfig,
+
+    /// Coder agent configuration
+    #[serde(default)]
+    pub coder: AgentTypeConfig,
+}
+
+/// Configuration for a specific agent type
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AgentTypeConfig {
+    /// Tools allowed for this agent type
+    #[serde(default)]
+    pub allowed_tools: Vec<String>,
+
+    /// Tools restricted for this agent type
+    #[serde(default)]
+    pub restricted_tools: Vec<String>,
+
+    /// Maximum execution time for tasks (seconds)
+    #[serde(default = "default_max_task_time")]
+    pub max_task_time_seconds: u64,
+
+    /// Maximum context window size
+    #[serde(default = "default_max_context_window")]
+    pub max_context_window: usize,
+}
+
 /// Tool execution policy
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -168,6 +280,7 @@ impl Default for VTAgentConfig {
             commands: CommandsConfig::default(),
             security: SecurityConfig::default(),
             pty: PtyConfig::default(),
+            multi_agent: MultiAgentSystemConfig::default(),
         }
     }
 }
@@ -227,6 +340,97 @@ impl Default for PtyConfig {
             default_cols: default_pty_cols(),
             max_sessions: default_max_pty_sessions(),
             command_timeout_seconds: default_pty_timeout_seconds(),
+        }
+    }
+}
+
+impl Default for MultiAgentSystemConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            execution_mode: default_execution_mode(),
+            orchestrator_model: default_orchestrator_model(),
+            subagent_model: default_subagent_model(),
+            max_concurrent_subagents: default_max_concurrent_subagents(),
+            context_store_enabled: default_true(),
+            enable_task_management: default_true(),
+            verification_strategy: default_verification_strategy(),
+            delegation_strategy: default_delegation_strategy(),
+            context_store: ContextStoreConfiguration::default(),
+            agents: AgentSpecificConfigs::default(),
+        }
+    }
+}
+
+impl Default for ContextStoreConfiguration {
+    fn default() -> Self {
+        Self {
+            max_contexts: default_max_contexts(),
+            auto_cleanup_days: default_auto_cleanup_days(),
+            enable_persistence: default_true(),
+            compression_enabled: default_true(),
+            storage_dir: default_storage_dir(),
+        }
+    }
+}
+
+impl Default for AgentSpecificConfigs {
+    fn default() -> Self {
+        Self {
+            orchestrator: AgentTypeConfig {
+                allowed_tools: vec![
+                    "task_create".to_string(),
+                    "launch_subagent".to_string(),
+                    "add_context".to_string(),
+                    "context_search".to_string(),
+                    "task_status".to_string(),
+                    "finish".to_string(),
+                ],
+                restricted_tools: vec![
+                    "read_file".to_string(),
+                    "write_file".to_string(),
+                    "edit_file".to_string(),
+                    "run_command".to_string(),
+                ],
+                max_task_time_seconds: default_max_task_time(),
+                max_context_window: default_max_context_window(),
+            },
+            explorer: AgentTypeConfig {
+                allowed_tools: vec![
+                    "read_file".to_string(),
+                    "grep_search".to_string(),
+                    "run_command".to_string(),
+                    "file_metadata".to_string(),
+                    "project_overview".to_string(),
+                    "tree_sitter_analyze".to_string(),
+                    "ast_grep_search".to_string(),
+                ],
+                restricted_tools: vec![
+                    "write_file".to_string(),
+                    "edit_file".to_string(),
+                    "delete_file".to_string(),
+                    "create_file".to_string(),
+                ],
+                max_task_time_seconds: default_max_task_time(),
+                max_context_window: default_max_context_window(),
+            },
+            coder: AgentTypeConfig {
+                allowed_tools: vec!["*".to_string()], // Full access
+                restricted_tools: Vec::new(),
+                max_task_time_seconds: default_max_task_time(),
+                max_context_window: default_max_context_window(),
+            },
+        }
+    }
+}
+
+impl Default for AgentTypeConfig {
+    fn default() -> Self {
+        Self {
+            allowed_tools: Vec::new(),
+            restricted_tools: Vec::new(),
+            max_task_time_seconds: default_max_task_time(),
+            max_context_window: default_max_context_window(),
         }
     }
 }
@@ -348,6 +552,51 @@ fn default_allowed_extensions() -> Vec<String> {
         ".ts".to_string(),
         ".py".to_string(),
     ]
+}
+
+// Multi-agent configuration defaults
+fn default_execution_mode() -> String {
+    "auto".to_string()
+}
+
+fn default_orchestrator_model() -> String {
+    "gemini-1.5-pro".to_string()
+}
+
+fn default_subagent_model() -> String {
+    "gemini-1.5-flash".to_string()
+}
+
+fn default_max_concurrent_subagents() -> usize {
+    3
+}
+
+fn default_verification_strategy() -> String {
+    "always".to_string()
+}
+
+fn default_delegation_strategy() -> String {
+    "adaptive".to_string()
+}
+
+fn default_max_contexts() -> usize {
+    1000
+}
+
+fn default_auto_cleanup_days() -> u64 {
+    7
+}
+
+fn default_storage_dir() -> String {
+    ".vtagent/contexts".to_string()
+}
+
+fn default_max_task_time() -> u64 {
+    300 // 5 minutes
+}
+
+fn default_max_context_window() -> usize {
+    32000
 }
 
 impl VTAgentConfig {

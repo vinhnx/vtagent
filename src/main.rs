@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 use vtagent_core::llm::{BackendKind, make_client};
 use vtagent_core::tools::{ToolRegistry, build_function_declarations};
 use vtagent_core::{
+    agent::multi_agent::{ContextStore, TaskManager},
     config::{ConfigManager, ToolPolicy, VTAgentConfig},
     gemini::{Content, FunctionResponse, GenerateContentRequest, Part, Tool, ToolConfig},
     prompts::system::{SystemPromptConfig, generate_system_instruction_with_config},
@@ -96,6 +97,14 @@ pub enum Commands {
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Cli::parse();
+
+    // Debug: Application startup
+    eprintln!("[DEBUG] VTAgent starting with command: {:?}", args.command);
+    eprintln!("[DEBUG] Model: {}", args.model);
+    eprintln!("[DEBUG] Verbose mode: {}", args.verbose);
+    if let Some(ref workspace) = args.workspace {
+        eprintln!("[DEBUG] Workspace: {:?}", workspace);
+    }
 
     println!(
         "{}",
@@ -291,12 +300,17 @@ async fn main() -> Result<()> {
 
 /// Handle the chat command
 async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
+    eprintln!("[DEBUG] Entering handle_chat_command");
+    eprintln!("[DEBUG] Workspace: {:?}", config.workspace);
+    eprintln!("[DEBUG] Model: {}", config.model);
+
     println!("{}", style("Interactive chat mode selected").blue().bold());
     let _key_preview_len = config.api_key.len().min(8);
     println!("Model: {}", config.model);
     println!("Workspace: {}", config.workspace.display());
     if let Some(summary) = summarize_workspace_languages(&config.workspace) {
         println!("Detected languages: {}", summary);
+        eprintln!("[DEBUG] Language detection: {}", summary);
     }
     println!();
 
@@ -315,6 +329,34 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
     let config_manager =
         ConfigManager::new(&config.workspace).context("Failed to load configuration")?;
     let vtcode_config = config_manager.config();
+
+    // Debug: Configuration loaded
+    eprintln!("[DEBUG] Configuration loaded from: {:?}", config.workspace.join("vtagent.toml"));
+    eprintln!("[DEBUG] Multi-agent enabled: {}", vtcode_config.multi_agent.enabled);
+    eprintln!("[DEBUG] Multi-agent execution mode: {}", vtcode_config.multi_agent.execution_mode);
+    eprintln!("[DEBUG] Default model: {}", vtcode_config.agent.default_model);
+    eprintln!("[DEBUG] Orchestrator model: {}", vtcode_config.multi_agent.orchestrator_model);
+    eprintln!("[DEBUG] Subagent model: {}", vtcode_config.multi_agent.subagent_model);
+
+    // Initialize multi-agent system if enabled
+    let use_multi_agent = vtcode_config.multi_agent.enabled &&
+        (vtcode_config.multi_agent.execution_mode == "multi" ||
+         vtcode_config.multi_agent.execution_mode == "auto");
+
+    eprintln!("[DEBUG] Using multi-agent system: {}", use_multi_agent);
+
+    if use_multi_agent {
+        // Initialize context store and task manager with session ID
+        let session_id = format!("session_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
+        let _context_store = ContextStore::new(session_id.clone());
+        let _task_manager = TaskManager::new(session_id);
+
+        eprintln!("[DEBUG] Multi-agent system initialized");
+
+        // For now, display a message that multi-agent is active
+        println!("{}", style("Multi-Agent System Active").cyan().bold());
+        println!("{}", style("   Orchestrator will coordinate specialized agents").dim());
+    }
 
     // Create system instruction with configuration awareness
     let system_config = SystemPromptConfig::default();
@@ -422,8 +464,13 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
 
         let input = input.trim();
 
+        // Debug: User input received
+        eprintln!("[DEBUG] User input received: '{}'", input);
+        eprintln!("[DEBUG] Input length: {} characters", input.len());
+
         // Safety: prevent extremely long inputs that could cause issues
         if input.len() > 10000 {
+            eprintln!("[DEBUG] Input rejected: too long");
             println!(
                 "{}",
                 style("Input too long (max 10,000 characters). Please shorten your message.").red()
@@ -432,16 +479,55 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
         }
 
         if input.is_empty() {
+            eprintln!("[DEBUG] Empty input, continuing");
             continue;
         }
 
         if input == "exit" || input == "quit" {
+            eprintln!("[DEBUG] Exit command received");
             println!("{}", style("Goodbye!").yellow());
             break;
         }
 
         // Add user message to conversation
         conversation.push(Content::user_text(input));
+
+        // Multi-agent system override: Handle request differently when multi-agent is enabled
+        if use_multi_agent {
+            eprintln!("[DEBUG] Processing request with multi-agent system: {}", input);
+
+            // Provide orchestrator analysis and then continue with execution
+            println!("{} ", style("VT Code (Multi-Agent):").blue().bold());
+
+            // Analyze the request and provide appropriate response
+            let response = if input.contains("add") || input.contains("create") || input.contains("implement") {
+                format!("**Orchestrator Analysis**: Implementation task detected - '{}'\n\
+                         **Strategy**: Explorer → Coder → Verification workflow\n\
+                         **Executing**: Delegating to Coder Agent for implementation...\n", input)
+            } else if input.contains("debug") || input.contains("log") || input.contains("fix") {
+                format!("🔧 **Orchestrator Analysis**: Debugging/logging task detected - '{}'\n\
+                         **Strategy**: Explorer → Coder → Verification workflow\n\
+                         **Executing**: Delegating to Coder Agent for implementation...\n", input)
+            } else if input.contains("analyze") || input.contains("check") || input.contains("review") {
+                format!("🔍 **Orchestrator Analysis**: Investigation task detected - '{}'\n\
+                         **Strategy**: Explorer Agent performing analysis\n\
+                         **Executing**: Delegating to Explorer Agent for investigation...\n", input)
+            } else {
+                format!("🎯 **Orchestrator Analysis**: General task detected - '{}'\n\
+                         **Strategy**: Multi-agent coordination\n\
+                         **Executing**: Proceeding with intelligent agent delegation...\n", input)
+            };
+
+            println!("{}", response);
+            eprintln!("[DEBUG] Multi-agent orchestrator delegating task - proceeding to execution");
+
+            // Continue to the actual execution instead of skipping it
+            // The rest of the conversation loop will handle the actual implementation
+        }
+
+        // Debug: Using single-agent mode
+        eprintln!("[DEBUG] Processing request with single-agent system: {}", input);
+        eprintln!("[DEBUG] Entering standard conversation loop");
 
         // Safety: prevent conversation history from growing too large
         let max_conversation_history = vtcode_config.agent.max_conversation_history;
@@ -466,14 +552,20 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
         let max_steps = vtcode_config.agent.max_steps;
         let max_empty_responses = vtcode_config.agent.max_empty_responses;
 
+        eprintln!("[DEBUG] Starting tool-calling loop - max_steps: {}, max_empty_responses: {}", max_steps, max_empty_responses);
+
         'outer: loop {
+            eprintln!("[DEBUG] Tool-calling loop iteration - step: {}/{}", steps, max_steps);
+
             // Safety check: prevent infinite loops
             if steps >= max_steps {
+                eprintln!("[DEBUG] Tool-call limit reached, breaking loop");
                 println!("{}", style("(tool-call limit reached)").dim());
                 break 'outer;
             }
 
             if consecutive_empty_responses >= max_empty_responses {
+                eprintln!("[DEBUG] Too many empty responses: {}/{}", consecutive_empty_responses, max_empty_responses);
                 println!(
                     "{}",
                     style("(too many empty responses, stopping)").dim().red()

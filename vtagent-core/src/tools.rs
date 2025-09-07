@@ -581,6 +581,8 @@ struct RgInput {
     include_hidden: Option<bool>,
     #[serde(default)]
     max_results: Option<usize>,
+    #[serde(default)]
+    file_type: Option<String>,
 }
 
 fn default_search_path() -> String {
@@ -603,6 +605,76 @@ impl ToolRegistry {
             rp_search_manager,
             ast_grep_engine,
         }
+    }
+
+    /// Intelligently resolve file paths by trying multiple variations
+    /// This helps the agent find files even when given imprecise paths
+    fn resolve_file_path(&self, input_path: &str) -> Result<Vec<PathBuf>> {
+        let mut candidates = Vec::new();
+
+        // 1. Try the exact path as provided (relative to workspace root)
+        candidates.push(self.root.join(input_path));
+
+        // 2. If it's just a filename, try common directories
+        if !input_path.contains('/') && !input_path.contains('\\') {
+            let common_dirs = [
+                "src",
+                "lib",
+                "bin",
+                "tests",
+                "examples",
+                "benches",
+                ".", // current directory
+            ];
+
+            for dir in &common_dirs {
+                candidates.push(self.root.join(dir).join(input_path));
+            }
+
+            // Also try recursively searching for the file
+            if let Ok(entries) = std::fs::read_dir(&self.root) {
+                for entry in entries.flatten() {
+                    if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
+                        let dir_path = entry.path();
+                        candidates.push(dir_path.join(input_path));
+                    }
+                }
+            }
+        }
+
+        // 3. If input looks like it's missing a common extension, try adding them
+        if !input_path.contains('.') {
+            let extensions = ["rs", "toml", "md", "txt", "json", "yaml", "yml", "js", "ts", "py"];
+            for ext in &extensions {
+                candidates.push(self.root.join(format!("{}.{}", input_path, ext)));
+
+                // Also try in src/ directory
+                candidates.push(self.root.join("src").join(format!("{}.{}", input_path, ext)));
+            }
+        }
+
+        // 4. If it starts with "/" or "\", treat as absolute path
+        if input_path.starts_with('/') || input_path.starts_with('\\') {
+            candidates.push(PathBuf::from(input_path));
+        }
+
+        // 5. Try case-insensitive variations (for common files)
+        let lowercase = input_path.to_lowercase();
+        if lowercase != input_path {
+            candidates.push(self.root.join(&lowercase));
+            candidates.push(self.root.join("src").join(&lowercase));
+        }
+
+        let uppercase = input_path.to_uppercase();
+        if uppercase != input_path {
+            candidates.push(self.root.join(&uppercase));
+        }
+
+        // Remove duplicates while preserving order (first match wins)
+        let mut seen = std::collections::HashSet::new();
+        candidates.retain(|path| seen.insert(path.clone()));
+
+        Ok(candidates)
     }
 
     /// Initialize the tool registry with async components
@@ -778,21 +850,52 @@ impl ToolRegistry {
     /// Enhanced read_file with intelligent caching and performance monitoring
     async fn read_file(&self, args: Value) -> Result<Value> {
         let input: Input = serde_json::from_value(args).context("invalid read_file args")?;
-        let path = self.root.join(&input.path);
         let ast_grep_pattern = input.ast_grep_pattern.clone();
 
-        // Check if file should be excluded by .vtagentgitignore
-        if should_exclude_file(&path).await {
-            return Err(anyhow!(
-                "File '{}' is excluded by .vtagentgitignore",
-                input.path
-            ));
+        // Intelligent path resolution - try multiple variations
+        let potential_paths = self.resolve_file_path(&input.path)?;
+
+        let mut last_error = None;
+        let mut resolved_path = None;
+
+        // Try each potential path until we find one that exists
+        for candidate_path in &potential_paths {
+            // Check if file should be excluded by .vtagentgitignore
+            if should_exclude_file(candidate_path).await {
+                last_error = Some(anyhow!(
+                    "File '{}' is excluded by .vtagentgitignore",
+                    candidate_path.display()
+                ));
+                continue;
+            }
+
+            // Check if the file exists and is readable
+            if candidate_path.exists() && candidate_path.is_file() {
+                resolved_path = Some(candidate_path.clone());
+                break;
+            } else {
+                last_error = Some(anyhow!(
+                    "File not found: {}",
+                    candidate_path.display()
+                ));
+            }
         }
 
-        // Create cache key
+        let path = resolved_path.ok_or_else(|| {
+            last_error.unwrap_or_else(|| anyhow!(
+                "Could not resolve file path '{}'. Tried paths: {}",
+                input.path,
+                potential_paths.iter()
+                    .map(|p| format!("'{}'", p.display()))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ))
+        })?;
+
+        // Create cache key with resolved path
         let cache_key = format!(
             "read_file:{}:{}:{}",
-            input.path,
+            path.display(),
             input.max_bytes.unwrap_or(usize::MAX),
             ast_grep_pattern.clone().unwrap_or_default()
         );
@@ -1273,6 +1376,31 @@ impl ToolRegistry {
         // Add glob pattern if specified
         if let Some(ref glob_pattern) = input.glob_pattern {
             cmd.arg("--glob").arg(glob_pattern);
+        }
+
+        // Add file type filter if specified
+        if let Some(ref file_type) = input.file_type {
+            // Map common abbreviations to ripgrep type names
+            let rg_type = match file_type.as_str() {
+                "rs" => "rust",
+                "py" => "py",
+                "js" => "js",
+                "ts" => "ts",
+                "tsx" => "tsx",
+                "go" => "go",
+                "java" => "java",
+                "cpp" | "cc" | "cxx" => "cpp",
+                "c" => "c",
+                "h" | "hpp" => "c",
+                "html" => "html",
+                "css" => "css",
+                "json" => "json",
+                "yaml" | "yml" => "yaml",
+                "toml" => "toml",
+                "md" => "md",
+                other => other, // Pass through for exact matches
+            };
+            cmd.arg("--type").arg(rg_type);
         }
 
         // Add hidden files flag if specified
@@ -1974,19 +2102,19 @@ impl ToolRegistry {
         let mut config = FileSearchConfig::default();
         config.max_results = max_results;
         config.include_hidden = include_hidden;
-        
+
         if let Some(extensions) = file_extensions {
             config.include_extensions.extend(extensions);
         }
 
         let search_path = self.root.join(path);
         let searcher = FileSearcher::new(search_path, config);
-        
+
         match searcher.search_files(pattern) {
             Ok(results) => Ok(FileSearcher::results_to_json(results)),
-            Err(e) => Ok(json!({ 
-                "success": false, 
-                "error": format!("Failed to search files: {}", e) 
+            Err(e) => Ok(json!({
+                "success": false,
+                "error": format!("Failed to search files: {}", e)
             })),
         }
     }
@@ -2018,7 +2146,7 @@ impl ToolRegistry {
         // Create file searcher configuration
         let mut config = FileSearchConfig::default();
         config.max_results = max_results;
-        
+
         // Handle case sensitivity by converting to lowercase if needed
         let search_pattern = if case_sensitive {
             content_pattern.to_string()
@@ -2028,15 +2156,15 @@ impl ToolRegistry {
 
         let search_path = self.root.join(path);
         let searcher = FileSearcher::new(search_path, config);
-        
+
         match searcher.search_files_with_content(
             &search_pattern,
             file_pattern,
         ) {
             Ok(results) => Ok(FileSearcher::results_to_json(results)),
-            Err(e) => Ok(json!({ 
-                "success": false, 
-                "error": format!("Failed to search files with content: {}", e) 
+            Err(e) => Ok(json!({
+                "success": false,
+                "error": format!("Failed to search files with content: {}", e)
             })),
         }
     }
@@ -2061,32 +2189,32 @@ impl ToolRegistry {
         let config = FileSearchConfig::default();
         let search_path = self.root.join(path);
         let searcher = FileSearcher::new(search_path, config);
-        
+
         match searcher.find_file_by_name(file_name) {
             Ok(Some(found_path)) => {
                 // Convert to relative path
                 if let Ok(relative_path) = found_path.strip_prefix(&self.root) {
-                    Ok(json!({ 
-                        "success": true, 
+                    Ok(json!({
+                        "success": true,
                         "found": true,
                         "path": relative_path.to_string_lossy()
                     }))
                 } else {
-                    Ok(json!({ 
-                        "success": true, 
+                    Ok(json!({
+                        "success": true,
                         "found": true,
                         "path": found_path.to_string_lossy()
                     }))
                 }
             },
-            Ok(None) => Ok(json!({ 
-                "success": true, 
+            Ok(None) => Ok(json!({
+                "success": true,
                 "found": false,
                 "message": format!("File '{}' not found", file_name)
             })),
-            Err(e) => Ok(json!({ 
-                "success": false, 
-                "error": format!("Failed to find file: {}", e) 
+            Err(e) => Ok(json!({
+                "success": false,
+                "error": format!("Failed to find file: {}", e)
             })),
         }
     }
@@ -2226,7 +2354,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
 /// Build function declarations filtered by capability level
 pub fn build_function_declarations_for_level(level: crate::types::CapabilityLevel) -> Vec<FunctionDeclaration> {
     let all_declarations = build_function_declarations();
-    
+
     match level {
         crate::types::CapabilityLevel::Basic => vec![],
         crate::types::CapabilityLevel::FileReading => {
@@ -2302,7 +2430,8 @@ pub fn build_function_declarations_for_level(level: crate::types::CapabilityLeve
                     "glob_pattern": {"type": "string", "description": "Glob pattern to filter files (e.g., '**/*.rs')"},
                     "context_lines": {"type": "integer", "description": "Number of context lines before/after each match", "default": 0},
                     "include_hidden": {"type": "boolean", "description": "Include hidden files", "default": false},
-                    "max_results": {"type": "integer", "description": "Maximum number of matches to return", "default": 1000}
+                    "max_results": {"type": "integer", "description": "Maximum number of matches to return", "default": 1000},
+                    "file_type": {"type": "string", "description": "Filter by file type: 'rs' (Rust), 'py' (Python), 'js' (JavaScript), 'ts' (TypeScript), 'go', 'java', 'cpp', 'c', etc."}
                 },
                 "required": ["pattern"]
             }),
@@ -2323,11 +2452,11 @@ pub fn build_function_declarations_for_level(level: crate::types::CapabilityLeve
         },
         FunctionDeclaration {
             name: "read_file".to_string(),
-            description: "Read content from a file. Optionally extract AST pattern matches.".to_string(),
+            description: "Read content from a file with intelligent path resolution. Tries multiple path variations if the exact path isn't found (e.g., 'main.rs' will search in 'src/', current directory, etc.). Optionally extract AST pattern matches.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Path to the file to read"},
+                    "path": {"type": "string", "description": "Path to the file to read (can be relative, filename only, or absolute). System will intelligently resolve the path by trying common locations."},
                     "max_bytes": {"type": "integer", "description": "Maximum bytes to read", "default": null},
                     "encoding": {"type": "string", "description": "Text encoding", "default": "utf-8"},
                     "ast_grep_pattern": {"type": "string", "description": "Optional AST pattern to extract matches from the file content"}

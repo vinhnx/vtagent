@@ -677,6 +677,67 @@ impl ToolRegistry {
         Ok(candidates)
     }
 
+    /// Determine if a search pattern should be treated as literal text
+    /// This helps avoid regex parsing errors for common code patterns
+    fn should_pattern_be_literal(&self, pattern: &str) -> bool {
+        // Patterns that contain common code constructs that are likely meant literally
+        let literal_indicators = [
+            "(",     // Function calls like "fn main("
+            ")",     // Closing parentheses
+            "[",     // Array/slice syntax
+            "]",     // Array/slice closing
+            "{",     // Braces
+            "}",     // Closing braces
+            "::(",   // Rust method calls
+            ".(",    // Method calls
+            "->",    // Rust return types
+            "=>",    // Rust match arms
+            "<",     // Generic brackets (less common but can cause issues)
+            ">",     // Closing generic brackets
+        ];
+
+        // Common regex metacharacters that are often meant literally in code search
+        let regex_metacharacters = [
+            "+",     // Could be regex quantifier or arithmetic
+            "*",     // Could be regex quantifier or dereference/glob
+            "?",     // Could be regex quantifier or Option syntax
+            "^",     // Could be regex anchor or XOR
+            "$",     // Could be regex anchor or variable
+            "|",     // Could be regex alternation or pipe
+        ];
+
+        // If the pattern contains parentheses or brackets, it's likely code syntax
+        for indicator in &literal_indicators {
+            if pattern.contains(indicator) {
+                return true;
+            }
+        }
+
+        // If pattern contains multiple regex metacharacters, likely meant as literal code
+        let metachar_count = regex_metacharacters.iter()
+            .filter(|&c| pattern.contains(c))
+            .count();
+
+        if metachar_count >= 2 {
+            return true;
+        }
+
+        // If pattern looks like a function signature or similar code construct
+        if pattern.contains("fn ") ||
+           pattern.contains("struct ") ||
+           pattern.contains("impl ") ||
+           pattern.contains("pub fn") ||
+           pattern.contains("async fn") ||
+           pattern.contains("const ") ||
+           pattern.contains("let ") ||
+           pattern.contains("use ") {
+            return true;
+        }
+
+        // Otherwise, treat as regex (default ripgrep behavior)
+        false
+    }
+
     /// Initialize the tool registry with async components
     pub async fn initialize_async(&self) -> Result<()> {
         // Initialize the vtagentgitignore system
@@ -1343,12 +1404,28 @@ impl ToolRegistry {
             "rg".to_string()
         });
         let mut cmd = tokio::process::Command::new(&rg_path);
+
+        // Smart pattern handling: Auto-detect if pattern should be literal
+        let should_use_literal = if input.literal.is_some() {
+            // User explicitly specified literal mode
+            input.literal.unwrap_or(false)
+        } else {
+            // Auto-detect: if pattern contains regex special chars that are likely meant literally
+            self.should_pattern_be_literal(&input.pattern)
+        };
+
         cmd.arg("--json")
             .arg("--max-count")
             .arg(input.max_results.unwrap_or(1000).to_string())
             .arg("--context")
-            .arg(input.context_lines.unwrap_or(0).to_string())
-            .arg(&input.pattern)
+            .arg(input.context_lines.unwrap_or(0).to_string());
+
+        // Add literal flag before pattern if needed
+        if should_use_literal {
+            cmd.arg("--fixed-strings");
+        }
+
+        cmd.arg(&input.pattern)
             .current_dir(&working_dir);
 
         // If base_path is a file, we need to pass it as an argument to ripgrep
@@ -1366,11 +1443,6 @@ impl ToolRegistry {
             } else {
                 cmd.arg("--ignore-case");
             }
-        }
-
-        // Add literal flag if specified
-        if input.literal.unwrap_or(false) {
-            cmd.arg("--fixed-strings");
         }
 
         // Add glob pattern if specified
@@ -1521,6 +1593,8 @@ impl ToolRegistry {
             command: Vec<String>,
             #[serde(default)]
             working_dir: Option<String>,
+            #[serde(default)]
+            timeout_secs: Option<u64>,
         }
 
         let input: TerminalCommandInput =
@@ -1532,6 +1606,15 @@ impl ToolRegistry {
 
         let program = &input.command[0];
         let cmd_args = &input.command[1..];
+
+        // Check for potentially problematic commands and suggest alternatives
+        if let Some(suggestion) = self.suggest_better_tool(&input.command) {
+            return Err(anyhow!(
+                "Command '{}' might be slow or produce large output. Suggestion: {}",
+                input.command.join(" "),
+                suggestion
+            ));
+        }
 
         let mut cmd = tokio::process::Command::new(program);
         cmd.args(cmd_args);
@@ -1553,17 +1636,77 @@ impl ToolRegistry {
             );
         }
 
-        let output = cmd.output().await.context("failed to execute command")?;
+        // Set up timeout (default 30 seconds, configurable)
+        let timeout_duration = std::time::Duration::from_secs(
+            input.timeout_secs.unwrap_or(30)
+        );
 
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        // Execute command with timeout
+        let output = match tokio::time::timeout(timeout_duration, cmd.output()).await {
+            Ok(Ok(output)) => output,
+            Ok(Err(e)) => return Err(anyhow!("failed to execute command: {}", e)),
+            Err(_) => return Err(anyhow!(
+                "command '{}' timed out after {} seconds. Consider using more specific search tools like rp_search instead.",
+                input.command.join(" "),
+                timeout_duration.as_secs()
+            )),
+        };
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        // Limit output size to prevent memory issues (max 50KB per stream)
+        const MAX_OUTPUT_SIZE: usize = 50 * 1024;
+        let stdout_truncated = if stdout.len() > MAX_OUTPUT_SIZE {
+            format!("{}... [truncated, {} bytes total]",
+                   &stdout[..MAX_OUTPUT_SIZE], stdout.len())
+        } else {
+            stdout.to_string()
+        };
+
+        let stderr_truncated = if stderr.len() > MAX_OUTPUT_SIZE {
+            format!("{}... [truncated, {} bytes total]",
+                   &stderr[..MAX_OUTPUT_SIZE], stderr.len())
+        } else {
+            stderr.to_string()
+        };
 
         Ok(json!({
             "success": output.status.success(),
             "code": output.status.code(),
-            "stdout": stdout,
-            "stderr": stderr
+            "stdout": stdout_truncated,
+            "stderr": stderr_truncated
         }))
+    }
+
+    /// Suggest better tools for common problematic commands
+    fn suggest_better_tool(&self, command: &[String]) -> Option<String> {
+        if command.is_empty() {
+            return None;
+        }
+
+        let program = &command[0];
+
+        match program.as_str() {
+            "grep" => {
+                // Check if it's a recursive grep that could be slow
+                if command.contains(&"-r".to_string()) || command.contains(&"-R".to_string()) {
+                    Some("Use 'rp_search' tool instead for fast recursive searching with file type filtering".to_string())
+                } else {
+                    None
+                }
+            },
+            "find" => {
+                Some("Use 'list_files' or 'rp_search' tool instead for better performance and filtering".to_string())
+            },
+            "rg" => {
+                Some("Use 'rp_search' tool instead which provides the same ripgrep functionality with better integration".to_string())
+            },
+            "ag" | "ack" => {
+                Some("Use 'rp_search' tool instead for fast searching with file type filtering".to_string())
+            },
+            _ => None,
+        }
     }
 
     /// Run a terminal command with basic safety checks (legacy)
@@ -2419,7 +2562,7 @@ pub fn build_function_declarations_for_level(level: crate::types::CapabilityLeve
         },
         FunctionDeclaration {
             name: "rp_search".to_string(),
-            description: "Enhanced ripgrep search with debounce and cancellation support for interactive queries.".to_string(),
+            description: "Enhanced ripgrep search with smart literal detection and debounce support. Automatically detects when patterns should be treated as literal text (e.g., 'fn main(' or 'struct MyStruct') to avoid regex parsing errors.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
@@ -2512,12 +2655,13 @@ pub fn build_function_declarations_for_level(level: crate::types::CapabilityLeve
 
         FunctionDeclaration {
             name: "run_terminal_cmd".to_string(),
-            description: "Run a terminal command in the workspace with basic safety checks".to_string(),
+            description: "Run a terminal command with timeout and safety checks. For search operations, prefer 'rp_search' tool for better performance. Automatically suggests alternatives for slow commands like 'grep -r'.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
                     "command": {"type": "array", "items": {"type": "string"}, "description": "Program + args as array"},
-                    "working_dir": {"type": "string", "description": "Working directory relative to workspace"}
+                    "working_dir": {"type": "string", "description": "Working directory relative to workspace"},
+                    "timeout_secs": {"type": "integer", "description": "Command timeout in seconds (default: 30)", "default": 30}
                 },
                 "required": ["command"]
             }),

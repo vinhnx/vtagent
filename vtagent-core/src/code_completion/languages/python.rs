@@ -1,0 +1,45 @@
+use super::LanguageProvider;
+use crate::code_completion::engine::{CompletionSuggestion, CompletionKind};
+use crate::code_completion::context::CompletionContext;
+
+/// Python-specific completion provider
+pub struct PythonProvider;
+
+impl PythonProvider {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl LanguageProvider for PythonProvider {
+    fn get_completions(&self, context: &CompletionContext) -> Vec<CompletionSuggestion> {
+        let mut suggestions = Vec::new();
+
+        // Add Python-specific keywords
+        if context.prefix.is_empty() || "def".starts_with(&context.prefix) {
+            suggestions.push(CompletionSuggestion::new(
+                "def".to_string(),
+                CompletionKind::Keyword,
+                context.clone(),
+            ));
+        }
+
+        if context.prefix.is_empty() || "class".starts_with(&context.prefix) {
+            suggestions.push(CompletionSuggestion::new(
+                "class".to_string(),
+                CompletionKind::Keyword,
+                context.clone(),
+            ));
+        }
+
+        suggestions
+    }
+
+    fn language_name(&self) -> &str {
+        "python"
+    }
+
+    fn supports_language(&self, language: &str) -> bool {
+        language == "python" || language == "py"
+    }
+}

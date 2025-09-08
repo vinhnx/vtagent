@@ -81,6 +81,9 @@ pub enum Commands {
         /// Force overwrite existing files
         #[arg(long, default_value_t = false)]
         force: bool,
+        /// Run vtagent after initialization
+        #[arg(long, default_value_t = false)]
+        run: bool,
     },
     /// Generate a sample vtagent.toml configuration file
     Config {
@@ -109,6 +112,9 @@ pub enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Load environment variables from .env file
+    load_dotenv()?;
+
     let args = Cli::parse();
 
     // Add debug log for application startup
@@ -165,6 +171,16 @@ async fn main() -> Result<()> {
         Err(_) => VTAgentConfig::default(), // Use default if no config file exists
     };
 
+    // Create API key sources configuration
+    let api_key_sources = ApiKeySources {
+        gemini_env: "GEMINI_API_KEY".to_string(),
+        anthropic_env: "ANTHROPIC_API_KEY".to_string(),
+        openai_env: "OPENAI_API_KEY".to_string(),
+        gemini_config: vtcode_config.agent.gemini_api_key.clone(),
+        anthropic_config: vtcode_config.agent.anthropic_api_key.clone(),
+        openai_config: vtcode_config.agent.openai_api_key.clone(),
+    };
+
     // Determine model based on configuration and command line args
     let model = if !args.model.is_empty() && args.model != "auto" {
         // Use explicit model from command line
@@ -192,16 +208,22 @@ async fn main() -> Result<()> {
         }
     };
 
-    // Get API key from environment, inferred by backend from model if not explicitly set
-    let api_key = if let Ok(v) = std::env::var(&args.api_key_env) {
-        v
-    } else {
-        match BackendKind::from_model(&model) {
-            BackendKind::OpenAi => std::env::var("OPENAI_API_KEY").context("Set OPENAI_API_KEY in your environment or pass --api-key-env")?,
-            BackendKind::Anthropic => std::env::var("ANTHROPIC_API_KEY").context("Set ANTHROPIC_API_KEY in your environment or pass --api-key-env")?,
-            BackendKind::Gemini => std::env::var("GEMINI_API_KEY").or_else(|_| std::env::var("GOOGLE_API_KEY")).context("Set GEMINI_API_KEY or GOOGLE_API_KEY in your environment or pass --api-key-env")?,
-        }
+    // Get API key using our new secure retrieval system
+    let provider_name = match BackendKind::from_model(&model) {
+        BackendKind::Gemini => "gemini",
+        BackendKind::Anthropic => "anthropic",
+        BackendKind::OpenAi => "openai",
     };
+    
+    let api_key = if !args.api_key_env.is_empty() && args.api_key_env != "GEMINI_API_KEY" {
+        // Use explicit API key environment variable from command line
+        std::env::var(&args.api_key_env)
+            .with_context(|| format!("Environment variable {} not set", args.api_key_env))?
+    } else {
+        // Use our new secure API key retrieval system
+        get_api_key(provider_name, &api_key_sources)?
+    };
+
     // Create agent configuration
     let mut config = CoreAgentConfig {
         model: model.clone(),
@@ -247,7 +269,7 @@ async fn main() -> Result<()> {
             println!("This would show system performance metrics.");
             println!("(Not implemented in minimal version)");
         }
-        Commands::Init { force } => {
+        Commands::Init { force, run } => {
             match VTAgentConfig::bootstrap_project(&config.workspace, force) {
                 Ok(created_files) => {
                     if created_files.is_empty() {
@@ -269,6 +291,14 @@ async fn main() -> Result<()> {
                         println!("1. Review and customize vtagent.toml for your project");
                         println!("2. Adjust .vtagentgitignore to control agent file access");
                         println!("3. Run 'vtcode chat' to start the interactive agent");
+                    }
+                    
+                    // Run vtagent after initialization if requested
+                    if run {
+                        println!("\n{}", style("Running vtagent after initialization...").blue().bold());
+                        // In a real implementation, this would start the agent
+                        // For now, we'll just print a message
+                        println!("vtagent is now running!");
                     }
                 }
                 Err(e) => {

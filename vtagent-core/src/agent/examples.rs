@@ -5,7 +5,7 @@
 
 use crate::agent::integration::{MultiAgentSystem, OptimizedTaskResult};
 use crate::agent::multi_agent::{MultiAgentConfig, AgentType};
-use crate::config::{MultiAgentDefaults, ContextStoreDefaults, ScenarioDefaults};
+use crate::config::{MultiAgentDefaults, ScenarioDefaults};
 use crate::models::ModelId;
 use anyhow::Result;
 use std::path::PathBuf;

@@ -191,6 +191,7 @@ main() {
     print_success "Development environment setup complete!"
     echo ""
     echo "Next steps:"
+    echo "  • Create a .env file with your API keys (copy .env.example)"
     echo "  • Run './scripts/check.sh' to verify everything works"
     echo "  • Use 'cargo fmt --all' to format your code"
     echo "  • Use 'cargo clippy' to lint your code"
@@ -234,6 +235,11 @@ After running this script, you can use:
   • cargo fmt --all - Format code
   • cargo clippy - Lint code
   • cargo test - Run tests
+
+To configure API keys:
+  • Copy .env.example to .env and add your actual API keys
+  • Or set environment variables directly
+  • Or configure in vtagent.toml (less secure)
 
 EOF
 }

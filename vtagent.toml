@@ -1,5 +1,15 @@
 # VTAgent Configuration File
 # This file controls agent behavior, tool policies, and command permissions.
+#
+# For API key configuration, you can use one of these methods (in order of priority):
+# 1. Environment variables (most secure): GEMINI_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY
+# 2. .env file (convenient for development): Create a .env file with your API keys
+# 3. Configuration file (least secure): Set api_key values below
+#
+# Example .env file:
+# GEMINI_API_KEY=your_gemini_api_key_here
+# ANTHROPIC_API_KEY=your_anthropic_api_key_here
+# OPENAI_API_KEY=your_openai_api_key_here
 
 [agent]
 # Agent-wide settings
@@ -10,6 +20,7 @@ verbose_logging = false
 # Default LLM settings
 default_model = "gemini-2.5-flash-lite"
 api_key_env = "GEMINI_API_KEY"
+
 default_system_instruction = "You are a helpful coding assistant."
 
 [tools]
@@ -37,13 +48,13 @@ run_terminal_cmd = "prompt"
 allow_list = [
     # Basic file operations
     "ls", "pwd", "cat", "grep", "find", "head", "tail",
-    
+
     # Git operations (read-only)
     "git status", "git diff", "git log", "git branch", "git show",
-    
+
     # Build and test (safe operations)
     "cargo check", "cargo clippy", "cargo fmt",
-    
+
     # Version checks
     "python --version", "node --version", "rustc --version",
 ]

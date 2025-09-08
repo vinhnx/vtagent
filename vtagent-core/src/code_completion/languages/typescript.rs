@@ -1,0 +1,45 @@
+use super::LanguageProvider;
+use crate::code_completion::engine::{CompletionSuggestion, CompletionKind};
+use crate::code_completion::context::CompletionContext;
+
+/// TypeScript-specific completion provider
+pub struct TypeScriptProvider;
+
+impl TypeScriptProvider {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl LanguageProvider for TypeScriptProvider {
+    fn get_completions(&self, context: &CompletionContext) -> Vec<CompletionSuggestion> {
+        let mut suggestions = Vec::new();
+
+        // Add TypeScript-specific keywords
+        if context.prefix.is_empty() || "function".starts_with(&context.prefix) {
+            suggestions.push(CompletionSuggestion::new(
+                "function".to_string(),
+                CompletionKind::Keyword,
+                context.clone(),
+            ));
+        }
+
+        if context.prefix.is_empty() || "interface".starts_with(&context.prefix) {
+            suggestions.push(CompletionSuggestion::new(
+                "interface".to_string(),
+                CompletionKind::Keyword,
+                context.clone(),
+            ));
+        }
+
+        suggestions
+    }
+
+    fn language_name(&self) -> &str {
+        "typescript"
+    }
+
+    fn supports_language(&self, language: &str) -> bool {
+        language == "typescript" || language == "ts" || language == "javascript" || language == "js"
+    }
+}

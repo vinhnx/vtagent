@@ -1,60 +1,3 @@
-To gather accurate and current information for this query, first access the internet via reliable search tools or APIs to fetch relevant data, or utilize the provided context7 as a primary source if it suffices. Then, rigorously double-check and verify the tool calling (function calling) capabilities, APIs, documentation, and implementation details for major LLM providers, including OpenAI (e.g., ChatGPT and GPT models), Anthropic (e.g., Claude models), and Google Gemini (e.g., Gemini models), ensuring comparisons on aspects like syntax, supported tools, error handling, security, and recent updates.
-
---
-implement Gemini, Anthropic and OpenAI API key retrieval from environment variables and configuration files to enhance security and flexibility in managing sensitive information.
-
---
-let role = match message.role {
-    MessageRole::User => "user",
-    MessageRole::Assistant => "assistant",
-    MessageRole::System => continue,
-    MessageRole::Tool => "user",
-};
-
-is MessageRole::Tool => "user", correct for Anthropic?
---
-
-double check all // Placeholder in the project and implement actual logic. reference the logic and surrounding context
-
---
-
-double check all // TODO in the project and implement actual logic. reference the logic and surrounding context
-
---
-double check all // Implementation would go here in the project and implement actual logic. reference the logic and surrounding context
-
---
-double check all // Simplified for now would go here in the project and implement actual logic. reference the logic and surrounding context
-
---
-double check all // for now would go here in the project and implement actual logic. reference the logic and surrounding context
-
---
-
-implement
- ⋮
- ● Path: /Users/vinh.nguyenxuan/Developer/learn-by-doing/vtagent/vtagent-core/src/gemini/streaming/processor.rs
-
-+    1: // Placeholder for streaming processor functionality
-+    2: // This will be implemented as needed
-
-
---
-
-dont hard code model id in the project, find and replace with model config or constant
-
-
---
-check vtagent-core/src/pty_renderer.rs, is it working?
-
---
-
-restructure files in vtagent-core/src/, group related functionalities into submodules for better organization and clarity.
-
---
-
-Please refactor the composable section of the file `vtagent-core/src/tools.rs`. The current implementation is overly large and monolithic, making it difficult to maintain and extend. Break it down into smaller, reusable modules or traits that promote better composability, separation of concerns, and modularity. Ensure the refactored code maintains the original functionality while improving readability, testability, and adherence to Rust best practices. Provide the updated code with clear comments explaining the changes.
---
 reference this as roadmap for future improvements
 
 https://x.com/iannuttall/status/1964976282237649041
@@ -77,15 +20,7 @@ If you want better results with GPT-5, use AI to rewrite your human-written prom
 
 --
 
-review and reduce number of tools in vtagent-core/src/tools.rs
-
---
-
 double check prompts/codex_tool_recommendations.md
-
---
-
-double check prompts/system_codex_enhanced.md
 
 --
 
@@ -97,17 +32,18 @@ implement lmstudio provider
 
 --
 
+
+implement ollama provider
+
+---
+
 context compression for long context window task
 
-The context window has overflowed, summarizing the history...
-
---
+eg: "The context window has overflowed, summarizing the history..."
 
 https://github.com/openai/codex/blob/main/codex-rs/core/src/prompt_for_compact_command.md
 
 ---
-
-implement ollama provider
 
 --
 <https://github.com/laude-institute/terminal-bench?tab=readme-ov-file#submit-to-our-leaderboard>
@@ -137,7 +73,9 @@ prompt caching guide and apply to our system
 streaming
 
 ---
+
 Ensure that the event handling system in the agent loop properly captures, processes, and responds to all relevant events (such as user inputs, system triggers, or external signals) without conflicts or delays, while implementing a robust turn-based management structure that enforces sequential execution of agent actions, maintains state consistency across turns, handles interruptions gracefully, and includes error recovery mechanisms for seamless operation in multi-agent or interactive environments.
+
 --
 
 

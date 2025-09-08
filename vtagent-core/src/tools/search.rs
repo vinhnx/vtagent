@@ -1,7 +1,7 @@
 //! Search tool implementation with multiple modes
 
-use super::traits::{Tool, ModeTool, CacheableTool};
-use crate::rp_search::{RpSearchManager, RpSearchInput};
+use super::traits::{CacheableTool, ModeTool, Tool};
+use crate::rp_search::{RpSearchInput, RpSearchManager};
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use serde_json::{Value, json};
@@ -24,21 +24,34 @@ impl SearchTool {
 
     /// Execute exact search mode
     async fn execute_exact(&self, args: Value) -> Result<Value> {
-        let pattern = args.get("pattern")
+        let pattern = args
+            .get("pattern")
             .and_then(|p| p.as_str())
             .ok_or_else(|| anyhow!("Missing pattern for search"))?;
-        
+
         let input = RpSearchInput {
             pattern: pattern.to_string(),
-            path: args.get("path").and_then(|p| p.as_str()).unwrap_or(".").to_string(),
-            max_results: Some(args.get("max_results").and_then(|m| m.as_u64()).unwrap_or(100) as usize),
-            case_sensitive: Some(args.get("case_sensitive").and_then(|c| c.as_bool()).unwrap_or(true)),
+            path: args
+                .get("path")
+                .and_then(|p| p.as_str())
+                .unwrap_or(".")
+                .to_string(),
+            max_results: Some(
+                args.get("max_results")
+                    .and_then(|m| m.as_u64())
+                    .unwrap_or(100) as usize,
+            ),
+            case_sensitive: Some(
+                args.get("case_sensitive")
+                    .and_then(|c| c.as_bool())
+                    .unwrap_or(true),
+            ),
             literal: Some(false),
             glob_pattern: None,
             context_lines: Some(0),
             include_hidden: Some(false),
         };
-        
+
         let result = self.rp_search.perform_search(input).await?;
         Ok(json!({
             "success": true,
@@ -60,18 +73,22 @@ impl SearchTool {
 
     /// Execute multi-pattern search mode
     async fn execute_multi(&self, args: Value) -> Result<Value> {
-        let args_obj = args.as_object().ok_or_else(|| anyhow!("Invalid arguments"))?;
-        
-        let patterns = args_obj.get("patterns")
+        let args_obj = args
+            .as_object()
+            .ok_or_else(|| anyhow!("Invalid arguments"))?;
+
+        let patterns = args_obj
+            .get("patterns")
             .and_then(|p| p.as_array())
             .ok_or_else(|| anyhow!("Missing patterns array for multi mode"))?;
-        
-        let logic = args_obj.get("logic")
+
+        let logic = args_obj
+            .get("logic")
             .and_then(|l| l.as_str())
             .unwrap_or("AND");
 
         let mut all_results = Vec::new();
-        
+
         // Execute search for each pattern
         for pattern in patterns {
             if let Some(pattern_str) = pattern.as_str() {
@@ -79,7 +96,7 @@ impl SearchTool {
                 if let Some(obj) = pattern_args.as_object_mut() {
                     obj.insert("pattern".to_string(), json!(pattern_str));
                 }
-                
+
                 match self.execute_exact(pattern_args).await {
                     Ok(result) => {
                         if let Some(matches) = result.get("matches").and_then(|m| m.as_array()) {
@@ -109,49 +126,58 @@ impl SearchTool {
 
     /// Execute similarity search mode
     async fn execute_similarity(&self, args: Value) -> Result<Value> {
-        let args_obj = args.as_object().ok_or_else(|| anyhow!("Invalid arguments"))?;
-        
-        let reference_file = args_obj.get("reference_file")
+        let args_obj = args
+            .as_object()
+            .ok_or_else(|| anyhow!("Invalid arguments"))?;
+
+        let reference_file = args_obj
+            .get("reference_file")
             .and_then(|f| f.as_str())
             .ok_or_else(|| anyhow!("Missing reference_file for similarity mode"))?;
-        
-        let content_type = args_obj.get("content_type")
+
+        let content_type = args_obj
+            .get("content_type")
             .and_then(|c| c.as_str())
             .unwrap_or("all");
 
         // Read reference file to extract patterns
         let ref_path = self.workspace_root.join(reference_file);
-        let ref_content = tokio::fs::read_to_string(&ref_path).await
+        let ref_content = tokio::fs::read_to_string(&ref_path)
+            .await
             .map_err(|e| anyhow!("Failed to read reference file: {}", e))?;
 
         // Extract patterns based on content type
         let patterns = self.extract_similarity_patterns(&ref_content, content_type)?;
-        
+
         // Execute multi-pattern search with OR logic
         let mut search_args = args.clone();
         if let Some(obj) = search_args.as_object_mut() {
             obj.insert("patterns".to_string(), json!(patterns));
             obj.insert("logic".to_string(), json!("OR"));
         }
-        
+
         self.execute_multi(search_args).await
     }
 
     /// Apply AND logic to search results
     fn apply_and_logic(&self, results: Vec<Value>, pattern_count: usize) -> Vec<Value> {
         use std::collections::HashMap;
-        
+
         let mut file_matches: HashMap<String, Vec<Value>> = HashMap::new();
-        
+
         // Group matches by file
         for result in results {
             if let Some(path) = result.get("path").and_then(|p| p.as_str()) {
-                file_matches.entry(path.to_string()).or_default().push(result);
+                file_matches
+                    .entry(path.to_string())
+                    .or_default()
+                    .push(result);
             }
         }
-        
+
         // Only include files that have matches for all patterns
-        file_matches.into_iter()
+        file_matches
+            .into_iter()
             .filter(|(_, matches)| matches.len() >= pattern_count)
             .flat_map(|(_, matches)| matches)
             .collect()
@@ -160,34 +186,44 @@ impl SearchTool {
     /// Apply OR logic to search results (remove duplicates)
     fn apply_or_logic(&self, results: Vec<Value>) -> Vec<Value> {
         use std::collections::HashSet;
-        
+
         let mut seen = HashSet::new();
         let mut unique_results = Vec::new();
-        
+
         for result in results {
-            let key = format!("{}:{}:{}", 
+            let key = format!(
+                "{}:{}:{}",
                 result.get("path").and_then(|p| p.as_str()).unwrap_or(""),
-                result.get("line_number").and_then(|l| l.as_u64()).unwrap_or(0),
+                result
+                    .get("line_number")
+                    .and_then(|l| l.as_u64())
+                    .unwrap_or(0),
                 result.get("column").and_then(|c| c.as_u64()).unwrap_or(0)
             );
-            
+
             if seen.insert(key) {
                 unique_results.push(result);
             }
         }
-        
+
         unique_results
     }
 
     /// Extract patterns for similarity search
-    fn extract_similarity_patterns(&self, content: &str, content_type: &str) -> Result<Vec<String>> {
+    fn extract_similarity_patterns(
+        &self,
+        content: &str,
+        content_type: &str,
+    ) -> Result<Vec<String>> {
         let mut patterns = Vec::new();
-        
+
         match content_type {
             "functions" => {
                 // Extract function signatures
                 for line in content.lines() {
-                    if line.trim_start().starts_with("fn ") || line.trim_start().starts_with("pub fn ") {
+                    if line.trim_start().starts_with("fn ")
+                        || line.trim_start().starts_with("pub fn ")
+                    {
                         if let Some(name) = self.extract_function_name(line) {
                             patterns.push(format!("fn {}", name));
                         }
@@ -207,7 +243,13 @@ impl SearchTool {
                 for line in content.lines() {
                     let trimmed = line.trim_start();
                     if trimmed.starts_with("struct ") || trimmed.starts_with("enum ") {
-                        patterns.push(trimmed.split_whitespace().take(2).collect::<Vec<_>>().join(" "));
+                        patterns.push(
+                            trimmed
+                                .split_whitespace()
+                                .take(2)
+                                .collect::<Vec<_>>()
+                                .join(" "),
+                        );
                     }
                 }
             }
@@ -216,11 +258,11 @@ impl SearchTool {
                 patterns.extend(self.extract_keywords(content));
             }
         }
-        
+
         if patterns.is_empty() {
             return Err(anyhow!("No patterns extracted from reference file"));
         }
-        
+
         Ok(patterns)
     }
 
@@ -243,7 +285,7 @@ impl SearchTool {
     fn extract_keywords(&self, content: &str) -> Vec<String> {
         let keywords = ["fn ", "struct ", "enum ", "impl ", "trait ", "use ", "mod "];
         let mut patterns = Vec::new();
-        
+
         for line in content.lines() {
             for keyword in &keywords {
                 if line.contains(keyword) {
@@ -251,7 +293,7 @@ impl SearchTool {
                 }
             }
         }
-        
+
         patterns.sort();
         patterns.dedup();
         patterns
@@ -262,10 +304,11 @@ impl SearchTool {
 impl Tool for SearchTool {
     async fn execute(&self, args: Value) -> Result<Value> {
         let args_clone = args.clone();
-        let mode = args_clone.get("mode")
+        let mode = args_clone
+            .get("mode")
             .and_then(|m| m.as_str())
             .unwrap_or("exact");
-        
+
         self.execute_mode(mode, args).await
     }
 
@@ -298,7 +341,8 @@ impl ModeTool for SearchTool {
 #[async_trait]
 impl CacheableTool for SearchTool {
     fn cache_key(&self, args: &Value) -> String {
-        format!("search:{}:{}", 
+        format!(
+            "search:{}:{}",
             args.get("pattern").and_then(|p| p.as_str()).unwrap_or(""),
             args.get("mode").and_then(|m| m.as_str()).unwrap_or("exact")
         )

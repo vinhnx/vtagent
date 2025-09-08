@@ -1,6 +1,6 @@
-use crate::config::core::{AgentConfig, ToolsConfig, CommandsConfig, SecurityConfig};
-use crate::config::multi_agent::MultiAgentSystemConfig;
 use crate::config::PtyConfig;
+use crate::config::core::{AgentConfig, CommandsConfig, SecurityConfig, ToolsConfig};
+use crate::config::multi_agent::MultiAgentSystemConfig;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -61,7 +61,7 @@ impl ConfigManager {
     /// Load configuration from a specific workspace
     pub fn load_from_workspace(workspace: impl AsRef<Path>) -> Result<Self> {
         let workspace = workspace.as_ref();
-        
+
         // Try vtagent.toml in workspace root first
         let config_path = workspace.join("vtagent.toml");
         if config_path.exists() {

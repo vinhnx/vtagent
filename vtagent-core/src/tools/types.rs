@@ -26,7 +26,7 @@ impl<T> EnhancedCacheEntry<T> {
             priority: 1,
         }
     }
-    
+
     pub fn access(&mut self) {
         self.access_count += 1;
         self.last_accessed = Instant::now();
@@ -139,8 +139,12 @@ pub struct VtagentPtySession {
 }
 
 // Default value functions
-fn default_max_items() -> usize { 1000 }
-fn default_write_mode() -> String { "overwrite".to_string() }
+fn default_max_items() -> usize {
+    1000
+}
+fn default_write_mode() -> String {
+    "overwrite".to_string()
+}
 
 // Search path default
 pub fn default_search_path() -> String {

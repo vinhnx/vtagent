@@ -4,9 +4,10 @@ pub mod retry;
 pub use config::ClientConfig;
 pub use retry::RetryConfig;
 
-use crate::timeout_detector::{OperationType, TIMEOUT_DETECTOR};
-use crate::gemini::streaming::{StreamingError, StreamingMetrics};
 use crate::gemini::models::{GenerateContentRequest, GenerateContentResponse};
+use crate::gemini::streaming::{
+    StreamingError, StreamingMetrics, StreamingProcessor, StreamingResponse,
+};
 use anyhow::{Context, Result};
 use reqwest::Client as ReqwestClient;
 use std::time::Instant;
@@ -78,7 +79,10 @@ impl Client {
     fn classify_error(&self, error: &anyhow::Error) -> StreamingError {
         let error_str = error.to_string().to_lowercase();
 
-        if error_str.contains("timeout") || error_str.contains("connection") || error_str.contains("network") {
+        if error_str.contains("timeout")
+            || error_str.contains("connection")
+            || error_str.contains("network")
+        {
             StreamingError::NetworkError {
                 message: error.to_string(),
                 is_retryable: true,
@@ -98,23 +102,24 @@ impl Client {
     }
 
     /// Generate content with the Gemini API
-    pub async fn generate_content(&mut self, request: &GenerateContentRequest) -> Result<GenerateContentResponse> {
+    pub async fn generate_content(
+        &mut self,
+        request: &GenerateContentRequest,
+    ) -> Result<GenerateContentResponse> {
         let start_time = Instant::now();
-        TIMEOUT_DETECTOR.start_operation(OperationType::ApiCall).await;
 
         let url = format!(
             "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
             self.model, self.api_key
         );
 
-        let response = self.http
+        let response = self
+            .http
             .post(&url)
             .json(request)
             .send()
             .await
             .context("Failed to send request")?;
-
-        TIMEOUT_DETECTOR.end_operation(OperationType::ApiCall).await;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -122,14 +127,65 @@ impl Client {
             return Err(anyhow::anyhow!("API error {}: {}", status, error_text));
         }
 
-        let response_data: GenerateContentResponse = response
-            .json()
-            .await
-            .context("Failed to parse response")?;
+        let response_data: GenerateContentResponse =
+            response.json().await.context("Failed to parse response")?;
 
         self.metrics.total_requests += 1;
         self.metrics.total_response_time += start_time.elapsed();
 
         Ok(response_data)
+    }
+
+    /// Generate content with the Gemini API using streaming
+    pub async fn generate_content_stream<F>(
+        &mut self,
+        request: &GenerateContentRequest,
+        on_chunk: F,
+    ) -> Result<StreamingResponse, StreamingError>
+    where
+        F: FnMut(&str) -> Result<(), StreamingError>,
+    {
+        let start_time = Instant::now();
+
+        let url = format!(
+            "https://generativelanguage.googleapis.com/v1beta/models/{}:streamGenerateContent?key={}",
+            self.model, self.api_key
+        );
+
+        let response = self
+            .http
+            .post(&url)
+            .json(request)
+            .send()
+            .await
+            .map_err(|e| StreamingError::NetworkError {
+                message: format!("Failed to send request: {}", e),
+                is_retryable: true,
+            })?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+
+            let is_retryable = match status.as_u16() {
+                429 | 500 | 502 | 503 | 504 => true,
+                _ => false,
+            };
+
+            return Err(StreamingError::ApiError {
+                status_code: status.as_u16(),
+                message: error_text,
+                is_retryable,
+            });
+        }
+
+        // Process the streaming response
+        let mut processor = StreamingProcessor::new();
+        let result = processor.process_stream(response, on_chunk).await;
+
+        self.metrics.total_requests += 1;
+        self.metrics.total_response_time += start_time.elapsed();
+
+        result
     }
 }

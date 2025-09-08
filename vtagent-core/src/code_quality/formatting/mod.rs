@@ -4,6 +4,8 @@ pub mod black;
 
 use crate::code_quality::config::FormatConfig;
 use std::path::Path;
+use std::process::Command;
+use anyhow::{Result, Context};
 
 /// Result of formatting operation
 #[derive(Debug, Clone)]
@@ -53,12 +55,44 @@ impl FormattingOrchestrator {
     }
 
     async fn run_formatter(&self, config: &FormatConfig, file_path: &Path) -> FormatResult {
-        // Simplified implementation - would use actual tool execution
-        FormatResult {
-            success: true,
-            formatted_content: None,
-            error_message: None,
-            tool_used: config.tool_name.clone(),
+        // Execute the actual formatting tool
+        let mut cmd = Command::new(&config.command[0]);
+        
+        // Add arguments
+        for arg in &config.args {
+            cmd.arg(arg);
+        }
+        
+        // Add the file path as the last argument
+        cmd.arg(file_path);
+
+        match cmd.output() {
+            Ok(output) => {
+                if output.status.success() {
+                    FormatResult {
+                        success: true,
+                        formatted_content: None, // We don't capture the formatted content since tools modify files in place
+                        error_message: None,
+                        tool_used: config.tool_name.clone(),
+                    }
+                } else {
+                    let error_msg = String::from_utf8_lossy(&output.stderr).to_string();
+                    FormatResult {
+                        success: false,
+                        formatted_content: None,
+                        error_message: Some(error_msg),
+                        tool_used: config.tool_name.clone(),
+                    }
+                }
+            }
+            Err(e) => {
+                FormatResult {
+                    success: false,
+                    formatted_content: None,
+                    error_message: Some(format!("Failed to execute {}: {}", config.tool_name, e)),
+                    tool_used: config.tool_name.clone(),
+                }
+            }
         }
     }
 }

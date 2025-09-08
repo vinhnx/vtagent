@@ -17,7 +17,7 @@ pub struct Cli {
     pub model: Option<String>,
 
     /// **API key environment variable** to read\n\n**Checks in order:**\n1. Specified env var\n2. `GOOGLE_API_KEY`\n\n**Setup:** `export GEMINI_API_KEY="your_key"`
-    #[arg(long, global = true, default_value = "GEMINI_API_KEY")]
+    #[arg(long, global = true, default_value = crate::constants::defaults::DEFAULT_API_KEY_ENV)]
     pub api_key_env: String,
 
     /// **Workspace root directory** for file operations\n\n**Defaults to:** Current directory\n**All file operations** are restricted to this path
@@ -124,6 +124,13 @@ pub enum Commands {
 
     /// **Initialize project with AGENTS.md** - analyzes current project and generates AGENTS.md file\n\n**Features:**\n• Auto-detect project languages and frameworks\n• Analyze dependencies and build systems\n• Generate comprehensive agent guidelines\n• Create project-specific conventions\n\n**Usage:** vtagent init
     Init,
+
+    /// **Manage tool execution policies** - control which tools the agent can use\n\n**Features:**\n• Allow/deny specific tools\n• Persistent policy storage\n• User confirmation workflow\n• Policy status overview\n\n**Examples:**\n  vtagent tool-policy status\n  vtagent tool-policy allow read_file\n  vtagent tool-policy deny run_terminal_cmd
+    #[command(name = "tool-policy")]
+    ToolPolicy {
+        #[command(subcommand)]
+        command: crate::cli::tool_policy_commands::ToolPolicyCommands,
+    },
 }
 
 /// Configuration file structure

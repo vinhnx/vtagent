@@ -1,12 +1,13 @@
 //! Agent runner for executing individual agent instances
 
 use crate::agent::multi_agent::*;
+use crate::gemini::{Content, FunctionResponse, GenerateContentRequest, Part, Tool, ToolConfig};
 use crate::llm::{AnyClient, make_client};
+use crate::models::ModelId;
 use crate::tools::{ToolRegistry, build_function_declarations};
-use crate::gemini::{Content, Part, Tool, FunctionResponse, GenerateContentRequest, ToolConfig};
 use anyhow::{Result, anyhow};
 use console::style;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -35,7 +36,10 @@ impl AgentRunner {
         workspace: PathBuf,
         session_id: String,
     ) -> Result<Self> {
-        let client = make_client(api_key, model);
+        let model_id = model
+            .parse::<ModelId>()
+            .map_err(|_| anyhow::anyhow!("Invalid model: {}", model))?;
+        let client = make_client(api_key, model_id);
         let tool_registry = Arc::new(ToolRegistry::new(workspace.clone()));
 
         // Load system prompt for this agent type
@@ -56,8 +60,13 @@ impl AgentRunner {
         let prompt_path = workspace.join(agent_type.system_prompt_path());
 
         if prompt_path.exists() {
-            std::fs::read_to_string(&prompt_path)
-                .map_err(|e| anyhow!("Failed to read system prompt from {}: {}", prompt_path.display(), e))
+            std::fs::read_to_string(&prompt_path).map_err(|e| {
+                anyhow!(
+                    "Failed to read system prompt from {}: {}",
+                    prompt_path.display(),
+                    e
+                )
+            })
         } else {
             // Fall back to default prompts
             Ok(match agent_type {
@@ -75,10 +84,12 @@ impl AgentRunner {
         task: &Task,
         contexts: &[ContextItem],
     ) -> Result<TaskResults> {
-        println!("{} Executing {} task: {}",
-                style("[AGENT]").magenta().bold(),
-                self.agent_type,
-                task.title);
+        println!(
+            "{} Executing {} task: {}",
+            style("[AGENT]").magenta().bold(),
+            self.agent_type,
+            task.title
+        );
 
         // Prepare conversation with task context
         let mut conversation = Vec::new();
@@ -113,8 +124,14 @@ impl AgentRunner {
                 generation_config: None,
             };
 
-            let response = self.client.generate_content(&request).await
-                .map_err(|e| anyhow!("Agent {} execution failed at turn {}: {}", self.agent_type, turn, e))?;
+            let response = self.client.generate_content(&request).await.map_err(|e| {
+                anyhow!(
+                    "Agent {} execution failed at turn {}: {}",
+                    self.agent_type,
+                    turn,
+                    e
+                )
+            })?;
 
             if let Some(candidate) = response.candidates.first() {
                 let mut had_tool_call = false;
@@ -123,10 +140,12 @@ impl AgentRunner {
                     match part {
                         Part::Text { text } => {
                             if !text.trim().is_empty() {
-                                println!("{} [{}]: {}",
-                                        style("[RESPONSE]").cyan().bold(),
-                                        self.agent_type,
-                                        text.trim());
+                                println!(
+                                    "{} [{}]: {}",
+                                    style("[RESPONSE]").cyan().bold(),
+                                    self.agent_type,
+                                    text.trim()
+                                );
                                 conversation.push(Content {
                                     role: "model".to_string(),
                                     parts: vec![Part::Text { text: text.clone() }],
@@ -138,11 +157,13 @@ impl AgentRunner {
                             let tool_name = &function_call.name;
                             let args = function_call.args.clone();
 
-                            println!("{} [{}] Calling tool: {} {}",
-                                    style("[TOOL]").yellow().bold(),
-                                    self.agent_type,
-                                    tool_name,
-                                    args);
+                            println!(
+                                "{} [{}] Calling tool: {} {}",
+                                style("[TOOL]").yellow().bold(),
+                                self.agent_type,
+                                tool_name,
+                                args
+                            );
 
                             // Check if tool is allowed for this agent
                             if !self.is_tool_allowed(tool_name) {
@@ -167,27 +188,39 @@ impl AgentRunner {
                                 "report" => {
                                     // Agent is completing the task
                                     has_completed = true;
-                                    self.handle_report_tool(&args, &mut created_contexts).await?
+                                    self.handle_report_tool(&args, &mut created_contexts)
+                                        .await?
                                 }
                                 _ => {
-                                    // Execute regular tool
-                                    // For now, just return a placeholder result
-                                    json!({ "ok": true, "result": "Tool executed successfully" })
+                                    // Try to execute the tool through the tool registry
+                                    match self.execute_tool(&tool_name, &args).await {
+                                        Ok(result) => result,
+                                        Err(e) => {
+                                            // Log the error and return a proper error response
+                                            eprintln!(
+                                                "Error executing tool '{}': {}",
+                                                tool_name, e
+                                            );
+                                            json!({
+                                                "error": format!("Failed to execute tool '{}': {}", tool_name, e),
+                                                "tool": tool_name
+                                            })
+                                        }
+                                    }
                                 }
                             };
 
-                            conversation.push(Content::user_parts(vec![
-                                Part::FunctionResponse {
-                                    function_response: FunctionResponse {
-                                        name: tool_name.clone(),
-                                        response: tool_result,
-                                    },
+                            conversation.push(Content::user_parts(vec![Part::FunctionResponse {
+                                function_response: FunctionResponse {
+                                    name: tool_name.clone(),
+                                    response: tool_result,
                                 },
-                            ]));
+                            }]));
                         }
                         Part::FunctionResponse { .. } => {
                             // Should not happen in agent response
-                            warnings.push("Unexpected function response in agent output".to_string());
+                            warnings
+                                .push("Unexpected function response in agent output".to_string());
                         }
                     }
                 }
@@ -197,14 +230,23 @@ impl AgentRunner {
                     has_completed = true;
                 }
             } else {
-                return Err(anyhow!("No response candidate from agent {}", self.agent_type));
+                return Err(anyhow!(
+                    "No response candidate from agent {}",
+                    self.agent_type
+                ));
             }
         }
 
         let summary = if has_completed {
-            format!("{} task '{}' completed successfully", self.agent_type, task.title)
+            format!(
+                "{} task '{}' completed successfully",
+                self.agent_type, task.title
+            )
         } else {
-            format!("{} task '{}' reached turn limit", self.agent_type, task.title)
+            format!(
+                "{} task '{}' reached turn limit",
+                self.agent_type, task.title
+            )
         };
 
         Ok(TaskResults {
@@ -307,7 +349,8 @@ impl AgentRunner {
                     function_declarations: vec![decl],
                 });
             }
-        }        filtered_tools
+        }
+        filtered_tools
     }
 
     /// Check if a tool is allowed for this agent type
@@ -322,12 +365,16 @@ impl AgentRunner {
     }
 
     /// Handle the report tool call
-    async fn handle_report_tool(&self, args: &Value, created_contexts: &mut Vec<String>) -> Result<Value> {
+    async fn handle_report_tool(
+        &self,
+        args: &Value,
+        created_contexts: &mut Vec<String>,
+    ) -> Result<Value> {
         if let Some(contexts) = args.get("contexts").and_then(|c| c.as_array()) {
             for context in contexts {
                 if let (Some(id), Some(content)) = (
                     context.get("id").and_then(|i| i.as_str()),
-                    context.get("content").and_then(|c| c.as_str())
+                    context.get("content").and_then(|c| c.as_str()),
                 ) {
                     created_contexts.push(id.to_string());
 
@@ -347,28 +394,56 @@ impl AgentRunner {
                         related_files: Vec::new(),
                     };
 
-                    println!("{} [{}] Created context: {} - {}",
-                            style("[CONTEXT]").green().bold(),
-                            self.agent_type,
-                            id,
-                            content.chars().take(100).collect::<String>());
+                    println!(
+                        "{} [{}] Created context: {} - {}",
+                        style("[CONTEXT]").green().bold(),
+                        self.agent_type,
+                        id,
+                        content.chars().take(100).collect::<String>()
+                    );
                 }
             }
         }
 
-        let comments = args.get("comments")
+        let comments = args
+            .get("comments")
             .and_then(|c| c.as_str())
             .unwrap_or("Task completed");
 
-        println!("{} [{}] Task completed: {}",
-                style("[REPORT]").green().bold(),
-                self.agent_type,
-                comments);
+        println!(
+            "{} [{}] Task completed: {}",
+            style("[REPORT]").green().bold(),
+            self.agent_type,
+            comments
+        );
 
         Ok(json!({
             "ok": true,
             "message": "Report submitted successfully",
-            "task_completed": true
         }))
+    }
+
+    /// Execute a tool by name with given arguments
+    async fn execute_tool(&self, tool_name: &str, args: &Value) -> Result<Value> {
+        use crate::tools::registry::ToolRegistry;
+
+        // Create a tool registry and try to execute the tool
+        let mut registry = ToolRegistry::new(self.workspace.clone());
+
+        // Register default tools
+        registry.register_default_tools()?;
+
+        // Try to execute the tool
+        match registry.execute_tool(tool_name, args).await {
+            Ok(result) => Ok(result),
+            Err(e) => {
+                // If the tool doesn't exist in the registry, return an error
+                Err(anyhow!(
+                    "Tool '{}' not found or failed to execute: {}",
+                    tool_name,
+                    e
+                ))
+            }
+        }
     }
 }

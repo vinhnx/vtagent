@@ -22,12 +22,16 @@ impl CompletionLearningData {
         } else {
             (current_rate - 0.1).max(0.0)
         };
-        self.pattern_acceptance.insert(suggestion.to_string(), new_rate);
+        self.pattern_acceptance
+            .insert(suggestion.to_string(), new_rate);
     }
 
     /// Get insights for a specific context
     pub fn get_context_insights(&self, context: &str) -> HashMap<String, f64> {
-        self.context_insights.get(context).cloned().unwrap_or_default()
+        self.context_insights
+            .get(context)
+            .cloned()
+            .unwrap_or_default()
     }
 
     /// Record symbol usage frequency

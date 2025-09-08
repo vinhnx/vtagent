@@ -5,10 +5,10 @@
 
 use crate::agent::multi_agent::{AgentType, Task, TaskResults};
 use crate::models::ModelId;
-use anyhow::{Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::{SystemTime, Duration};
+use std::time::{Duration, SystemTime};
 
 /// Verification criteria for task results
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -224,35 +224,44 @@ impl VerificationWorkflow {
         let mut criteria_by_agent = HashMap::new();
 
         // Set default criteria for each agent type
-        criteria_by_agent.insert(AgentType::Coder, VerificationCriteria {
-            min_confidence: 0.8,
-            min_completeness: 0.9,
-            require_compilation: true,
-            require_tests: false,
-            max_errors: 0,
-            required_formats: vec!["rs".to_string(), "py".to_string(), "js".to_string()],
-            custom_rules: vec![],
-        });
+        criteria_by_agent.insert(
+            AgentType::Coder,
+            VerificationCriteria {
+                min_confidence: 0.8,
+                min_completeness: 0.9,
+                require_compilation: true,
+                require_tests: false,
+                max_errors: 0,
+                required_formats: vec!["rs".to_string(), "py".to_string(), "js".to_string()],
+                custom_rules: vec![],
+            },
+        );
 
-        criteria_by_agent.insert(AgentType::Explorer, VerificationCriteria {
-            min_confidence: 0.7,
-            min_completeness: 0.8,
-            require_compilation: false,
-            require_tests: false,
-            max_errors: 2,
-            required_formats: vec![],
-            custom_rules: vec![],
-        });
+        criteria_by_agent.insert(
+            AgentType::Explorer,
+            VerificationCriteria {
+                min_confidence: 0.7,
+                min_completeness: 0.8,
+                require_compilation: false,
+                require_tests: false,
+                max_errors: 2,
+                required_formats: vec![],
+                custom_rules: vec![],
+            },
+        );
 
-        criteria_by_agent.insert(AgentType::Orchestrator, VerificationCriteria {
-            min_confidence: 0.9,
-            min_completeness: 0.95,
-            require_compilation: false,
-            require_tests: false,
-            max_errors: 0,
-            required_formats: vec![],
-            custom_rules: vec![],
-        });
+        criteria_by_agent.insert(
+            AgentType::Orchestrator,
+            VerificationCriteria {
+                min_confidence: 0.9,
+                min_completeness: 0.95,
+                require_compilation: false,
+                require_tests: false,
+                max_errors: 0,
+                required_formats: vec![],
+                custom_rules: vec![],
+            },
+        );
 
         Self {
             criteria_by_agent,
@@ -270,12 +279,16 @@ impl VerificationWorkflow {
     ) -> Result<VerificationResult> {
         let start_time = SystemTime::now();
 
-        let criteria = self.criteria_by_agent
+        let criteria = self
+            .criteria_by_agent
             .get(&agent_type)
             .cloned()
             .unwrap_or_default();
 
-        eprintln!("Starting verification for task {} by agent type {:?}", task.id, agent_type);
+        eprintln!(
+            "Starting verification for task {} by agent type {:?}",
+            task.id, agent_type
+        );
 
         let mut findings = vec![];
         let mut confidence = 1.0;
@@ -297,9 +310,10 @@ impl VerificationWorkflow {
         }
 
         // Check for error indicators in summary and warnings
-        if results.summary.to_lowercase().contains("error") ||
-           results.summary.to_lowercase().contains("failed") ||
-           !results.warnings.is_empty() {
+        if results.summary.to_lowercase().contains("error")
+            || results.summary.to_lowercase().contains("failed")
+            || !results.warnings.is_empty()
+        {
             findings.push(VerificationFinding {
                 finding_type: FindingType::LogicError,
                 severity: Severity::High,
@@ -343,54 +357,77 @@ impl VerificationWorkflow {
         match agent_type {
             AgentType::Coder => {
                 // Check for code-specific requirements
-                if !results.summary.contains("```") && !results.summary.contains("fn ") &&
-                   !results.summary.contains("def ") && !results.summary.contains("function ") &&
-                   results.modified_files.is_empty() {
+                if !results.summary.contains("```")
+                    && !results.summary.contains("fn ")
+                    && !results.summary.contains("def ")
+                    && !results.summary.contains("function ")
+                    && results.modified_files.is_empty()
+                {
                     findings.push(VerificationFinding {
                         finding_type: FindingType::MissingRequirement,
                         severity: Severity::Medium,
-                        description: "No code blocks or file modifications detected in coder output".to_string(),
+                        description:
+                            "No code blocks or file modifications detected in coder output"
+                                .to_string(),
                         file_path: None,
                         line_number: None,
-                        suggested_fix: Some("Include actual code implementation or file modifications".to_string()),
+                        suggested_fix: Some(
+                            "Include actual code implementation or file modifications".to_string(),
+                        ),
                     });
                     completeness *= 0.8;
                 }
-            },
+            }
             AgentType::Explorer => {
                 // Check for exploration-specific requirements
-                if !results.summary.contains("found") && !results.summary.contains("discovered") &&
-                   !results.summary.contains("analysis") && results.created_contexts.is_empty() {
+                if !results.summary.contains("found")
+                    && !results.summary.contains("discovered")
+                    && !results.summary.contains("analysis")
+                    && results.created_contexts.is_empty()
+                {
                     findings.push(VerificationFinding {
                         finding_type: FindingType::MissingRequirement,
                         severity: Severity::Low,
-                        description: "Explorer output lacks discovery indicators or created contexts".to_string(),
+                        description:
+                            "Explorer output lacks discovery indicators or created contexts"
+                                .to_string(),
                         file_path: None,
                         line_number: None,
-                        suggested_fix: Some("Include findings, analysis details, or context creation".to_string()),
+                        suggested_fix: Some(
+                            "Include findings, analysis details, or context creation".to_string(),
+                        ),
                     });
                     completeness *= 0.9;
                 }
-            },
+            }
             _ => {}
         }
 
         // Apply criteria thresholds
-        let passed = confidence >= criteria.min_confidence &&
-                    completeness >= criteria.min_completeness &&
-                    errors <= criteria.max_errors;
+        let passed = confidence >= criteria.min_confidence
+            && completeness >= criteria.min_completeness
+            && errors <= criteria.max_errors;
 
         let duration = start_time.elapsed().unwrap_or(Duration::from_secs(0));
 
         let mut recommendations = vec![];
         if confidence < criteria.min_confidence {
-            recommendations.push(format!("Improve confidence from {:.2} to {:.2}", confidence, criteria.min_confidence));
+            recommendations.push(format!(
+                "Improve confidence from {:.2} to {:.2}",
+                confidence, criteria.min_confidence
+            ));
         }
         if completeness < criteria.min_completeness {
-            recommendations.push(format!("Improve completeness from {:.2} to {:.2}", completeness, criteria.min_completeness));
+            recommendations.push(format!(
+                "Improve completeness from {:.2} to {:.2}",
+                completeness, criteria.min_completeness
+            ));
         }
         if errors > criteria.max_errors {
-            recommendations.push(format!("Reduce errors from {} to {}", errors, criteria.max_errors));
+            recommendations.push(format!(
+                "Reduce errors from {} to {}",
+                errors, criteria.max_errors
+            ));
         }
 
         let result = VerificationResult {
@@ -427,22 +464,24 @@ impl VerificationWorkflow {
     /// Get verification statistics
     pub fn get_statistics(&self) -> VerificationStatistics {
         let total_verifications = self.history.len();
-        let passed_verifications = self.history.iter()
-            .filter(|r| r.result.passed)
-            .count();
+        let passed_verifications = self.history.iter().filter(|r| r.result.passed).count();
 
         let avg_confidence = if total_verifications > 0 {
-            self.history.iter()
+            self.history
+                .iter()
                 .map(|r| r.result.confidence)
-                .sum::<f64>() / total_verifications as f64
+                .sum::<f64>()
+                / total_verifications as f64
         } else {
             0.0
         };
 
         let avg_completeness = if total_verifications > 0 {
-            self.history.iter()
+            self.history
+                .iter()
                 .map(|r| r.result.completeness)
-                .sum::<f64>() / total_verifications as f64
+                .sum::<f64>()
+                / total_verifications as f64
         } else {
             0.0
         };
@@ -510,7 +549,9 @@ mod tests {
             warnings: vec![],
         };
 
-        let verification = workflow.verify_task_results(&task, &results, AgentType::Coder).await;
+        let verification = workflow
+            .verify_task_results(&task, &results, AgentType::Coder)
+            .await;
         assert!(verification.is_ok());
 
         let result = verification.unwrap();

@@ -3,9 +3,9 @@
 //! This module provides performance monitoring, optimization strategies, and
 //! resource management for the multi-agent architecture.
 
-use crate::agent::multi_agent::{AgentType};
+use crate::agent::multi_agent::AgentType;
 use crate::models::ModelId;
-use anyhow::{Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
@@ -314,7 +314,8 @@ impl PerformanceMonitor {
         let strategies = vec![
             OptimizationStrategy {
                 id: "smart_model_selection".to_string(),
-                description: "Automatically select the best model based on task complexity".to_string(),
+                description: "Automatically select the best model based on task complexity"
+                    .to_string(),
                 strategy_type: StrategyType::ModelSelection,
                 expected_improvement: 0.25,
                 complexity: OptimizationComplexity::Medium,
@@ -388,7 +389,8 @@ impl PerformanceMonitor {
         drop(history);
 
         // Update metrics
-        self.update_performance_metrics(agent_type, duration, success, &model, quality_score).await;
+        self.update_performance_metrics(agent_type, duration, success, &model, quality_score)
+            .await;
 
         Ok(())
     }
@@ -405,9 +407,12 @@ impl PerformanceMonitor {
         let mut metrics = self.metrics.write().await;
 
         // Update completion time
-        let avg_time = metrics.avg_completion_time.entry(agent_type).or_insert(Duration::from_secs(0));
+        let avg_time = metrics
+            .avg_completion_time
+            .entry(agent_type)
+            .or_insert(Duration::from_secs(0));
         *avg_time = Duration::from_millis(
-            (avg_time.as_millis() as f64 * 0.9 + duration.as_millis() as f64 * 0.1) as u64
+            (avg_time.as_millis() as f64 * 0.9 + duration.as_millis() as f64 * 0.1) as u64,
         );
 
         // Update success rate
@@ -415,35 +420,41 @@ impl PerformanceMonitor {
         *success_rate = *success_rate * 0.9 + (if success { 1.0 } else { 0.0 }) * 0.1;
 
         // Update model performance
-        let model_perf = metrics.model_performance.entry(model.to_string()).or_insert(ModelPerformance {
-            model_id: model.to_string(),
-            avg_response_time: Duration::from_secs(0),
-            success_rate: 1.0,
-            token_stats: TokenStatistics {
-                avg_input_tokens: 0.0,
-                avg_output_tokens: 0.0,
-                total_tokens: 0,
-                peak_tokens: 0,
-            },
-            cost_metrics: CostMetrics {
-                total_cost: 0.0,
-                cost_per_task: 0.0,
-                cost_per_token: 0.0001,
-                daily_cost: 0.0,
-            },
-            quality_scores: QualityMetrics {
-                avg_confidence: 0.0,
-                avg_completeness: 0.0,
-                revision_rate: 0.0,
-                satisfaction_score: 0.0,
-            },
-        });
+        let model_perf = metrics
+            .model_performance
+            .entry(model.to_string())
+            .or_insert(ModelPerformance {
+                model_id: model.to_string(),
+                avg_response_time: Duration::from_secs(0),
+                success_rate: 1.0,
+                token_stats: TokenStatistics {
+                    avg_input_tokens: 0.0,
+                    avg_output_tokens: 0.0,
+                    total_tokens: 0,
+                    peak_tokens: 0,
+                },
+                cost_metrics: CostMetrics {
+                    total_cost: 0.0,
+                    cost_per_task: 0.0,
+                    cost_per_token: 0.0001,
+                    daily_cost: 0.0,
+                },
+                quality_scores: QualityMetrics {
+                    avg_confidence: 0.0,
+                    avg_completeness: 0.0,
+                    revision_rate: 0.0,
+                    satisfaction_score: 0.0,
+                },
+            });
 
         model_perf.avg_response_time = Duration::from_millis(
-            (model_perf.avg_response_time.as_millis() as f64 * 0.9 + duration.as_millis() as f64 * 0.1) as u64
+            (model_perf.avg_response_time.as_millis() as f64 * 0.9
+                + duration.as_millis() as f64 * 0.1) as u64,
         );
-        model_perf.success_rate = model_perf.success_rate * 0.9 + (if success { 1.0 } else { 0.0 }) * 0.1;
-        model_perf.quality_scores.avg_confidence = model_perf.quality_scores.avg_confidence * 0.9 + quality_score * 0.1;
+        model_perf.success_rate =
+            model_perf.success_rate * 0.9 + (if success { 1.0 } else { 0.0 }) * 0.1;
+        model_perf.quality_scores.avg_confidence =
+            model_perf.quality_scores.avg_confidence * 0.9 + quality_score * 0.1;
     }
 
     /// Get current performance metrics
@@ -461,7 +472,11 @@ impl PerformanceMonitor {
             if *success_rate < 0.9 {
                 recommendations.push(OptimizationStrategy {
                     id: format!("improve_{:?}_reliability", agent_type),
-                    description: format!("Improve reliability for {:?} agents (current: {:.2}%)", agent_type, success_rate * 100.0),
+                    description: format!(
+                        "Improve reliability for {:?} agents (current: {:.2}%)",
+                        agent_type,
+                        success_rate * 100.0
+                    ),
                     strategy_type: StrategyType::ModelSelection,
                     expected_improvement: 0.1,
                     complexity: OptimizationComplexity::Medium,
@@ -473,7 +488,10 @@ impl PerformanceMonitor {
             if completion_time > &Duration::from_secs(30) {
                 recommendations.push(OptimizationStrategy {
                     id: format!("optimize_{:?}_speed", agent_type),
-                    description: format!("Optimize speed for {:?} agents (current: {:?})", agent_type, completion_time),
+                    description: format!(
+                        "Optimize speed for {:?} agents (current: {:?})",
+                        agent_type, completion_time
+                    ),
                     strategy_type: StrategyType::Parallelization,
                     expected_improvement: 0.3,
                     complexity: OptimizationComplexity::High,
@@ -490,9 +508,9 @@ impl PerformanceMonitor {
         let mut model_scores: Vec<(String, f64)> = vec![];
 
         for (model_id, perf) in &metrics.model_performance {
-            let score = perf.success_rate * 0.4 +
-                       (1.0 / perf.avg_response_time.as_secs_f64().max(0.1)) * 0.3 +
-                       perf.quality_scores.avg_confidence * 0.3;
+            let score = perf.success_rate * 0.4
+                + (1.0 / perf.avg_response_time.as_secs_f64().max(0.1)) * 0.3
+                + perf.quality_scores.avg_confidence * 0.3;
             model_scores.push((model_id.clone(), score));
         }
 
@@ -500,7 +518,8 @@ impl PerformanceMonitor {
         model_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // Convert to ModelId, taking top 3
-        model_scores.into_iter()
+        model_scores
+            .into_iter()
             .take(3)
             .filter_map(|(model_id, _)| model_id.parse::<ModelId>().ok())
             .collect()
@@ -541,7 +560,8 @@ impl PerformanceMonitor {
             },
             avg_response_time: if total_tasks > 0 {
                 Duration::from_millis(
-                    history.iter().map(|r| r.duration.as_millis()).sum::<u128>() as u64 / total_tasks as u64
+                    history.iter().map(|r| r.duration.as_millis()).sum::<u128>() as u64
+                        / total_tasks as u64,
                 )
             } else {
                 Duration::from_secs(0)
@@ -558,7 +578,8 @@ impl PerformanceMonitor {
 
         for (agent_type, success_rate) in &metrics.success_rate {
             if let Some(completion_time) = metrics.avg_completion_time.get(agent_type) {
-                let score = *success_rate * 0.7 + (1.0 / completion_time.as_secs_f64().max(0.1)) * 0.3;
+                let score =
+                    *success_rate * 0.7 + (1.0 / completion_time.as_secs_f64().max(0.1)) * 0.3;
                 if score > best_score {
                     best_score = score;
                     best_agent = Some(*agent_type);
@@ -619,17 +640,20 @@ mod tests {
     async fn test_performance_monitor() {
         let monitor = PerformanceMonitor::new(PerformanceConfig::default());
 
-        monitor.record_task_execution(
-            "test_task".to_string(),
-            AgentType::Coder,
-            Instant::now(),
-            Duration::from_secs(5),
-            true,
-            "gemini-2.5-flash".to_string(),
-            100,
-            200,
-            0.9,
-        ).await.unwrap();
+        monitor
+            .record_task_execution(
+                "test_task".to_string(),
+                AgentType::Coder,
+                Instant::now(),
+                Duration::from_secs(5),
+                true,
+                "gemini-2.5-flash".to_string(),
+                100,
+                200,
+                0.9,
+            )
+            .await
+            .unwrap();
 
         let metrics = monitor.get_metrics().await;
         assert!(metrics.success_rate.contains_key(&AgentType::Coder));
@@ -639,6 +663,11 @@ mod tests {
     fn test_optimization_strategies() {
         let monitor = PerformanceMonitor::new(PerformanceConfig::default());
         assert!(!monitor.strategies.is_empty());
-        assert!(monitor.strategies.iter().any(|s| matches!(s.strategy_type, StrategyType::ModelSelection)));
+        assert!(
+            monitor
+                .strategies
+                .iter()
+                .any(|s| matches!(s.strategy_type, StrategyType::ModelSelection))
+        );
     }
 }

@@ -41,7 +41,7 @@ impl CompletionSuggestion {
         } else {
             self.rejected_count += 1;
         }
-        
+
         let total = self.accepted_count + self.rejected_count;
         if total > 0 {
             self.acceptance_rate = self.accepted_count as f64 / total as f64;

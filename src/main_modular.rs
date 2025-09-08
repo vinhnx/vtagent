@@ -6,6 +6,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use console::style;
 use std::path::PathBuf;
+use vtagent_core::constants::defaults;
 use vtagent_core::config::loader::ConfigManager;
 use vtagent_core::api_keys::{ApiKeySources, get_api_key, load_dotenv};
 use vtagent_core::{
@@ -29,11 +30,11 @@ use cli::*;
 )]
 pub struct Cli {
     /// Gemini model ID (e.g., gemini-2.5-flash-lite)
-    #[arg(long, global = true, default_value = "gemini-2.5-flash-lite")]
+    #[arg(long, global = true, default_value = defaults::DEFAULT_CLI_MODEL)]
     pub model: String,
 
     /// API key environment variable to read
-    #[arg(long, global = true, default_value = "GEMINI_API_KEY")]
+    #[arg(long, global = true, default_value = defaults::DEFAULT_API_KEY_ENV)]
     pub api_key_env: String,
 
     /// Workspace root directory for file operations
@@ -155,7 +156,17 @@ async fn main() -> Result<()> {
             let prompt_text = prompt.join(" ");
             println!("{}", style("Ask mode").blue().bold());
             println!("Question: {}", prompt_text);
-            // Ask implementation would go here
+            
+            // Ask implementation
+            // Create a simple LLM client and get a response
+            let client = vtagent_core::llm::make_client(
+                config.api_key.clone(), 
+                config.model.parse().unwrap_or_default()
+            );
+            
+            // For a minimal implementation, we'll just print a placeholder response
+            // In a full implementation, this would actually call the LLM
+            println!("Answer: This is a placeholder response. In a full implementation, this would call the LLM with your question.");
         }
         Commands::Analyze => {
             handle_analyze_command(&config).await?;
@@ -171,7 +182,14 @@ async fn main() -> Result<()> {
         }
         Commands::Performance => {
             println!("{}", style("Performance metrics mode selected").blue().bold());
-            // Performance metrics implementation would go here
+            
+            // Performance metrics implementation
+            // In a real implementation, this would collect and display actual performance metrics
+            println!("Performance Metrics:");
+            println!("  Response time: N/A (not implemented)");
+            println!("  Memory usage: N/A (not implemented)");
+            println!("  Token usage: N/A (not implemented)");
+            println!("  Cache hit rate: N/A (not implemented)");
         }
     }
 

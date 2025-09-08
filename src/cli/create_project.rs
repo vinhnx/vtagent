@@ -1,6 +1,8 @@
 use anyhow::Result;
 use console::style;
 use vtagent_core::types::AgentConfig as CoreAgentConfig;
+use std::fs;
+use std::path::Path;
 
 /// Handle the create-project command
 pub async fn handle_create_project_command(config: &CoreAgentConfig, name: &str, features: &[String]) -> Result<()> {
@@ -9,8 +11,85 @@ pub async fn handle_create_project_command(config: &CoreAgentConfig, name: &str,
     println!("Features: {:?}", features);
     println!("Workspace: {}", config.workspace.display());
     
-    // Project creation implementation would go here
-    println!("Project creation not fully implemented in this minimal version");
+    // Project creation implementation
+    let project_path = config.workspace.join(name);
     
+    // Create project directory
+    fs::create_dir_all(&project_path)?;
+    println!("Created project directory: {}", project_path.display());
+    
+    // Create basic project structure based on features
+    create_project_structure(&project_path, features)?;
+    
+    // Create vtagent configuration
+    create_vtagent_config(&project_path)?;
+    
+    println!("Project '{}' created successfully!", name);
+    
+    Ok(())
+}
+
+/// Create project structure based on selected features
+fn create_project_structure(project_path: &Path, features: &[String]) -> Result<()> {
+    // Create src directory
+    let src_path = project_path.join("src");
+    fs::create_dir_all(&src_path)?;
+    
+    // Create main file based on features
+    let main_content = if features.contains(&"cli".to_string()) {
+        r#"fn main() {
+    println!("Hello, world!");
+}
+"#
+    } else {
+        r#"fn main() {
+    println!("Hello, world!");
+}
+"#
+    };
+    
+    fs::write(src_path.join("main.rs"), main_content)?;
+    
+    // Create README.md
+    let readme_content = r#"# Project
+
+This is a new project created with VTAgent.
+
+## Features
+
+"#
+    .to_string()
+    + &features.iter().map(|f| format!("- {}\n", f)).collect::<String>();
+    
+    fs::write(project_path.join("README.md"), readme_content)?;
+    
+    // Create Cargo.toml for Rust projects
+    let cargo_content = r#"[package]
+name = "project"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#;
+    
+    fs::write(project_path.join("Cargo.toml"), cargo_content)?;
+    
+    Ok(())
+}
+
+/// Create vtagent configuration file
+fn create_vtagent_config(project_path: &Path) -> Result<()> {
+    let config_content = r#"# VTAgent Configuration
+[model]
+name = "gemini-1.5-flash"
+
+[workspace]
+path = "."
+
+[agent]
+verbose = false
+"#;
+    
+    fs::write(project_path.join("vtagent.toml"), config_content)?;
     Ok(())
 }

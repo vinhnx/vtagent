@@ -1,6 +1,6 @@
 //! Multi-agent system types and structures
 
-use crate::config::{MultiAgentDefaults, ContextStoreDefaults};
+use crate::config::{ContextStoreDefaults, MultiAgentDefaults};
 use crate::models::{ModelId, Provider};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -69,13 +69,8 @@ impl AgentType {
                 "delete_file",
                 "run_command",
             ],
-            AgentType::Explorer => vec![
-                "write_file",
-                "edit_file",
-                "delete_file",
-                "create_file",
-            ],
-            AgentType::Coder => vec![], // No restrictions
+            AgentType::Explorer => vec!["write_file", "edit_file", "delete_file", "create_file"],
+            AgentType::Coder => vec![],  // No restrictions
             AgentType::Single => vec![], // No restrictions
         }
     }
@@ -244,7 +239,10 @@ impl ContextStore {
     pub fn add_context(&mut self, mut context: ContextItem) -> Result<(), anyhow::Error> {
         // Ensure unique ID
         if self.contexts.contains_key(&context.id) {
-            return Err(anyhow::anyhow!("Context with ID '{}' already exists", context.id));
+            return Err(anyhow::anyhow!(
+                "Context with ID '{}' already exists",
+                context.id
+            ));
         }
 
         context.session_id = self.session_id.clone();
@@ -253,7 +251,8 @@ impl ContextStore {
 
         self.contexts.insert(context.id.clone(), context);
         Ok(())
-    }    /// Get context by ID
+    }
+    /// Get context by ID
     pub fn get_context(&self, id: &str) -> Option<&ContextItem> {
         self.contexts.get(id)
     }
@@ -262,9 +261,7 @@ impl ContextStore {
     pub fn find_by_tags(&self, tags: &[String]) -> Vec<&ContextItem> {
         self.contexts
             .values()
-            .filter(|context| {
-                tags.iter().any(|tag| context.tags.contains(tag))
-            })
+            .filter(|context| tags.iter().any(|tag| context.tags.contains(tag)))
             .collect()
     }
 
@@ -290,7 +287,10 @@ impl ContextStore {
             .values()
             .filter(|context| {
                 file_paths.iter().any(|path| {
-                    context.related_files.iter().any(|related| related.contains(path))
+                    context
+                        .related_files
+                        .iter()
+                        .any(|related| related.contains(path))
                 })
             })
             .collect()
@@ -372,8 +372,14 @@ impl TaskManager {
     }
 
     /// Update task status
-    pub fn update_task_status(&mut self, task_id: &str, status: TaskStatus) -> Result<(), anyhow::Error> {
-        let task = self.tasks.get_mut(task_id)
+    pub fn update_task_status(
+        &mut self,
+        task_id: &str,
+        status: TaskStatus,
+    ) -> Result<(), anyhow::Error> {
+        let task = self
+            .tasks
+            .get_mut(task_id)
             .ok_or_else(|| anyhow::anyhow!("Task '{}' not found", task_id))?;
 
         let now = SystemTime::now();
@@ -392,8 +398,14 @@ impl TaskManager {
     }
 
     /// Set task results
-    pub fn set_task_results(&mut self, task_id: &str, results: TaskResults) -> Result<(), anyhow::Error> {
-        let task = self.tasks.get_mut(task_id)
+    pub fn set_task_results(
+        &mut self,
+        task_id: &str,
+        results: TaskResults,
+    ) -> Result<(), anyhow::Error> {
+        let task = self
+            .tasks
+            .get_mut(task_id)
             .ok_or_else(|| anyhow::anyhow!("Task '{}' not found", task_id))?;
 
         task.results = Some(results);
@@ -402,14 +414,17 @@ impl TaskManager {
 
     /// Set task error
     pub fn set_task_error(&mut self, task_id: &str, error: String) -> Result<(), anyhow::Error> {
-        let task = self.tasks.get_mut(task_id)
+        let task = self
+            .tasks
+            .get_mut(task_id)
             .ok_or_else(|| anyhow::anyhow!("Task '{}' not found", task_id))?;
 
         task.error_message = Some(error);
         task.status = TaskStatus::Failed;
         task.completed_at = Some(SystemTime::now());
         Ok(())
-    }    /// Get task by ID
+    }
+    /// Get task by ID
     pub fn get_task(&self, task_id: &str) -> Option<&Task> {
         self.tasks.get(task_id)
     }
@@ -437,7 +452,8 @@ impl TaskManager {
 
     /// Get pending tasks sorted by priority
     pub fn get_pending_tasks(&self) -> Vec<&Task> {
-        let mut tasks: Vec<&Task> = self.tasks
+        let mut tasks: Vec<&Task> = self
+            .tasks
             .values()
             .filter(|task| task.status == TaskStatus::Pending)
             .collect();
@@ -541,8 +557,14 @@ impl Default for MultiAgentConfig {
             enable_multi_agent: MultiAgentDefaults::ENABLE_MULTI_AGENT,
             execution_mode: ExecutionMode::Auto,
             provider: default_provider.clone(),
-            orchestrator_model: ModelId::default_orchestrator_for_provider(default_provider.clone()).as_str().to_string(),
-            subagent_model: ModelId::default_subagent_for_provider(default_provider).as_str().to_string(),
+            orchestrator_model: ModelId::default_orchestrator_for_provider(
+                default_provider.clone(),
+            )
+            .as_str()
+            .to_string(),
+            subagent_model: ModelId::default_subagent_for_provider(default_provider)
+                .as_str()
+                .to_string(),
             max_concurrent_subagents: MultiAgentDefaults::MAX_CONCURRENT_SUBAGENTS,
             context_store_enabled: MultiAgentDefaults::CONTEXT_STORE_ENABLED,
             enable_task_management: MultiAgentDefaults::ENABLE_TASK_MANAGEMENT,

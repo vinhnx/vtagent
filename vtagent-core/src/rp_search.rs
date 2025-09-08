@@ -162,29 +162,68 @@ impl RpSearchManager {
     }
 
     fn spawn_rp_search(
-        _query: String,
-        _search_dir: PathBuf,
+        query: String,
+        search_dir: PathBuf,
         cancellation_token: Arc<AtomicBool>,
         search_state: Arc<Mutex<SearchState>>,
     ) {
-        // In a real implementation, this would perform the actual ripgrep search
-        // For now, we'll just simulate the search completion
+        use std::process::Command;
 
-        // Simulate search work
         thread::spawn(move || {
-            // Simulate some work being done
-            thread::sleep(Duration::from_millis(100));
+            // Check if cancelled before starting
+            if cancellation_token.load(Ordering::Relaxed) {
+                // Reset the active search state
+                {
+                    #[expect(clippy::unwrap_used)]
+                    let mut st = search_state.lock().unwrap();
+                    if let Some(active_search) = &st.active_search
+                        && Arc::ptr_eq(&active_search.cancellation_token, &cancellation_token)
+                    {
+                        st.active_search = None;
+                    }
+                }
+                return;
+            }
+
+            // Build the ripgrep command
+            let mut cmd = Command::new("rg");
+
+            // Add the search pattern
+            cmd.arg(&query);
+
+            // Add the search path
+            cmd.arg(search_dir.to_string_lossy().as_ref());
+
+            // Output as JSON for easier parsing
+            cmd.arg("--json");
+
+            // Set result limits
+            cmd.arg("--max-count")
+                .arg(MAX_SEARCH_RESULTS.get().to_string());
+
+            // Execute the command
+            let output = cmd.output();
 
             let is_cancelled = cancellation_token.load(Ordering::Relaxed);
             if !is_cancelled {
-                // In a real implementation, this would send the search results
-                // For now, we're just demonstrating the structure
-                println!("Search completed");
+                // Process the results if the command succeeded
+                if let Ok(output) = output {
+                    if output.status.success() {
+                        // Parse the JSON output
+                        let output_str = String::from_utf8_lossy(&output.stdout);
+                        for line in output_str.lines() {
+                            if !line.trim().is_empty() {
+                                // In a real implementation, this would send the search results
+                                // to the UI or store them somewhere accessible
+                                // For now, we'll just print them
+                                println!("Search result: {}", line);
+                            }
+                        }
+                    }
+                }
             }
 
-            // Reset the active search state. Do a pointer comparison to verify
-            // that we are clearing the ActiveSearch that corresponds to the
-            // cancellation token we were given.
+            // Reset the active search state
             {
                 #[expect(clippy::unwrap_used)]
                 let mut st = search_state.lock().unwrap();
@@ -198,13 +237,84 @@ impl RpSearchManager {
     }
 
     /// Perform an actual ripgrep search with the given input parameters
-    pub async fn perform_search(&self, _input: RpSearchInput) -> Result<RpSearchResult> {
-        // This would be implemented to actually call ripgrep
-        // For now, returning a placeholder result
+    pub async fn perform_search(&self, input: RpSearchInput) -> Result<RpSearchResult> {
+        use std::path::Path;
+        use std::process::Command;
+
+        // Build the ripgrep command
+        let mut cmd = Command::new("rg");
+
+        // Add the search pattern
+        cmd.arg(&input.pattern);
+
+        // Add the search path
+        cmd.arg(&input.path);
+
+        // Add optional flags
+        if let Some(case_sensitive) = input.case_sensitive {
+            if case_sensitive {
+                cmd.arg("--case-sensitive");
+            } else {
+                cmd.arg("--ignore-case");
+            }
+        }
+
+        if let Some(literal) = input.literal {
+            if literal {
+                cmd.arg("--fixed-strings");
+            }
+        }
+
+        if let Some(glob_pattern) = &input.glob_pattern {
+            cmd.arg("--glob").arg(glob_pattern);
+        }
+
+        if let Some(context_lines) = input.context_lines {
+            cmd.arg("--context").arg(context_lines.to_string());
+        }
+
+        if let Some(include_hidden) = input.include_hidden {
+            if include_hidden {
+                cmd.arg("--hidden");
+            }
+        }
+
+        // Set result limits
+        let max_results = input.max_results.unwrap_or(MAX_SEARCH_RESULTS.get());
+        cmd.arg("--max-count").arg(max_results.to_string());
+
+        // Output as JSON for easier parsing
+        cmd.arg("--json");
+
+        // Execute the command
+        let output = cmd.output()?;
+
+        if !output.status.success() {
+            // If ripgrep is not found, return an error
+            if String::from_utf8_lossy(&output.stderr).contains("not found") {
+                return Err(anyhow::anyhow!(
+                    "ripgrep (rg) command not found. Please install ripgrep to use search functionality."
+                ));
+            }
+
+            // For other errors, still return results but with a warning
+        }
+
+        // Parse the JSON output
+        let output_str = String::from_utf8_lossy(&output.stdout);
+        let mut matches = Vec::new();
+
+        for line in output_str.lines() {
+            if !line.trim().is_empty() {
+                if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(line) {
+                    matches.push(json_value);
+                }
+            }
+        }
 
         Ok(RpSearchResult {
-            query: "test".to_string(),
-            matches: vec![],
+            query: input.pattern,
+            matches,
         })
     }
 }

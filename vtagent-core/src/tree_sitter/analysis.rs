@@ -552,10 +552,48 @@ pub struct AnalysisUtils;
 
 impl AnalysisUtils {
     /// Calculate code duplication (simplified)
-    pub fn calculate_duplication(_tree: &SyntaxTree) -> f64 {
-        // This would implement a more sophisticated duplication analysis
-        // For now, return a placeholder
-        0.0
+    pub fn calculate_duplication(tree: &SyntaxTree) -> f64 {
+        // Implement a more sophisticated duplication analysis
+        // This looks for similar code structures in the tree
+
+        let mut total_nodes = 0;
+        let mut duplicate_patterns = 0;
+
+        // Traverse the tree and count nodes
+        fn traverse_node(
+            node: &SyntaxNode,
+            node_counts: &mut std::collections::HashMap<String, usize>,
+        ) -> usize {
+            let mut count = 1; // Count this node
+
+            // Create a signature for this node based on its kind and children
+            let mut signature = node.kind.clone();
+
+            // Add children signatures
+            for child in &node.children {
+                let child_count = traverse_node(child, node_counts);
+                count += child_count;
+                signature.push_str(&format!("_{}", child.kind));
+            }
+
+            // Update the count for this signature
+            *node_counts.entry(signature).or_insert(0) += 1;
+
+            count
+        }
+
+        let mut node_counts = std::collections::HashMap::new();
+        total_nodes = traverse_node(&tree.root, &mut node_counts);
+
+        // Count how many patterns appear more than once
+        duplicate_patterns = node_counts.values().filter(|&&count| count > 1).count();
+
+        // Calculate duplication ratio
+        if total_nodes == 0 {
+            0.0
+        } else {
+            (duplicate_patterns as f64 / total_nodes as f64) * 100.0
+        }
     }
 
     /// Analyze code maintainability index

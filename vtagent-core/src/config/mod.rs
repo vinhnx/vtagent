@@ -5,15 +5,19 @@
 //! command allow lists.
 
 pub mod core;
-pub mod multi_agent;
 pub mod defaults;
 pub mod loader;
+pub mod multi_agent;
 
 // Re-export main types for backward compatibility
-pub use core::{AgentConfig, ToolsConfig, CommandsConfig, SecurityConfig, ToolPolicy};
-pub use multi_agent::{MultiAgentSystemConfig, ContextStoreConfiguration, AgentSpecificConfigs, AgentTypeConfig};
-pub use defaults::{MultiAgentDefaults, ContextStoreDefaults, PerformanceDefaults, ScenarioDefaults};
+pub use core::{AgentConfig, CommandsConfig, SecurityConfig, ToolPolicy, ToolsConfig};
+pub use defaults::{
+    ContextStoreDefaults, MultiAgentDefaults, PerformanceDefaults, ScenarioDefaults,
+};
 pub use loader::{ConfigManager, VTAgentConfig};
+pub use multi_agent::{
+    AgentSpecificConfigs, AgentTypeConfig, ContextStoreConfiguration, MultiAgentSystemConfig,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -53,8 +57,18 @@ impl Default for PtyConfig {
     }
 }
 
-fn default_pty_enabled() -> bool { true }
-fn default_pty_rows() -> u16 { 24 }
-fn default_pty_cols() -> u16 { 80 }
-fn default_max_pty_sessions() -> usize { 10 }
-fn default_pty_timeout() -> u64 { 300 }
+fn default_pty_enabled() -> bool {
+    true
+}
+fn default_pty_rows() -> u16 {
+    24
+}
+fn default_pty_cols() -> u16 {
+    80
+}
+fn default_max_pty_sessions() -> usize {
+    10
+}
+fn default_pty_timeout() -> u64 {
+    300
+}

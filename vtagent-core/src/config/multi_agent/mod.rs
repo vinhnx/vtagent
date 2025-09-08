@@ -92,6 +92,12 @@ impl Default for AgentTypeConfig {
     }
 }
 
-fn default_max_agents() -> usize { 5 }
-fn default_max_context_size() -> usize { 100000 }
-fn default_true() -> bool { true }
+fn default_max_agents() -> usize {
+    5
+}
+fn default_max_context_size() -> usize {
+    100000
+}
+fn default_true() -> bool {
+    true
+}

@@ -26,14 +26,14 @@ impl FileCache {
     pub fn new(capacity: usize) -> Self {
         Self {
             file_cache: Arc::new(RwLock::new(LruCache::new(
-                NonZeroUsize::new(capacity).unwrap()
+                NonZeroUsize::new(capacity).unwrap(),
             ))),
             directory_cache: Arc::new(RwLock::new(LruCache::new(
-                NonZeroUsize::new(capacity / 2).unwrap()
+                NonZeroUsize::new(capacity / 2).unwrap(),
             ))),
             stats: Arc::new(RwLock::new(EnhancedCacheStats::default())),
             max_size_bytes: 50 * 1024 * 1024, // 50MB default
-            ttl: Duration::from_secs(300), // 5 minutes default
+            ttl: Duration::from_secs(300),    // 5 minutes default
         }
     }
 
@@ -41,7 +41,7 @@ impl FileCache {
     pub async fn get_file(&self, key: &str) -> Option<Value> {
         let mut cache = self.file_cache.write().await;
         let mut stats = self.stats.write().await;
-        
+
         if let Some(entry) = cache.get_mut(key) {
             // Check if entry is still valid
             if entry.timestamp.elapsed() < self.ttl {
@@ -54,7 +54,7 @@ impl FileCache {
                 stats.expired_evictions += 1;
             }
         }
-        
+
         stats.misses += 1;
         None
     }
@@ -63,21 +63,22 @@ impl FileCache {
     pub async fn put_file(&self, key: String, value: Value) {
         let size_bytes = serde_json::to_string(&value).unwrap_or_default().len();
         let entry = EnhancedCacheEntry::new(value, size_bytes);
-        
+
         let mut cache = self.file_cache.write().await;
         let mut stats = self.stats.write().await;
-        
+
         // Check memory limits
         if stats.total_size_bytes + size_bytes > self.max_size_bytes {
             // Evict oldest entries until we have space
             while stats.total_size_bytes + size_bytes > self.max_size_bytes && !cache.is_empty() {
                 if let Some((_, old_entry)) = cache.pop_lru() {
-                    stats.total_size_bytes = stats.total_size_bytes.saturating_sub(old_entry.size_bytes);
+                    stats.total_size_bytes =
+                        stats.total_size_bytes.saturating_sub(old_entry.size_bytes);
                     stats.memory_evictions += 1;
                 }
             }
         }
-        
+
         cache.put(key, entry);
         stats.entries = cache.len();
         stats.total_size_bytes += size_bytes;
@@ -87,7 +88,7 @@ impl FileCache {
     pub async fn get_directory(&self, key: &str) -> Option<Value> {
         let mut cache = self.directory_cache.write().await;
         let mut stats = self.stats.write().await;
-        
+
         if let Some(entry) = cache.get_mut(key) {
             if entry.timestamp.elapsed() < self.ttl {
                 entry.access();
@@ -98,7 +99,7 @@ impl FileCache {
                 stats.expired_evictions += 1;
             }
         }
-        
+
         stats.misses += 1;
         None
     }
@@ -107,10 +108,10 @@ impl FileCache {
     pub async fn put_directory(&self, key: String, value: Value) {
         let size_bytes = serde_json::to_string(&value).unwrap_or_default().len();
         let entry = EnhancedCacheEntry::new(value, size_bytes);
-        
+
         let mut cache = self.directory_cache.write().await;
         let mut stats = self.stats.write().await;
-        
+
         cache.put(key, entry);
         stats.entries += cache.len();
         stats.total_size_bytes += size_bytes;

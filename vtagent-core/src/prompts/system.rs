@@ -133,10 +133,10 @@ fn read_system_prompt_from_md() -> String {
     // Try to read from prompts/system.md relative to project root
     let prompt_paths = [
         "prompts/system.md",
-        "../prompts/system.md", 
+        "../prompts/system.md",
         "../../prompts/system.md",
     ];
-    
+
     for path in &prompt_paths {
         if let Ok(content) = fs::read_to_string(path) {
             // Extract the main system prompt from the markdown
@@ -149,7 +149,7 @@ fn read_system_prompt_from_md() -> String {
             }
         }
     }
-    
+
     // Fallback to hardcoded prompt if file not found
     r#"You are a coding agent running in the VT Code CLI, a terminal-based coding assistant. You are expected to be precise, safe, and helpful.
 
@@ -477,13 +477,13 @@ fn read_multi_agent_prompt_from_md(agent_type: &str) -> String {
         format!("../prompts/{}", filename),
         format!("../../prompts/{}", filename),
     ];
-    
+
     for path in &prompt_paths {
         if let Ok(content) = fs::read_to_string(path) {
             return content;
         }
     }
-    
+
     // Return empty string if file not found
     String::new()
 }
@@ -662,24 +662,24 @@ pub fn generate_system_instruction_for_level(level: crate::types::CapabilityLeve
     let instruction = match level {
         crate::types::CapabilityLevel::Basic => {
             "You are a helpful AI coding assistant. You can have conversations with the user but have no access to tools."
-        },
+        }
         crate::types::CapabilityLevel::FileReading => {
             "You are a helpful AI coding assistant. You can read files in the workspace using the read_file tool."
-        },
+        }
         crate::types::CapabilityLevel::FileListing => {
             "You are a helpful AI coding assistant. You can read files and list directory contents using the read_file and list_files tools."
-        },
+        }
         crate::types::CapabilityLevel::Bash => {
             "You are a helpful AI coding assistant. You can read files, list directory contents, and run safe bash commands using the read_file, list_files, and bash tools."
-        },
+        }
         crate::types::CapabilityLevel::Editing => {
             "You are a helpful AI coding assistant. You can read files, list directory contents, run safe bash commands, and edit files using the read_file, list_files, bash, and edit_file tools."
-        },
+        }
         crate::types::CapabilityLevel::CodeSearch => {
             "You are a helpful AI coding assistant. You have full file system access and can read files, list directory contents, run safe bash commands, edit files, and search code using the read_file, list_files, bash, edit_file, and code_search tools. You also have access to advanced AST-based tools: ast_grep_search and ast_grep_transform for syntax-aware code operations."
-        },
+        }
     };
-    
+
     Content::system_text(instruction.to_string())
 }
 
@@ -805,7 +805,7 @@ pub fn get_orchestrator_prompt() -> String {
     read_multi_agent_prompt_from_md("orchestrator")
 }
 
-/// Get explorer agent prompt  
+/// Get explorer agent prompt
 pub fn get_explorer_prompt() -> String {
     read_multi_agent_prompt_from_md("explorer")
 }

@@ -24,19 +24,31 @@ pub struct CompletionSuggestion {
 
 /// Type of completion suggestion
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum CompletionKind {
-    Function,
-    Method,
-    Variable,
-    Class,
-    Struct,
-    Enum,
-    Trait,
-    Module,
-    Keyword,
-    Snippet,
-    Import,
-    Type,
+pub struct CompletionKind {
+    pub kind: String,
+    pub sub_kind: Option<String>,
+}
+
+impl CompletionKind {
+    pub fn new(kind: &str) -> Self {
+        Self {
+            kind: kind.to_string(),
+            sub_kind: None,
+        }
+    }
+    
+    pub fn with_sub_kind(kind: &str, sub_kind: &str) -> Self {
+        Self {
+            kind: kind.to_string(),
+            sub_kind: Some(sub_kind.to_string()),
+        }
+    }
+}
+
+impl PartialEq for CompletionKind {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind && self.sub_kind == other.sub_kind
+    }
 }
 
 /// Context information for completion
@@ -62,9 +74,9 @@ pub struct CodeCompletionEngine {
 /// Learning data for improving completion accuracy
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompletionLearningData {
-    pub user_patterns: HashMap<String, Vec<String>>, // Simplified: just preferred suggestions
-    pub language_patterns: HashMap<String, Vec<String>>, // Simplified: just common patterns
-    pub acceptance_rates: HashMap<String, f64>,      // Simplified: just acceptance rates
+    pub user_patterns: HashMap<String, UserPatternData>,
+    pub language_patterns: HashMap<String, LanguagePatternData>,
+    pub acceptance_rates: HashMap<String, AcceptanceRateData>,
 }
 
 impl Default for CompletionLearningData {
@@ -79,23 +91,24 @@ impl Default for CompletionLearningData {
 
 /// User-specific completion patterns
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UserPattern {
+pub struct UserPatternData {
     pub preferred_suggestions: Vec<String>,
-    pub rejected_suggestions: Vec<String>, // Changed from HashSet to Vec for serialization
-    pub common_prefixes: HashMap<String, Vec<String>>,
-    pub last_updated: String, // Changed from Instant to String for serialization
+    pub rejected_suggestions: Vec<String>,
+    pub context_preferences: HashMap<String, Vec<String>>,
+    pub last_updated: String,
 }
 
 /// Language-specific patterns
-#[derive(Debug, Clone)]
-pub struct LanguagePattern {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LanguagePatternData {
     pub common_completions: HashMap<String, Vec<CompletionSuggestion>>,
     pub context_patterns: Vec<ContextPattern>,
     pub semantic_rules: Vec<SemanticRule>,
+    pub symbol_frequencies: HashMap<String, usize>,
 }
 
 /// Context pattern for completion
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextPattern {
     pub trigger: String,
     pub context_type: String,
@@ -104,7 +117,7 @@ pub struct ContextPattern {
 }
 
 /// Semantic rule for intelligent completion
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SemanticRule {
     pub pattern: String,
     pub condition: String,
@@ -112,13 +125,13 @@ pub struct SemanticRule {
     pub priority: i32,
 }
 
-/// Acceptance statistics for learning
-#[derive(Debug, Clone)]
-pub struct AcceptanceStats {
+/// Acceptance rate data for learning
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AcceptanceRateData {
     pub total_suggestions: usize,
     pub accepted_suggestions: usize,
     pub acceptance_rate: f64,
-    pub last_updated: Instant,
+    pub last_updated: String,
 }
 
 /// Completion performance statistics
@@ -286,11 +299,7 @@ impl CodeCompletionEngine {
 
                 suggestions.push(CompletionSuggestion {
                     acceptance_rate: 0.0,
-                    learning_data: CompletionLearningData {
-                        user_patterns: HashMap::new(),
-                        language_patterns: HashMap::new(),
-                        acceptance_rates: HashMap::new(),
-                    },
+                    learning_data: CompletionLearningData::default(),
                     text: symbol.name.clone(),
                     kind,
                     confidence,
@@ -317,13 +326,9 @@ impl CodeCompletionEngine {
                 if method.starts_with(&context.prefix) {
                     suggestions.push(CompletionSuggestion {
                         acceptance_rate: 0.0,
-                        learning_data: CompletionLearningData {
-                            user_patterns: HashMap::new(),
-                            language_patterns: HashMap::new(),
-                            acceptance_rates: HashMap::new(),
-                        },
+                        learning_data: CompletionLearningData::default(),
                         text: method,
-                        kind: CompletionKind::Method,
+                        kind: CompletionKind::new("method"),
                         confidence: 0.85,
                         context: context.clone(),
                         metadata: HashMap::from([
@@ -348,30 +353,30 @@ impl CodeCompletionEngine {
     ) -> Result<Vec<CompletionSuggestion>, CompletionError> {
         let mut suggestions = Vec::new();
 
-        // Check learning data for context patterns (simplified)
+        // Check learning data for context patterns
         let learning_data = self.learning_data.read().await;
 
-        if let Some(patterns) = learning_data.language_patterns.get(&context.language) {
-            for pattern in patterns {
-                if context.prefix.contains(pattern) {
-                    suggestions.push(CompletionSuggestion {
-                        acceptance_rate: 0.0,
-                        learning_data: CompletionLearningData {
-                            user_patterns: HashMap::new(),
-                            language_patterns: HashMap::new(),
-                            acceptance_rates: HashMap::new(),
-                        },
-                        text: pattern.clone(),
-                        kind: CompletionKind::Snippet,
-                        confidence: 0.7,
-                        context: context.clone(),
-                        metadata: HashMap::from([
-                            ("pattern".to_string(), pattern.clone()),
-                            ("source".to_string(), "context".to_string()),
-                        ]),
-                        accepted_count: 0,
-                        rejected_count: 0,
-                    });
+        if let Some(language_data) = learning_data.language_patterns.get(&context.language) {
+            for pattern in &language_data.context_patterns {
+                if context.prefix.contains(&pattern.trigger) {
+                    for suggestion_text in &pattern.suggestions {
+                        if suggestion_text.starts_with(&context.prefix) {
+                            suggestions.push(CompletionSuggestion {
+                                acceptance_rate: pattern.confidence,
+                                learning_data: CompletionLearningData::default(),
+                                text: suggestion_text.clone(),
+                                kind: CompletionKind::new("snippet"),
+                                confidence: pattern.confidence,
+                                context: context.clone(),
+                                metadata: HashMap::from([
+                                    ("pattern".to_string(), pattern.trigger.clone()),
+                                    ("source".to_string(), "context".to_string()),
+                                ]),
+                                accepted_count: 0,
+                                rejected_count: 0,
+                            });
+                        }
+                    }
                 }
             }
         }
@@ -388,18 +393,14 @@ impl CodeCompletionEngine {
 
         let learning_data = self.learning_data.read().await;
 
-        if let Some(user_patterns) = learning_data.user_patterns.get("default") {
-            for suggestion in user_patterns {
+        if let Some(user_data) = learning_data.user_patterns.get("default") {
+            for suggestion in &user_data.preferred_suggestions {
                 if suggestion.starts_with(&context.prefix) {
                     suggestions.push(CompletionSuggestion {
                         acceptance_rate: 0.0,
-                        learning_data: CompletionLearningData {
-                            user_patterns: HashMap::new(),
-                            language_patterns: HashMap::new(),
-                            acceptance_rates: HashMap::new(),
-                        },
+                        learning_data: CompletionLearningData::default(),
                         text: suggestion.clone(),
-                        kind: CompletionKind::Snippet,
+                        kind: CompletionKind::new("snippet"),
                         confidence: 0.7,
                         context: context.clone(),
                         metadata: HashMap::from([("source".to_string(), "pattern".to_string())]),
@@ -426,13 +427,9 @@ impl CodeCompletionEngine {
             if keyword.starts_with(prefix) && keyword != prefix {
                 suggestions.push(CompletionSuggestion {
                     acceptance_rate: 0.0,
-                    learning_data: CompletionLearningData {
-                        user_patterns: HashMap::new(),
-                        language_patterns: HashMap::new(),
-                        acceptance_rates: HashMap::new(),
-                    },
+                    learning_data: CompletionLearningData::default(),
                     text: keyword.to_string(),
-                    kind: CompletionKind::Keyword,
+                    kind: CompletionKind::new("keyword"),
                     confidence: 0.9,
                     context: CompletionContext {
                         line: 0,
@@ -459,13 +456,13 @@ impl CodeCompletionEngine {
         suggestions: Vec<CompletionSuggestion>,
         context: &CompletionContext,
     ) -> Result<Vec<CompletionSuggestion>, CompletionError> {
-        let _learning_data = self.learning_data.read().await;
+        let learning_data = self.learning_data.read().await;
 
         let mut ranked = suggestions;
         ranked.sort_by(|a, b| {
             // Calculate composite score
-            let a_score = self.calculate_suggestion_score(a, context, &_learning_data);
-            let b_score = self.calculate_suggestion_score(b, context, &_learning_data);
+            let a_score = self.calculate_suggestion_score(a, context, &learning_data);
+            let b_score = self.calculate_suggestion_score(b, context, &learning_data);
 
             b_score
                 .partial_cmp(&a_score)
@@ -480,15 +477,14 @@ impl CodeCompletionEngine {
         &self,
         suggestion: &CompletionSuggestion,
         context: &CompletionContext,
-        _learning_data: &CompletionLearningData,
+        learning_data: &CompletionLearningData,
     ) -> f64 {
         let mut score = suggestion.confidence;
 
         // Boost score based on acceptance history
-        if suggestion.accepted_count > 0 {
-            let acceptance_rate = suggestion.accepted_count as f64
-                / (suggestion.accepted_count + suggestion.rejected_count) as f64;
-            score += acceptance_rate * 0.2;
+        let key = format!("{}:{}", suggestion.kind.kind, suggestion.text);
+        if let Some(acceptance_data) = learning_data.acceptance_rates.get(&key) {
+            score += acceptance_data.acceptance_rate * 0.3;
         }
 
         // Boost based on recent usage
@@ -510,8 +506,12 @@ impl CodeCompletionEngine {
         suggestions: Vec<CompletionSuggestion>,
         max_suggestions: usize,
     ) -> Result<Vec<CompletionSuggestion>, CompletionError> {
-        // Simplified filtering - just limit the number of suggestions
-        let filtered: Vec<_> = suggestions.into_iter().take(max_suggestions).collect();
+        // Filter out low confidence suggestions and limit the number
+        let filtered: Vec<_> = suggestions
+            .into_iter()
+            .filter(|s| s.confidence > 0.1) // Minimum confidence threshold
+            .take(max_suggestions)
+            .collect();
 
         Ok(filtered)
     }
@@ -520,31 +520,52 @@ impl CodeCompletionEngine {
     pub async fn record_acceptance(&self, suggestion: &CompletionSuggestion, accepted: bool) {
         let mut learning_data = self.learning_data.write().await;
 
-        let key = format!("{}:{}", format!("{:?}", suggestion.kind), suggestion.text);
+        let key = format!("{}:{}", suggestion.kind.kind, suggestion.text);
 
-        // Update acceptance rate (simplified)
-        let current_rate = learning_data
+        // Update acceptance rate data
+        let current_data = learning_data
             .acceptance_rates
-            .get(&key)
-            .copied()
-            .unwrap_or(0.0);
-        let new_rate = if accepted {
-            (current_rate + 1.0) / 2.0 // Simple moving average
-        } else {
-            current_rate * 0.9 // Decay for rejections
-        };
-        learning_data.acceptance_rates.insert(key, new_rate);
+            .entry(key.clone())
+            .or_insert_with(|| AcceptanceRateData {
+                total_suggestions: 0,
+                accepted_suggestions: 0,
+                acceptance_rate: 0.0,
+                last_updated: chrono::Utc::now().to_rfc3339(),
+            });
 
-        // Update user patterns (simplified)
-        if let Some(user_patterns) = learning_data.user_patterns.get_mut("default") {
-            if accepted && !user_patterns.contains(&suggestion.text) {
-                user_patterns.push(suggestion.text.clone());
-                // Keep only recent preferences
-                if user_patterns.len() > 100 {
-                    user_patterns.remove(0);
-                }
+        current_data.total_suggestions += 1;
+        if accepted {
+            current_data.accepted_suggestions += 1;
+        }
+        current_data.acceptance_rate = current_data.accepted_suggestions as f64
+            / current_data.total_suggestions as f64;
+        current_data.last_updated = chrono::Utc::now().to_rfc3339();
+
+        // Update user patterns
+        let user_data = learning_data
+            .user_patterns
+            .entry("default".to_string())
+            .or_insert_with(|| UserPatternData {
+                preferred_suggestions: Vec::new(),
+                rejected_suggestions: Vec::new(),
+                context_preferences: HashMap::new(),
+                last_updated: chrono::Utc::now().to_rfc3339(),
+            });
+
+        if accepted && !user_data.preferred_suggestions.contains(&suggestion.text) {
+            user_data.preferred_suggestions.push(suggestion.text.clone());
+            // Keep only recent preferences
+            if user_data.preferred_suggestions.len() > 100 {
+                user_data.preferred_suggestions.remove(0);
+            }
+        } else if !accepted && !user_data.rejected_suggestions.contains(&suggestion.text) {
+            user_data.rejected_suggestions.push(suggestion.text.clone());
+            // Keep only recent rejections
+            if user_data.rejected_suggestions.len() > 50 {
+                user_data.rejected_suggestions.remove(0);
             }
         }
+        user_data.last_updated = chrono::Utc::now().to_rfc3339();
     }
 
     /// Get performance statistics
@@ -576,23 +597,23 @@ impl CodeCompletionEngine {
         // Update acceptance rates from learning data
         let learning_data = self.learning_data.read().await;
         if let Some(acceptance_rate) = learning_data.acceptance_rates.values().next() {
-            lang_stats.top_suggestion_accuracy = *acceptance_rate;
+            lang_stats.top_suggestion_accuracy = acceptance_rate.acceptance_rate;
         }
     }
 
     // Helper methods
     fn map_symbol_kind(&self, symbol_kind: &str) -> CompletionKind {
         match symbol_kind {
-            "function" => CompletionKind::Function,
-            "method" => CompletionKind::Method,
-            "variable" => CompletionKind::Variable,
-            "class" => CompletionKind::Class,
-            "struct" => CompletionKind::Struct,
-            "enum" => CompletionKind::Enum,
-            "trait" => CompletionKind::Trait,
-            "module" => CompletionKind::Module,
-            "type" => CompletionKind::Type,
-            _ => CompletionKind::Variable,
+            "function" => CompletionKind::new("function"),
+            "method" => CompletionKind::new("method"),
+            "variable" => CompletionKind::new("variable"),
+            "class" => CompletionKind::new("class"),
+            "struct" => CompletionKind::new("struct"),
+            "enum" => CompletionKind::new("enum"),
+            "trait" => CompletionKind::new("trait"),
+            "module" => CompletionKind::new("module"),
+            "type" => CompletionKind::new("type"),
+            _ => CompletionKind::new("variable"),
         }
     }
 
@@ -623,8 +644,9 @@ impl CodeCompletionEngine {
         _analysis: &CodeAnalysis,
         _context: &CompletionContext,
     ) -> Option<String> {
-        // For now, return None as we need to implement proper line access
-        // This would require storing the source code lines in the CodeAnalysis struct
+        // In a real implementation, this would analyze the current context
+        // to determine what object/class methods are being accessed
+        // For now, we'll return None
         None
     }
 

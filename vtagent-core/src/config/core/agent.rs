@@ -1,3 +1,4 @@
+use crate::constants::defaults;
 use serde::{Deserialize, Serialize};
 
 /// Agent-wide configuration
@@ -76,12 +77,30 @@ impl Default for AgentConfig {
     }
 }
 
-fn default_max_conversation_turns() -> usize { 1000 }
-fn default_max_session_duration_minutes() -> u64 { 60 }
-fn default_max_conversation_history() -> usize { 100 }
-fn default_max_steps() -> usize { 50 }
-fn default_max_empty_responses() -> usize { 3 }
-fn default_provider() -> String { "gemini".to_string() }
-fn default_model() -> String { "gemini-2.5-flash".to_string() }
-fn default_api_key_env() -> String { "GEMINI_API_KEY".to_string() }
-fn default_system_instruction() -> String { "You are a helpful AI assistant.".to_string() }
+fn default_max_conversation_turns() -> usize {
+    1000
+}
+fn default_max_session_duration_minutes() -> u64 {
+    60
+}
+fn default_max_conversation_history() -> usize {
+    100
+}
+fn default_max_steps() -> usize {
+    50
+}
+fn default_max_empty_responses() -> usize {
+    3
+}
+fn default_provider() -> String {
+    defaults::DEFAULT_PROVIDER.to_string()
+}
+fn default_model() -> String {
+    defaults::DEFAULT_MODEL.to_string()
+}
+fn default_api_key_env() -> String {
+    defaults::DEFAULT_API_KEY_ENV.to_string()
+}
+fn default_system_instruction() -> String {
+    "You are a helpful AI assistant.".to_string()
+}

@@ -2,13 +2,13 @@
 
 use crate::agent::multi_agent::*;
 use crate::agent::runner::AgentRunner;
-use crate::llm::AnyClient;
 use crate::gemini::GenerateContentRequest;
+use crate::llm::AnyClient;
 use crate::models::ModelId;
 use crate::orchestrator_retry::{RetryManager, is_empty_response};
 use anyhow::{Result, anyhow};
 use std::sync::Arc;
-use std::time::{SystemTime, Duration};
+use std::time::{Duration, SystemTime};
 use tokio::time::sleep;
 
 /// Orchestrator agent for strategic coordination
@@ -40,12 +40,8 @@ impl OrchestratorAgent {
         api_key: String,
         workspace: std::path::PathBuf,
     ) -> Self {
-        let context_store = Arc::new(std::sync::Mutex::new(
-            ContextStore::new(session_id.clone())
-        ));
-        let task_manager = Arc::new(std::sync::Mutex::new(
-            TaskManager::new(session_id.clone())
-        ));
+        let context_store = Arc::new(std::sync::Mutex::new(ContextStore::new(session_id.clone())));
+        let task_manager = Arc::new(std::sync::Mutex::new(TaskManager::new(session_id.clone())));
 
         Self {
             config,
@@ -69,7 +65,9 @@ impl OrchestratorAgent {
         context_bootstrap: Vec<ContextBootstrap>,
         priority: TaskPriority,
     ) -> Result<String> {
-        let mut task_manager = self.task_manager.lock()
+        let mut task_manager = self
+            .task_manager
+            .lock()
             .map_err(|e| anyhow!("Failed to lock task manager: {}", e))?;
 
         let task_id = task_manager.create_task(
@@ -87,17 +85,22 @@ impl OrchestratorAgent {
     /// Launch a subagent to execute a task
     pub async fn launch_subagent(&mut self, task_id: &str) -> Result<TaskResults> {
         let task = {
-            let task_manager = self.task_manager.lock()
+            let task_manager = self
+                .task_manager
+                .lock()
                 .map_err(|e| anyhow!("Failed to lock task manager: {}", e))?;
 
-            task_manager.get_task(task_id)
+            task_manager
+                .get_task(task_id)
                 .ok_or_else(|| anyhow!("Task '{}' not found", task_id))?
                 .clone()
         };
 
         // Update task status to in progress
         {
-            let mut task_manager = self.task_manager.lock()
+            let mut task_manager = self
+                .task_manager
+                .lock()
                 .map_err(|e| anyhow!("Failed to lock task manager: {}", e))?;
             task_manager.update_task_status(task_id, TaskStatus::InProgress)?;
         }
@@ -113,26 +116,47 @@ impl OrchestratorAgent {
                 return Err(anyhow!("Orchestrator cannot launch another orchestrator"));
             }
             AgentType::Single => {
-                return Err(anyhow!("Single agent type not supported in multi-agent mode"));
+                return Err(anyhow!(
+                    "Single agent type not supported in multi-agent mode"
+                ));
             }
         };
 
-        // Store contexts created by the agent
-        for context_id in &results.created_contexts {
-            // In a real implementation, we would get the actual context content from the agent
-            // For now, we'll create a placeholder context
+        // Store contexts created by the agent with more detailed information
+        for (index, context_id) in results.created_contexts.iter().enumerate() {
+            let context_type = match task.agent_type {
+                AgentType::Explorer => ContextType::Analysis,
+                AgentType::Coder => ContextType::Implementation,
+                _ => ContextType::General,
+            };
+
+            let content = format!(
+                "Context '{}' created by {} agent during task '{}'\n\nSummary: {}\n\nModified files: {}\n\nExecuted commands: {}\n\nWarnings: {}",
+                context_id,
+                task.agent_type,
+                task.title,
+                results.summary,
+                results.modified_files.join(", "),
+                results.executed_commands.join(", "),
+                if results.warnings.is_empty() {
+                    "None".to_string()
+                } else {
+                    results.warnings.join(", ")
+                }
+            );
+
             let context = ContextItem {
                 id: context_id.clone(),
-                content: format!("Context created by {} agent for task '{}'", task.agent_type, task.title),
+                content,
                 created_by: task.agent_type,
                 session_id: self.session_id.clone(),
                 created_at: SystemTime::now(),
-                tags: vec!["agent_created".to_string()],
-                context_type: match task.agent_type {
-                    AgentType::Explorer => ContextType::Analysis,
-                    AgentType::Coder => ContextType::Implementation,
-                    _ => ContextType::General,
-                },
+                tags: vec![
+                    "agent_created".to_string(),
+                    task.agent_type.to_string(),
+                    format!("task_{}", index),
+                ],
+                context_type,
                 related_files: results.modified_files.clone(),
             };
 
@@ -141,37 +165,69 @@ impl OrchestratorAgent {
 
         // Update task with results
         {
-            let mut task_manager = self.task_manager.lock()
+            let mut task_manager = self
+                .task_manager
+                .lock()
                 .map_err(|e| anyhow!("Failed to lock task manager: {}", e))?;
             task_manager.set_task_results(task_id, results.clone())?;
             task_manager.update_task_status(task_id, TaskStatus::Completed)?;
         }
 
-        // Store any new contexts created by the subagent
-        for context_id in &results.created_contexts {
-            // Note: This is a simplified implementation
-            // In a real implementation, the subagent would return the actual context items
-            self.add_context(ContextItem {
-                id: context_id.clone(),
-                content: format!("Context created by {} during task {}", task.agent_type, task_id),
-                created_by: task.agent_type,
-                session_id: self.session_id.clone(),
-                created_at: SystemTime::now(),
-                tags: vec!["subagent".to_string(), task.agent_type.to_string()],
-                context_type: ContextType::General,
-                related_files: Vec::new(),
-            })?;
-        }
+        // Create a summary context for the entire task execution
+        let task_summary_context_id = format!("{}_summary", task_id);
+        let task_summary_content = format!(
+            "Task '{}' executed by {} agent\n\nTitle: {}\n\nDescription: {}\n\nSummary: {}\n\nModified files: {}\n\nExecuted commands: {}\n\nWarnings: {}",
+            task_id,
+            task.agent_type,
+            task.title,
+            task.description,
+            results.summary,
+            if results.modified_files.is_empty() {
+                "None".to_string()
+            } else {
+                results.modified_files.join(", ")
+            },
+            if results.executed_commands.is_empty() {
+                "None".to_string()
+            } else {
+                results.executed_commands.join(", ")
+            },
+            if results.warnings.is_empty() {
+                "None".to_string()
+            } else {
+                results.warnings.join(", ")
+            }
+        );
+
+        let task_summary_context = ContextItem {
+            id: task_summary_context_id.clone(),
+            content: task_summary_content,
+            created_by: task.agent_type,
+            session_id: self.session_id.clone(),
+            created_at: SystemTime::now(),
+            tags: vec![
+                "task_summary".to_string(),
+                "subagent".to_string(),
+                task.agent_type.to_string(),
+            ],
+            context_type: ContextType::Analysis,
+            related_files: results.modified_files.clone(),
+        };
+
+        self.add_context(task_summary_context)?;
 
         Ok(results)
     }
 
     /// Add a context to the context store
     pub fn add_context(&self, context: ContextItem) -> Result<()> {
-        let mut context_store = self.context_store.lock()
+        let mut context_store = self
+            .context_store
+            .lock()
             .map_err(|e| anyhow!("Failed to lock context store: {}", e))?;
 
-        context_store.add_context(context)
+        context_store
+            .add_context(context)
             .map_err(|e| anyhow!("Failed to add context: {}", e))?;
 
         Ok(())
@@ -179,7 +235,9 @@ impl OrchestratorAgent {
 
     /// Get context by ID
     pub fn get_context(&self, context_id: &str) -> Result<Option<ContextItem>> {
-        let context_store = self.context_store.lock()
+        let context_store = self
+            .context_store
+            .lock()
             .map_err(|e| anyhow!("Failed to lock context store: {}", e))?;
 
         Ok(context_store.get_context(context_id).cloned())
@@ -187,7 +245,9 @@ impl OrchestratorAgent {
 
     /// Search contexts by criteria
     pub fn search_contexts(&self, criteria: ContextSearchCriteria) -> Result<Vec<ContextItem>> {
-        let context_store = self.context_store.lock()
+        let context_store = self
+            .context_store
+            .lock()
             .map_err(|e| anyhow!("Failed to lock context store: {}", e))?;
 
         let mut results = Vec::new();
@@ -197,11 +257,21 @@ impl OrchestratorAgent {
         }
 
         if let Some(context_type) = criteria.context_type {
-            results.extend(context_store.find_by_type(context_type).into_iter().cloned());
+            results.extend(
+                context_store
+                    .find_by_type(context_type)
+                    .into_iter()
+                    .cloned(),
+            );
         }
 
         if let Some(agent_type) = criteria.created_by {
-            results.extend(context_store.find_by_creator(agent_type).into_iter().cloned());
+            results.extend(
+                context_store
+                    .find_by_creator(agent_type)
+                    .into_iter()
+                    .cloned(),
+            );
         }
 
         if let Some(files) = criteria.related_files {
@@ -217,23 +287,35 @@ impl OrchestratorAgent {
 
     /// Get task status
     pub fn get_task_status(&self, task_id: &str) -> Result<Option<TaskStatus>> {
-        let task_manager = self.task_manager.lock()
+        let task_manager = self
+            .task_manager
+            .lock()
             .map_err(|e| anyhow!("Failed to lock task manager: {}", e))?;
 
-        Ok(task_manager.get_task(task_id).map(|task| task.status.clone()))
+        Ok(task_manager
+            .get_task(task_id)
+            .map(|task| task.status.clone()))
     }
 
     /// Get all pending tasks
     pub fn get_pending_tasks(&self) -> Result<Vec<Task>> {
-        let task_manager = self.task_manager.lock()
+        let task_manager = self
+            .task_manager
+            .lock()
             .map_err(|e| anyhow!("Failed to lock task manager: {}", e))?;
 
-        Ok(task_manager.get_pending_tasks().into_iter().cloned().collect())
+        Ok(task_manager
+            .get_pending_tasks()
+            .into_iter()
+            .cloned()
+            .collect())
     }
 
     /// Get contexts relevant to a task
     fn get_contexts_for_task(&self, task: &Task) -> Result<Vec<ContextItem>> {
-        let context_store = self.context_store.lock()
+        let context_store = self
+            .context_store
+            .lock()
             .map_err(|e| anyhow!("Failed to lock context store: {}", e))?;
 
         let mut contexts = Vec::new();
@@ -287,10 +369,19 @@ impl OrchestratorAgent {
     }
 
     /// Execute orchestrator with LLM call
-    pub async fn execute_orchestrator(&mut self, request: &GenerateContentRequest) -> Result<serde_json::Value> {
-        let primary_model = self.config.orchestrator_model.parse::<ModelId>()
+    pub async fn execute_orchestrator(
+        &mut self,
+        request: &GenerateContentRequest,
+    ) -> Result<serde_json::Value> {
+        let primary_model = self
+            .config
+            .orchestrator_model
+            .parse::<ModelId>()
             .unwrap_or(ModelId::default_orchestrator());
-        let fallback_model = self.config.subagent_model.parse::<ModelId>()
+        let fallback_model = self
+            .config
+            .subagent_model
+            .parse::<ModelId>()
             .unwrap_or(ModelId::default_subagent());
 
         // First attempt with primary model (orchestrator model)
@@ -312,18 +403,34 @@ impl OrchestratorAgent {
 
                     // Check if response is empty or invalid
                     if is_empty_response(&response_json) {
-                        last_error = Some(anyhow!("Empty or invalid response from orchestrator model {}", primary_model.as_str()));
-                        eprintln!("Empty response from {}, attempt {} failed", primary_model.as_str(), attempt + 1);
+                        last_error = Some(anyhow!(
+                            "Empty or invalid response from orchestrator model {}",
+                            primary_model.as_str()
+                        ));
+                        eprintln!(
+                            "Empty response from {}, attempt {} failed",
+                            primary_model.as_str(),
+                            attempt + 1
+                        );
                     } else {
                         if attempt > 0 {
-                            eprintln!("Orchestrator succeeded on attempt {} with model {}", attempt + 1, primary_model.as_str());
+                            eprintln!(
+                                "Orchestrator succeeded on attempt {} with model {}",
+                                attempt + 1,
+                                primary_model.as_str()
+                            );
                         }
                         return Ok(response_json);
                     }
                 }
                 Err(e) => {
                     last_error = Some(anyhow!("Orchestrator LLM call failed: {}", e));
-                    eprintln!("Attempt {} failed for orchestrator with model {}: {}", attempt + 1, primary_model.as_str(), e);
+                    eprintln!(
+                        "Attempt {} failed for orchestrator with model {}: {}",
+                        attempt + 1,
+                        primary_model.as_str(),
+                        e
+                    );
                 }
             }
 
@@ -348,14 +455,21 @@ impl OrchestratorAgent {
                 let response_json = serde_json::to_value(&response)?;
 
                 if is_empty_response(&response_json) {
-                    Err(anyhow!("Fallback model {} also returned empty response", fallback_model.as_str()))
+                    Err(anyhow!(
+                        "Fallback model {} also returned empty response",
+                        fallback_model.as_str()
+                    ))
                 } else {
                     eprintln!("Fallback model {} succeeded", fallback_model.as_str());
                     Ok(response_json)
                 }
             }
             Err(e) => {
-                eprintln!("Fallback model {} also failed: {}", fallback_model.as_str(), e);
+                eprintln!(
+                    "Fallback model {} also failed: {}",
+                    fallback_model.as_str(),
+                    e
+                );
                 Err(last_error.unwrap_or_else(|| anyhow!("All orchestrator attempts failed")))
             }
         }

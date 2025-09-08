@@ -2,9 +2,10 @@ pub mod errors;
 pub mod processor;
 
 pub use errors::StreamingError;
+pub use processor::{StreamingConfig, StreamingProcessor};
 
-use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
+use std::time::{Duration, Instant};
 
 /// Streaming metrics for monitoring and debugging
 #[derive(Debug, Clone, Default)]

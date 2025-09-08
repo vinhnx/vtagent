@@ -38,10 +38,17 @@ impl LLMClient for GeminiProvider {
                     .unwrap_or("")
                     .to_string();
 
+                // Extract usage information from the response
+                let usage = response.usage_metadata.as_ref().map(|metadata| Usage {
+                    prompt_tokens: metadata.prompt_token_count,
+                    completion_tokens: metadata.candidates_token_count,
+                    total_tokens: metadata.total_token_count,
+                });
+
                 Ok(LLMResponse {
                     content,
                     model: self.model.clone(),
-                    usage: None, // Gemini doesn't provide detailed usage in this simplified version
+                    usage,
                 })
             }
             Err(e) => Err(LLMError::ApiError(e.to_string())),

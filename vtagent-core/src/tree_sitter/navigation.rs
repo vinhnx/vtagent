@@ -44,13 +44,12 @@ pub struct NavigationContext {
 /// Reference information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReferenceInfo {
-    pub symbol_name: String,
-    pub position: Position,
-    pub kind: ReferenceKind,
+    pub symbol: SymbolInfo,
+    pub reference_type: ReferenceType,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ReferenceKind {
+pub enum ReferenceType {
     Definition,
     Declaration,
     Usage,
@@ -110,10 +109,21 @@ impl CodeNavigator {
     }
 
     /// Find all references to a symbol
-    pub fn find_references(&self, _symbol_name: &str) -> Vec<ReferenceInfo> {
-        // This would require a more sophisticated analysis
-        // For now, return a placeholder implementation
-        Vec::new()
+    pub fn find_references(&self, symbol_name: &str) -> Vec<ReferenceInfo> {
+        // Search through all symbols to find references to the given symbol name
+        self.symbol_map
+            .values()
+            .filter(|symbol| {
+                // Check if this symbol references the target symbol
+                // Since the SymbolInfo struct doesn't have a references field,
+                // we'll look for symbols with the same name in different scopes
+                symbol.name == symbol_name
+            })
+            .map(|symbol| ReferenceInfo {
+                symbol: symbol.clone(),
+                reference_type: ReferenceType::Usage, // Default to usage, could be refined
+            })
+            .collect()
     }
 
     /// Get symbol information at position

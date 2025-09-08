@@ -2,6 +2,7 @@
 
 use crate::gemini::{Content, FunctionResponse, GenerateContentRequest, Part};
 use crate::llm::make_client;
+use crate::models::ModelId;
 use crate::types::AgentConfig;
 use anyhow::Result;
 use console::style;
@@ -161,7 +162,11 @@ Focus on: key decisions, actions taken, current state, and user requirements."#,
         )),
     };
 
-    let mut client = make_client(config.api_key.clone(), config.model.clone());
+    let model_id = config
+        .model
+        .parse::<ModelId>()
+        .map_err(|_| anyhow::anyhow!("Invalid model: {}", config.model))?;
+    let mut client = make_client(config.api_key.clone(), model_id);
     println!("{}", style("Compressing conversation...").cyan());
 
     let compressed_response = client.generate_content(&compression_request).await?;

@@ -86,14 +86,14 @@ fn get_api_key_with_fallback(
             return Ok(key);
         }
     }
-    
+
     // Then try configuration file value
     if let Some(key) = config_value {
         if !key.is_empty() {
             return Ok(key.clone());
         }
     }
-    
+
     // If neither worked, return an error
     Err(anyhow::anyhow!(
         "No API key found for {} provider. Set {} environment variable or configure in vtagent.toml",
@@ -110,21 +110,21 @@ fn get_gemini_api_key(sources: &ApiKeySources) -> Result<String> {
             return Ok(key);
         }
     }
-    
+
     // Try Google API key as fallback (for backward compatibility)
     if let Ok(key) = env::var("GOOGLE_API_KEY") {
         if !key.is_empty() {
             return Ok(key);
         }
     }
-    
+
     // Try configuration file value
     if let Some(key) = &sources.gemini_config {
         if !key.is_empty() {
             return Ok(key.clone());
         }
     }
-    
+
     // If nothing worked, return an error
     Err(anyhow::anyhow!(
         "No API key found for Gemini provider. Set {} or GOOGLE_API_KEY environment variable or configure in vtagent.toml",
@@ -137,7 +137,7 @@ fn get_anthropic_api_key(sources: &ApiKeySources) -> Result<String> {
     get_api_key_with_fallback(
         &sources.anthropic_env,
         sources.anthropic_config.as_ref(),
-        "Anthropic"
+        "Anthropic",
     )
 }
 
@@ -146,7 +146,7 @@ fn get_openai_api_key(sources: &ApiKeySources) -> Result<String> {
     get_api_key_with_fallback(
         &sources.openai_env,
         sources.openai_config.as_ref(),
-        "OpenAI"
+        "OpenAI",
     )
 }
 
@@ -159,16 +159,16 @@ mod tests {
     fn test_get_gemini_api_key_from_env() {
         // Set environment variable
         env::set_var("TEST_GEMINI_KEY", "test-gemini-key");
-        
+
         let sources = ApiKeySources {
             gemini_env: "TEST_GEMINI_KEY".to_string(),
             ..Default::default()
         };
-        
+
         let result = get_gemini_api_key(&sources);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "test-gemini-key");
-        
+
         // Clean up
         env::remove_var("TEST_GEMINI_KEY");
     }
@@ -177,16 +177,16 @@ mod tests {
     fn test_get_anthropic_api_key_from_env() {
         // Set environment variable
         env::set_var("TEST_ANTHROPIC_KEY", "test-anthropic-key");
-        
+
         let sources = ApiKeySources {
             anthropic_env: "TEST_ANTHROPIC_KEY".to_string(),
             ..Default::default()
         };
-        
+
         let result = get_anthropic_api_key(&sources);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "test-anthropic-key");
-        
+
         // Clean up
         env::remove_var("TEST_ANTHROPIC_KEY");
     }
@@ -195,16 +195,16 @@ mod tests {
     fn test_get_openai_api_key_from_env() {
         // Set environment variable
         env::set_var("TEST_OPENAI_KEY", "test-openai-key");
-        
+
         let sources = ApiKeySources {
             openai_env: "TEST_OPENAI_KEY".to_string(),
             ..Default::default()
         };
-        
+
         let result = get_openai_api_key(&sources);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "test-openai-key");
-        
+
         // Clean up
         env::remove_var("TEST_OPENAI_KEY");
     }
@@ -215,7 +215,7 @@ mod tests {
             gemini_config: Some("config-gemini-key".to_string()),
             ..Default::default()
         };
-        
+
         let result = get_gemini_api_key(&sources);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "config-gemini-key");
@@ -225,17 +225,17 @@ mod tests {
     fn test_get_api_key_with_fallback_prefers_env() {
         // Set environment variable
         env::set_var("TEST_FALLBACK_KEY", "env-key");
-        
+
         let sources = ApiKeySources {
             openai_env: "TEST_FALLBACK_KEY".to_string(),
             openai_config: Some("config-key".to_string()),
             ..Default::default()
         };
-        
+
         let result = get_openai_api_key(&sources);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "env-key"); // Should prefer env var
-        
+
         // Clean up
         env::remove_var("TEST_FALLBACK_KEY");
     }
@@ -247,7 +247,7 @@ mod tests {
             openai_config: Some("config-key".to_string()),
             ..Default::default()
         };
-        
+
         let result = get_openai_api_key(&sources);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "config-key");
@@ -259,7 +259,7 @@ mod tests {
             openai_env: "NONEXISTENT_ENV_VAR".to_string(),
             ..Default::default()
         };
-        
+
         let result = get_openai_api_key(&sources);
         assert!(result.is_err());
     }

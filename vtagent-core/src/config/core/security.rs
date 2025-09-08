@@ -44,5 +44,9 @@ impl Default for SecurityConfig {
     }
 }
 
-fn default_true() -> bool { true }
-fn default_max_file_size_mb() -> u64 { 50 }
+fn default_true() -> bool {
+    true
+}
+fn default_max_file_size_mb() -> u64 {
+    50
+}

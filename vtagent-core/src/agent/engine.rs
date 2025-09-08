@@ -127,15 +127,27 @@ impl CompactionEngine {
         Ok(key_info)
     }
 
-    /// Get compaction suggestions (minimal implementation)
+    /// Get compaction suggestions
     pub async fn get_compaction_suggestions(
         &self,
     ) -> Result<Vec<crate::agent::compaction::CompactionSuggestion>> {
-        Ok(Vec::new()) // Minimal implementation
+        // In a real implementation, this would analyze the conversation history
+        // and suggest which messages could be compacted based on various factors:
+        // - Age of the message
+        // - Importance/relevance to current context
+        // - Size of the message
+        // - Semantic similarity to other messages
+
+        // For now, we'll return an empty vector as this is a complex feature
+        // that would require sophisticated analysis
+        Ok(Vec::new())
     }
 
-    /// Get statistics (minimal implementation)
+    /// Get statistics
     pub async fn get_statistics(&self) -> Result<crate::agent::compaction::CompactionStatistics> {
+        // In a real implementation, this would collect and return actual statistics
+        // about the compaction engine's performance and the state of messages
+
         Ok(crate::agent::compaction::CompactionStatistics {
             total_messages: 0,
             messages_by_priority: std::collections::HashMap::new(),
@@ -146,15 +158,26 @@ impl CompactionEngine {
         })
     }
 
-    /// Check if should compact (minimal implementation)
+    /// Check if should compact
     pub async fn should_compact(&self) -> Result<bool> {
-        Ok(false) // Minimal implementation
+        // In a real implementation, this would check various conditions to determine
+        // if compaction is needed:
+        // - Total message count
+        // - Memory usage
+        // - Time since last compaction
+        // - Context window limits
+
+        // For now, we'll return false as this is a minimal implementation
+        Ok(false)
     }
 
-    /// Compact messages intelligently (minimal implementation)
+    /// Compact messages intelligently
     pub async fn compact_messages_intelligently(
         &self,
     ) -> Result<crate::agent::compaction::CompactionResult> {
+        // In a real implementation, this would perform intelligent compaction
+        // by analyzing message importance, semantic content, and context relevance
+
         Ok(crate::agent::compaction::CompactionResult {
             messages_processed: 0,
             messages_compacted: 0,
@@ -165,12 +188,15 @@ impl CompactionEngine {
         })
     }
 
-    /// Compact context (minimal implementation)
+    /// Compact context
     pub async fn compact_context(
         &self,
         _context_key: &str,
         _context_data: &mut std::collections::HashMap<String, serde_json::Value>,
     ) -> Result<crate::agent::compaction::CompactionResult> {
+        // In a real implementation, this would compact the context data
+        // by removing redundant information and summarizing where appropriate
+
         Ok(crate::agent::compaction::CompactionResult {
             messages_processed: 0,
             messages_compacted: 0,

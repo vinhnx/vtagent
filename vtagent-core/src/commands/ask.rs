@@ -2,13 +2,18 @@
 
 use crate::gemini::{Content, GenerateContentRequest};
 use crate::llm::make_client;
+use crate::models::ModelId;
 use crate::prompts::generate_lightweight_instruction;
 use crate::types::AgentConfig;
 use anyhow::Result;
 
 /// Handle the ask command - single prompt without tools
 pub async fn handle_ask_command(config: AgentConfig, prompt: Vec<String>) -> Result<()> {
-    let mut client = make_client(config.api_key.clone(), config.model.clone());
+    let model_id = config
+        .model
+        .parse::<ModelId>()
+        .map_err(|_| anyhow::anyhow!("Invalid model: {}", config.model))?;
+    let mut client = make_client(config.api_key.clone(), model_id);
     let prompt_text = prompt.join(" ");
 
     if config.verbose {

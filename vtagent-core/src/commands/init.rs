@@ -323,10 +323,16 @@ fn extract_package_dependencies(analysis: &mut ProjectAnalysis, content: &str) {
 }
 
 /// Check if files contain a specific pattern
-fn files_contain_pattern(_analysis: &ProjectAnalysis, _pattern: &str) -> bool {
+fn files_contain_pattern(analysis: &ProjectAnalysis, pattern: &str) -> bool {
     // This is a simplified implementation
     // In a real implementation, you'd scan actual files for patterns
-    true // Placeholder
+    // For now, we'll implement a basic check
+    analysis.source_dirs.iter().any(|dir| dir.contains(pattern))
+        || analysis
+            .config_files
+            .iter()
+            .any(|file| file.contains(pattern))
+        || analysis.languages.iter().any(|lang| lang.contains(pattern))
 }
 
 /// Analyze git history to detect commit message patterns

@@ -31,12 +31,14 @@ The agent follows proven patterns for reliable, long-running coding assistance:
 
 // Public modules
 pub mod agent;
+pub mod api_keys;
 pub mod apply_patch;
 pub mod ast_grep;
 pub mod cli;
 pub mod code_completion;
 pub mod commands;
 pub mod config;
+pub mod constants;
 pub mod conversation_summarizer;
 pub mod decision_tracker;
 pub mod diff_renderer;
@@ -52,13 +54,13 @@ pub mod prompts;
 pub mod rp_search;
 pub mod safety;
 pub mod timeout_detector;
+pub mod tool_policy;
 pub mod tools;
 pub mod tree_sitter;
 pub mod types;
 pub mod user_confirmation;
 pub mod utils;
 pub mod vtagentgitignore;
-pub mod api_keys;
 
 // Re-exports for convenience
 pub use agent::core::Agent;
@@ -68,14 +70,20 @@ pub use commands::stats::handle_stats_command;
 pub use config::{AgentConfig, VTAgentConfig};
 pub use diff_renderer::DiffRenderer;
 pub use gemini::{Content, FunctionDeclaration, Part};
-pub use llm::{make_client, AnyClient};
+pub use llm::{AnyClient, make_client};
 pub use performance_profiler::PerformanceProfiler;
-pub use prompts::{generate_system_instruction, generate_specialized_instruction, generate_lightweight_instruction};
+pub use prompts::{
+    generate_lightweight_instruction, generate_specialized_instruction, generate_system_instruction,
+};
 pub use rp_search::RpSearchManager;
 pub use timeout_detector::TimeoutDetector;
+pub use tool_policy::{ToolPolicy, ToolPolicyManager};
 pub use tools::{ToolRegistry, build_function_declarations, build_function_declarations_for_level};
 pub use tree_sitter::TreeSitterAnalyzer;
-pub use types::{SessionInfo, ToolConfig, ContextConfig, LoggingConfig, CommandResult, AnalysisDepth, OutputFormat, CompressionLevel, PerformanceMetrics, CapabilityLevel};
+pub use types::{
+    AnalysisDepth, CapabilityLevel, CommandResult, CompressionLevel, ContextConfig, LoggingConfig,
+    OutputFormat, PerformanceMetrics, SessionInfo, ToolConfig,
+};
 pub use vtagentgitignore::initialize_vtagent_gitignore;
 
 #[cfg(test)]

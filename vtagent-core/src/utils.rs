@@ -224,7 +224,11 @@ pub fn summarize_workspace_languages(root: &std::path::Path) -> Option<String> {
 }
 
 /// Safe text replacement with validation
-pub fn safe_replace_text(content: &str, old_str: &str, new_str: &str) -> Result<String, anyhow::Error> {
+pub fn safe_replace_text(
+    content: &str,
+    old_str: &str,
+    new_str: &str,
+) -> Result<String, anyhow::Error> {
     if old_str.is_empty() {
         return Err(anyhow::anyhow!("old_string cannot be empty"));
     }

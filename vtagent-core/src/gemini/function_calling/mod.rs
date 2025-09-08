@@ -18,7 +18,10 @@ pub struct FunctionResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionCallingConfig {
     pub mode: String,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "allowedFunctionNames")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        rename = "allowedFunctionNames"
+    )]
     pub allowed_function_names: Option<Vec<String>>,
 }
 
@@ -29,14 +32,14 @@ impl FunctionCallingConfig {
             allowed_function_names: None,
         }
     }
-    
+
     pub fn none() -> Self {
         Self {
             mode: "NONE".to_string(),
             allowed_function_names: None,
         }
     }
-    
+
     pub fn any() -> Self {
         Self {
             mode: "ANY".to_string(),

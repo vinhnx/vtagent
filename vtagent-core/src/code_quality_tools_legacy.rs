@@ -401,13 +401,27 @@ impl CodeQualityManager {
     }
 
     /// Discover files that need formatting
-    async fn discover_files_for_formatting(&self, _root_path: &Path) -> Result<Vec<PathBuf>> {
-        let files = Vec::new();
+    async fn discover_files_for_formatting(&self, root_path: &Path) -> Result<Vec<PathBuf>> {
+        use walkdir::WalkDir;
+        
+        let mut files = Vec::new();
 
         for format_config in self.format_configs.values() {
-            for _ext in &format_config.file_extensions {
-                // This would need to be implemented with a file discovery utility
-                // For now, return empty vec as placeholder
+            for ext in &format_config.file_extensions {
+                // Walk the directory tree and find files with the matching extension
+                for entry in WalkDir::new(root_path)
+                    .follow_links(true)
+                    .into_iter()
+                    .filter_map(|e| e.ok())
+                {
+                    if entry.file_type().is_file() {
+                        if let Some(entry_ext) = entry.path().extension() {
+                            if entry_ext == *ext {
+                                files.push(entry.path().to_path_buf());
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -415,15 +429,31 @@ impl CodeQualityManager {
     }
 
     /// Discover files that need linting
-    async fn discover_files_for_linting(&self, _root_path: &Path) -> Result<Vec<PathBuf>> {
-        let files = Vec::new();
+    async fn discover_files_for_linting(&self, root_path: &Path) -> Result<Vec<PathBuf>> {
+        use walkdir::WalkDir;
+        
+        let mut files = Vec::new();
+        let mut seen_files = std::collections::HashSet::new();
 
         for lint_config in self.lint_configs.values() {
-            for format_config in self.format_configs.values() {
-                if format_config.language == lint_config.language {
-                    for _ext in &format_config.file_extensions {
-                        // This would need to be implemented with a file discovery utility
-                        // For now, return empty vec as placeholder
+            // Find the format config for the same language
+            if let Some(format_config) = self.format_configs.values()
+                .find(|format_cfg| format_cfg.language == lint_config.language) {
+                for ext in &format_config.file_extensions {
+                    // Walk the directory tree and find files with the matching extension
+                    for entry in WalkDir::new(root_path)
+                        .follow_links(true)
+                        .into_iter()
+                        .filter_map(|e| e.ok())
+                    {
+                        if entry.file_type().is_file() {
+                            if let Some(entry_ext) = entry.path().extension() {
+                                if entry_ext == *ext && !seen_files.contains(entry.path()) {
+                                    files.push(entry.path().to_path_buf());
+                                    seen_files.insert(entry.path().to_path_buf());
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -437,24 +467,104 @@ impl CodeQualityManager {
         &self,
         output: &[u8],
         file_path: &Path,
-        _tool_name: &str,
+        tool_name: &str,
     ) -> Result<Vec<LintFinding>> {
         let output_str = String::from_utf8_lossy(output);
         let mut findings = Vec::new();
 
-        // This is a placeholder implementation
-        // Real implementation would parse the specific output format of each linter
-        for line in output_str.lines() {
-            if !line.trim().is_empty() {
-                findings.push(LintFinding {
-                    file_path: file_path.to_path_buf(),
-                    line: 1,
-                    column: 1,
-                    severity: LintSeverity::Warning,
-                    rule: "placeholder".to_string(),
-                    message: line.to_string(),
-                    suggestion: None,
-                });
+        // Parse based on the specific tool
+        match tool_name {
+            "eslint" => {
+                // ESLint JSON format
+                if let Ok(eslint_results) = serde_json::from_str::<Vec<serde_json::Value>>(&output_str) {
+                    for result in eslint_results {
+                        if let Some(messages) = result.get("messages").and_then(|m| m.as_array()) {
+                            for message in messages {
+                                if let (Some(line), Some(message_str)) = (
+                                    message.get("line").and_then(|l| l.as_u64()),
+                                    message.get("message").and_then(|m| m.as_str()),
+                                ) {
+                                    let severity = match message.get("severity").and_then(|s| s.as_u64()).unwrap_or(1) {
+                                        2 => LintSeverity::Error,
+                                        1 => LintSeverity::Warning,
+                                        _ => LintSeverity::Info,
+                                    };
+                                    
+                                    let rule = message.get("ruleId")
+                                        .and_then(|r| r.as_str())
+                                        .unwrap_or("unknown")
+                                        .to_string();
+                                    
+                                    findings.push(LintFinding {
+                                        file_path: file_path.to_path_buf(),
+                                        line: line as usize,
+                                        column: message.get("column").and_then(|c| c.as_u64()).unwrap_or(1) as usize,
+                                        severity,
+                                        rule,
+                                        message: message_str.to_string(),
+                                        suggestion: None,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Fallback to line-by-line parsing
+                    for line in output_str.lines() {
+                        if !line.trim().is_empty() {
+                            findings.push(LintFinding {
+                                file_path: file_path.to_path_buf(),
+                                line: 1,
+                                column: 1,
+                                severity: LintSeverity::Warning,
+                                rule: tool_name.to_string(),
+                                message: line.to_string(),
+                                suggestion: None,
+                            });
+                        }
+                    }
+                }
+            }
+            "clippy" => {
+                // Clippy format: file:line:col: severity: message
+                for line in output_str.lines() {
+                    if line.contains("warning:") || line.contains("error:") {
+                        let parts: Vec<&str> = line.split(':').collect();
+                        if parts.len() >= 4 {
+                            let severity = if line.contains("error:") {
+                                LintSeverity::Error
+                            } else {
+                                LintSeverity::Warning
+                            };
+                            
+                            findings.push(LintFinding {
+                                file_path: file_path.to_path_buf(),
+                                line: parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(1),
+                                column: parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(1),
+                                severity,
+                                rule: "clippy".to_string(),
+                                message: parts[4..].join(":").trim().to_string(),
+                                suggestion: None,
+                            });
+                        }
+                    }
+                }
+            }
+            _ => {
+                // Generic line-by-line parsing
+                for line in output_str.lines() {
+                    if !line.trim().is_empty() {
+                        findings.push(LintFinding {
+                            file_path: file_path.to_path_buf(),
+                            line: 1,
+                            column: 1,
+                            severity: LintSeverity::Warning,
+                            rule: tool_name.to_string(),
+                            message: line.to_string(),
+                            suggestion: None,
+                        });
+                    }
+                }
             }
         }
 
@@ -482,19 +592,87 @@ impl CodeQualityManager {
     /// Calculate comprehensive code quality metrics
     async fn calculate_quality_metrics(
         &self,
-        _root_path: &Path,
+        root_path: &Path,
         format_result: &FormatResult,
         lint_result: &LintResult,
     ) -> Result<CodeQualityMetrics> {
+        use walkdir::WalkDir;
+        
+        // Calculate actual complexity metrics
+        let mut total_lines = 0;
+        let mut total_functions = 0;
+        let mut total_files = 0;
+        
+        // Walk the directory to count lines and files
+        for entry in WalkDir::new(root_path)
+            .follow_links(true)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            if entry.file_type().is_file() {
+                if let Some(ext) = entry.path().extension() {
+                    // Check if this is a source code file
+                    let source_extensions = ["rs", "js", "ts", "py", "java", "cpp", "c", "go"];
+                    if source_extensions.contains(&ext.to_str().unwrap_or("")) {
+                        total_files += 1;
+                        // Try to read the file and count lines
+                        if let Ok(content) = std::fs::read_to_string(entry.path()) {
+                            total_lines += content.lines().count();
+                            // Simple function counting (this is a very basic approximation)
+                            total_functions += content.matches("fn ").count() + 
+                                             content.matches("function ").count() + 
+                                             content.matches("def ").count();
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Calculate complexity score based on lines of code and functions
+        let complexity_score = if total_functions > 0 {
+            (total_lines as f64 / total_functions as f64).min(20.0) // Cap at 20
+        } else {
+            5.0 // Default if no functions found
+        };
+        
+        // Calculate maintainability index (simplified)
+        let maintainability_index = (171.0 - 5.2 * (total_lines as f64).ln() - 0.23 * (lint_result.errors as f64) - 16.2 * (total_files as f64).ln())
+            .max(0.0)
+            .min(100.0);
+        
+        // Estimate test coverage (very simplified)
+        let test_coverage = {
+            let mut test_files = 0;
+            for entry in WalkDir::new(root_path)
+                .follow_links(true)
+                .into_iter()
+                .filter_map(|e| e.ok())
+            {
+                if entry.file_type().is_file() {
+                    if let Some(file_name) = entry.path().file_name().and_then(|n| n.to_str()) {
+                        if file_name.contains("test") || file_name.contains("spec") {
+                            test_files += 1;
+                        }
+                    }
+                }
+            }
+            
+            if total_files > 0 {
+                Some((test_files as f64 / total_files as f64) * 100.0)
+            } else {
+                Some(0.0)
+            }
+        };
+
         Ok(CodeQualityMetrics {
             total_files: format_result.total_files.max(lint_result.total_files),
             formatted_files: format_result.formatted_files,
             lint_errors: lint_result.errors,
             lint_warnings: lint_result.warnings,
             lint_info: lint_result.info,
-            complexity_score: 5.0,       // Placeholder
-            maintainability_index: 75.0, // Placeholder
-            test_coverage: Some(85.0),   // Placeholder
+            complexity_score,
+            maintainability_index,
+            test_coverage,
         })
     }
 

@@ -1,13 +1,16 @@
-pub mod provider;
-pub mod factory;
 pub mod client;
+pub mod factory;
+pub mod provider;
 pub mod providers;
 
 // Re-export main types
-pub use provider::{LLMProvider, LLMRequest, LLMResponse, LLMError, Message, MessageRole, ToolDefinition, ToolCall, Usage, FinishReason};
-pub use factory::{LLMFactory, create_provider_for_model};
 pub use client::UnifiedLLMClient;
-pub use providers::{GeminiProvider, OpenAIProvider, AnthropicProvider};
+pub use factory::{LLMFactory, create_provider_for_model};
+pub use provider::{
+    FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
+    ToolDefinition, Usage,
+};
+pub use providers::{AnthropicProvider, GeminiProvider, OpenAIProvider};
 
 // Backward compatibility
 use crate::models::ModelId;
@@ -48,14 +51,51 @@ impl AnyClient {
 
     pub async fn generate_content(
         &mut self,
-        _req: &crate::gemini::GenerateContentRequest,
+        req: &crate::gemini::GenerateContentRequest,
     ) -> anyhow::Result<crate::gemini::GenerateContentResponse> {
-        // Simplified implementation for compilation
-        Ok(crate::gemini::GenerateContentResponse {
-            candidates: vec![],
-            usage_metadata: None,
-            prompt_feedback: None,
-        })
+        match self {
+            AnyClient::Universal(client) => {
+                // Convert the Gemini request to the unified format
+                let prompt = req
+                    .contents
+                    .iter()
+                    .map(|c| {
+                        c.parts
+                            .iter()
+                            .map(|p| p.to_string())
+                            .collect::<Vec<_>>()
+                            .join("")
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+
+                match client.generate(&prompt).await {
+                    Ok(response) => {
+                        // Convert back to Gemini format for compatibility
+                        Ok(crate::gemini::GenerateContentResponse {
+                            candidates: vec![crate::gemini::Candidate {
+                                content: crate::gemini::Content {
+                                    parts: vec![crate::gemini::Part::Text(response.content)],
+                                    role: crate::gemini::Role::Model,
+                                },
+                                finish_reason: Some(crate::gemini::FinishReason::Stop),
+                                index: 0,
+                                safety_ratings: vec![],
+                            }],
+                            usage_metadata: response.usage.map(|u| crate::gemini::UsageMetadata {
+                                prompt_token_count: u.prompt_tokens,
+                                candidates_token_count: u.completion_tokens,
+                                total_token_count: u.total_tokens,
+                                cached_content_token_count: 0,
+                            }),
+                            prompt_feedback: None,
+                        })
+                    }
+                    Err(e) => Err(anyhow::anyhow!("LLM call failed: {}", e)),
+                }
+            }
+            AnyClient::Gemini(client) => client.generate_content(req).await,
+        }
     }
 }
 

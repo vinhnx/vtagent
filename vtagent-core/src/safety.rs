@@ -4,7 +4,7 @@
 //! or resource-intensive operations to ensure user control and efficiency.
 
 use crate::models::ModelId;
-use crate::user_confirmation::{UserConfirmation, AgentMode, TaskComplexity};
+use crate::user_confirmation::{AgentMode, TaskComplexity, UserConfirmation};
 use anyhow::Result;
 use console::style;
 
@@ -19,12 +19,12 @@ impl SafetyValidator {
         task_description: Option<&str>,
         skip_confirmations: bool,
     ) -> Result<String> {
+        use crate::constants::models;
         // Parse the requested model
         let model_id = match requested_model {
-            "gemini-2.5-pro" => Some(ModelId::Gemini25Pro),
-            "gemini-2.5-flash" => Some(ModelId::Gemini25Flash),
-            "gemini-2.5-flash-lite" => Some(ModelId::Gemini25FlashLite),
-            "gemini-2.0-flash" => Some(ModelId::Gemini20Flash),
+            s if s == models::GEMINI_2_5_PRO => Some(ModelId::Gemini25Pro),
+            s if s == models::GEMINI_2_5_FLASH => Some(ModelId::Gemini25Flash),
+            s if s == models::GEMINI_2_5_FLASH_LITE => Some(ModelId::Gemini25FlashLite),
             _ => None,
         };
 
@@ -33,7 +33,10 @@ impl SafetyValidator {
             let current_default = ModelId::default();
 
             if skip_confirmations {
-                println!("{}", style("Using Gemini 2.5 Pro model (confirmations skipped)").yellow());
+                println!(
+                    "{}",
+                    style("Using Gemini 2.5 Pro model (confirmations skipped)").yellow()
+                );
                 return Ok(requested_model.to_string());
             }
 
@@ -44,8 +47,12 @@ impl SafetyValidator {
             }
 
             // Ask for explicit confirmation before using the most capable model
-            let confirmed = UserConfirmation::confirm_pro_model_usage(current_default.as_str())?;            if !confirmed {
-                println!("Falling back to default model: {}", current_default.display_name());
+            let confirmed = UserConfirmation::confirm_pro_model_usage(current_default.as_str())?;
+            if !confirmed {
+                println!(
+                    "Falling back to default model: {}",
+                    current_default.display_name()
+                );
                 return Ok(current_default.as_str().to_string());
             }
         }
@@ -64,18 +71,28 @@ impl SafetyValidator {
         // Handle force multi-agent flag
         if force_multi_agent {
             if skip_confirmations {
-                println!("{}", style("Forcing multi-agent mode (confirmations skipped)").yellow());
+                println!(
+                    "{}",
+                    style("Forcing multi-agent mode (confirmations skipped)").yellow()
+                );
                 return Ok(AgentMode::MultiAgent);
             }
 
             let confirmed = UserConfirmation::confirm_multi_agent_usage(task_description)?;
-            return Ok(if confirmed { AgentMode::MultiAgent } else { AgentMode::SingleCoder });
+            return Ok(if confirmed {
+                AgentMode::MultiAgent
+            } else {
+                AgentMode::SingleCoder
+            });
         }
 
         // If multi-agent is explicitly requested, ask for confirmation
         if requested_multi_agent {
             if skip_confirmations {
-                println!("{}", style("Using multi-agent mode (confirmations skipped)").yellow());
+                println!(
+                    "{}",
+                    style("Using multi-agent mode (confirmations skipped)").yellow()
+                );
                 return Ok(AgentMode::MultiAgent);
             }
 
@@ -91,7 +108,10 @@ impl SafetyValidator {
 
         // For auto mode, assess task complexity and recommend
         if skip_confirmations {
-            println!("{}", style("Using single coder agent (confirmations skipped)").yellow());
+            println!(
+                "{}",
+                style("Using single coder agent (confirmations skipped)").yellow()
+            );
             return Ok(AgentMode::SingleCoder);
         }
 
@@ -101,26 +121,40 @@ impl SafetyValidator {
         match complexity {
             TaskComplexity::Complex => {
                 // For complex tasks, offer multi-agent but don't force it
-                println!("{}", style("Complex task detected - Multi-agent mode recommended").blue().bold());
+                println!(
+                    "{}",
+                    style("Complex task detected - Multi-agent mode recommended")
+                        .blue()
+                        .bold()
+                );
 
                 let confirmed = UserConfirmation::confirm_multi_agent_usage(task_description)?;
 
                 if confirmed {
                     Ok(AgentMode::MultiAgent)
                 } else {
-                    println!("{}", style("Using single coder agent for complex task").yellow());
+                    println!(
+                        "{}",
+                        style("Using single coder agent for complex task").yellow()
+                    );
                     Ok(AgentMode::SingleCoder)
                 }
-            },
+            }
             TaskComplexity::Moderate => {
                 // For moderate tasks, default to single agent but offer choice
-                println!("{}", style("Moderate task - Single agent recommended").green());
+                println!(
+                    "{}",
+                    style("Moderate task - Single agent recommended").green()
+                );
                 println!("Single coder agent should handle this efficiently.");
                 Ok(AgentMode::SingleCoder)
-            },
+            }
             TaskComplexity::Simple => {
                 // For simple tasks, always use single agent
-                println!("{}", style("Simple task - Using single coder agent").green());
+                println!(
+                    "{}",
+                    style("Simple task - Using single coder agent").green()
+                );
                 Ok(AgentMode::SingleCoder)
             }
         }
@@ -135,7 +169,7 @@ impl SafetyValidator {
             (Some(from), Some(to)) => {
                 // Switching to Pro model requires confirmation
                 !matches!(to, ModelId::Gemini25Pro) || matches!(from, ModelId::Gemini25Pro)
-            },
+            }
             _ => true, // Unknown models are allowed
         }
     }
@@ -157,26 +191,27 @@ impl SafetyValidator {
         println!();
 
         // Model-specific recommendations
+        use crate::constants::models;
         match model {
-            "gemini-2.5-pro" => {
+            s if s == models::GEMINI_2_5_PRO => {
                 println!("{}", style("Using most capable model:").yellow());
                 println!("• Highest quality responses");
                 println!("• Higher cost per token");
                 println!("• Slower response times");
-            },
-            "gemini-2.5-flash" => {
+            }
+            s if s == models::GEMINI_2_5_FLASH => {
                 println!("{}", style("⚡ Using balanced model:").green());
                 println!("• Good quality responses");
                 println!("• Reasonable cost");
                 println!("• Fast response times");
-            },
-            "gemini-2.5-flash-lite" => {
+            }
+            s if s == models::GEMINI_2_5_FLASH_LITE => {
                 println!("{}", style("Using fast model:").blue());
                 println!("• Quick responses");
                 println!("• Most cost-effective");
                 println!("• Good for simple tasks");
-            },
-            _ => {},
+            }
+            _ => {}
         }
 
         // Agent mode recommendations
@@ -187,14 +222,14 @@ impl SafetyValidator {
                 println!("• Lower API costs");
                 println!("• Faster task completion");
                 println!("• Best for most development tasks");
-            },
+            }
             AgentMode::MultiAgent => {
                 println!("{}", style("Multi-Agent System:").blue());
                 println!("• Specialized expertise");
                 println!("• Parallel task execution");
                 println!("• Enhanced verification");
                 println!("• Higher resource usage");
-            },
+            }
         }
 
         println!();
@@ -206,10 +241,11 @@ impl SafetyValidator {
         agent_mode: &AgentMode,
         estimated_tokens: Option<usize>,
     ) -> Result<bool> {
+        use crate::constants::models;
         let mut warnings = Vec::new();
 
         // Check for expensive model usage
-        if model == "gemini-2.5-pro" {
+        if model == models::GEMINI_2_5_PRO {
             warnings.push("Using most expensive model (Gemini 2.5 Pro)");
         }
 
@@ -248,11 +284,11 @@ impl SafetyValidator {
 impl ModelId {
     /// Parse a model string into a ModelId
     pub fn from_str(s: &str) -> Result<Self, &'static str> {
+        use crate::constants::models;
         match s {
-            "gemini-2.5-flash-lite" => Ok(ModelId::Gemini25FlashLite),
-            "gemini-2.5-flash" => Ok(ModelId::Gemini25Flash),
-            "gemini-2.5-pro" => Ok(ModelId::Gemini25Pro),
-            "gemini-2.0-flash" => Ok(ModelId::Gemini20Flash),
+            s if s == models::GEMINI_2_5_FLASH_LITE => Ok(ModelId::Gemini25FlashLite),
+            s if s == models::GEMINI_2_5_FLASH => Ok(ModelId::Gemini25Flash),
+            s if s == models::GEMINI_2_5_PRO => Ok(ModelId::Gemini25Pro),
             _ => Err("Unknown model"),
         }
     }

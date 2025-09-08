@@ -1,10 +1,10 @@
 //! File operation tools with composable functionality
 
-use super::traits::{Tool, FileTool, ModeTool, CacheableTool};
+use super::traits::{CacheableTool, FileTool, ModeTool, Tool};
 use super::types::*;
 use crate::rp_search::RpSearchManager;
 use crate::vtagentgitignore::should_exclude_file;
-use anyhow::{Result, anyhow, Context};
+use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
@@ -28,9 +28,12 @@ impl FileOpsTool {
     /// Execute basic directory listing
     async fn execute_basic_list(&self, input: &ListInput) -> Result<Value> {
         let base = self.workspace_root.join(&input.path);
-        
+
         if self.should_exclude(&base).await {
-            return Err(anyhow!("Path '{}' is excluded by .vtagentgitignore", input.path));
+            return Err(anyhow!(
+                "Path '{}' is excluded by .vtagentgitignore",
+                input.path
+            ));
         }
 
         let mut items = Vec::new();
@@ -49,14 +52,20 @@ impl FileOpsTool {
         } else if base.is_dir() {
             let mut entries = tokio::fs::read_dir(&base).await?;
             while let Some(entry) = entries.next_entry().await? {
-                if count >= input.max_items { break; }
-                
+                if count >= input.max_items {
+                    break;
+                }
+
                 let path = entry.path();
                 let name = entry.file_name().to_string_lossy().to_string();
-                
-                if !input.include_hidden && name.starts_with('.') { continue; }
-                if self.should_exclude(&path).await { continue; }
-                
+
+                if !input.include_hidden && name.starts_with('.') {
+                    continue;
+                }
+                if self.should_exclude(&path).await {
+                    continue;
+                }
+
                 let metadata = entry.metadata().await?;
                 items.push(json!({
                     "name": name,
@@ -79,39 +88,54 @@ impl FileOpsTool {
 
     /// Execute recursive file search
     async fn execute_recursive_search(&self, input: &ListInput) -> Result<Value> {
-        let pattern = input.name_pattern.as_ref().ok_or_else(|| anyhow!("name_pattern required for recursive mode"))?;
+        let pattern = input
+            .name_pattern
+            .as_ref()
+            .ok_or_else(|| anyhow!("name_pattern required for recursive mode"))?;
         let search_path = self.workspace_root.join(&input.path);
-        
+
         let mut items = Vec::new();
         let mut count = 0;
-        
+
         for entry in WalkDir::new(&search_path).max_depth(10) {
-            if count >= input.max_items { break; }
-            
+            if count >= input.max_items {
+                break;
+            }
+
             let entry = entry.map_err(|e| anyhow!("Walk error: {}", e))?;
             let path = entry.path();
-            
-            if self.should_exclude(path).await { continue; }
-            
+
+            if self.should_exclude(path).await {
+                continue;
+            }
+
             let name = path.file_name().unwrap_or_default().to_string_lossy();
-            if !input.include_hidden && name.starts_with('.') { continue; }
-            
+            if !input.include_hidden && name.starts_with('.') {
+                continue;
+            }
+
             // Pattern matching
             let matches = if input.case_sensitive.unwrap_or(true) {
                 name.contains(pattern)
             } else {
                 name.to_lowercase().contains(&pattern.to_lowercase())
             };
-            
+
             if matches {
                 // Extension filtering
                 if let Some(ref extensions) = input.file_extensions {
                     if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                        if !extensions.contains(&ext.to_string()) { continue; }
-                    } else { continue; }
+                        if !extensions.contains(&ext.to_string()) {
+                            continue;
+                        }
+                    } else {
+                        continue;
+                    }
                 }
-                
-                let metadata = entry.metadata().map_err(|e| anyhow!("Metadata error: {}", e))?;
+
+                let metadata = entry
+                    .metadata()
+                    .map_err(|e| anyhow!("Metadata error: {}", e))?;
                 items.push(json!({
                     "name": name,
                     "path": path.strip_prefix(&self.workspace_root).unwrap_or(path).to_string_lossy(),
@@ -122,7 +146,7 @@ impl FileOpsTool {
                 count += 1;
             }
         }
-        
+
         Ok(json!({
             "success": true,
             "items": items,
@@ -134,24 +158,31 @@ impl FileOpsTool {
 
     /// Execute find by exact name
     async fn execute_find_by_name(&self, input: &ListInput) -> Result<Value> {
-        let file_name = input.name_pattern.as_ref().ok_or_else(|| anyhow!("name_pattern required for find_name mode"))?;
+        let file_name = input
+            .name_pattern
+            .as_ref()
+            .ok_or_else(|| anyhow!("name_pattern required for find_name mode"))?;
         let search_path = self.workspace_root.join(&input.path);
-        
+
         for entry in WalkDir::new(&search_path).max_depth(10) {
             let entry = entry.map_err(|e| anyhow!("Walk error: {}", e))?;
             let path = entry.path();
-            
-            if self.should_exclude(path).await { continue; }
-            
+
+            if self.should_exclude(path).await {
+                continue;
+            }
+
             let name = path.file_name().unwrap_or_default().to_string_lossy();
             let matches = if input.case_sensitive.unwrap_or(true) {
                 name == file_name.as_str()
             } else {
                 name.to_lowercase() == file_name.to_lowercase()
             };
-            
+
             if matches {
-                let metadata = entry.metadata().map_err(|e| anyhow!("Metadata error: {}", e))?;
+                let metadata = entry
+                    .metadata()
+                    .map_err(|e| anyhow!("Metadata error: {}", e))?;
                 return Ok(json!({
                     "success": true,
                     "found": true,
@@ -163,7 +194,7 @@ impl FileOpsTool {
                 }));
             }
         }
-        
+
         Ok(json!({
             "success": true,
             "found": false,
@@ -174,29 +205,38 @@ impl FileOpsTool {
 
     /// Execute find by content pattern
     async fn execute_find_by_content(&self, input: &ListInput) -> Result<Value> {
-        let content_pattern = input.content_pattern.as_ref().ok_or_else(|| anyhow!("content_pattern required for find_content mode"))?;
-        
+        let content_pattern = input
+            .content_pattern
+            .as_ref()
+            .ok_or_else(|| anyhow!("content_pattern required for find_content mode"))?;
+
         // Simple content search implementation
         let search_path = self.workspace_root.join(&input.path);
         let mut items = Vec::new();
         let mut count = 0;
-        
+
         for entry in WalkDir::new(&search_path).max_depth(10) {
-            if count >= input.max_items { break; }
-            
+            if count >= input.max_items {
+                break;
+            }
+
             let entry = entry.map_err(|e| anyhow!("Walk error: {}", e))?;
             let path = entry.path();
-            
-            if !path.is_file() || self.should_exclude(path).await { continue; }
-            
+
+            if !path.is_file() || self.should_exclude(path).await {
+                continue;
+            }
+
             // Read file content and search for pattern
             if let Ok(content) = tokio::fs::read_to_string(path).await {
                 let matches = if input.case_sensitive.unwrap_or(true) {
                     content.contains(content_pattern)
                 } else {
-                    content.to_lowercase().contains(&content_pattern.to_lowercase())
+                    content
+                        .to_lowercase()
+                        .contains(&content_pattern.to_lowercase())
                 };
-                
+
                 if matches {
                     if let Ok(metadata) = tokio::fs::metadata(path).await {
                         items.push(json!({
@@ -211,7 +251,7 @@ impl FileOpsTool {
                 }
             }
         }
-        
+
         Ok(json!({
             "success": true,
             "items": items,
@@ -224,15 +264,15 @@ impl FileOpsTool {
     /// Read file with intelligent path resolution
     pub async fn read_file(&self, args: Value) -> Result<Value> {
         let input: Input = serde_json::from_value(args).context("invalid read_file args")?;
-        
+
         // Try to resolve the file path
         let potential_paths = self.resolve_file_path(&input.path)?;
-        
+
         for candidate_path in &potential_paths {
             if self.should_exclude(candidate_path).await {
                 continue;
             }
-            
+
             if candidate_path.exists() && candidate_path.is_file() {
                 let content = if let Some(max_bytes) = input.max_bytes {
                     let mut file_content = tokio::fs::read(candidate_path).await?;
@@ -243,7 +283,7 @@ impl FileOpsTool {
                 } else {
                     tokio::fs::read_to_string(candidate_path).await?
                 };
-                
+
                 return Ok(json!({
                     "success": true,
                     "content": content,
@@ -252,7 +292,7 @@ impl FileOpsTool {
                 }));
             }
         }
-        
+
         Err(anyhow!("File not found: {}", input.path))
     }
 
@@ -260,12 +300,12 @@ impl FileOpsTool {
     pub async fn write_file(&self, args: Value) -> Result<Value> {
         let input: WriteInput = serde_json::from_value(args).context("invalid write_file args")?;
         let file_path = self.workspace_root.join(&input.path);
-        
+
         // Create parent directories if needed
         if let Some(parent) = file_path.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
-        
+
         match input.mode.as_str() {
             "overwrite" => {
                 tokio::fs::write(&file_path, &input.content).await?;
@@ -291,7 +331,7 @@ impl FileOpsTool {
             }
             _ => return Err(anyhow!("Unsupported write mode: {}", input.mode)),
         }
-        
+
         Ok(json!({
             "success": true,
             "path": input.path,
@@ -303,17 +343,17 @@ impl FileOpsTool {
     /// Resolve file path with intelligent fallbacks
     fn resolve_file_path(&self, path: &str) -> Result<Vec<PathBuf>> {
         let mut paths = Vec::new();
-        
+
         // Try exact path first
         paths.push(self.workspace_root.join(path));
-        
+
         // If it's just a filename, try common directories
         if !path.contains('/') && !path.contains('\\') {
             paths.push(self.workspace_root.join("src").join(path));
             paths.push(self.workspace_root.join("lib").join(path));
             paths.push(self.workspace_root.join("bin").join(path));
         }
-        
+
         Ok(paths)
     }
 }
@@ -322,7 +362,7 @@ impl FileOpsTool {
 impl Tool for FileOpsTool {
     async fn execute(&self, args: Value) -> Result<Value> {
         let input: ListInput = serde_json::from_value(args).context("invalid list_files args")?;
-        
+
         let mode_clone = input.mode.clone();
         let mode = mode_clone.as_deref().unwrap_or("list");
         self.execute_mode(mode, serde_json::to_value(input)?).await
@@ -356,7 +396,7 @@ impl ModeTool for FileOpsTool {
 
     async fn execute_mode(&self, mode: &str, args: Value) -> Result<Value> {
         let input: ListInput = serde_json::from_value(args)?;
-        
+
         match mode {
             "list" => self.execute_basic_list(&input).await,
             "recursive" => self.execute_recursive_search(&input).await,
@@ -370,7 +410,8 @@ impl ModeTool for FileOpsTool {
 #[async_trait]
 impl CacheableTool for FileOpsTool {
     fn cache_key(&self, args: &Value) -> String {
-        format!("files:{}:{}",
+        format!(
+            "files:{}:{}",
             args.get("path").and_then(|p| p.as_str()).unwrap_or(""),
             args.get("mode").and_then(|m| m.as_str()).unwrap_or("list")
         )

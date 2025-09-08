@@ -2,7 +2,7 @@ pub mod request;
 pub mod response;
 
 pub use request::GenerateContentRequest;
-pub use response::{GenerateContentResponse, Candidate};
+pub use response::{Candidate, GenerateContentResponse};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -20,14 +20,14 @@ impl Content {
             parts: vec![Part::Text { text: text.into() }],
         }
     }
-    
+
     pub fn system_text(text: impl Into<String>) -> Self {
         Content {
             role: "system".into(),
             parts: vec![Part::Text { text: text.into() }],
         }
     }
-    
+
     pub fn user_parts(parts: Vec<Part>) -> Self {
         Content {
             role: "user".into(),

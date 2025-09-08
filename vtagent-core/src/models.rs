@@ -67,8 +67,6 @@ pub enum ModelId {
     Gemini25Flash,
     /// Gemini 2.5 Pro - Latest, most capable
     Gemini25Pro,
-    /// Gemini 2.0 Flash - Previous generation, fast
-    Gemini20Flash,
 
     // OpenAI models
     /// GPT-5 - High performance model
@@ -81,29 +79,32 @@ pub enum ModelId {
     ClaudeSonnet4,
     /// Claude Opus 4.1 - Powerful model for complex tasks
     ClaudeOpus41,
-}impl ModelId {
+}
+impl ModelId {
     /// Convert the model identifier to its string representation
     /// used in API calls and configurations
     pub fn as_str(&self) -> &'static str {
+        use crate::constants::models;
         match self {
             // Gemini models
-            ModelId::Gemini25FlashLite => "gemini-2.5-flash-lite",
-            ModelId::Gemini25Flash => "gemini-2.5-flash",
-            ModelId::Gemini25Pro => "gemini-2.5-pro",
-            ModelId::Gemini20Flash => "gemini-2.0-flash",
+            ModelId::Gemini25FlashLite => models::GEMINI_2_5_FLASH_LITE,
+            ModelId::Gemini25Flash => models::GEMINI_2_5_FLASH,
+            ModelId::Gemini25Pro => models::GEMINI_2_5_PRO,
             // OpenAI models
-            ModelId::GPT5 => "gpt-5",
-            ModelId::GPT5Mini => "gpt-5-mini",
+            ModelId::GPT5 => models::GPT_5,
+            ModelId::GPT5Mini => models::GPT_5_MINI,
             // Anthropic models
-            ModelId::ClaudeSonnet4 => "claude-sonnet-4-20250514",
-            ModelId::ClaudeOpus41 => "claude-opus-4-1-20250805",
+            ModelId::ClaudeSonnet4 => models::CLAUDE_SONNET_4_20250514,
+            ModelId::ClaudeOpus41 => models::CLAUDE_OPUS_4_1_20250805,
         }
     }
 
     /// Get the provider for this model
     pub fn provider(&self) -> Provider {
         match self {
-            ModelId::Gemini25FlashLite | ModelId::Gemini25Flash | ModelId::Gemini25Pro | ModelId::Gemini20Flash => Provider::Gemini,
+            ModelId::Gemini25FlashLite | ModelId::Gemini25Flash | ModelId::Gemini25Pro => {
+                Provider::Gemini
+            }
             ModelId::GPT5 | ModelId::GPT5Mini => Provider::OpenAI,
             ModelId::ClaudeSonnet4 | ModelId::ClaudeOpus41 => Provider::Anthropic,
         }
@@ -116,7 +117,6 @@ pub enum ModelId {
             ModelId::Gemini25FlashLite => "Gemini 2.5 Flash Lite",
             ModelId::Gemini25Flash => "Gemini 2.5 Flash",
             ModelId::Gemini25Pro => "Gemini 2.5 Pro",
-            ModelId::Gemini20Flash => "Gemini 2.0 Flash",
             // OpenAI models
             ModelId::GPT5 => "GPT-5",
             ModelId::GPT5Mini => "GPT-5 mini",
@@ -131,9 +131,10 @@ pub enum ModelId {
         match self {
             // Gemini models
             ModelId::Gemini25FlashLite => "Fastest, most cost-effective",
-            ModelId::Gemini25Flash => "Fast, cost-effective, default for agent/planning/orchestrator",
+            ModelId::Gemini25Flash => {
+                "Fast, cost-effective, default for agent/planning/orchestrator"
+            }
             ModelId::Gemini25Pro => "Latest, most capable",
-            ModelId::Gemini20Flash => "Previous generation, fast",
             // OpenAI models
             ModelId::GPT5 => "High performance model",
             ModelId::GPT5Mini => "Smaller, faster version and fast and economical",
@@ -150,7 +151,6 @@ pub enum ModelId {
             ModelId::Gemini25FlashLite,
             ModelId::Gemini25Flash,
             ModelId::Gemini25Pro,
-            ModelId::Gemini20Flash,
             // OpenAI models
             ModelId::GPT5,
             ModelId::GPT5Mini,
@@ -162,7 +162,8 @@ pub enum ModelId {
 
     /// Get all models for a specific provider
     pub fn models_for_provider(provider: Provider) -> Vec<ModelId> {
-        Self::all_models().into_iter()
+        Self::all_models()
+            .into_iter()
             .filter(|model| model.provider() == provider)
             .collect()
     }
@@ -174,7 +175,6 @@ pub enum ModelId {
             ModelId::Gemini25Pro,
             ModelId::GPT5,
             ModelId::ClaudeSonnet4,
-            ModelId::Gemini20Flash,
         ]
     }
 
@@ -222,28 +222,17 @@ pub enum ModelId {
 
     /// Check if this is a "flash" variant (optimized for speed)
     pub fn is_flash_variant(&self) -> bool {
-        matches!(
-            self,
-            ModelId::Gemini25FlashLite
-                | ModelId::Gemini25Flash
-                | ModelId::Gemini20Flash
-        )
+        matches!(self, ModelId::Gemini25FlashLite | ModelId::Gemini25Flash)
     }
 
     /// Check if this is a "pro" variant (optimized for capability)
     pub fn is_pro_variant(&self) -> bool {
-        matches!(
-            self,
-            ModelId::Gemini25Pro | ModelId::GPT5
-        )
+        matches!(self, ModelId::Gemini25Pro | ModelId::GPT5)
     }
 
     /// Check if this is an optimized/efficient variant
     pub fn is_efficient_variant(&self) -> bool {
-        matches!(
-            self,
-            ModelId::Gemini25FlashLite | ModelId::GPT5Mini
-        )
+        matches!(self, ModelId::Gemini25FlashLite | ModelId::GPT5Mini)
     }
 
     /// Check if this is a top-tier model
@@ -259,7 +248,6 @@ pub enum ModelId {
         match self {
             // Gemini generations
             ModelId::Gemini25FlashLite | ModelId::Gemini25Flash | ModelId::Gemini25Pro => "2.5",
-            ModelId::Gemini20Flash => "2.0",
             // OpenAI generations
             ModelId::GPT5 | ModelId::GPT5Mini => "5",
             // Anthropic generations
@@ -279,18 +267,18 @@ impl FromStr for ModelId {
     type Err = ModelParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use crate::constants::models;
         match s {
             // Gemini models
-            "gemini-2.5-flash-lite" => Ok(ModelId::Gemini25FlashLite),
-            "gemini-2.5-flash" => Ok(ModelId::Gemini25Flash),
-            "gemini-2.5-pro" => Ok(ModelId::Gemini25Pro),
-            "gemini-2.0-flash" => Ok(ModelId::Gemini20Flash),
+            s if s == models::GEMINI_2_5_FLASH_LITE => Ok(ModelId::Gemini25FlashLite),
+            s if s == models::GEMINI_2_5_FLASH => Ok(ModelId::Gemini25Flash),
+            s if s == models::GEMINI_2_5_PRO => Ok(ModelId::Gemini25Pro),
             // OpenAI models
-            "gpt-5" => Ok(ModelId::GPT5),
-            "gpt-5-mini" => Ok(ModelId::GPT5Mini),
+            s if s == models::GPT_5 => Ok(ModelId::GPT5),
+            s if s == models::GPT_5_MINI => Ok(ModelId::GPT5Mini),
             // Anthropic models
-            "claude-sonnet-4-20250514" => Ok(ModelId::ClaudeSonnet4),
-            "claude-opus-4-1-20250805" => Ok(ModelId::ClaudeOpus41),
+            s if s == models::CLAUDE_SONNET_4_20250514 => Ok(ModelId::ClaudeSonnet4),
+            s if s == models::CLAUDE_OPUS_4_1_20250805 => Ok(ModelId::ClaudeOpus41),
             _ => Err(ModelParseError::InvalidModel(s.to_string())),
         }
     }
@@ -307,18 +295,24 @@ impl fmt::Display for ModelParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ModelParseError::InvalidModel(model) => {
-                write!(f, "Invalid model identifier: '{}'. Supported models: {}",
+                write!(
+                    f,
+                    "Invalid model identifier: '{}'. Supported models: {}",
                     model,
-                    ModelId::all_models().iter()
+                    ModelId::all_models()
+                        .iter()
                         .map(|m| m.as_str())
                         .collect::<Vec<_>>()
                         .join(", ")
                 )
             }
             ModelParseError::InvalidProvider(provider) => {
-                write!(f, "Invalid provider: '{}'. Supported providers: {}",
+                write!(
+                    f,
+                    "Invalid provider: '{}'. Supported providers: {}",
                     provider,
-                    Provider::all_providers().iter()
+                    Provider::all_providers()
+                        .iter()
                         .map(|p| p.to_string())
                         .collect::<Vec<_>>()
                         .join(", ")
@@ -339,7 +333,6 @@ mod tests {
         // Gemini models
         assert_eq!(ModelId::Gemini25FlashLite.as_str(), "gemini-2.5-flash-lite");
         assert_eq!(ModelId::Gemini25Pro.as_str(), "gemini-2.5-pro");
-        assert_eq!(ModelId::Gemini20Flash.as_str(), "gemini-2.0-flash");
         // OpenAI models
         assert_eq!(ModelId::GPT5.as_str(), "gpt-5");
         assert_eq!(ModelId::GPT5Mini.as_str(), "gpt-5-mini");
@@ -351,13 +344,22 @@ mod tests {
     #[test]
     fn test_model_from_string() {
         // Gemini models
-        assert_eq!("gemini-2.5-flash-lite".parse::<ModelId>().unwrap(), ModelId::Gemini25FlashLite);
-        assert_eq!("gemini-2.5-pro".parse::<ModelId>().unwrap(), ModelId::Gemini25Pro);
+        assert_eq!(
+            "gemini-2.5-flash-lite".parse::<ModelId>().unwrap(),
+            ModelId::Gemini25FlashLite
+        );
+        assert_eq!(
+            "gemini-2.5-pro".parse::<ModelId>().unwrap(),
+            ModelId::Gemini25Pro
+        );
         // OpenAI models
         assert_eq!("gpt-5".parse::<ModelId>().unwrap(), ModelId::GPT5);
         assert_eq!("gpt-5-mini".parse::<ModelId>().unwrap(), ModelId::GPT5Mini);
         // Anthropic models
-        assert_eq!("claude-sonnet-4-20250514".parse::<ModelId>().unwrap(), ModelId::ClaudeSonnet4);
+        assert_eq!(
+            "claude-sonnet-4-20250514".parse::<ModelId>().unwrap(),
+            ModelId::ClaudeSonnet4
+        );
         // Invalid model
         assert!("invalid-model".parse::<ModelId>().is_err());
     }
@@ -366,7 +368,10 @@ mod tests {
     fn test_provider_parsing() {
         assert_eq!("gemini".parse::<Provider>().unwrap(), Provider::Gemini);
         assert_eq!("openai".parse::<Provider>().unwrap(), Provider::OpenAI);
-        assert_eq!("anthropic".parse::<Provider>().unwrap(), Provider::Anthropic);
+        assert_eq!(
+            "anthropic".parse::<Provider>().unwrap(),
+            Provider::Anthropic
+        );
         assert!("invalid-provider".parse::<Provider>().is_err());
     }
 
@@ -379,13 +384,31 @@ mod tests {
 
     #[test]
     fn test_provider_defaults() {
-        assert_eq!(ModelId::default_orchestrator_for_provider(Provider::Gemini), ModelId::Gemini25Flash);
-        assert_eq!(ModelId::default_orchestrator_for_provider(Provider::OpenAI), ModelId::GPT5);
-        assert_eq!(ModelId::default_orchestrator_for_provider(Provider::Anthropic), ModelId::ClaudeSonnet4);
+        assert_eq!(
+            ModelId::default_orchestrator_for_provider(Provider::Gemini),
+            ModelId::Gemini25Flash
+        );
+        assert_eq!(
+            ModelId::default_orchestrator_for_provider(Provider::OpenAI),
+            ModelId::GPT5
+        );
+        assert_eq!(
+            ModelId::default_orchestrator_for_provider(Provider::Anthropic),
+            ModelId::ClaudeSonnet4
+        );
 
-        assert_eq!(ModelId::default_subagent_for_provider(Provider::Gemini), ModelId::Gemini25FlashLite);
-        assert_eq!(ModelId::default_subagent_for_provider(Provider::OpenAI), ModelId::GPT5Mini);
-        assert_eq!(ModelId::default_subagent_for_provider(Provider::Anthropic), ModelId::ClaudeOpus41);
+        assert_eq!(
+            ModelId::default_subagent_for_provider(Provider::Gemini),
+            ModelId::Gemini25FlashLite
+        );
+        assert_eq!(
+            ModelId::default_subagent_for_provider(Provider::OpenAI),
+            ModelId::GPT5Mini
+        );
+        assert_eq!(
+            ModelId::default_subagent_for_provider(Provider::Anthropic),
+            ModelId::ClaudeOpus41
+        );
     }
 
     #[test]
@@ -422,7 +445,6 @@ mod tests {
     fn test_model_generation() {
         // Gemini generations
         assert_eq!(ModelId::Gemini25Flash.generation(), "2.5");
-        assert_eq!(ModelId::Gemini20Flash.generation(), "2.0");
         assert_eq!(ModelId::Gemini25Pro.generation(), "2.5");
 
         // OpenAI generations

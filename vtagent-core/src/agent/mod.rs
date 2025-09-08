@@ -16,9 +16,9 @@ pub mod performance;
 pub mod runner;
 pub mod semantic;
 pub mod snapshots;
-pub mod verification;
 pub mod stats;
 pub mod types;
+pub mod verification;
 
 // Re-export main types for convenience
 pub use config::CompactionConfig;

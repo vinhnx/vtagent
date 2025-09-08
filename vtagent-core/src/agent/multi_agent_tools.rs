@@ -1,9 +1,9 @@
 //! Multi-agent orchestration tools
 
 use crate::agent::multi_agent::*;
-use crate::agent::orchestrator::{OrchestratorAgent, ContextSearchCriteria};
+use crate::agent::orchestrator::{ContextSearchCriteria, OrchestratorAgent};
 use anyhow::{Result, anyhow};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
 
 /// Multi-agent system tools for orchestrator control
@@ -79,16 +79,21 @@ impl MultiAgentTools {
 
         let task_id = {
             let orchestrator = self.orchestrator.lock().unwrap();
-            format!("task_{}_{}",
+            format!(
+                "task_{}_{}",
                 match agent_type {
                     AgentType::Explorer => "explorer",
                     AgentType::Coder => "coder",
                     AgentType::Orchestrator => "orchestrator",
                     AgentType::Single => "single",
                 },
-                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs()
             )
-        };        Ok(json!({
+        };
+        Ok(json!({
             "task_id": task_id,
             "status": "created",
             "agent_type": agent_type.to_string()
@@ -101,17 +106,21 @@ impl MultiAgentTools {
             .as_str()
             .ok_or_else(|| anyhow!("Missing task_id parameter"))?;
 
-        // For now, return a placeholder result
-        // In the full implementation, this would delegate to the orchestrator
+        // Actually delegate to the orchestrator to launch the subagent
+        let results = {
+            let mut orchestrator = self.orchestrator.lock().unwrap();
+            orchestrator.launch_subagent(task_id).await?
+        };
+
         Ok(json!({
             "ok": true,
             "task_id": task_id,
             "status": "completed",
             "results": {
-                "created_contexts": ["analysis_result"],
-                "modified_files": [],
-                "executed_commands": ["analyze"],
-                "summary": "Task completed successfully"
+                "created_contexts": results.created_contexts,
+                "modified_files": results.modified_files,
+                "executed_commands": results.executed_commands,
+                "summary": results.summary
             }
         }))
     }
@@ -174,9 +183,9 @@ impl MultiAgentTools {
         };
 
         {
-            let mut orchestrator = self.orchestrator.lock().unwrap();
-            // For now, just return success without actually storing
-            // In full implementation, would call orchestrator.add_context(context)
+            let orchestrator = self.orchestrator.lock().unwrap();
+            // Actually store the context
+            orchestrator.add_context(context)?;
         }
 
         Ok(json!({
@@ -189,11 +198,13 @@ impl MultiAgentTools {
     pub async fn context_search(&self, params: Value) -> Result<Value> {
         let query = params["query"].as_str();
         let tags = if let Some(tags_array) = params["tags"].as_array() {
-            Some(tags_array
-                .iter()
-                .filter_map(|v| v.as_str())
-                .map(|s| s.to_string())
-                .collect())
+            Some(
+                tags_array
+                    .iter()
+                    .filter_map(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .collect(),
+            )
         } else {
             None
         };
@@ -225,11 +236,13 @@ impl MultiAgentTools {
         };
 
         let related_files = if let Some(files_array) = params["related_files"].as_array() {
-            Some(files_array
-                .iter()
-                .filter_map(|v| v.as_str())
-                .map(|s| s.to_string())
-                .collect())
+            Some(
+                files_array
+                    .iter()
+                    .filter_map(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .collect(),
+            )
         } else {
             None
         };
@@ -243,9 +256,8 @@ impl MultiAgentTools {
 
         let contexts: Vec<crate::agent::multi_agent::ContextItem> = {
             let orchestrator = self.orchestrator.lock().unwrap();
-            // For now, return empty results
-            // In full implementation, would call orchestrator.search_contexts(criteria)
-            Vec::new()
+            // Actually search the contexts
+            orchestrator.search_contexts(criteria)?
         };
 
         let results: Vec<Value> = contexts
@@ -289,8 +301,11 @@ impl MultiAgentTools {
 
         let status = {
             let orchestrator = self.orchestrator.lock().unwrap();
-            // For now, return a placeholder status
-            "completed"
+            // Actually get the real task status
+            orchestrator
+                .get_task_status(task_id)?
+                .map(|s| format!("{:?}", s))
+                .unwrap_or_else(|| "not_found".to_string())
         };
 
         Ok(json!({
@@ -303,8 +318,8 @@ impl MultiAgentTools {
     pub async fn get_pending_tasks(&self, _params: Value) -> Result<Value> {
         let tasks: Vec<crate::agent::multi_agent::Task> = {
             let orchestrator = self.orchestrator.lock().unwrap();
-            // For now, return empty task list
-            Vec::new()
+            // Actually get the pending tasks from the orchestrator
+            orchestrator.get_pending_tasks()?
         };
 
         let task_list: Vec<Value> = tasks
@@ -529,7 +544,7 @@ pub fn get_multi_agent_function_declarations() -> Vec<serde_json::Value> {
                 },
                 "required": ["message"]
             }
-        })
+        }),
     ]
 }
 

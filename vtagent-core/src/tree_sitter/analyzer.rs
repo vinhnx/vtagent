@@ -171,48 +171,421 @@ impl TreeSitterAnalyzer {
     /// Extract symbols from a syntax tree
     pub fn extract_symbols(
         &self,
-        _syntax_tree: &Tree,
-        _source_code: &str,
-        _language: LanguageSupport,
+        syntax_tree: &Tree,
+        source_code: &str,
+        language: LanguageSupport,
     ) -> Result<Vec<SymbolInfo>> {
-        // For now, return empty vector - full implementation needs more work
-        Ok(Vec::new())
+        let mut symbols = Vec::new();
+        let root_node = syntax_tree.root_node();
+
+        // Walk the tree and extract symbols based on language
+        self.extract_symbols_recursive(root_node, source_code, language, &mut symbols, None)?;
+
+        Ok(symbols)
+    }
+
+    /// Recursively extract symbols from a node
+    fn extract_symbols_recursive(
+        &self,
+        node: tree_sitter::Node,
+        source_code: &str,
+        language: LanguageSupport,
+        symbols: &mut Vec<SymbolInfo>,
+        parent_scope: Option<String>,
+    ) -> Result<()> {
+        let node_text = &source_code[node.start_byte()..node.end_byte()];
+        let kind = node.kind();
+
+        // Extract symbols based on node type and language
+        match language {
+            LanguageSupport::Rust => {
+                if kind == "function_item" || kind == "method_definition" {
+                    // Extract function name
+                    if let Some(name_node) = self.find_child_by_type(node, "identifier") {
+                        let name = &source_code[name_node.start_byte()..name_node.end_byte()];
+                        symbols.push(SymbolInfo {
+                            name: name.to_string(),
+                            kind: SymbolKind::Function,
+                            position: Position {
+                                row: node.start_position().row,
+                                column: node.start_position().column,
+                                byte_offset: node.start_byte(),
+                            },
+                            scope: parent_scope.clone(),
+                            signature: None,
+                            documentation: None,
+                        });
+                    }
+                } else if kind == "struct_item" || kind == "enum_item" {
+                    // Extract type name
+                    if let Some(name_node) = self.find_child_by_type(node, "type_identifier") {
+                        let name = &source_code[name_node.start_byte()..name_node.end_byte()];
+                        symbols.push(SymbolInfo {
+                            name: name.to_string(),
+                            kind: SymbolKind::Type,
+                            position: Position {
+                                row: node.start_position().row,
+                                column: node.start_position().column,
+                                byte_offset: node.start_byte(),
+                            },
+                            scope: parent_scope.clone(),
+                            signature: None,
+                            documentation: None,
+                        });
+                    }
+                }
+            }
+            LanguageSupport::Python => {
+                if kind == "function_definition" {
+                    // Extract function name
+                    if let Some(name_node) = self.find_child_by_type(node, "identifier") {
+                        let name = &source_code[name_node.start_byte()..name_node.end_byte()];
+                        symbols.push(SymbolInfo {
+                            name: name.to_string(),
+                            kind: SymbolKind::Function,
+                            position: Position {
+                                row: node.start_position().row,
+                                column: node.start_position().column,
+                                byte_offset: node.start_byte(),
+                            },
+                            scope: parent_scope.clone(),
+                            signature: None,
+                            documentation: None,
+                        });
+                    }
+                } else if kind == "class_definition" {
+                    // Extract class name
+                    if let Some(name_node) = self.find_child_by_type(node, "identifier") {
+                        let name = &source_code[name_node.start_byte()..name_node.end_byte()];
+                        symbols.push(SymbolInfo {
+                            name: name.to_string(),
+                            kind: SymbolKind::Type,
+                            position: Position {
+                                row: node.start_position().row,
+                                column: node.start_position().column,
+                                byte_offset: node.start_byte(),
+                            },
+                            scope: parent_scope.clone(),
+                            signature: None,
+                            documentation: None,
+                        });
+                    }
+                }
+            }
+            _ => {
+                // For other languages, do a basic extraction
+                if kind.contains("function") || kind.contains("method") {
+                    // Try to find a name
+                    if let Some(name_node) = self.find_child_by_type(node, "identifier") {
+                        let name = &source_code[name_node.start_byte()..name_node.end_byte()];
+                        symbols.push(SymbolInfo {
+                            name: name.to_string(),
+                            kind: SymbolKind::Function,
+                            position: Position {
+                                row: node.start_position().row,
+                                column: node.start_position().column,
+                                byte_offset: node.start_byte(),
+                            },
+                            scope: parent_scope.clone(),
+                            signature: None,
+                            documentation: None,
+                        });
+                    }
+                }
+            }
+        }
+
+        // Recursively process children
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            self.extract_symbols_recursive(
+                child,
+                source_code,
+                language.clone(),
+                symbols,
+                parent_scope.clone(),
+            )?;
+        }
+
+        Ok(())
+    }
+
+    /// Find a child node of a specific type
+    fn find_child_by_type<'a>(
+        &self,
+        node: tree_sitter::Node<'a>,
+        type_name: &str,
+    ) -> Option<tree_sitter::Node<'a>> {
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            if child.kind() == type_name {
+                return Some(child);
+            }
+        }
+        None
     }
 
     /// Extract dependencies from a syntax tree
     pub fn extract_dependencies(
         &self,
-        _syntax_tree: &Tree,
-        _language: LanguageSupport,
+        syntax_tree: &Tree,
+        language: LanguageSupport,
     ) -> Result<Vec<crate::tree_sitter::analysis::DependencyInfo>> {
-        // For now, return empty vector - full implementation needs more work
-        Ok(Vec::new())
+        let mut dependencies = Vec::new();
+        let root_node = syntax_tree.root_node();
+
+        // Extract dependencies based on language
+        match language {
+            LanguageSupport::Rust => {
+                self.extract_rust_dependencies(root_node, &mut dependencies)?;
+            }
+            LanguageSupport::Python => {
+                self.extract_python_dependencies(root_node, &mut dependencies)?;
+            }
+            LanguageSupport::JavaScript | LanguageSupport::TypeScript => {
+                self.extract_js_dependencies(root_node, &mut dependencies)?;
+            }
+            _ => {
+                // For other languages, do a basic extraction
+                self.extract_basic_dependencies(root_node, &mut dependencies)?;
+            }
+        }
+
+        Ok(dependencies)
+    }
+
+    /// Extract Rust dependencies
+    fn extract_rust_dependencies(
+        &self,
+        node: tree_sitter::Node,
+        dependencies: &mut Vec<crate::tree_sitter::analysis::DependencyInfo>,
+    ) -> Result<()> {
+        let mut cursor = node.walk();
+
+        // Look for use statements and extern crate declarations
+        if node.kind() == "use_declaration" {
+            // Extract the path from the use statement
+            if let Some(path_node) = self
+                .find_child_by_type(node, "use_list")
+                .or_else(|| self.find_child_by_type(node, "scoped_identifier"))
+                .or_else(|| self.find_child_by_type(node, "identifier"))
+            {
+                // This is a simplified extraction
+                dependencies.push(crate::tree_sitter::analysis::DependencyInfo {
+                    name: "unknown_rust_dep".to_string(), // Would need more parsing for actual name
+                    kind: crate::tree_sitter::analysis::DependencyKind::Import,
+                    source: "use_declaration".to_string(),
+                    position: Position {
+                        row: node.start_position().row,
+                        column: node.start_position().column,
+                        byte_offset: node.start_byte(),
+                    },
+                });
+            }
+        } else if node.kind() == "extern_crate_declaration" {
+            // Extract crate name from extern crate declaration
+            if let Some(name_node) = self.find_child_by_type(node, "identifier") {
+                dependencies.push(crate::tree_sitter::analysis::DependencyInfo {
+                    name: "unknown_crate".to_string(), // Would need more parsing for actual name
+                    kind: crate::tree_sitter::analysis::DependencyKind::External,
+                    source: "extern_crate".to_string(),
+                    position: Position {
+                        row: node.start_position().row,
+                        column: node.start_position().column,
+                        byte_offset: node.start_byte(),
+                    },
+                });
+            }
+        }
+
+        // Recursively process children
+        for child in node.children(&mut cursor) {
+            self.extract_rust_dependencies(child, dependencies)?;
+        }
+
+        Ok(())
+    }
+
+    /// Extract Python dependencies
+    fn extract_python_dependencies(
+        &self,
+        node: tree_sitter::Node,
+        dependencies: &mut Vec<crate::tree_sitter::analysis::DependencyInfo>,
+    ) -> Result<()> {
+        let mut cursor = node.walk();
+
+        // Look for import statements
+        if node.kind() == "import_statement" || node.kind() == "import_from_statement" {
+            // Extract the module name
+            dependencies.push(crate::tree_sitter::analysis::DependencyInfo {
+                name: "unknown_python_module".to_string(), // Would need more parsing for actual name
+                kind: crate::tree_sitter::analysis::DependencyKind::Import,
+                source: node.kind().to_string(),
+                position: Position {
+                    row: node.start_position().row,
+                    column: node.start_position().column,
+                    byte_offset: node.start_byte(),
+                },
+            });
+        }
+
+        // Recursively process children
+        for child in node.children(&mut cursor) {
+            self.extract_python_dependencies(child, dependencies)?;
+        }
+
+        Ok(())
+    }
+
+    /// Extract JavaScript/TypeScript dependencies
+    fn extract_js_dependencies(
+        &self,
+        node: tree_sitter::Node,
+        dependencies: &mut Vec<crate::tree_sitter::analysis::DependencyInfo>,
+    ) -> Result<()> {
+        let mut cursor = node.walk();
+
+        // Look for import statements
+        if node.kind() == "import_statement" {
+            // Extract the module name
+            dependencies.push(crate::tree_sitter::analysis::DependencyInfo {
+                name: "unknown_js_module".to_string(), // Would need more parsing for actual name
+                kind: crate::tree_sitter::analysis::DependencyKind::Import,
+                source: node.kind().to_string(),
+                position: Position {
+                    row: node.start_position().row,
+                    column: node.start_position().column,
+                    byte_offset: node.start_byte(),
+                },
+            });
+        }
+
+        // Recursively process children
+        for child in node.children(&mut cursor) {
+            self.extract_js_dependencies(child, dependencies)?;
+        }
+
+        Ok(())
+    }
+
+    /// Extract basic dependencies (fallback)
+    fn extract_basic_dependencies(
+        &self,
+        node: tree_sitter::Node,
+        dependencies: &mut Vec<crate::tree_sitter::analysis::DependencyInfo>,
+    ) -> Result<()> {
+        let mut cursor = node.walk();
+
+        // Look for import/include statements
+        if node.kind().contains("import") || node.kind().contains("include") {
+            // Extract the dependency name
+            dependencies.push(crate::tree_sitter::analysis::DependencyInfo {
+                name: "unknown_dependency".to_string(),
+                kind: crate::tree_sitter::analysis::DependencyKind::Import,
+                source: node.kind().to_string(),
+                position: Position {
+                    row: node.start_position().row,
+                    column: node.start_position().column,
+                    byte_offset: node.start_byte(),
+                },
+            });
+        }
+
+        // Recursively process children
+        for child in node.children(&mut cursor) {
+            self.extract_basic_dependencies(child, dependencies)?;
+        }
+
+        Ok(())
     }
 
     /// Calculate code metrics from a syntax tree
     pub fn calculate_metrics(
         &self,
-        _syntax_tree: &Tree,
+        syntax_tree: &Tree,
         source_code: &str,
     ) -> Result<crate::tree_sitter::analysis::CodeMetrics> {
-        // For now, return basic metrics - full implementation needs more work
+        let root_node = syntax_tree.root_node();
+        let lines = source_code.lines().collect::<Vec<_>>();
+
+        // Count different types of nodes
+        let mut functions_count = 0;
+        let mut classes_count = 0;
+        let mut variables_count = 0;
+        let mut imports_count = 0;
+
+        self.count_nodes_recursive(
+            root_node,
+            &mut functions_count,
+            &mut classes_count,
+            &mut variables_count,
+            &mut imports_count,
+        );
+
+        // Count comments
+        let lines_of_comments = lines
+            .iter()
+            .filter(|l| {
+                l.trim().starts_with("//")
+                    || l.trim().starts_with("/*")
+                    || l.trim().starts_with("#")
+            })
+            .count();
+
+        let blank_lines = lines.iter().filter(|l| l.trim().is_empty()).count();
+        let lines_of_code = lines.len();
+
+        let comment_ratio = if lines_of_code > 0 {
+            lines_of_comments as f64 / lines_of_code as f64
+        } else {
+            0.0
+        };
+
         Ok(crate::tree_sitter::analysis::CodeMetrics {
-            lines_of_code: source_code.lines().count(),
-            lines_of_comments: source_code
-                .lines()
-                .filter(|l| l.trim().starts_with("//") || l.trim().starts_with("/*"))
-                .count(),
-            blank_lines: source_code.lines().filter(|l| l.trim().is_empty()).count(),
-            functions_count: 0,
-            classes_count: 0,
-            variables_count: 0,
-            imports_count: 0,
-            comment_ratio: source_code
-                .lines()
-                .filter(|l| l.trim().starts_with("//") || l.trim().starts_with("/*"))
-                .count() as f64
-                / source_code.lines().count() as f64,
+            lines_of_code,
+            lines_of_comments,
+            blank_lines,
+            functions_count,
+            classes_count,
+            variables_count,
+            imports_count,
+            comment_ratio,
         })
+    }
+
+    /// Recursively count different types of nodes
+    fn count_nodes_recursive(
+        &self,
+        node: tree_sitter::Node,
+        functions_count: &mut usize,
+        classes_count: &mut usize,
+        variables_count: &mut usize,
+        imports_count: &mut usize,
+    ) {
+        let kind = node.kind();
+
+        // Count based on node type
+        if kind.contains("function") || kind.contains("method") {
+            *functions_count += 1;
+        } else if kind.contains("class") || kind.contains("struct") || kind.contains("enum") {
+            *classes_count += 1;
+        } else if kind.contains("variable") || kind.contains("let") || kind.contains("const") {
+            *variables_count += 1;
+        } else if kind.contains("import") || kind.contains("include") || kind.contains("use") {
+            *imports_count += 1;
+        }
+
+        // Recursively process children
+        let mut cursor = node.walk();
+        for child in node.children(&mut cursor) {
+            self.count_nodes_recursive(
+                child,
+                functions_count,
+                classes_count,
+                variables_count,
+                imports_count,
+            );
+        }
     }
 
     /// Parse file into a syntax tree
@@ -338,6 +711,39 @@ impl TreeSitterAnalyzer {
         );
         stats
     }
+
+    pub fn analyze_file_with_tree_sitter(
+        &mut self,
+        file_path: &std::path::Path,
+        source_code: &str,
+    ) -> Result<CodeAnalysis> {
+        let language = self
+            .detect_language_from_path(file_path)
+            .unwrap_or_else(|_| {
+                self.detect_language_from_content(source_code)
+                    .unwrap_or(LanguageSupport::Rust)
+            });
+
+        self.current_file = file_path.to_string_lossy().to_string();
+
+        let tree = self.parse(source_code, language.clone())?;
+        
+        // Extract actual symbols and dependencies
+        let symbols = self.extract_symbols(&tree, source_code, language.clone())?;
+        let dependencies = self.extract_dependencies(&tree, language.clone())?;
+        let metrics = self.calculate_metrics(&tree, source_code)?;
+
+        Ok(CodeAnalysis {
+            file_path: self.current_file.clone(),
+            language: language,
+            symbols: symbols,
+            dependencies: dependencies,
+            metrics: metrics,
+            issues: vec![], // Would need to implement actual issue detection
+            complexity: Default::default(), // Would need to implement actual complexity analysis
+            structure: Default::default(), // Would need to implement actual structure analysis
+        })
+    }
 }
 
 /// Helper function to get tree-sitter language
@@ -408,15 +814,22 @@ impl TreeSitterAnalyzer {
 
         let _tree = self.parse(source_code, language.clone())?;
 
+        let tree = self.parse(source_code, language.clone())?;
+        
+        // Extract actual symbols and dependencies
+        let symbols = self.extract_symbols(&tree, source_code, language.clone())?;
+        let dependencies = self.extract_dependencies(&tree, language.clone())?;
+        let metrics = self.calculate_metrics(&tree, source_code)?;
+
         Ok(CodeAnalysis {
             file_path: self.current_file.clone(),
             language: language,
-            symbols: vec![],      // Placeholder - would extract actual symbols
-            dependencies: vec![], // Placeholder - would extract actual dependencies
-            metrics: Default::default(),
-            issues: vec![],
-            complexity: Default::default(),
-            structure: Default::default(),
+            symbols: symbols,
+            dependencies: dependencies,
+            metrics: metrics,
+            issues: vec![], // Would need to implement actual issue detection
+            complexity: Default::default(), // Would need to implement actual complexity analysis
+            structure: Default::default(), // Would need to implement actual structure analysis
         })
     }
 }

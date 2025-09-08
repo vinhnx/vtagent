@@ -1,13 +1,14 @@
 //! Tool registry and function declarations
 
-use super::traits::Tool;
-use super::search::SearchTool;
-use super::file_ops::FileOpsTool;
-use super::command::CommandTool;
 use super::cache::FILE_CACHE;
+use super::command::CommandTool;
+use super::file_ops::FileOpsTool;
+use super::search::SearchTool;
+use super::traits::Tool;
 use crate::ast_grep::AstGrepEngine;
 use crate::gemini::FunctionDeclaration;
 use crate::rp_search::RpSearchManager;
+use crate::tool_policy::{ToolPolicy, ToolPolicyManager};
 use anyhow::{Result, anyhow};
 use serde_json::{Value, json};
 use std::path::PathBuf;
@@ -21,16 +22,37 @@ pub struct ToolRegistry {
     command_tool: CommandTool,
     rp_search: Arc<RpSearchManager>,
     ast_grep_engine: Option<Arc<AstGrepEngine>>,
+    policy_manager: ToolPolicyManager,
 }
 
 impl ToolRegistry {
     /// Create a new tool registry
     pub fn new(workspace_root: PathBuf) -> Self {
         let rp_search = Arc::new(RpSearchManager::new(workspace_root.clone()));
-        
+
         let search_tool = SearchTool::new(workspace_root.clone(), rp_search.clone());
         let file_ops_tool = FileOpsTool::new(workspace_root.clone(), rp_search.clone());
         let command_tool = CommandTool::new(workspace_root.clone());
+
+        // Initialize policy manager and update available tools
+        let mut policy_manager = ToolPolicyManager::new().unwrap_or_else(|e| {
+            eprintln!("Warning: Failed to initialize tool policy manager: {}", e);
+            // Create a fallback that allows all tools
+            ToolPolicyManager::new().unwrap()
+        });
+
+        // Update available tools in policy manager
+        let available_tools = vec![
+            "rp_search".to_string(),
+            "list_files".to_string(),
+            "run_terminal_cmd".to_string(),
+            "read_file".to_string(),
+            "write_file".to_string(),
+        ];
+
+        if let Err(e) = policy_manager.update_available_tools(available_tools) {
+            eprintln!("Warning: Failed to update tool policies: {}", e);
+        }
 
         Self {
             workspace_root,
@@ -39,6 +61,7 @@ impl ToolRegistry {
             command_tool,
             rp_search,
             ast_grep_engine: None,
+            policy_manager,
         }
     }
 
@@ -53,8 +76,13 @@ impl ToolRegistry {
         &self.workspace_root
     }
 
-    /// Execute a tool by name
-    pub async fn execute_tool(&self, name: &str, args: Value) -> Result<Value> {
+    /// Execute a tool by name with policy checking
+    pub async fn execute_tool(&mut self, name: &str, args: Value) -> Result<Value> {
+        // Check tool policy before execution
+        if !self.policy_manager.should_execute_tool(name)? {
+            return Err(anyhow!("Tool '{}' execution denied by policy", name));
+        }
+
         match name {
             "rp_search" => self.search_tool.execute(args).await,
             "list_files" => self.file_ops_tool.execute(args).await,
@@ -78,7 +106,50 @@ impl ToolRegistry {
 
     /// Check if a tool exists
     pub fn has_tool(&self, name: &str) -> bool {
-        matches!(name, "rp_search" | "list_files" | "run_terminal_cmd" | "read_file" | "write_file")
+        matches!(
+            name,
+            "rp_search" | "list_files" | "run_terminal_cmd" | "read_file" | "write_file"
+        )
+    }
+
+    /// Get tool policy manager (mutable reference)
+    pub fn policy_manager_mut(&mut self) -> &mut ToolPolicyManager {
+        &mut self.policy_manager
+    }
+
+    /// Get tool policy manager (immutable reference)
+    pub fn policy_manager(&self) -> &ToolPolicyManager {
+        &self.policy_manager
+    }
+
+    /// Set policy for a specific tool
+    pub fn set_tool_policy(&mut self, tool_name: &str, policy: ToolPolicy) -> Result<()> {
+        self.policy_manager.set_policy(tool_name, policy)
+    }
+
+    /// Get policy for a specific tool
+    pub fn get_tool_policy(&self, tool_name: &str) -> ToolPolicy {
+        self.policy_manager.get_policy(tool_name)
+    }
+
+    /// Reset all tool policies to prompt
+    pub fn reset_tool_policies(&mut self) -> Result<()> {
+        self.policy_manager.reset_all_to_prompt()
+    }
+
+    /// Allow all tools
+    pub fn allow_all_tools(&mut self) -> Result<()> {
+        self.policy_manager.allow_all_tools()
+    }
+
+    /// Deny all tools
+    pub fn deny_all_tools(&mut self) -> Result<()> {
+        self.policy_manager.deny_all_tools()
+    }
+
+    /// Print tool policy status
+    pub fn print_tool_policy_status(&self) {
+        self.policy_manager.print_status();
     }
 
     /// Get cache statistics
@@ -101,31 +172,31 @@ impl ToolRegistry {
     }
 
     // Legacy methods for backward compatibility
-    pub async fn read_file(&self, args: Value) -> Result<Value> {
-        self.file_ops_tool.read_file(args).await
+    pub async fn read_file(&mut self, args: Value) -> Result<Value> {
+        self.execute_tool("read_file", args).await
     }
 
-    pub async fn write_file(&self, args: Value) -> Result<Value> {
-        self.file_ops_tool.write_file(args).await
+    pub async fn write_file(&mut self, args: Value) -> Result<Value> {
+        self.execute_tool("write_file", args).await
     }
 
-    pub async fn edit_file(&self, _args: Value) -> Result<Value> {
+    pub async fn edit_file(&mut self, _args: Value) -> Result<Value> {
         Err(anyhow!("edit_file not yet implemented in modular system"))
     }
 
-    pub async fn delete_file(&self, _args: Value) -> Result<Value> {
+    pub async fn delete_file(&mut self, _args: Value) -> Result<Value> {
         Err(anyhow!("delete_file not yet implemented in modular system"))
     }
 
-    pub async fn rp_search(&self, args: Value) -> Result<Value> {
+    pub async fn rp_search(&mut self, args: Value) -> Result<Value> {
         self.execute_tool("rp_search", args).await
     }
 
-    pub async fn list_files(&self, args: Value) -> Result<Value> {
+    pub async fn list_files(&mut self, args: Value) -> Result<Value> {
         self.execute_tool("list_files", args).await
     }
 
-    pub async fn run_terminal_cmd(&self, args: Value) -> Result<Value> {
+    pub async fn run_terminal_cmd(&mut self, args: Value) -> Result<Value> {
         self.execute_tool("run_terminal_cmd", args).await
     }
 }
@@ -198,31 +269,31 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
 }
 
 /// Build function declarations filtered by capability level
-pub fn build_function_declarations_for_level(level: crate::types::CapabilityLevel) -> Vec<FunctionDeclaration> {
+pub fn build_function_declarations_for_level(
+    level: crate::types::CapabilityLevel,
+) -> Vec<FunctionDeclaration> {
     let all_declarations = build_function_declarations();
 
     match level {
         crate::types::CapabilityLevel::Basic => vec![],
         crate::types::CapabilityLevel::FileReading => vec![],
-        crate::types::CapabilityLevel::FileListing => {
-            all_declarations.into_iter()
-                .filter(|fd| fd.name == "list_files")
-                .collect()
-        },
-        crate::types::CapabilityLevel::Bash => {
-            all_declarations.into_iter()
-                .filter(|fd| fd.name == "list_files" || fd.name == "run_terminal_cmd")
-                .collect()
-        },
-        crate::types::CapabilityLevel::Editing => {
-            all_declarations.into_iter()
-                .filter(|fd| fd.name == "list_files" || fd.name == "run_terminal_cmd")
-                .collect()
-        },
-        crate::types::CapabilityLevel::CodeSearch => {
-            all_declarations.into_iter()
-                .filter(|fd| fd.name == "list_files" || fd.name == "run_terminal_cmd" || fd.name == "rp_search")
-                .collect()
-        },
+        crate::types::CapabilityLevel::FileListing => all_declarations
+            .into_iter()
+            .filter(|fd| fd.name == "list_files")
+            .collect(),
+        crate::types::CapabilityLevel::Bash => all_declarations
+            .into_iter()
+            .filter(|fd| fd.name == "list_files" || fd.name == "run_terminal_cmd")
+            .collect(),
+        crate::types::CapabilityLevel::Editing => all_declarations
+            .into_iter()
+            .filter(|fd| fd.name == "list_files" || fd.name == "run_terminal_cmd")
+            .collect(),
+        crate::types::CapabilityLevel::CodeSearch => all_declarations
+            .into_iter()
+            .filter(|fd| {
+                fd.name == "list_files" || fd.name == "run_terminal_cmd" || fd.name == "rp_search"
+            })
+            .collect(),
     }
 }

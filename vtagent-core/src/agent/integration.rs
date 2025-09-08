@@ -4,10 +4,11 @@
 //! orchestrating all components including verification workflows and performance optimization.
 
 use crate::agent::multi_agent::*;
+use crate::agent::optimization::{PerformanceConfig, PerformanceMonitor};
 use crate::agent::orchestrator::OrchestratorAgent;
-use crate::agent::verification::{VerificationWorkflow, VerificationConfig};
-use crate::agent::optimization::{PerformanceMonitor, PerformanceConfig};
+use crate::agent::verification::{VerificationConfig, VerificationWorkflow};
 use crate::llm::{AnyClient, make_client};
+use crate::models::ModelId;
 use anyhow::{Result, anyhow};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -164,18 +165,25 @@ impl MultiAgentSystem {
         workspace: std::path::PathBuf,
     ) -> Result<Self> {
         // Generate unique session ID
-        let session_id = format!("session_{}", SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs());
+        let session_id = format!(
+            "session_{}",
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs()
+        );
 
-        eprintln!("Initializing multi-agent system with session ID: {}", session_id);
+        eprintln!(
+            "Initializing multi-agent system with session ID: {}",
+            session_id
+        );
 
         // Create orchestrator client
-        let orchestrator_client = make_client(
-            api_key.clone(),
-            config.orchestrator_model.clone(),
-        );
+        let orchestrator_model_id = config
+            .orchestrator_model
+            .parse::<ModelId>()
+            .map_err(|_| anyhow!("Invalid orchestrator model: {}", config.orchestrator_model))?;
+        let orchestrator_client = make_client(api_key.clone(), orchestrator_model_id);
 
         // Create orchestrator agent
         let orchestrator = OrchestratorAgent::new(
@@ -199,7 +207,11 @@ impl MultiAgentSystem {
         let mut coder_agents = vec![];
         for i in 0..config.max_concurrent_subagents {
             let agent_id = format!("coder_{}", i);
-            let client = make_client(api_key.clone(), config.subagent_model.clone());
+            let subagent_model_id = config
+                .subagent_model
+                .parse::<ModelId>()
+                .map_err(|_| anyhow!("Invalid subagent model: {}", config.subagent_model))?;
+            let client = make_client(api_key.clone(), subagent_model_id);
 
             coder_agents.push(SubAgent {
                 id: agent_id,
@@ -219,9 +231,14 @@ impl MultiAgentSystem {
 
         // Create explorer agents
         let mut explorer_agents = vec![];
-        for i in 0..2 { // Fewer explorer agents as they're typically read-only
+        for i in 0..2 {
+            // Fewer explorer agents as they're typically read-only
             let agent_id = format!("explorer_{}", i);
-            let client = make_client(api_key.clone(), config.subagent_model.clone());
+            let subagent_model_id = config
+                .subagent_model
+                .parse::<ModelId>()
+                .map_err(|_| anyhow!("Invalid subagent model: {}", config.subagent_model))?;
+            let client = make_client(api_key.clone(), subagent_model_id);
 
             explorer_agents.push(SubAgent {
                 id: agent_id,
@@ -251,8 +268,14 @@ impl MultiAgentSystem {
         eprintln!("Multi-agent system initialized successfully");
         eprintln!("- Orchestrator: {} model", config.orchestrator_model);
         eprintln!("- Subagents: {} model", config.subagent_model);
-        eprintln!("- Coder agents: {}", subagents.get(&AgentType::Coder).map_or(0, |v| v.len()));
-        eprintln!("- Explorer agents: {}", subagents.get(&AgentType::Explorer).map_or(0, |v| v.len()));
+        eprintln!(
+            "- Coder agents: {}",
+            subagents.get(&AgentType::Coder).map_or(0, |v| v.len())
+        );
+        eprintln!(
+            "- Explorer agents: {}",
+            subagents.get(&AgentType::Explorer).map_or(0, |v| v.len())
+        );
 
         Ok(Self {
             orchestrator,
@@ -272,12 +295,18 @@ impl MultiAgentSystem {
         required_agent_type: AgentType,
     ) -> Result<OptimizedTaskResult> {
         let start_time = Instant::now();
-        let task_id = format!("task_{}", SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos());
+        let task_id = format!(
+            "task_{}",
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        );
 
-        eprintln!("Starting optimized task execution: {} ({})", task_title, task_id);
+        eprintln!(
+            "Starting optimized task execution: {} ({})",
+            task_title, task_id
+        );
 
         // Create task
         let task_id_result = self.orchestrator.create_task(
@@ -314,14 +343,19 @@ impl MultiAgentSystem {
         // Find available agent
         let agent_id = self.find_available_agent_id(required_agent_type).await?;
 
-        eprintln!("Assigned task {} to agent {} ({:?})", task_id, agent_id, required_agent_type);
+        eprintln!(
+            "Assigned task {} to agent {} ({:?})",
+            task_id, agent_id, required_agent_type
+        );
 
         // Mark agent as busy
-        self.update_agent_status(&agent_id, AgentStatus::Busy(task_id.clone())).await?;
+        self.update_agent_status(&agent_id, AgentStatus::Busy(task_id.clone()))
+            .await?;
 
         // Get agent info for execution (clone the needed data)
         let agent_info = {
-            let agent = self.get_agent_by_id(&agent_id)
+            let agent = self
+                .get_agent_by_id(&agent_id)
                 .ok_or_else(|| anyhow!("Agent {} not found", agent_id))?;
             (agent.id.clone(), agent.agent_type)
         };
@@ -329,29 +363,37 @@ impl MultiAgentSystem {
         // Record active task
         {
             let mut active_tasks = self.session.active_tasks.write().await;
-            active_tasks.insert(task_id.clone(), ActiveTaskInfo {
-                task: task.clone(),
-                agent_id: agent_id.clone(),
-                start_time,
-                status: TaskExecutionStatus::Executing,
-            });
+            active_tasks.insert(
+                task_id.clone(),
+                ActiveTaskInfo {
+                    task: task.clone(),
+                    agent_id: agent_id.clone(),
+                    start_time,
+                    status: TaskExecutionStatus::Executing,
+                },
+            );
         }
 
         // Execute task with the agent
-        let execution_result = self.execute_task_with_agent_id(&task, &agent_id, agent_info.1).await;
+        let execution_result = self
+            .execute_task_with_agent_id(&task, &agent_id, agent_info.1)
+            .await;
 
         // Mark agent as available again
-        self.update_agent_status(&agent_id, AgentStatus::Available).await?;
+        self.update_agent_status(&agent_id, AgentStatus::Available)
+            .await?;
 
         match execution_result {
             Ok(results) => {
                 eprintln!("Task {} completed successfully", task_id);
 
                 // Update task status to verifying
-                self.update_task_status(&task_id, TaskExecutionStatus::Verifying).await?;
+                self.update_task_status(&task_id, TaskExecutionStatus::Verifying)
+                    .await?;
 
                 // Perform verification
-                let verification_result = self.verification
+                let verification_result = self
+                    .verification
                     .verify_task_results(&task, &results, required_agent_type)
                     .await?;
 
@@ -362,27 +404,57 @@ impl MultiAgentSystem {
 
                 // Record performance metrics
                 let task_successful = verification_result.passed && results.warnings.is_empty();
-                self.performance.record_task_execution(
-                    task_id.clone(),
-                    required_agent_type,
-                    perf_start,
-                    start_time.elapsed(),
-                    task_successful,
-                    self.config.subagent_model.clone(),
-                    0, // TODO: Extract actual token counts
-                    0,
-                    verification_result.confidence,
-                ).await?;
+
+                // Extract token counts from the LLM response if available
+                let (input_tokens, output_tokens) = if let Some(response) = &results.llm_response {
+                    // Try to extract token counts from the response
+                    let input_tokens = response
+                        .usage_metadata
+                        .as_ref()
+                        .and_then(|usage| usage.get("prompt_token_count"))
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0) as usize;
+
+                    let output_tokens = response
+                        .usage_metadata
+                        .as_ref()
+                        .and_then(|usage| usage.get("candidates_token_count"))
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0) as usize;
+
+                    (input_tokens, output_tokens)
+                } else {
+                    (0, 0)
+                };
+
+                self.performance
+                    .record_task_execution(
+                        task_id.clone(),
+                        required_agent_type,
+                        perf_start,
+                        start_time.elapsed(),
+                        task_successful,
+                        self.config.subagent_model.clone(),
+                        input_tokens,
+                        output_tokens,
+                        verification_result.confidence,
+                    )
+                    .await?;
 
                 // Update agent statistics
-                self.update_agent_stats(&agent_id, start_time.elapsed(), task_successful).await?;
+                self.update_agent_stats(&agent_id, start_time.elapsed(), task_successful)
+                    .await?;
 
                 // Mark task as completed
-                self.update_task_status(&task_id, if verification_result.passed {
-                    TaskExecutionStatus::Completed
-                } else {
-                    TaskExecutionStatus::Failed("Verification failed".to_string())
-                }).await?;
+                self.update_task_status(
+                    &task_id,
+                    if verification_result.passed {
+                        TaskExecutionStatus::Completed
+                    } else {
+                        TaskExecutionStatus::Failed("Verification failed".to_string())
+                    },
+                )
+                .await?;
 
                 // Move to completed tasks
                 self.session.task_history.push(CompletedTaskInfo {
@@ -412,23 +484,27 @@ impl MultiAgentSystem {
                 eprintln!("Task {} failed: {}", task_id, e);
 
                 // Mark task as failed
-                self.update_task_status(&task_id, TaskExecutionStatus::Failed(e.to_string())).await?;
+                self.update_task_status(&task_id, TaskExecutionStatus::Failed(e.to_string()))
+                    .await?;
 
                 // Record failure in performance monitor
-                self.performance.record_task_execution(
-                    task_id.clone(),
-                    required_agent_type,
-                    perf_start,
-                    start_time.elapsed(),
-                    false,
-                    self.config.subagent_model.clone(),
-                    0,
-                    0,
-                    0.0,
-                ).await?;
+                self.performance
+                    .record_task_execution(
+                        task_id.clone(),
+                        required_agent_type,
+                        perf_start,
+                        start_time.elapsed(),
+                        false,
+                        self.config.subagent_model.clone(),
+                        0, // No tokens on failure
+                        0, // No tokens on failure
+                        0.0,
+                    )
+                    .await?;
 
                 // Update agent statistics
-                self.update_agent_stats(&agent_id, start_time.elapsed(), false).await?;
+                self.update_agent_stats(&agent_id, start_time.elapsed(), false)
+                    .await?;
 
                 Err(e)
             }
@@ -437,7 +513,9 @@ impl MultiAgentSystem {
 
     /// Find an available agent of the specified type and return its ID
     async fn find_available_agent_id(&self, agent_type: AgentType) -> Result<String> {
-        let agents = self.subagents.get(&agent_type)
+        let agents = self
+            .subagents
+            .get(&agent_type)
             .ok_or_else(|| anyhow!("No agents available for type {:?}", agent_type))?;
 
         for agent in agents {
@@ -446,7 +524,10 @@ impl MultiAgentSystem {
             }
         }
 
-        Err(anyhow!("All agents of type {:?} are currently busy", agent_type))
+        Err(anyhow!(
+            "All agents of type {:?} are currently busy",
+            agent_type
+        ))
     }
 
     /// Get agent by ID (helper method)
@@ -462,7 +543,12 @@ impl MultiAgentSystem {
     }
 
     /// Execute a task with a specific agent by ID
-    async fn execute_task_with_agent_id(&self, task: &Task, agent_id: &str, agent_type: AgentType) -> Result<TaskResults> {
+    async fn execute_task_with_agent_id(
+        &self,
+        task: &Task,
+        agent_id: &str,
+        agent_type: AgentType,
+    ) -> Result<TaskResults> {
         // This is a simplified implementation - in reality, this would involve
         // complex LLM interactions, tool usage, etc.
 
@@ -475,7 +561,13 @@ impl MultiAgentSystem {
             executed_commands: vec![format!("execute_task_{}", task.id)],
             summary: format!(
                 "Task '{}' completed by agent {} ({:?})\n\nDescription: {}\n\nExecution details:\n- Agent ID: {}\n- Agent Type: {:?}\n- Timestamp: {:?}",
-                task.title, agent_id, agent_type, task.description, agent_id, agent_type, SystemTime::now()
+                task.title,
+                agent_id,
+                agent_type,
+                task.description,
+                agent_id,
+                agent_type,
+                SystemTime::now()
             ),
             warnings: vec![],
         };
@@ -485,7 +577,8 @@ impl MultiAgentSystem {
 
     /// Execute a task with a specific agent
     async fn execute_task_with_agent(&self, task: &Task, agent: &SubAgent) -> Result<TaskResults> {
-        self.execute_task_with_agent_id(task, &agent.id, agent.agent_type).await
+        self.execute_task_with_agent_id(task, &agent.id, agent.agent_type)
+            .await
     }
 
     /// Update agent status
@@ -511,16 +604,24 @@ impl MultiAgentSystem {
     }
 
     /// Update agent performance statistics
-    async fn update_agent_stats(&mut self, agent_id: &str, execution_time: Duration, success: bool) -> Result<()> {
+    async fn update_agent_stats(
+        &mut self,
+        agent_id: &str,
+        execution_time: Duration,
+        success: bool,
+    ) -> Result<()> {
         for agents in self.subagents.values_mut() {
             for agent in agents {
                 if agent.id == agent_id {
                     agent.stats.tasks_completed += 1;
-                    agent.stats.success_rate = (agent.stats.success_rate * (agent.stats.tasks_completed - 1) as f64 +
-                                               if success { 1.0 } else { 0.0 }) / agent.stats.tasks_completed as f64;
+                    agent.stats.success_rate = (agent.stats.success_rate
+                        * (agent.stats.tasks_completed - 1) as f64
+                        + if success { 1.0 } else { 0.0 })
+                        / agent.stats.tasks_completed as f64;
                     agent.stats.avg_completion_time = Duration::from_millis(
-                        (agent.stats.avg_completion_time.as_millis() as f64 * 0.8 +
-                         execution_time.as_millis() as f64 * 0.2) as u64
+                        (agent.stats.avg_completion_time.as_millis() as f64 * 0.8
+                            + execution_time.as_millis() as f64 * 0.2)
+                            as u64,
                     );
                     agent.stats.last_activity = SystemTime::now();
                     return Ok(());
@@ -538,7 +639,8 @@ impl MultiAgentSystem {
 
         let mut agent_statuses = HashMap::new();
         for (agent_type, agents) in &self.subagents {
-            let statuses: Vec<_> = agents.iter()
+            let statuses: Vec<_> = agents
+                .iter()
                 .map(|a| (a.id.clone(), a.status.clone(), a.stats.clone()))
                 .collect();
             agent_statuses.insert(*agent_type, statuses);
@@ -569,7 +671,10 @@ impl MultiAgentSystem {
             if active_tasks.is_empty() {
                 break;
             }
-            eprintln!("Waiting for {} active tasks to complete...", active_tasks.len());
+            eprintln!(
+                "Waiting for {} active tasks to complete...",
+                active_tasks.len()
+            );
             drop(active_tasks);
             tokio::time::sleep(Duration::from_secs(1)).await;
         }
@@ -578,8 +683,14 @@ impl MultiAgentSystem {
         let report = self.performance.generate_report().await;
         eprintln!("Final performance report:");
         eprintln!("- Total tasks: {}", report.summary.total_tasks);
-        eprintln!("- Success rate: {:.2}%", report.summary.overall_success_rate * 100.0);
-        eprintln!("- Average response time: {:?}", report.summary.avg_response_time);
+        eprintln!(
+            "- Success rate: {:.2}%",
+            report.summary.overall_success_rate * 100.0
+        );
+        eprintln!(
+            "- Average response time: {:?}",
+            report.summary.avg_response_time
+        );
 
         eprintln!("Multi-agent system shutdown complete");
         Ok(())

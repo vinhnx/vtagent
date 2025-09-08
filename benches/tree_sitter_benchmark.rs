@@ -1,15 +1,47 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use vtagent_core::tree_sitter::TreeSitterAnalyzer;
 
-/// Benchmark tree-sitter parsing performance (disabled - module not available)
+/// Benchmark tree-sitter parsing performance
 fn benchmark_tree_sitter_parsing(c: &mut Criterion) {
-    // Disabled due to missing tree_sitter module
     let mut group = c.benchmark_group("tree_sitter");
-    group.bench_function("disabled", |b| {
+
+    // Create a simple test code snippet
+    let test_code = r#"
+    fn main() {
+        println!("Hello, world!");
+        let x = 42;
+        if x > 0 {
+            println!("Positive number");
+        }
+    }
+    "#;
+
+    group.bench_function("parse_rust_code", |b| {
         b.iter(|| {
-            // Placeholder benchmark
-            black_box(42)
+            let mut analyzer = TreeSitterAnalyzer::new().expect("Failed to create analyzer");
+            let tree = analyzer.parse(test_code, vtagent_core::tree_sitter::LanguageSupport::Rust);
+            black_box(tree.is_ok())
         })
     });
+
+    group.bench_function("extract_symbols", |b| {
+        b.iter(|| {
+            let mut analyzer = TreeSitterAnalyzer::new().expect("Failed to create analyzer");
+            if let Ok(tree) =
+                analyzer.parse(test_code, vtagent_core::tree_sitter::LanguageSupport::Rust)
+            {
+                let symbols = analyzer.extract_symbols(
+                    &tree,
+                    test_code,
+                    vtagent_core::tree_sitter::LanguageSupport::Rust,
+                );
+                black_box(symbols.is_ok())
+            } else {
+                black_box(false)
+            }
+        })
+    });
+
     group.finish();
 }
 

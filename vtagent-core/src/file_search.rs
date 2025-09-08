@@ -1,11 +1,11 @@
 //! Recursive file search functionality for VTAgent
-//! 
+//!
 //! This module provides utilities for recursively searching files in a project workspace,
 //! with support for glob patterns, exclusions, and content searching.
 
 use anyhow::{Context, Result};
 use glob::Pattern;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -104,7 +104,7 @@ impl FileSearcher {
             }
 
             let path = entry.path();
-            
+
             // Skip if should be excluded
             if self.should_exclude_path(path)? {
                 continue;
@@ -227,7 +227,7 @@ impl FileSearcher {
             .filter_map(|e| e.ok())
         {
             let path = entry.path();
-            
+
             // Skip if should be excluded
             if self.should_exclude_path(path)? {
                 continue;
@@ -264,12 +264,12 @@ impl FileSearcher {
         // Check file extensions
         if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
             let ext_lower = ext.to_lowercase();
-            
+
             // Check exclude extensions
             if self.config.exclude_extensions.contains(&ext_lower) {
                 return Ok(true);
             }
-            
+
             // Check include extensions (if specified)
             if !self.config.include_extensions.is_empty()
                 && !self.config.include_extensions.contains(&ext_lower)
@@ -303,11 +303,11 @@ impl FileSearcher {
         if pattern.is_empty() {
             return Ok(true);
         }
-        
+
         // Convert to lowercase for case-insensitive matching
         let path_str = path.to_string_lossy().to_lowercase();
         let pattern_lower = pattern.to_lowercase();
-        
+
         // Handle wildcard patterns
         if pattern_lower.contains('*') || pattern_lower.contains('?') {
             // Use glob matching for patterns with wildcards
@@ -315,7 +315,7 @@ impl FileSearcher {
                 return Ok(glob_pattern.matches(&path_str));
             }
         }
-        
+
         // Simple substring match for basic patterns
         Ok(path_str.contains(&pattern_lower))
     }
@@ -406,7 +406,7 @@ mod tests {
     #[test]
     fn test_search_files() -> Result<()> {
         let temp_dir = TempDir::new().unwrap();
-        
+
         // Create test files
         fs::write(temp_dir.path().join("file1.txt"), "content1").unwrap();
         fs::write(temp_dir.path().join("file2.rs"), "content2").unwrap();

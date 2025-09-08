@@ -4,7 +4,7 @@
 //! with all optimization features enabled.
 
 use crate::agent::integration::{MultiAgentSystem, OptimizedTaskResult};
-use crate::agent::multi_agent::{MultiAgentConfig, AgentType};
+use crate::agent::multi_agent::{AgentType, MultiAgentConfig};
 use crate::config::{MultiAgentDefaults, ScenarioDefaults};
 use crate::models::ModelId;
 use anyhow::Result;
@@ -31,16 +31,17 @@ pub async fn demonstrate_multi_agent_system() -> Result<()> {
     };
 
     // Initialize system (requires actual API key in real usage)
-    let api_key = std::env::var("GEMINI_API_KEY")
-        .unwrap_or_else(|_| "demo_key".to_string());
+    let api_key = std::env::var("GEMINI_API_KEY").unwrap_or_else(|_| "demo_key".to_string());
 
-    let workspace = std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."));
+    let workspace = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
     println!("Configuration:");
     println!("  - Orchestrator Model: {}", config.orchestrator_model);
     println!("  - Subagent Model: {}", config.subagent_model);
-    println!("  - Max Concurrent Agents: {}", config.max_concurrent_subagents);
+    println!(
+        "  - Max Concurrent Agents: {}",
+        config.max_concurrent_subagents
+    );
     println!("  - Task Timeout: {:?}", config.task_timeout);
 
     // Create multi-agent system
@@ -56,7 +57,8 @@ pub async fn demonstrate_multi_agent_system() -> Result<()> {
         "Analyze Rust Code Structure",
         "Analyze the structure of the multi-agent system code and identify key components",
         AgentType::Explorer,
-    ).await?;
+    )
+    .await?;
 
     print_task_result(&result1, 1);
 
@@ -67,7 +69,8 @@ pub async fn demonstrate_multi_agent_system() -> Result<()> {
         "Implement Error Handler",
         "Create a robust error handling mechanism for the agent communication system",
         AgentType::Coder,
-    ).await?;
+    )
+    .await?;
 
     print_task_result(&result2, 2);
 
@@ -78,7 +81,8 @@ pub async fn demonstrate_multi_agent_system() -> Result<()> {
         "Design Scalability Solution",
         "Design a solution for scaling the multi-agent system to handle 100+ concurrent tasks",
         AgentType::Orchestrator,
-    ).await?;
+    )
+    .await?;
 
     print_task_result(&result3, 3);
 
@@ -113,11 +117,9 @@ async fn execute_example_task(
     println!("     Agent Type: {:?}", agent_type);
     println!("     Description: {}", description);
 
-    let result = system.execute_task_optimized(
-        title.to_string(),
-        description.to_string(),
-        agent_type,
-    ).await?;
+    let result = system
+        .execute_task_optimized(title.to_string(), description.to_string(), agent_type)
+        .await?;
 
     Ok(result)
 }
@@ -130,8 +132,14 @@ fn print_task_result(result: &OptimizedTaskResult, task_num: usize) {
     println!("     Execution Time: {:?}", result.execution_time);
     println!("     Success: {}", result.results.warnings.is_empty());
     println!("     Verification Passed: {}", result.verification.passed);
-    println!("     Confidence Score: {:.2}", result.verification.confidence);
-    println!("     Completeness Score: {:.2}", result.verification.completeness);
+    println!(
+        "     Confidence Score: {:.2}",
+        result.verification.confidence
+    );
+    println!(
+        "     Completeness Score: {:.2}",
+        result.verification.completeness
+    );
 
     if !result.results.warnings.is_empty() {
         println!("     Warnings: {:?}", result.results.warnings);
@@ -167,24 +175,50 @@ fn print_status_report(status: &crate::agent::integration::SystemStatusReport) {
             println!("      {} - {:?}", id, status);
             println!("        Tasks Completed: {}", stats.tasks_completed);
             println!("        Success Rate: {:.2}%", stats.success_rate * 100.0);
-            println!("        Avg Completion Time: {:?}", stats.avg_completion_time);
+            println!(
+                "        Avg Completion Time: {:?}",
+                stats.avg_completion_time
+            );
         }
     }
 
     println!("  \n  Performance Summary:");
-    if let Some(success_rate) = status.performance_metrics.success_rate.get(&AgentType::Coder) {
+    if let Some(success_rate) = status
+        .performance_metrics
+        .success_rate
+        .get(&AgentType::Coder)
+    {
         println!("    Coder Success Rate: {:.2}%", success_rate * 100.0);
     }
-    if let Some(success_rate) = status.performance_metrics.success_rate.get(&AgentType::Explorer) {
+    if let Some(success_rate) = status
+        .performance_metrics
+        .success_rate
+        .get(&AgentType::Explorer)
+    {
         println!("    Explorer Success Rate: {:.2}%", success_rate * 100.0);
     }
 
     println!("  \n  Verification Statistics:");
-    println!("    Total Verifications: {}", status.verification_statistics.total_verifications);
-    println!("    Passed Verifications: {}", status.verification_statistics.passed_verifications);
-    println!("    Success Rate: {:.2}%", status.verification_statistics.success_rate * 100.0);
-    println!("    Avg Confidence: {:.2}", status.verification_statistics.avg_confidence);
-    println!("    Avg Completeness: {:.2}", status.verification_statistics.avg_completeness);
+    println!(
+        "    Total Verifications: {}",
+        status.verification_statistics.total_verifications
+    );
+    println!(
+        "    Passed Verifications: {}",
+        status.verification_statistics.passed_verifications
+    );
+    println!(
+        "    Success Rate: {:.2}%",
+        status.verification_statistics.success_rate * 100.0
+    );
+    println!(
+        "    Avg Confidence: {:.2}",
+        status.verification_statistics.avg_confidence
+    );
+    println!(
+        "    Avg Completeness: {:.2}",
+        status.verification_statistics.avg_completeness
+    );
 }
 
 /// Demonstrate performance optimization features
@@ -194,8 +228,12 @@ async fn demonstrate_performance_features(status: &crate::agent::integration::Sy
     if !status.recommendations.is_empty() {
         println!("    Current Recommendations:");
         for (i, rec) in status.recommendations.iter().enumerate() {
-            println!("      {}. {} (Expected improvement: {:.1}%)",
-                     i + 1, rec.description, rec.expected_improvement * 100.0);
+            println!(
+                "      {}. {} (Expected improvement: {:.1}%)",
+                i + 1,
+                rec.description,
+                rec.expected_improvement * 100.0
+            );
             println!("         Complexity: {:?}", rec.complexity);
         }
     } else {
@@ -207,16 +245,24 @@ async fn demonstrate_performance_features(status: &crate::agent::integration::Sy
     // Analyze queue performance
     let queue_stats = &status.performance_metrics.queue_stats;
     println!("    Queue Performance:");
-    println!("      Average Queue Length: {:.1}", queue_stats.avg_queue_length);
+    println!(
+        "      Average Queue Length: {:.1}",
+        queue_stats.avg_queue_length
+    );
     println!("      Peak Queue Length: {}", queue_stats.peak_queue_length);
     println!("      Average Wait Time: {:?}", queue_stats.avg_wait_time);
-    println!("      Processing Rate: {:.2} tasks/min", queue_stats.processing_rate);
+    println!(
+        "      Processing Rate: {:.2} tasks/min",
+        queue_stats.processing_rate
+    );
 
     // Resource utilization
     let resources = &status.performance_metrics.resource_utilization;
     println!("    Resource Utilization:");
-    println!("      Memory Usage: {:.1} MB (Peak: {:.1} MB)",
-             resources.memory_usage.current_mb, resources.memory_usage.peak_mb);
+    println!(
+        "      Memory Usage: {:.1} MB (Peak: {:.1} MB)",
+        resources.memory_usage.current_mb, resources.memory_usage.peak_mb
+    );
     println!("      CPU Utilization: {:.1}%", resources.cpu_utilization);
     println!("      Concurrent Agents: {}", resources.concurrent_agents);
 
@@ -226,7 +272,10 @@ async fn demonstrate_performance_features(status: &crate::agent::integration::Sy
         println!("      {}:", model_id);
         println!("        Avg Response Time: {:?}", perf.avg_response_time);
         println!("        Success Rate: {:.2}%", perf.success_rate * 100.0);
-        println!("        Quality Score: {:.2}", perf.quality_scores.avg_confidence);
+        println!(
+            "        Quality Score: {:.2}",
+            perf.quality_scores.avg_confidence
+        );
     }
 }
 
@@ -280,7 +329,7 @@ pub fn create_specialized_configs() -> Vec<(String, MultiAgentConfig)> {
                 context_window_size: ScenarioDefaults::HIGH_PERF_CONTEXT_WINDOW,
                 max_context_items: ScenarioDefaults::HIGH_PERF_MAX_CONTEXTS,
                 ..Default::default()
-            }
+            },
         ),
         (
             "High Quality".to_string(),
@@ -296,7 +345,7 @@ pub fn create_specialized_configs() -> Vec<(String, MultiAgentConfig)> {
                 context_window_size: ScenarioDefaults::HIGH_QUALITY_CONTEXT_WINDOW,
                 max_context_items: ScenarioDefaults::HIGH_QUALITY_MAX_CONTEXTS,
                 ..Default::default()
-            }
+            },
         ),
         (
             "Balanced".to_string(),
@@ -312,7 +361,7 @@ pub fn create_specialized_configs() -> Vec<(String, MultiAgentConfig)> {
                 context_window_size: ScenarioDefaults::BALANCED_CONTEXT_WINDOW,
                 max_context_items: ScenarioDefaults::BALANCED_MAX_CONTEXTS,
                 ..Default::default()
-            }
+            },
         ),
     ]
 }
@@ -343,7 +392,9 @@ mod tests {
         let performance_config = &configs[0].1;
         let quality_config = &configs[1].1;
 
-        assert!(performance_config.max_concurrent_subagents > quality_config.max_concurrent_subagents);
+        assert!(
+            performance_config.max_concurrent_subagents > quality_config.max_concurrent_subagents
+        );
         assert!(quality_config.task_timeout > performance_config.task_timeout);
     }
 }

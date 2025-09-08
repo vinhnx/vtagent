@@ -1,18 +1,18 @@
+pub mod python;
 pub mod rust;
 pub mod typescript;
-pub mod python;
 
-use crate::code_completion::engine::CompletionSuggestion;
 use crate::code_completion::context::CompletionContext;
+use crate::code_completion::engine::CompletionSuggestion;
 
 /// Language-specific completion provider trait
 pub trait LanguageProvider {
     /// Get language-specific completions
     fn get_completions(&self, context: &CompletionContext) -> Vec<CompletionSuggestion>;
-    
+
     /// Get language name
     fn language_name(&self) -> &str;
-    
+
     /// Check if this provider supports the given language
     fn supports_language(&self, language: &str) -> bool;
 }
@@ -27,12 +27,12 @@ impl LanguageRegistry {
         let mut registry = Self {
             providers: Vec::new(),
         };
-        
+
         // Register default providers
         registry.register(Box::new(rust::RustProvider::new()));
         registry.register(Box::new(typescript::TypeScriptProvider::new()));
         registry.register(Box::new(python::PythonProvider::new()));
-        
+
         registry
     }
 

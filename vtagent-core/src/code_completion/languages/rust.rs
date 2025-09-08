@@ -1,6 +1,6 @@
 use super::LanguageProvider;
-use crate::code_completion::engine::{CompletionSuggestion, CompletionKind};
 use crate::code_completion::context::CompletionContext;
+use crate::code_completion::engine::{CompletionKind, CompletionSuggestion};
 
 /// Rust-specific completion provider
 pub struct RustProvider;

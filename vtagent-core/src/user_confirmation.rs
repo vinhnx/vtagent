@@ -15,9 +15,13 @@ impl UserConfirmation {
     /// Ask for confirmation before switching to the most capable model (Gemini 2.5 Pro)
     /// This is critical for ensuring user control over potentially expensive operations
     pub fn confirm_pro_model_usage(current_model: &str) -> Result<bool> {
+        use crate::constants::models;
         println!("{}", style("Model Upgrade Required").yellow().bold());
         println!("Current model: {}", style(current_model).cyan());
-        println!("Requested model: {}", style("gemini-2.5-pro").cyan().bold());
+        println!(
+            "Requested model: {}",
+            style(models::GEMINI_2_5_PRO).cyan().bold()
+        );
         println!();
         println!("The Gemini 2.5 Pro model is the most capable but also:");
         println!("• More expensive per token");
@@ -98,13 +102,13 @@ impl UserConfirmation {
                 println!("• Fast and efficient");
                 println!("• Lower costs");
                 println!("• Direct implementation");
-            },
+            }
             AgentMode::MultiAgent => {
                 println!("{}", style("Selected: Multi-Agent System").green());
                 println!("• Specialized expertise");
                 println!("• Parallel execution");
                 println!("• Enhanced verification");
-            },
+            }
         }
 
         Ok(mode)
@@ -137,14 +141,23 @@ impl UserConfirmation {
 
         match complexity {
             TaskComplexity::Simple => {
-                println!("{}", style("Simple task - Single agent recommended").green());
-            },
+                println!(
+                    "{}",
+                    style("Simple task - Single agent recommended").green()
+                );
+            }
             TaskComplexity::Moderate => {
-                println!("{}", style("Moderate task - Single agent usually sufficient").yellow());
-            },
+                println!(
+                    "{}",
+                    style("Moderate task - Single agent usually sufficient").yellow()
+                );
+            }
             TaskComplexity::Complex => {
-                println!("{}", style("Complex task - Multi-agent mode recommended").blue());
-            },
+                println!(
+                    "{}",
+                    style("Complex task - Multi-agent mode recommended").blue()
+                );
+            }
         }
 
         Ok(complexity)

@@ -162,6 +162,7 @@ impl SnapshotManager {
     pub async fn create_snapshot(
         &self,
         agent: &Agent,
+        conversation_history: &[crate::gemini::Content],
         turn_number: usize,
         description: &str,
     ) -> Result<String> {
@@ -170,15 +171,25 @@ impl SnapshotManager {
         }
 
         // Extract agent state
-        let snapshot = self
+        let mut snapshot = self
             .extract_agent_state(agent, turn_number, description)
             .await?;
+
+        // Add conversation history to the snapshot
+        snapshot.conversation_history = conversation_history.to_vec();
 
         // Serialize to JSON
         let json_data = serde_json::to_string_pretty(&snapshot)?;
 
         // Calculate checksum
-        let _checksum = self.calculate_checksum(&json_data);
+        let checksum = self.calculate_checksum(&json_data);
+        snapshot.checksum = checksum.clone();
+
+        // Update metadata size
+        snapshot.metadata.size_bytes = json_data.len();
+
+        // Serialize again with updated checksum and size
+        let json_data = serde_json::to_string_pretty(&snapshot)?;
 
         // Create snapshot filename
         let filename = format!("turn_{}.json", turn_number);
@@ -326,44 +337,96 @@ impl SnapshotManager {
             verbose: agent.config().verbose,
         };
 
+        // Extract decision tracker data
+        let decision_tracker_data = agent.decision_tracker().generate_transparency_report();
         let decision_tracker = DecisionTrackerSnapshot {
-            total_decisions: 10,                            // Placeholder
-            successful_decisions: 8,                        // Placeholder
-            failed_decisions: 2,                            // Placeholder
-            recent_decisions: vec![],                       // Placeholder
-            available_tools: vec!["test_tool".to_string()], // Placeholder
+            total_decisions: decision_tracker_data.total_decisions,
+            successful_decisions: decision_tracker_data.successful_decisions,
+            failed_decisions: decision_tracker_data.failed_decisions,
+            recent_decisions: decision_tracker_data
+                .recent_decisions
+                .iter()
+                .map(|d| format!("Decision {}: {}", d.id, d.reasoning))
+                .collect(),
+            available_tools: agent
+                .decision_tracker()
+                .get_current_context()
+                .available_tools
+                .clone(),
         };
 
+        // Extract error recovery data
+        let error_stats = agent.error_recovery().get_error_statistics();
         let error_recovery = ErrorRecoverySnapshot {
-            total_errors: 0,           // Placeholder
-            resolved_errors: 0,        // Placeholder
-            error_patterns: vec![],    // Placeholder
-            recovery_attempts: vec![], // Placeholder
+            total_errors: error_stats.total_errors,
+            resolved_errors: error_stats.resolved_errors,
+            error_patterns: error_stats
+                .errors_by_type
+                .iter()
+                .map(|(error_type, count)| format!("{:?}: {}", error_type, count))
+                .collect(),
+            recovery_attempts: error_stats
+                .recent_errors
+                .iter()
+                .map(|e| format!("Error {}: {}", e.id, e.message))
+                .collect(),
         };
 
+        // Extract summarizer data
+        let summaries = agent.summarizer().get_summaries();
         let summarizer = SummarizerSnapshot {
-            total_summaries: 0,      // Placeholder
-            latest_summary: None,    // Placeholder
-            summary_history: vec![], // Placeholder
+            total_summaries: summaries.len(),
+            latest_summary: agent
+                .summarizer()
+                .get_latest_summary()
+                .map(|s| s.summary_text.clone()),
+            summary_history: summaries.iter().map(|s| s.summary_text.clone()).collect(),
         };
 
+        // Extract compaction engine data
+        let compaction_stats = agent
+            .compaction_engine()
+            .get_statistics()
+            .await
+            .unwrap_or_default();
+        let compaction_suggestions = agent
+            .compaction_engine()
+            .get_compaction_suggestions()
+            .await
+            .unwrap_or_default();
         let compaction_engine = CompactionEngineSnapshot {
-            total_compactions: 0,           // Placeholder
-            memory_saved: 0,                // Placeholder
-            compression_ratio: 1.0,         // Placeholder
-            compaction_suggestions: vec![], // Placeholder
+            total_compactions: compaction_stats.total_messages,
+            memory_saved: compaction_stats.total_memory_usage,
+            compression_ratio: compaction_stats.compression_ratio,
+            compaction_suggestions: compaction_suggestions
+                .iter()
+                .map(|s| format!("Suggestion: {:?}", s))
+                .collect(),
         };
 
+        // Extract tree-sitter analyzer data
+        let tree_sitter_analyzer = agent.tree_sitter_analyzer();
         let tree_sitter_state = TreeSitterSnapshot {
-            loaded_languages: vec![], // Placeholder
-            total_analyses: 0,        // Placeholder
-            cache_size: 0,            // Placeholder
+            loaded_languages: tree_sitter_analyzer
+                .supported_languages()
+                .iter()
+                .map(|l| format!("{}", l))
+                .collect(),
+            total_analyses: tree_sitter_analyzer
+                .get_parser_stats()
+                .get("supported_languages")
+                .copied()
+                .unwrap_or(0),
+            cache_size: 0, // Would need to implement cache size tracking
         };
 
+        // Extract tool registry data
+        let tool_registry_ref = agent.tool_registry();
+        let tool_usage_stats = std::collections::HashMap::new(); // Would need to implement actual tool usage tracking
         let tool_registry = ToolRegistrySnapshot {
-            total_tools: 0,                   // Placeholder
-            available_tools: vec![],          // Placeholder
-            tool_usage_stats: HashMap::new(), // Placeholder
+            total_tools: tool_registry_ref.available_tools().len(),
+            available_tools: tool_registry_ref.available_tools(),
+            tool_usage_stats,
         };
 
         let environment = std::env::vars().collect();
@@ -372,7 +435,7 @@ impl SnapshotManager {
             metadata,
             config,
             session_info: agent.session_info().clone(),
-            conversation_history: vec![], // Placeholder - would extract from agent in full implementation
+            conversation_history: vec![], // This will be filled when creating the snapshot
             decision_tracker,
             error_recovery,
             summarizer,
@@ -380,14 +443,7 @@ impl SnapshotManager {
             tree_sitter_state,
             tool_registry,
             environment,
-            performance_metrics: crate::performance_monitor::PerformanceMetrics {
-                response_times: vec![std::time::Duration::from_millis(200)],
-                cache_hit_rate: 0.8,
-                memory_usage: 50,
-                error_rate: 0.0,
-                throughput: 10,
-                context_accuracy: 0.9,
-            },
+            performance_metrics: agent.performance_metrics(),
             checksum: String::new(), // Will be set after serialization
         })
     }
@@ -563,15 +619,15 @@ mod tests {
         let manager = SnapshotManager::new(config);
 
         let test_data = "test data for checksum";
-        let _checksum = manager.calculate_checksum(test_data);
-        assert!(!_checksum.is_empty());
+        let checksum = manager.calculate_checksum(test_data);
+        assert!(!checksum.is_empty());
 
         // Same data should produce same checksum
         let checksum2 = manager.calculate_checksum(test_data);
-        assert_eq!(_checksum, checksum2);
+        assert_eq!(checksum, checksum2);
 
         // Different data should produce different checksum
         let checksum3 = manager.calculate_checksum("different data");
-        assert_ne!(_checksum, checksum3);
+        assert_ne!(checksum, checksum3);
     }
 }

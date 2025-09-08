@@ -1,7 +1,10 @@
-use super::super::provider::{LLMProvider, LLMRequest, LLMResponse, LLMError, Message, MessageRole, ToolCall, Usage, FinishReason};
+use super::super::provider::{
+    FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
+    Usage,
+};
 use async_trait::async_trait;
 use reqwest::Client as HttpClient;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 pub struct GeminiProvider {
     api_key: String,
@@ -27,13 +30,14 @@ impl LLMProvider for GeminiProvider {
 
     async fn generate(&self, request: LLMRequest) -> Result<LLMResponse, LLMError> {
         let gemini_request = self.convert_to_gemini_format(&request)?;
-        
+
         let url = format!(
             "{}/models/{}:generateContent?key={}",
             self.base_url, request.model, self.api_key
         );
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .post(&url)
             .json(&gemini_request)
             .send()
@@ -43,27 +47,35 @@ impl LLMProvider for GeminiProvider {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            return Err(LLMError::Provider(format!("HTTP {}: {}", status, error_text)));
+            return Err(LLMError::Provider(format!(
+                "HTTP {}: {}",
+                status, error_text
+            )));
         }
 
-        let gemini_response: Value = response.json().await
+        let gemini_response: Value = response
+            .json()
+            .await
             .map_err(|e| LLMError::Provider(e.to_string()))?;
 
         self.convert_from_gemini_format(gemini_response)
     }
 
     fn supported_models(&self) -> Vec<String> {
+        use crate::constants::models;
         vec![
-            "gemini-2.5-flash".to_string(),
-            "gemini-2.5-flash-lite".to_string(),
-            "gemini-1.5-pro".to_string(),
-            "gemini-1.5-flash".to_string(),
+            models::GEMINI_2_5_FLASH.to_string(),
+            models::GEMINI_2_5_FLASH_LITE.to_string(),
+            models::GEMINI_2_5_PRO.to_string(),
         ]
     }
 
     fn validate_request(&self, request: &LLMRequest) -> Result<(), LLMError> {
         if !self.supported_models().contains(&request.model) {
-            return Err(LLMError::InvalidRequest(format!("Unsupported model: {}", request.model)));
+            return Err(LLMError::InvalidRequest(format!(
+                "Unsupported model: {}",
+                request.model
+            )));
         }
         Ok(())
     }
@@ -72,7 +84,7 @@ impl LLMProvider for GeminiProvider {
 impl GeminiProvider {
     fn convert_to_gemini_format(&self, request: &LLMRequest) -> Result<Value, LLMError> {
         let mut contents = Vec::new();
-        
+
         for message in &request.messages {
             let role = match message.role {
                 MessageRole::User => "user",
@@ -80,14 +92,14 @@ impl GeminiProvider {
                 MessageRole::System => continue,
                 MessageRole::Tool => "function",
             };
-            
+
             let mut parts = Vec::new();
-            
+
             // Add text content if present
             if !message.content.is_empty() {
                 parts.push(json!({"text": message.content}));
             }
-            
+
             // Add function calls for assistant messages
             if message.role == MessageRole::Assistant {
                 if let Some(tool_calls) = &message.tool_calls {
@@ -101,7 +113,7 @@ impl GeminiProvider {
                     }
                 }
             }
-            
+
             // Add function response for tool messages
             if message.role == MessageRole::Tool {
                 if let Some(tool_calls) = &message.tool_calls {
@@ -117,7 +129,7 @@ impl GeminiProvider {
                     }
                 }
             }
-            
+
             contents.push(json!({
                 "role": role,
                 "parts": parts
@@ -136,15 +148,18 @@ impl GeminiProvider {
 
         // Add tools if present
         if let Some(tools) = &request.tools {
-            let gemini_tools: Vec<Value> = tools.iter().map(|tool| {
-                json!({
-                    "functionDeclarations": [{
-                        "name": tool.name,
-                        "description": tool.description,
-                        "parameters": tool.parameters
-                    }]
+            let gemini_tools: Vec<Value> = tools
+                .iter()
+                .map(|tool| {
+                    json!({
+                        "functionDeclarations": [{
+                            "name": tool.name,
+                            "description": tool.description,
+                            "parameters": tool.parameters
+                        }]
+                    })
                 })
-            }).collect();
+                .collect();
             gemini_request["tools"] = json!(gemini_tools);
         }
 
@@ -152,13 +167,16 @@ impl GeminiProvider {
     }
 
     fn convert_from_gemini_format(&self, response: Value) -> Result<LLMResponse, LLMError> {
-        let candidates = response["candidates"].as_array()
+        let candidates = response["candidates"]
+            .as_array()
             .ok_or_else(|| LLMError::Provider("No candidates in response".to_string()))?;
 
-        let candidate = candidates.first()
+        let candidate = candidates
+            .first()
             .ok_or_else(|| LLMError::Provider("No candidate in response".to_string()))?;
 
-        let parts = candidate["content"]["parts"].as_array()
+        let parts = candidate["content"]["parts"]
+            .as_array()
             .ok_or_else(|| LLMError::Provider("No parts in response".to_string()))?;
 
         let mut text_content = String::new();
@@ -189,8 +207,16 @@ impl GeminiProvider {
         };
 
         Ok(LLMResponse {
-            content: if text_content.is_empty() { None } else { Some(text_content) },
-            tool_calls: if tool_calls.is_empty() { None } else { Some(tool_calls) },
+            content: if text_content.is_empty() {
+                None
+            } else {
+                Some(text_content)
+            },
+            tool_calls: if tool_calls.is_empty() {
+                None
+            } else {
+                Some(tool_calls)
+            },
             usage: None, // Gemini doesn't provide usage in basic response
             finish_reason,
         })

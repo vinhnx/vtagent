@@ -4,7 +4,7 @@
 //! including retry mechanisms with exponential backoff and fallback strategies.
 
 use crate::models::ModelId;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
@@ -156,28 +156,26 @@ impl RetryManager {
 
         // If we have a fallback model and primary failed, try fallback
         if let Some(fallback) = fallback_model {
-        eprintln!(
-            "Primary model {} failed after {} attempts. Trying fallback model {}",
-            primary_model,
-            self.config.max_retries + 1,
-            fallback
-        );            self.stats.fallback_activations += 1;
+            eprintln!(
+                "Primary model {} failed after {} attempts. Trying fallback model {}",
+                primary_model,
+                self.config.max_retries + 1,
+                fallback
+            );
+            self.stats.fallback_activations += 1;
 
             match operation(fallback.clone()).await {
                 Ok(result) => {
                     eprintln!(
                         "Fallback model {} succeeded for operation '{}'",
-                        fallback,
-                        operation_name
+                        fallback, operation_name
                     );
                     return Ok(result);
                 }
                 Err(err) => {
                     eprintln!(
                         "Fallback model {} also failed for operation '{}': {}",
-                        fallback,
-                        operation_name,
-                        err
+                        fallback, operation_name, err
                     );
                 }
             }
@@ -217,7 +215,7 @@ pub fn is_empty_response(response: &serde_json::Value) -> bool {
                 serde_json::Value::Array(arr) => arr.is_empty(),
                 _ => false,
             }))
-        },
+        }
         serde_json::Value::Array(arr) => arr.is_empty(),
         _ => false,
     }
@@ -228,16 +226,16 @@ pub fn is_retryable_error(error: &anyhow::Error) -> bool {
     let error_msg = error.to_string().to_lowercase();
 
     // Common temporary error patterns
-    error_msg.contains("timeout") ||
-    error_msg.contains("rate limit") ||
-    error_msg.contains("503") ||
-    error_msg.contains("502") ||
-    error_msg.contains("500") ||
-    error_msg.contains("connection") ||
-    error_msg.contains("network") ||
-    error_msg.contains("temporary") ||
-    error_msg.contains("overloaded") ||
-    error_msg.contains("quota")
+    error_msg.contains("timeout")
+        || error_msg.contains("rate limit")
+        || error_msg.contains("503")
+        || error_msg.contains("502")
+        || error_msg.contains("500")
+        || error_msg.contains("connection")
+        || error_msg.contains("network")
+        || error_msg.contains("temporary")
+        || error_msg.contains("overloaded")
+        || error_msg.contains("quota")
 }
 
 #[cfg(test)]
@@ -258,7 +256,9 @@ mod tests {
 
         assert!(!is_empty_response(&json!("hello")));
         assert!(!is_empty_response(&json!({"content": "hello"})));
-        assert!(!is_empty_response(&json!({"candidates": [{"content": "hello"}]})));
+        assert!(!is_empty_response(
+            &json!({"candidates": [{"content": "hello"}]})
+        ));
     }
 
     #[test]

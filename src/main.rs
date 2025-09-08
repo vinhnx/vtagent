@@ -11,17 +11,19 @@ use serde_json::json;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use vtagent_core::constants::defaults;
 use vtagent_core::llm::{BackendKind, make_client};
 use vtagent_core::tools::{ToolRegistry, build_function_declarations};
 use vtagent_core::{
     agent::multi_agent::{ContextStore, TaskManager},
+    cli::tool_policy_commands::{ToolPolicyCommands, handle_tool_policy_command},
     config::{ConfigManager, ToolPolicy, VTAgentConfig},
     gemini::{Content, FunctionResponse, GenerateContentRequest, Part, Tool, ToolConfig},
-    models::{Provider, ModelId},
+    models::{ModelId, Provider},
     prompts::system::{SystemPromptConfig, generate_system_instruction_with_config},
     safety::SafetyValidator,
     types::AgentConfig as CoreAgentConfig,
-    user_confirmation::{UserConfirmation, AgentMode},
+    user_confirmation::{AgentMode, UserConfirmation},
 };
 use walkdir::WalkDir;
 
@@ -36,11 +38,11 @@ mod multi_agent_loop;
 )]
 pub struct Cli {
     /// Gemini model ID (e.g., gemini-2.5-flash-lite)
-    #[arg(long, global = true, default_value = "gemini-2.5-flash-lite")]
+    #[arg(long, global = true, default_value = defaults::DEFAULT_CLI_MODEL)]
     pub model: String,
 
     /// API key environment variable to read
-    #[arg(long, global = true, default_value = "GEMINI_API_KEY")]
+    #[arg(long, global = true, default_value = defaults::DEFAULT_API_KEY_ENV)]
     pub api_key_env: String,
 
     /// Workspace root directory for file operations
@@ -107,6 +109,12 @@ pub enum Commands {
         /// Case sensitive (default false)
         #[arg(long, default_value_t = false)]
         case_sensitive: bool,
+    },
+    /// Manage tool execution policies
+    #[command(name = "tool-policy")]
+    ToolPolicy {
+        #[command(subcommand)]
+        command: ToolPolicyCommands,
     },
 }
 
@@ -191,10 +199,14 @@ async fn main() -> Result<()> {
             Ok(provider) => {
                 if vtcode_config.multi_agent.enabled {
                     // For multi-agent mode, use orchestrator model
-                    ModelId::default_orchestrator_for_provider(provider).as_str().to_string()
+                    ModelId::default_orchestrator_for_provider(provider)
+                        .as_str()
+                        .to_string()
                 } else {
                     // For single agent mode, use single agent model
-                    ModelId::default_single_for_provider(provider).as_str().to_string()
+                    ModelId::default_single_for_provider(provider)
+                        .as_str()
+                        .to_string()
                 }
             }
             Err(_) => {
@@ -214,7 +226,7 @@ async fn main() -> Result<()> {
         BackendKind::Anthropic => "anthropic",
         BackendKind::OpenAi => "openai",
     };
-    
+
     let api_key = if !args.api_key_env.is_empty() && args.api_key_env != "GEMINI_API_KEY" {
         // Use explicit API key environment variable from command line
         std::env::var(&args.api_key_env)
@@ -237,7 +249,7 @@ async fn main() -> Result<()> {
     let validated_model = SafetyValidator::validate_model_usage(
         &config.model,
         Some("Interactive coding session"),
-        args.skip_confirmations
+        args.skip_confirmations,
     )?;
 
     // Update config with validated model
@@ -292,10 +304,15 @@ async fn main() -> Result<()> {
                         println!("2. Adjust .vtagentgitignore to control agent file access");
                         println!("3. Run 'vtcode chat' to start the interactive agent");
                     }
-                    
+
                     // Run vtagent after initialization if requested
                     if run {
-                        println!("\n{}", style("Running vtagent after initialization...").blue().bold());
+                        println!(
+                            "\n{}",
+                            style("Running vtagent after initialization...")
+                                .blue()
+                                .bold()
+                        );
                         // In a real implementation, this would start the agent
                         // For now, we'll just print a message
                         println!("vtagent is now running!");
@@ -368,6 +385,9 @@ async fn main() -> Result<()> {
                 }
             }
         }
+        Commands::ToolPolicy { command } => {
+            handle_tool_policy_command(command).await?;
+        }
     }
 
     if args.verbose {
@@ -389,7 +409,11 @@ async fn main() -> Result<()> {
 }
 
 /// Handle the chat command
-async fn handle_chat_command(config: &CoreAgentConfig, force_multi_agent: bool, skip_confirmations: bool) -> Result<()> {
+async fn handle_chat_command(
+    config: &CoreAgentConfig,
+    force_multi_agent: bool,
+    skip_confirmations: bool,
+) -> Result<()> {
     eprintln!("[DEBUG] Entering handle_chat_command");
     eprintln!("[DEBUG] Workspace: {:?}", config.workspace);
     eprintln!("[DEBUG] Model: {}", config.model);
@@ -405,7 +429,11 @@ async fn handle_chat_command(config: &CoreAgentConfig, force_multi_agent: bool, 
     println!();
 
     // Create model-agnostic client
-    let mut client = make_client(config.api_key.clone(), config.model.clone());
+    let model_id = config
+        .model
+        .parse::<ModelId>()
+        .map_err(|_| anyhow!("Invalid model: {}", config.model))?;
+    let mut client = make_client(config.api_key.clone(), model_id);
 
     // Initialize tool registry and function declarations
     let tool_registry = ToolRegistry::new(config.workspace.clone());
@@ -421,18 +449,36 @@ async fn handle_chat_command(config: &CoreAgentConfig, force_multi_agent: bool, 
     let vtcode_config = config_manager.config();
 
     // Debug: Configuration loaded
-    eprintln!("[DEBUG] Configuration loaded from: {:?}", config.workspace.join("vtagent.toml"));
-    eprintln!("[DEBUG] Multi-agent enabled: {}", vtcode_config.multi_agent.enabled);
-    eprintln!("[DEBUG] Multi-agent execution mode: {}", vtcode_config.multi_agent.execution_mode);
-    eprintln!("[DEBUG] Default model: {}", vtcode_config.agent.default_model);
-    eprintln!("[DEBUG] Orchestrator model: {}", vtcode_config.multi_agent.orchestrator_model);
-    eprintln!("[DEBUG] Subagent model: {}", vtcode_config.multi_agent.subagent_model);
+    eprintln!(
+        "[DEBUG] Configuration loaded from: {:?}",
+        config.workspace.join("vtagent.toml")
+    );
+    eprintln!(
+        "[DEBUG] Multi-agent enabled: {}",
+        vtcode_config.multi_agent.enabled
+    );
+    eprintln!(
+        "[DEBUG] Multi-agent execution mode: {}",
+        vtcode_config.multi_agent.execution_mode
+    );
+    eprintln!(
+        "[DEBUG] Default model: {}",
+        vtcode_config.agent.default_model
+    );
+    eprintln!(
+        "[DEBUG] Orchestrator model: {}",
+        vtcode_config.multi_agent.orchestrator_model
+    );
+    eprintln!(
+        "[DEBUG] Subagent model: {}",
+        vtcode_config.multi_agent.subagent_model
+    );
 
     // Apply safety validation for agent mode selection
     // Default to single-agent mode for efficiency and cost control
-    let requested_multi_agent = vtcode_config.multi_agent.enabled &&
-        (vtcode_config.multi_agent.execution_mode == "multi" ||
-         vtcode_config.multi_agent.execution_mode == "auto");
+    let requested_multi_agent = vtcode_config.multi_agent.enabled
+        && (vtcode_config.multi_agent.execution_mode == "multi"
+            || vtcode_config.multi_agent.execution_mode == "auto");
 
     // Validate agent mode with user confirmation for complex tasks
     let agent_mode = SafetyValidator::validate_agent_mode(
@@ -457,7 +503,13 @@ async fn handle_chat_command(config: &CoreAgentConfig, force_multi_agent: bool, 
 
     if use_multi_agent {
         // Initialize context store and task manager with session ID
-        let session_id = format!("session_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
+        let session_id = format!(
+            "session_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+        );
         let _context_store = ContextStore::new(session_id.clone());
         let _task_manager = TaskManager::new(session_id);
 
@@ -603,28 +655,49 @@ async fn handle_chat_command(config: &CoreAgentConfig, force_multi_agent: bool, 
 
         // Multi-agent system override: Handle request differently when multi-agent is enabled
         if use_multi_agent {
-            eprintln!("[DEBUG] Processing request with multi-agent system: {}", input);
+            eprintln!(
+                "[DEBUG] Processing request with multi-agent system: {}",
+                input
+            );
 
             // Provide orchestrator analysis and then continue with execution
             println!("{} ", style("VT Code (Multi-Agent):").blue().bold());
 
             // Analyze the request and provide appropriate response
-            let response = if input.contains("add") || input.contains("create") || input.contains("implement") {
-                format!("**Orchestrator Analysis**: Implementation task detected - '{}'\n\
+            let response = if input.contains("add")
+                || input.contains("create")
+                || input.contains("implement")
+            {
+                format!(
+                    "**Orchestrator Analysis**: Implementation task detected - '{}'\n\
                          **Strategy**: Explorer → Coder → Verification workflow\n\
-                         **Executing**: Delegating to Coder Agent for implementation...\n", input)
+                         **Executing**: Delegating to Coder Agent for implementation...\n",
+                    input
+                )
             } else if input.contains("debug") || input.contains("log") || input.contains("fix") {
-                format!("**Orchestrator Analysis**: Debugging/logging task detected - '{}'\n\
+                format!(
+                    "**Orchestrator Analysis**: Debugging/logging task detected - '{}'\n\
                          **Strategy**: Explorer → Coder → Verification workflow\n\
-                         **Executing**: Delegating to Coder Agent for implementation...\n", input)
-            } else if input.contains("analyze") || input.contains("check") || input.contains("review") {
-                format!("🔍 **Orchestrator Analysis**: Investigation task detected - '{}'\n\
+                         **Executing**: Delegating to Coder Agent for implementation...\n",
+                    input
+                )
+            } else if input.contains("analyze")
+                || input.contains("check")
+                || input.contains("review")
+            {
+                format!(
+                    "🔍 **Orchestrator Analysis**: Investigation task detected - '{}'\n\
                          **Strategy**: Explorer Agent performing analysis\n\
-                         **Executing**: Delegating to Explorer Agent for investigation...\n", input)
+                         **Executing**: Delegating to Explorer Agent for investigation...\n",
+                    input
+                )
             } else {
-                format!("🎯 **Orchestrator Analysis**: General task detected - '{}'\n\
+                format!(
+                    "🎯 **Orchestrator Analysis**: General task detected - '{}'\n\
                          **Strategy**: Multi-agent coordination\n\
-                         **Executing**: Proceeding with intelligent agent delegation...\n", input)
+                         **Executing**: Proceeding with intelligent agent delegation...\n",
+                    input
+                )
             };
 
             println!("{}", response);
@@ -635,7 +708,10 @@ async fn handle_chat_command(config: &CoreAgentConfig, force_multi_agent: bool, 
         }
 
         // Debug: Using single-agent mode
-        eprintln!("[DEBUG] Processing request with single-agent system: {}", input);
+        eprintln!(
+            "[DEBUG] Processing request with single-agent system: {}",
+            input
+        );
         eprintln!("[DEBUG] Entering standard conversation loop");
 
         // Safety: prevent conversation history from growing too large
@@ -661,10 +737,16 @@ async fn handle_chat_command(config: &CoreAgentConfig, force_multi_agent: bool, 
         let max_steps = vtcode_config.agent.max_steps;
         let max_empty_responses = vtcode_config.agent.max_empty_responses;
 
-        eprintln!("[DEBUG] Starting tool-calling loop - max_steps: {}, max_empty_responses: {}", max_steps, max_empty_responses);
+        eprintln!(
+            "[DEBUG] Starting tool-calling loop - max_steps: {}, max_empty_responses: {}",
+            max_steps, max_empty_responses
+        );
 
         'outer: loop {
-            eprintln!("[DEBUG] Tool-calling loop iteration - step: {}/{}", steps, max_steps);
+            eprintln!(
+                "[DEBUG] Tool-calling loop iteration - step: {}/{}",
+                steps, max_steps
+            );
 
             // Safety check: prevent infinite loops
             if steps >= max_steps {
@@ -674,7 +756,10 @@ async fn handle_chat_command(config: &CoreAgentConfig, force_multi_agent: bool, 
             }
 
             if consecutive_empty_responses >= max_empty_responses {
-                eprintln!("[DEBUG] Too many empty responses: {}/{}", consecutive_empty_responses, max_empty_responses);
+                eprintln!(
+                    "[DEBUG] Too many empty responses: {}/{}",
+                    consecutive_empty_responses, max_empty_responses
+                );
                 println!(
                     "{}",
                     style("(too many empty responses, stopping)").dim().red()
@@ -1124,7 +1209,8 @@ impl ProjectOverview {
             description: self.description.clone(),
             readme_excerpt: self.readme_excerpt.clone(),
             root: self.root.clone(),
-        }.short_for_display()
+        }
+        .short_for_display()
     }
 
     fn as_prompt_block(&self) -> String {
@@ -1134,7 +1220,8 @@ impl ProjectOverview {
             description: self.description.clone(),
             readme_excerpt: self.readme_excerpt.clone(),
             root: self.root.clone(),
-        }.as_prompt_block()
+        }
+        .as_prompt_block()
     }
 }
 

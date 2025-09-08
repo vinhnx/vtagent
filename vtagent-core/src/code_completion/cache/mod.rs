@@ -59,11 +59,13 @@ impl CompletionCache {
 
     fn cleanup_expired(&mut self) {
         let now = Instant::now();
-        self.cache.retain(|_, entry| now.duration_since(entry.created_at) < self.ttl);
+        self.cache
+            .retain(|_, entry| now.duration_since(entry.created_at) < self.ttl);
     }
 
     fn evict_lru(&mut self) {
-        if let Some(lru_key) = self.cache
+        if let Some(lru_key) = self
+            .cache
             .iter()
             .min_by_key(|(_, entry)| entry.access_count)
             .map(|(key, _)| key.clone())

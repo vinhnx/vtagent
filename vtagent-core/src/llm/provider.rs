@@ -76,20 +76,23 @@ pub enum FinishReason {
 pub trait LLMProvider: Send + Sync {
     /// Provider name (e.g., "gemini", "openai", "anthropic")
     fn name(&self) -> &str;
-    
+
     /// Generate completion
     async fn generate(&self, request: LLMRequest) -> Result<LLMResponse, LLMError>;
-    
+
     /// Stream completion (optional)
-    async fn stream(&self, request: LLMRequest) -> Result<Box<dyn Stream<Item = LLMResponse>>, LLMError> {
+    async fn stream(
+        &self,
+        request: LLMRequest,
+    ) -> Result<Box<dyn Stream<Item = LLMResponse>>, LLMError> {
         // Default implementation falls back to non-streaming
         let response = self.generate(request).await?;
         Ok(Box::new(futures::stream::once(async { response })))
     }
-    
+
     /// Get supported models
     fn supported_models(&self) -> Vec<String>;
-    
+
     /// Validate request for this provider
     fn validate_request(&self, request: &LLMRequest) -> Result<(), LLMError>;
 }

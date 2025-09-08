@@ -1,17 +1,25 @@
 //! Multi-agent conversation loop with orchestrator-driven execution
 
-use vtagent_core::agent::{MultiAgentConfig, OrchestratorAgent, get_multi_agent_function_declarations, MultiAgentTools, execute_multi_agent_tool, ExecutionMode, VerificationStrategy, DelegationStrategy, ContextStoreConfig};
-use vtagent_core::config::{ConfigManager, VTAgentConfig, MultiAgentSystemConfig, MultiAgentDefaults, ContextStoreDefaults};
-use vtagent_core::llm::{make_client};
-use vtagent_core::models::{Provider, ModelId};
-use vtagent_core::types::{AgentConfig as CoreAgentConfig, *};
-use vtagent_core::gemini::{GenerateContentRequest, Content, Part, FunctionResponse, Tool, ToolConfig, FunctionDeclaration};
 use anyhow::{Result, anyhow};
 use console::style;
 use serde_json::json;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use vtagent_core::agent::{
+    ContextStoreConfig, DelegationStrategy, ExecutionMode, MultiAgentConfig, MultiAgentTools,
+    OrchestratorAgent, VerificationStrategy, execute_multi_agent_tool,
+    get_multi_agent_function_declarations,
+};
+use vtagent_core::config::{
+    ConfigManager, ContextStoreDefaults, MultiAgentDefaults, MultiAgentSystemConfig, VTAgentConfig,
+};
+use vtagent_core::gemini::{
+    Content, FunctionDeclaration, FunctionResponse, GenerateContentRequest, Part, Tool, ToolConfig,
+};
+use vtagent_core::llm::make_client;
+use vtagent_core::models::{ModelId, Provider};
+use vtagent_core::types::{AgentConfig as CoreAgentConfig, *};
 
 /// Convert MultiAgentSystemConfig to MultiAgentConfig
 fn convert_multi_agent_config(system_config: &MultiAgentSystemConfig) -> MultiAgentConfig {
@@ -23,18 +31,24 @@ fn convert_multi_agent_config(system_config: &MultiAgentSystemConfig) -> MultiAg
     };
 
     // Parse provider from string
-    let provider = system_config.provider.parse::<Provider>()
+    let provider = system_config
+        .provider
+        .parse::<Provider>()
         .unwrap_or(Provider::Gemini); // Default to Gemini if parsing fails
 
     // Use provider-specific models if not explicitly configured
     let orchestrator_model = if system_config.orchestrator_model.is_empty() {
-        ModelId::default_orchestrator_for_provider(provider.clone()).as_str().to_string()
+        ModelId::default_orchestrator_for_provider(provider.clone())
+            .as_str()
+            .to_string()
     } else {
         system_config.orchestrator_model.clone()
     };
 
     let subagent_model = if system_config.subagent_model.is_empty() {
-        ModelId::default_subagent_for_provider(provider.clone()).as_str().to_string()
+        ModelId::default_subagent_for_provider(provider.clone())
+            .as_str()
+            .to_string()
     } else {
         system_config.subagent_model.clone()
     };
@@ -72,24 +86,81 @@ pub async fn run_multi_agent_conversation(
     vtcode_config: &VTAgentConfig,
 ) -> Result<()> {
     println!("{}", style("Multi-Agent System Active").cyan().bold());
-    println!("{}", style("   Orchestrator will coordinate specialized agents").dim());
+    println!(
+        "{}",
+        style("   Orchestrator will coordinate specialized agents").dim()
+    );
 
     // Create orchestrator agent
-    let session_id = format!("session_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
-    let orchestrator_client = make_client(config.api_key.clone(), vtcode_config.multi_agent.orchestrator_model.clone());
+    let session_id = format!(
+        "session_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    );
+    let orchestrator_model_id = vtcode_config
+        .multi_agent
+        .orchestrator_model
+        .parse::<ModelId>()
+        .map_err(|_| {
+            anyhow!(
+                "Invalid orchestrator model: {}",
+                vtcode_config.multi_agent.orchestrator_model
+            )
+        })?;
+    let orchestrator_client = make_client(config.api_key.clone(), orchestrator_model_id);
 
     let multi_agent_config = convert_multi_agent_config(&vtcode_config.multi_agent);
     let debug_mode = multi_agent_config.debug_mode;
 
     // Enable debug logging if debug mode is enabled
     if debug_mode {
-        println!("{}", style("[DEBUG] Multi-agent debug mode enabled").cyan().dim());
-        println!("{}", style(format!("[DEBUG] Session ID: {}", session_id)).cyan().dim());
-        println!("{}", style(format!("[DEBUG] Provider: {}", multi_agent_config.provider)).cyan().dim());
-        println!("{}", style(format!("[DEBUG] Orchestrator model: {}", multi_agent_config.orchestrator_model)).cyan().dim());
-        println!("{}", style(format!("[DEBUG] Subagent model: {}", multi_agent_config.subagent_model)).cyan().dim());
-        println!("{}", style(format!("[DEBUG] Max concurrent subagents: {}", multi_agent_config.max_concurrent_subagents)).cyan().dim());
-    }    let orchestrator = Arc::new(Mutex::new(OrchestratorAgent::new(
+        println!(
+            "{}",
+            style("[DEBUG] Multi-agent debug mode enabled").cyan().dim()
+        );
+        println!(
+            "{}",
+            style(format!("[DEBUG] Session ID: {}", session_id))
+                .cyan()
+                .dim()
+        );
+        println!(
+            "{}",
+            style(format!("[DEBUG] Provider: {}", multi_agent_config.provider))
+                .cyan()
+                .dim()
+        );
+        println!(
+            "{}",
+            style(format!(
+                "[DEBUG] Orchestrator model: {}",
+                multi_agent_config.orchestrator_model
+            ))
+            .cyan()
+            .dim()
+        );
+        println!(
+            "{}",
+            style(format!(
+                "[DEBUG] Subagent model: {}",
+                multi_agent_config.subagent_model
+            ))
+            .cyan()
+            .dim()
+        );
+        println!(
+            "{}",
+            style(format!(
+                "[DEBUG] Max concurrent subagents: {}",
+                multi_agent_config.max_concurrent_subagents
+            ))
+            .cyan()
+            .dim()
+        );
+    }
+    let orchestrator = Arc::new(Mutex::new(OrchestratorAgent::new(
         multi_agent_config,
         orchestrator_client,
         session_id.clone(),
@@ -126,12 +197,22 @@ pub async fn run_multi_agent_conversation(
         // Safety checks
         total_turns += 1;
         if total_turns >= max_conversation_turns {
-            println!("{}", style("Maximum conversation turns reached. Session ending for safety.").red().bold());
+            println!(
+                "{}",
+                style("Maximum conversation turns reached. Session ending for safety.")
+                    .red()
+                    .bold()
+            );
             break;
         }
 
         if session_start.elapsed() >= max_session_duration {
-            println!("{}", style("Maximum session duration reached. Session ending for safety.").red().bold());
+            println!(
+                "{}",
+                style("Maximum session duration reached. Session ending for safety.")
+                    .red()
+                    .bold()
+            );
             break;
         }
 
@@ -156,16 +237,27 @@ pub async fn run_multi_agent_conversation(
         conversation.push(Content::user_text(input));
 
         if debug_mode {
-            println!("{}", style(format!("[DEBUG] User input: '{}'", input)).cyan().dim());
-            println!("{}", style(format!("[DEBUG] Conversation length: {} messages", conversation.len())).cyan().dim());
+            println!(
+                "{}",
+                style(format!("[DEBUG] User input: '{}'", input))
+                    .cyan()
+                    .dim()
+            );
+            println!(
+                "{}",
+                style(format!(
+                    "[DEBUG] Conversation length: {} messages",
+                    conversation.len()
+                ))
+                .cyan()
+                .dim()
+            );
         }
 
         // Create system instruction for orchestrator
         let system_instruction = Content::system_text(format!(
             "{}\n\n## Current Session\nSession ID: {}\nUser Request: {}",
-            orchestrator_prompt,
-            session_id,
-            input
+            orchestrator_prompt, session_id, input
         ));
 
         // Orchestrator execution loop
@@ -193,7 +285,7 @@ pub async fn run_multi_agent_conversation(
                 let mut orchestrator_guard = orchestrator.lock().unwrap();
                 orchestrator_guard.execute_orchestrator(&request).await
             }
-                .map_err(|e| anyhow!("Orchestrator execution failed: {}", e))?;
+            .map_err(|e| anyhow!("Orchestrator execution failed: {}", e))?;
 
             // Parse response back to GenerateContentResponse
             let response: vtagent_core::gemini::GenerateContentResponse =
@@ -201,10 +293,23 @@ pub async fn run_multi_agent_conversation(
 
             // Debug logging
             if debug_mode {
-                println!("{}", style(format!("[DEBUG] Orchestrator response candidates: {}", response.candidates.len())).cyan().dim());
+                println!(
+                    "{}",
+                    style(format!(
+                        "[DEBUG] Orchestrator response candidates: {}",
+                        response.candidates.len()
+                    ))
+                    .cyan()
+                    .dim()
+                );
                 if let Some(candidate) = response.candidates.first() {
                     if let Some(finish_reason) = &candidate.finish_reason {
-                        println!("{}", style(format!("[DEBUG] Finish reason: {}", finish_reason)).cyan().dim());
+                        println!(
+                            "{}",
+                            style(format!("[DEBUG] Finish reason: {}", finish_reason))
+                                .cyan()
+                                .dim()
+                        );
                     }
                 }
             }
@@ -221,7 +326,12 @@ pub async fn run_multi_agent_conversation(
                         ));
 
                         if debug_mode {
-                            println!("{}", style("[DEBUG] Added recovery message for malformed function call").cyan().dim());
+                            println!(
+                                "{}",
+                                style("[DEBUG] Added recovery message for malformed function call")
+                                    .cyan()
+                                    .dim()
+                            );
                         }
 
                         continue 'orchestrator_loop;
@@ -248,39 +358,66 @@ pub async fn run_multi_agent_conversation(
                             let tool_name = &function_call.name;
                             let args = function_call.args.clone();
 
-                            println!("{} Orchestrator calling: {} {}",
-                                    style("[TOOL]").magenta().bold(),
-                                    tool_name,
-                                    args);
+                            println!(
+                                "{} Orchestrator calling: {} {}",
+                                style("[TOOL]").magenta().bold(),
+                                tool_name,
+                                args
+                            );
 
                             if debug_mode {
-                                println!("{}", style(format!("[DEBUG] Executing tool '{}' with args: {}", tool_name, args)).cyan().dim());
+                                println!(
+                                    "{}",
+                                    style(format!(
+                                        "[DEBUG] Executing tool '{}' with args: {}",
+                                        tool_name, args
+                                    ))
+                                    .cyan()
+                                    .dim()
+                                );
                             }
 
                             // Execute multi-agent tool
-                            let tool_result = execute_multi_agent_tool(tool_name, args, &multi_agent_tools).await
-                                .unwrap_or_else(|e| {
-                                    if debug_mode {
-                                        println!("{}", style(format!("[DEBUG] Tool execution error: {}", e)).red().dim());
-                                    }
-                                    json!({
-                                        "ok": false,
-                                        "error": e.to_string()
-                                    })
-                                });
+                            let tool_result =
+                                execute_multi_agent_tool(tool_name, args, &multi_agent_tools)
+                                    .await
+                                    .unwrap_or_else(|e| {
+                                        if debug_mode {
+                                            println!(
+                                                "{}",
+                                                style(format!(
+                                                    "[DEBUG] Tool execution error: {}",
+                                                    e
+                                                ))
+                                                .red()
+                                                .dim()
+                                            );
+                                        }
+                                        json!({
+                                            "ok": false,
+                                            "error": e.to_string()
+                                        })
+                                    });
 
                             if debug_mode {
-                                println!("{}", style(format!("[DEBUG] Tool result: {}", serde_json::to_string_pretty(&tool_result).unwrap_or_else(|_| "Failed to serialize".to_string()))).cyan().dim());
+                                println!(
+                                    "{}",
+                                    style(format!(
+                                        "[DEBUG] Tool result: {}",
+                                        serde_json::to_string_pretty(&tool_result)
+                                            .unwrap_or_else(|_| "Failed to serialize".to_string())
+                                    ))
+                                    .cyan()
+                                    .dim()
+                                );
                             }
 
-                            conversation.push(Content::user_parts(vec![
-                                Part::FunctionResponse {
-                                    function_response: FunctionResponse {
-                                        name: tool_name.clone(),
-                                        response: tool_result,
-                                    },
+                            conversation.push(Content::user_parts(vec![Part::FunctionResponse {
+                                function_response: FunctionResponse {
+                                    name: tool_name.clone(),
+                                    response: tool_result,
                                 },
-                            ]));
+                            }]));
                         }
                         Part::FunctionResponse { .. } => {
                             // Should not happen in orchestrator response
@@ -291,27 +428,47 @@ pub async fn run_multi_agent_conversation(
                 if had_tool_call {
                     // Continue orchestrator loop for tool responses
                     if debug_mode {
-                        println!("{}", style("[DEBUG] Tool call detected, continuing orchestrator loop").cyan().dim());
+                        println!(
+                            "{}",
+                            style("[DEBUG] Tool call detected, continuing orchestrator loop")
+                                .cyan()
+                                .dim()
+                        );
                     }
                     continue 'orchestrator_loop;
                 } else if had_text_response {
                     // Orchestrator provided final response, end turn
                     if debug_mode {
-                        println!("{}", style("[DEBUG] Text response received, ending orchestrator turn").cyan().dim());
+                        println!(
+                            "{}",
+                            style("[DEBUG] Text response received, ending orchestrator turn")
+                                .cyan()
+                                .dim()
+                        );
                     }
                     break 'orchestrator_loop;
                 } else {
                     // No content, something went wrong
                     println!("{}", style("Orchestrator provided no response").yellow());
                     if debug_mode {
-                        println!("{}", style("[DEBUG] No content in orchestrator response").red().dim());
+                        println!(
+                            "{}",
+                            style("[DEBUG] No content in orchestrator response")
+                                .red()
+                                .dim()
+                        );
                     }
                     break 'orchestrator_loop;
                 }
             } else {
                 println!("{}", style("No response from orchestrator").yellow());
                 if debug_mode {
-                    println!("{}", style("[DEBUG] No candidates in orchestrator response").red().dim());
+                    println!(
+                        "{}",
+                        style("[DEBUG] No candidates in orchestrator response")
+                            .red()
+                            .dim()
+                    );
                 }
                 break 'orchestrator_loop;
             }

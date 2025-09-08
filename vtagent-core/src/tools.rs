@@ -2493,40 +2493,6 @@ pub enum ToolError {
 
 /// Build function declarations for all available tools
 pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
-
-/// Build function declarations filtered by capability level
-pub fn build_function_declarations_for_level(level: crate::types::CapabilityLevel) -> Vec<FunctionDeclaration> {
-    let all_declarations = build_function_declarations();
-
-    match level {
-        crate::types::CapabilityLevel::Basic => vec![],
-        crate::types::CapabilityLevel::FileReading => {
-            all_declarations.into_iter()
-                .filter(|fd| fd.name == "read_file")
-                .collect()
-        },
-        crate::types::CapabilityLevel::FileListing => {
-            all_declarations.into_iter()
-                .filter(|fd| fd.name == "read_file" || fd.name == "list_files")
-                .collect()
-        },
-        crate::types::CapabilityLevel::Bash => {
-            all_declarations.into_iter()
-                .filter(|fd| fd.name == "read_file" || fd.name == "list_files" || fd.name == "bash")
-                .collect()
-        },
-        crate::types::CapabilityLevel::Editing => {
-            all_declarations.into_iter()
-                .filter(|fd| fd.name == "read_file" || fd.name == "list_files" || fd.name == "bash" || fd.name == "edit_file")
-                .collect()
-        },
-        crate::types::CapabilityLevel::CodeSearch => {
-            all_declarations.into_iter()
-                .filter(|fd| fd.name == "read_file" || fd.name == "list_files" || fd.name == "bash" || fd.name == "edit_file" || fd.name == "code_search")
-                .collect()
-        },
-    }
-}
     vec![
         FunctionDeclaration {
             name: "code_search".to_string(),
@@ -2919,6 +2885,40 @@ pub fn build_function_declarations_for_level(level: crate::types::CapabilityLeve
             }),
         },
     ]
+}
+
+/// Build function declarations filtered by capability level
+pub fn build_function_declarations_for_level(level: crate::types::CapabilityLevel) -> Vec<FunctionDeclaration> {
+    let all_declarations = build_function_declarations();
+
+    match level {
+        crate::types::CapabilityLevel::Basic => vec![],
+        crate::types::CapabilityLevel::FileReading => {
+            all_declarations.into_iter()
+                .filter(|fd| fd.name == "read_file")
+                .collect()
+        },
+        crate::types::CapabilityLevel::FileListing => {
+            all_declarations.into_iter()
+                .filter(|fd| fd.name == "read_file" || fd.name == "list_files")
+                .collect()
+        },
+        crate::types::CapabilityLevel::Bash => {
+            all_declarations.into_iter()
+                .filter(|fd| fd.name == "read_file" || fd.name == "list_files" || fd.name == "bash")
+                .collect()
+        },
+        crate::types::CapabilityLevel::Editing => {
+            all_declarations.into_iter()
+                .filter(|fd| fd.name == "read_file" || fd.name == "list_files" || fd.name == "bash" || fd.name == "edit_file")
+                .collect()
+        },
+        crate::types::CapabilityLevel::CodeSearch => {
+            all_declarations.into_iter()
+                .filter(|fd| fd.name == "read_file" || fd.name == "list_files" || fd.name == "bash" || fd.name == "edit_file" || fd.name == "code_search")
+                .collect()
+        },
+    }
 }
 
 #[cfg(test)]

@@ -1,7 +1,9 @@
 //! Orchestrator agent implementation for multi-agent coordination
 
 use crate::agent::multi_agent::*;
+use crate::agent::runner::AgentRunner;
 use crate::llm::AnyClient;
+use crate::gemini::GenerateContentRequest;
 use anyhow::{Result, anyhow};
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -18,6 +20,10 @@ pub struct OrchestratorAgent {
     task_manager: Arc<std::sync::Mutex<TaskManager>>,
     /// Session ID
     session_id: String,
+    /// API key for agents
+    api_key: String,
+    /// Workspace path
+    workspace: std::path::PathBuf,
 }
 
 impl OrchestratorAgent {
@@ -26,6 +32,8 @@ impl OrchestratorAgent {
         config: MultiAgentConfig,
         client: AnyClient,
         session_id: String,
+        api_key: String,
+        workspace: std::path::PathBuf,
     ) -> Self {
         let context_store = Arc::new(std::sync::Mutex::new(
             ContextStore::new(session_id.clone())
@@ -40,6 +48,8 @@ impl OrchestratorAgent {
             context_store,
             task_manager,
             session_id,
+            api_key,
+            workspace,
         }
     }
 
@@ -69,7 +79,7 @@ impl OrchestratorAgent {
     }
 
     /// Launch a subagent to execute a task
-    pub async fn launch_subagent(&self, task_id: &str) -> Result<TaskResults> {
+    pub async fn launch_subagent(&mut self, task_id: &str) -> Result<TaskResults> {
         let task = {
             let task_manager = self.task_manager.lock()
                 .map_err(|e| anyhow!("Failed to lock task manager: {}", e))?;
@@ -100,6 +110,28 @@ impl OrchestratorAgent {
                 return Err(anyhow!("Single agent type not supported in multi-agent mode"));
             }
         };
+
+        // Store contexts created by the agent
+        for context_id in &results.created_contexts {
+            // In a real implementation, we would get the actual context content from the agent
+            // For now, we'll create a placeholder context
+            let context = ContextItem {
+                id: context_id.clone(),
+                content: format!("Context created by {} agent for task '{}'", task.agent_type, task.title),
+                created_by: task.agent_type,
+                session_id: self.session_id.clone(),
+                created_at: SystemTime::now(),
+                tags: vec!["agent_created".to_string()],
+                context_type: match task.agent_type {
+                    AgentType::Explorer => ContextType::Analysis,
+                    AgentType::Coder => ContextType::Implementation,
+                    _ => ContextType::General,
+                },
+                related_files: results.modified_files.clone(),
+            };
+
+            let _ = self.add_context(context);
+        }
 
         // Update task with results
         {
@@ -210,40 +242,50 @@ impl OrchestratorAgent {
         Ok(contexts)
     }
 
-    /// Execute an explorer task (simplified implementation)
+    /// Execute an explorer task (using real agent runner)
     async fn execute_explorer_task(
-        &self,
+        &mut self,
         task: &Task,
-        _contexts: &[ContextItem],
+        contexts: &[ContextItem],
     ) -> Result<TaskResults> {
-        // This is a simplified implementation
-        // In reality, this would create and run an Explorer agent
+        // Create an explorer agent runner
+        let mut runner = AgentRunner::new(
+            AgentType::Explorer,
+            self.config.subagent_model.clone(),
+            self.api_key.clone(),
+            self.workspace.clone(),
+            self.session_id.clone(),
+        )?;
 
-        Ok(TaskResults {
-            created_contexts: vec![format!("explorer_result_{}", task.id)],
-            modified_files: Vec::new(),
-            executed_commands: vec!["analysis".to_string()],
-            summary: format!("Explorer task '{}' completed", task.title),
-            warnings: Vec::new(),
-        })
+        // Execute the task
+        runner.execute_task(task, contexts).await
     }
 
-    /// Execute a coder task (simplified implementation)
+    /// Execute a coder task (using real agent runner)
     async fn execute_coder_task(
-        &self,
+        &mut self,
         task: &Task,
-        _contexts: &[ContextItem],
+        contexts: &[ContextItem],
     ) -> Result<TaskResults> {
-        // This is a simplified implementation
-        // In reality, this would create and run a Coder agent
+        // Create a coder agent runner
+        let mut runner = AgentRunner::new(
+            AgentType::Coder,
+            self.config.subagent_model.clone(),
+            self.api_key.clone(),
+            self.workspace.clone(),
+            self.session_id.clone(),
+        )?;
 
-        Ok(TaskResults {
-            created_contexts: vec![format!("coder_result_{}", task.id)],
-            modified_files: vec!["example.rs".to_string()],
-            executed_commands: vec!["cargo check".to_string()],
-            summary: format!("Coder task '{}' completed", task.title),
-            warnings: Vec::new(),
-        })
+        // Execute the task
+        runner.execute_task(task, contexts).await
+    }
+
+    /// Execute orchestrator with LLM call
+    pub async fn execute_orchestrator(&mut self, request: &GenerateContentRequest) -> Result<serde_json::Value> {
+        let response = self.client.generate_content(request).await
+            .map_err(|e| anyhow!("Orchestrator LLM call failed: {}", e))?;
+
+        Ok(serde_json::to_value(response)?)
     }
 }
 

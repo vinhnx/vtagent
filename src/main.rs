@@ -17,6 +17,7 @@ use vtagent_core::{
     agent::multi_agent::{ContextStore, TaskManager},
     config::{ConfigManager, ToolPolicy, VTAgentConfig},
     gemini::{Content, FunctionResponse, GenerateContentRequest, Part, Tool, ToolConfig},
+    models::{Provider, ModelId},
     prompts::system::{SystemPromptConfig, generate_system_instruction_with_config},
     safety::SafetyValidator,
     types::AgentConfig as CoreAgentConfig,
@@ -152,25 +153,58 @@ async fn main() -> Result<()> {
             .bold()
     );
 
+    // Determine workspace directory first to load configuration
+    let workspace = args
+        .workspace
+        .unwrap_or(std::env::current_dir().context("cannot determine current dir")?);
+
+    // Load configuration early to get provider and model settings
+    let config_manager = ConfigManager::new(&workspace);
+    let vtcode_config = match config_manager {
+        Ok(mgr) => mgr.config().clone(),
+        Err(_) => VTAgentConfig::default(), // Use default if no config file exists
+    };
+
+    // Determine model based on configuration and command line args
+    let model = if !args.model.is_empty() && args.model != "auto" {
+        // Use explicit model from command line
+        args.model.clone()
+    } else {
+        // Use provider-specific default model based on configuration
+        match vtcode_config.agent.provider.parse::<Provider>() {
+            Ok(provider) => {
+                if vtcode_config.multi_agent.enabled {
+                    // For multi-agent mode, use orchestrator model
+                    ModelId::default_orchestrator_for_provider(provider).as_str().to_string()
+                } else {
+                    // For single agent mode, use single agent model
+                    ModelId::default_single_for_provider(provider).as_str().to_string()
+                }
+            }
+            Err(_) => {
+                // Fallback to configuration default or global default
+                if !vtcode_config.agent.default_model.is_empty() {
+                    vtcode_config.agent.default_model.clone()
+                } else {
+                    ModelId::default().as_str().to_string()
+                }
+            }
+        }
+    };
+
     // Get API key from environment, inferred by backend from model if not explicitly set
     let api_key = if let Ok(v) = std::env::var(&args.api_key_env) {
         v
     } else {
-        match BackendKind::from_model(&args.model) {
+        match BackendKind::from_model(&model) {
             BackendKind::OpenAi => std::env::var("OPENAI_API_KEY").context("Set OPENAI_API_KEY in your environment or pass --api-key-env")?,
             BackendKind::Anthropic => std::env::var("ANTHROPIC_API_KEY").context("Set ANTHROPIC_API_KEY in your environment or pass --api-key-env")?,
             BackendKind::Gemini => std::env::var("GEMINI_API_KEY").or_else(|_| std::env::var("GOOGLE_API_KEY")).context("Set GEMINI_API_KEY or GOOGLE_API_KEY in your environment or pass --api-key-env")?,
         }
     };
-
-    // Determine workspace directory
-    let workspace = args
-        .workspace
-        .unwrap_or(std::env::current_dir().context("cannot determine current dir")?);
-
     // Create agent configuration
     let mut config = CoreAgentConfig {
-        model: args.model.clone(),
+        model: model.clone(),
         api_key: api_key.clone(),
         workspace: workspace.clone(),
         verbose: args.verbose,

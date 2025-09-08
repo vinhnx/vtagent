@@ -1,7 +1,7 @@
 //! Multi-agent system types and structures
 
 use crate::config::{MultiAgentDefaults, ContextStoreDefaults};
-use crate::models::ModelId;
+use crate::models::{ModelId, Provider};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
@@ -465,6 +465,8 @@ pub struct MultiAgentConfig {
     pub enable_multi_agent: bool,
     /// Execution mode
     pub execution_mode: ExecutionMode,
+    /// AI provider for the agents (Gemini, OpenAI, Anthropic)
+    pub provider: Provider,
     /// Model to use for orchestrator agent
     pub orchestrator_model: String,
     /// Model to use for subagents
@@ -479,6 +481,8 @@ pub struct MultiAgentConfig {
     pub enable_context_sharing: bool,
     /// Enable performance monitoring
     pub enable_performance_monitoring: bool,
+    /// Enable debug mode for verbose logging and internal state inspection
+    pub debug_mode: bool,
     /// Task execution timeout
     pub task_timeout: Duration,
     /// Context window size for agents
@@ -532,16 +536,19 @@ pub struct ContextStoreConfig {
 
 impl Default for MultiAgentConfig {
     fn default() -> Self {
+        let default_provider = Provider::Gemini;
         Self {
             enable_multi_agent: MultiAgentDefaults::ENABLE_MULTI_AGENT,
             execution_mode: ExecutionMode::Auto,
-            orchestrator_model: ModelId::default_orchestrator().as_str().to_string(),
-            subagent_model: ModelId::default_subagent().as_str().to_string(),
+            provider: default_provider.clone(),
+            orchestrator_model: ModelId::default_orchestrator_for_provider(default_provider.clone()).as_str().to_string(),
+            subagent_model: ModelId::default_subagent_for_provider(default_provider).as_str().to_string(),
             max_concurrent_subagents: MultiAgentDefaults::MAX_CONCURRENT_SUBAGENTS,
             context_store_enabled: MultiAgentDefaults::CONTEXT_STORE_ENABLED,
             enable_task_management: MultiAgentDefaults::ENABLE_TASK_MANAGEMENT,
             enable_context_sharing: MultiAgentDefaults::ENABLE_CONTEXT_SHARING,
             enable_performance_monitoring: MultiAgentDefaults::ENABLE_PERFORMANCE_MONITORING,
+            debug_mode: MultiAgentDefaults::DEBUG_MODE,
             task_timeout: MultiAgentDefaults::task_timeout(),
             context_window_size: MultiAgentDefaults::CONTEXT_WINDOW_SIZE,
             max_context_items: MultiAgentDefaults::MAX_CONTEXT_ITEMS,

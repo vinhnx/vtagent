@@ -65,7 +65,11 @@ pub struct AgentConfig {
     #[serde(default = "default_max_empty_responses")]
     pub max_empty_responses: usize,
 
-    /// Default Gemini model to use
+    /// AI provider for single agent mode (gemini, openai, anthropic)
+    #[serde(default = "default_provider")]
+    pub provider: String,
+
+    /// Default model to use
     #[serde(default = "default_model")]
     pub default_model: String,
 
@@ -164,6 +168,10 @@ pub struct MultiAgentSystemConfig {
     #[serde(default = "default_execution_mode")]
     pub execution_mode: String,
 
+    /// AI provider (gemini, openai, anthropic)
+    #[serde(default = "default_provider")]
+    pub provider: String,
+
     /// Model to use for orchestrator agent
     #[serde(default = "default_orchestrator_model")]
     pub orchestrator_model: String,
@@ -199,6 +207,10 @@ pub struct MultiAgentSystemConfig {
     /// Agent-specific configurations
     #[serde(default)]
     pub agents: AgentSpecificConfigs,
+
+    /// Enable debug mode for verbose logging
+    #[serde(default)]
+    pub debug_mode: bool,
 }
 
 /// Context store configuration
@@ -295,6 +307,7 @@ impl Default for AgentConfig {
             max_conversation_history: default_max_conversation_history(),
             max_steps: default_max_steps(),
             max_empty_responses: default_max_empty_responses(),
+            provider: default_provider(),
             default_model: default_model(),
             api_key_env: default_api_key_env(),
             default_system_instruction: default_system_instruction(),
@@ -350,6 +363,7 @@ impl Default for MultiAgentSystemConfig {
         Self {
             enabled: false,
             execution_mode: default_execution_mode(),
+            provider: default_provider(),
             orchestrator_model: default_orchestrator_model(),
             subagent_model: default_subagent_model(),
             max_concurrent_subagents: default_max_concurrent_subagents(),
@@ -359,6 +373,7 @@ impl Default for MultiAgentSystemConfig {
             delegation_strategy: default_delegation_strategy(),
             context_store: ContextStoreConfiguration::default(),
             agents: AgentSpecificConfigs::default(),
+            debug_mode: false,
         }
     }
 }
@@ -558,6 +573,10 @@ fn default_allowed_extensions() -> Vec<String> {
 // Multi-agent configuration defaults
 fn default_execution_mode() -> String {
     "auto".to_string()
+}
+
+fn default_provider() -> String {
+    "gemini".to_string()
 }
 
 fn default_orchestrator_model() -> String {
@@ -891,6 +910,9 @@ impl MultiAgentDefaults {
 
     /// Default enable performance monitoring
     pub const ENABLE_PERFORMANCE_MONITORING: bool = true;
+
+    /// Default enable debug mode
+    pub const DEBUG_MODE: bool = false;
 
     /// Default enable multi-agent mode
     pub const ENABLE_MULTI_AGENT: bool = false;  // Changed to false for single-agent default

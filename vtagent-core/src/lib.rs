@@ -58,11 +58,12 @@ pub mod types;
 pub mod user_confirmation;
 pub mod utils;
 pub mod vtagentgitignore;
+pub mod api_keys;
 
 // Re-exports for convenience
 pub use agent::core::Agent;
 pub use cli::args::{Cli, Commands};
-pub use code_completion::{CodeCompletionEngine, CompletionSuggestion};
+pub use code_completion::{CompletionEngine, CompletionSuggestion};
 pub use commands::stats::handle_stats_command;
 pub use config::{AgentConfig, VTAgentConfig};
 pub use diff_renderer::DiffRenderer;
@@ -72,7 +73,7 @@ pub use performance_profiler::PerformanceProfiler;
 pub use prompts::{generate_system_instruction, generate_specialized_instruction, generate_lightweight_instruction};
 pub use rp_search::RpSearchManager;
 pub use timeout_detector::TimeoutDetector;
-pub use tools::{ToolRegistry, ToolError, build_function_declarations};
+pub use tools::{ToolRegistry, build_function_declarations, build_function_declarations_for_level};
 pub use tree_sitter::TreeSitterAnalyzer;
 pub use types::{SessionInfo, ToolConfig, ContextConfig, LoggingConfig, CommandResult, AnalysisDepth, OutputFormat, CompressionLevel, PerformanceMetrics, CapabilityLevel};
 pub use vtagentgitignore::initialize_vtagent_gitignore;

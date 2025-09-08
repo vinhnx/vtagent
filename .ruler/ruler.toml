@@ -3,16 +3,16 @@
 
 # To specify which agents are active by default when --agents is not used,
 # uncomment and populate the following line. If omitted, all agents are active.
-default_agents = [
-    "copilot",
-    "cursor",
-    "codex",
-    "agentsmd",
-    "qwen",
-    "gemini",
-    "kiro",
-    "kilocode",
-]
+# default_agents = [
+#     "copilot",
+#     "cursor",
+#     "codex",
+#     "agentsmd",
+#     "qwen",
+#     "gemini",
+#     "kiro",
+#     "kilocode",
+# ]
 
 [mcp]
 # Enable/disable MCP propagation globally (default: true)
@@ -22,7 +22,7 @@ merge_strategy = "merge"
 
 [gitignore]
 # Enable/disable automatic .gitignore updates (default: true)
-enabled = false
+enabled = true
 
 # Enable nested rule loading from nested .ruler directories
 # When enabled, ruler will search for and process .ruler directories throughout the project hierarchy

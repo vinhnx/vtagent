@@ -72,18 +72,51 @@ For new developers:
    ./scripts/setup.sh --with-hooks
    ```
 
-3. **Run code quality checks**
+3. **Configure API keys (optional)**
+
+   Create a `.env` file in the project root to store your API keys:
+   ```bash
+   # .env file
+   GEMINI_API_KEY=your_gemini_api_key_here
+   ANTHROPIC_API_KEY=your_anthropic_api_key_here
+   OPENAI_API_KEY=your_openai_api_key_here
+   ```
+
+4. **Run code quality checks**
 
    ```bash
    ./scripts/check.sh
    ```
 
-4. **Start developing!**
+5. **Start developing!**
 
    ```bash
    cargo build
    cargo test
    ```
+
+## API Key Configuration
+
+vtagent supports multiple ways to configure API keys, with the following priority:
+
+1. **Environment variables** (highest priority) - Most secure
+2. **.env file** - Convenient for development
+3. **Configuration file** (vtagent.toml) - Least secure, but convenient
+
+Example `.env` file:
+```bash
+GEMINI_API_KEY=your_gemini_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
+```
+
+Example `vtagent.toml` configuration:
+```toml
+[agent]
+gemini_api_key = "your_gemini_api_key_here"
+anthropic_api_key = "your_anthropic_api_key_here"
+openai_api_key = "your_openai_api_key_here"
+```
 
 ## Integration with CI/CD
 

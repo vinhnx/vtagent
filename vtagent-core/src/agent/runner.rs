@@ -3,7 +3,6 @@
 use crate::agent::multi_agent::*;
 use crate::llm::{AnyClient, make_client};
 use crate::tools::{ToolRegistry, build_function_declarations};
-use crate::types::*;
 use crate::gemini::{Content, Part, Tool, FunctionResponse, GenerateContentRequest, ToolConfig};
 use anyhow::{Result, anyhow};
 use console::style;

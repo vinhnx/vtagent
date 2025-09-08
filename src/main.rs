@@ -22,6 +22,8 @@ use vtagent_core::{
 };
 use walkdir::WalkDir;
 
+mod multi_agent_loop;
+
 /// Main CLI structure for VT Code
 #[derive(Parser, Debug)]
 #[command(
@@ -356,9 +358,8 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
 
         eprintln!("[DEBUG] Multi-agent system initialized");
 
-        // For now, display a message that multi-agent is active
-        println!("{}", style("Multi-Agent System Active").cyan().bold());
-        println!("{}", style("   Orchestrator will coordinate specialized agents").dim());
+        // Run the orchestrator-driven conversation loop
+        return multi_agent_loop::run_multi_agent_conversation(config, &vtcode_config).await;
     }
 
     // Create system instruction with configuration awareness

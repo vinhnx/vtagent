@@ -1,5 +1,6 @@
 //! CLI argument parsing and configuration
 
+use crate::models::ModelId;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -12,8 +13,8 @@ use std::path::PathBuf;
 )]
 pub struct Cli {
     /// **Gemini model ID** (e.g., `gemini-2.5-flash-lite`, `gemini-2.5-flash`, `gemini-pro`)\n\n**Available models:**\n• `gemini-2.5-flash-lite` - Fastest, most cost-effective\n• `gemini-2.5-flash` - Fast, cost-effective\n• `gemini-pro` - More capable, slower\n• `gemini-2.5-pro` - Latest, most Research-preview
-    #[arg(long, global = true, default_value = "gemini-2.5-flash-lite")]
-    pub model: String,
+    #[arg(long, global = true)]
+    pub model: Option<String>,
 
     /// **API key environment variable** to read\n\n**Checks in order:**\n1. Specified env var\n2. `GOOGLE_API_KEY`\n\n**Setup:** `export GEMINI_API_KEY="your_key"`
     #[arg(long, global = true, default_value = "GEMINI_API_KEY")]
@@ -58,6 +59,14 @@ pub struct Cli {
     /// Disable color output
     #[arg(long, global = true)]
     pub no_color: bool,
+
+    /// Force use of multi-agent mode (requires confirmation for safety)
+    #[arg(long, global = true)]
+    pub force_multi_agent: bool,
+
+    /// Skip safety confirmations (use with caution)
+    #[arg(long, global = true)]
+    pub skip_confirmations: bool,
 
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -159,7 +168,7 @@ pub struct LoggingConfig {
 impl Default for Cli {
     fn default() -> Self {
         Self {
-            model: "gemini-2.5-flash-lite".to_string(),
+            model: Some(ModelId::default().as_str().to_string()),
             api_key_env: "GEMINI_API_KEY".to_string(),
             workspace: None,
             async_file_ops: false,
@@ -171,12 +180,21 @@ impl Default for Cli {
             config: None,
             log_level: "info".to_string(),
             no_color: false,
+            force_multi_agent: false,
+            skip_confirmations: false,
             command: Some(Commands::Chat),
         }
     }
 }
 
 impl Cli {
+    /// Get the model to use, with fallback to default
+    pub fn get_model(&self) -> String {
+        self.model
+            .clone()
+            .unwrap_or_else(|| ModelId::default().as_str().to_string())
+    }
+
     /// Load configuration from a simple TOML-like file without external deps
     ///
     /// Supported keys (top-level): model, api_key_env, verbose, log_level, workspace
@@ -305,10 +323,5 @@ impl Cli {
     /// Check if verbose mode is enabled
     pub fn is_verbose(&self) -> bool {
         self.verbose
-    }
-
-    /// Get the effective model name
-    pub fn get_model(&self) -> String {
-        self.model.clone()
     }
 }

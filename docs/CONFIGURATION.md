@@ -344,3 +344,149 @@ Certain settings can still be overridden with environment variables for compatib
 - Ensure you're using the latest version of VTAgent
 - Check that configuration file syntax is correct
 - Verify the agent is loading the correct config file path
+
+## Multi-Agent System Configuration Constants
+
+VTAgent now uses centralized configuration constants instead of magic numbers to improve maintainability and allow easy tuning of system behavior.
+
+### Default Configuration Values
+
+All default values for the multi-agent system are defined as constants:
+
+#### Multi-Agent System Defaults (`MultiAgentDefaults`)
+
+```rust
+// Core system settings
+MAX_CONCURRENT_SUBAGENTS: usize = 3        // Default number of concurrent agents
+TASK_TIMEOUT_SECS: u64 = 300               // 5 minute default timeout
+CONTEXT_WINDOW_SIZE: usize = 8192          // Default context window
+MAX_CONTEXT_ITEMS: usize = 50              // Default max context items
+
+// Feature toggles
+ENABLE_TASK_MANAGEMENT: bool = true        // Enable task management
+ENABLE_CONTEXT_SHARING: bool = true        // Enable context sharing
+ENABLE_PERFORMANCE_MONITORING: bool = true // Enable performance monitoring
+ENABLE_MULTI_AGENT: bool = true           // Enable multi-agent mode
+CONTEXT_STORE_ENABLED: bool = true        // Enable context store
+```
+
+#### Context Store Defaults (`ContextStoreDefaults`)
+
+```rust
+MAX_CONTEXTS: usize = 1000                 // Max contexts in store
+AUTO_CLEANUP_DAYS: u64 = 7                 // Auto cleanup after 7 days
+ENABLE_PERSISTENCE: bool = true            // Enable persistence
+COMPRESSION_ENABLED: bool = true           // Enable compression
+STORAGE_DIR: &str = ".vtagent/contexts"    // Storage directory
+```
+
+#### Performance Monitoring Defaults (`PerformanceDefaults`)
+
+```rust
+METRICS_INTERVAL_SECS: u64 = 30           // 30 second collection interval
+METRICS_RETENTION_HOURS: u64 = 24         // 24 hour retention
+ANALYSIS_THRESHOLD_PERCENTILE: f64 = 0.95 // 95th percentile analysis
+OPTIMIZATION_TRIGGER_COUNT: usize = 3     // Trigger after 3 slow tasks
+```
+
+#### Verification System Defaults (`VerificationDefaults`)
+
+```rust
+MIN_CONFIDENCE_THRESHOLD: f64 = 0.7       // Minimum confidence (70%)
+MIN_COMPLETENESS_THRESHOLD: f64 = 0.8     // Minimum completeness (80%)
+MAX_VERIFICATION_ATTEMPTS: usize = 3      // Max verification attempts
+VERIFICATION_TIMEOUT_SECS: u64 = 60       // 60 second timeout
+```
+
+### Scenario-Specific Configurations
+
+VTAgent supports three pre-configured scenarios optimized for different use cases:
+
+#### High Performance Scenario (`ScenarioDefaults`)
+
+Optimized for speed with more agents and shorter timeouts:
+
+```rust
+HIGH_PERF_MAX_AGENTS: usize = 5           // More agents for parallelism
+HIGH_PERF_TIMEOUT_SECS: u64 = 120         // 2 minute timeout
+HIGH_PERF_CONTEXT_WINDOW: usize = 4096    // Smaller context window
+HIGH_PERF_MAX_CONTEXTS: usize = 25        // Fewer contexts for speed
+```
+
+#### High Quality Scenario
+
+Optimized for quality with fewer agents and longer processing time:
+
+```rust
+HIGH_QUALITY_MAX_AGENTS: usize = 2        // Fewer agents for focus
+HIGH_QUALITY_TIMEOUT_SECS: u64 = 600      // 10 minute timeout
+HIGH_QUALITY_CONTEXT_WINDOW: usize = 16384 // Larger context window
+HIGH_QUALITY_MAX_CONTEXTS: usize = 100    // More contexts for quality
+```
+
+#### Balanced Scenario
+
+Balanced configuration for general use:
+
+```rust
+BALANCED_MAX_AGENTS: usize = 3            // Standard agent count
+BALANCED_TIMEOUT_SECS: u64 = 300          // 5 minute timeout
+BALANCED_CONTEXT_WINDOW: usize = 8192     // Standard context window
+BALANCED_MAX_CONTEXTS: usize = 50         // Standard context count
+```
+
+### Updated Model Configuration Examples
+
+Current supported models with recommended scenarios:
+
+#### Development Configuration
+```rust
+// Fast development with Gemini 2.5 Flash Lite
+orchestrator_model: "gemini-2.5-flash"
+subagent_model: "gemini-2.5-flash-lite"
+max_concurrent_subagents: 5              // High performance scenario
+task_timeout: 120                        // 2 minute timeout
+context_window_size: 4096                // Optimized for speed
+```
+
+#### Production Configuration
+```rust
+// High quality with Gemini 2.5 Pro
+orchestrator_model: "gemini-2.5-pro"
+subagent_model: "gemini-2.5-flash"
+max_concurrent_subagents: 2              // High quality scenario
+task_timeout: 600                        // 10 minute timeout
+context_window_size: 16384               // Larger context for quality
+```
+
+#### Balanced Configuration
+```rust
+// General purpose with Gemini 2.5 Flash
+orchestrator_model: "gemini-2.5-flash"
+subagent_model: "gemini-2.5-flash-lite"
+max_concurrent_subagents: 3              // Balanced scenario
+task_timeout: 300                        // 5 minute timeout
+context_window_size: 8192                // Standard context window
+```
+
+### Configuration Best Practices
+
+1. **Use Constants**: Always use the defined constants instead of magic numbers
+2. **Scenario Selection**: Choose the appropriate scenario based on your use case:
+   - **High Performance**: For rapid prototyping and development
+   - **High Quality**: For production code and complex tasks
+   - **Balanced**: For general development and testing
+
+3. **Model Selection**: Choose models based on your needs:
+   - **Gemini 2.5 Flash Lite**: Fastest, most cost-effective
+   - **Gemini 2.5 Flash**: Fast, good balance of speed and capability
+   - **Gemini 2.5 Pro**: Most capable, best for complex tasks
+
+4. **Timeout Tuning**: Adjust timeouts based on task complexity:
+   - Simple tasks: 2-5 minutes
+   - Complex tasks: 10-15 minutes
+   - Large refactoring: 30+ minutes
+
+5. **Context Management**: Balance context size with performance:
+   - Larger contexts provide better understanding
+   - Smaller contexts improve speed and reduce costs

@@ -509,7 +509,7 @@ cargo run -- --async-file-ops --show-file-diffs chat
 ### Example Output
 
 ```
-📝 File: src/main.rs
+File: src/main.rs
 ══════════════════════════════════════════════════
 Changes: 5 additions, 2 deletions, 3 modifications
 

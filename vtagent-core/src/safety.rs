@@ -1,0 +1,259 @@
+//! Safety checks for VTAgent operations
+//!
+//! This module provides safety validations for potentially expensive
+//! or resource-intensive operations to ensure user control and efficiency.
+
+use crate::models::ModelId;
+use crate::user_confirmation::{UserConfirmation, AgentMode, TaskComplexity};
+use anyhow::Result;
+use console::style;
+
+/// Safety validation utilities for VTAgent operations
+pub struct SafetyValidator;
+
+impl SafetyValidator {
+    /// Validate and potentially request confirmation for model usage
+    /// Returns the approved model to use, which may be different from the requested model
+    pub fn validate_model_usage(
+        requested_model: &str,
+        task_description: Option<&str>,
+        skip_confirmations: bool,
+    ) -> Result<String> {
+        // Parse the requested model
+        let model_id = match requested_model {
+            "gemini-2.5-pro" => Some(ModelId::Gemini25Pro),
+            "gemini-2.5-flash" => Some(ModelId::Gemini25Flash),
+            "gemini-2.5-flash-lite" => Some(ModelId::Gemini25FlashLite),
+            "gemini-2.0-flash" => Some(ModelId::Gemini20Flash),
+            _ => None,
+        };
+
+        // Check if this is the most capable (and expensive) model
+        if let Some(ModelId::Gemini25Pro) = model_id {
+            let current_default = ModelId::default();
+
+            if skip_confirmations {
+                println!("{}", style("Using Gemini 2.5 Pro model (confirmations skipped)").yellow());
+                return Ok(requested_model.to_string());
+            }
+
+            if let Some(task) = task_description {
+                println!("{}", style("Model Selection Review").cyan().bold());
+                println!("Task: {}", style(task).cyan());
+                println!();
+            }
+
+            // Ask for explicit confirmation before using the most capable model
+            let confirmed = UserConfirmation::confirm_pro_model_usage(current_default.as_str())?;            if !confirmed {
+                println!("Falling back to default model: {}", current_default.display_name());
+                return Ok(current_default.as_str().to_string());
+            }
+        }
+
+        Ok(requested_model.to_string())
+    }
+
+    /// Validate agent mode selection based on task complexity and user preferences
+    /// Returns the recommended agent mode with user confirmation if needed
+    pub fn validate_agent_mode(
+        task_description: &str,
+        requested_multi_agent: bool,
+        force_multi_agent: bool,
+        skip_confirmations: bool,
+    ) -> Result<AgentMode> {
+        // Handle force multi-agent flag
+        if force_multi_agent {
+            if skip_confirmations {
+                println!("{}", style("Forcing multi-agent mode (confirmations skipped)").yellow());
+                return Ok(AgentMode::MultiAgent);
+            }
+
+            let confirmed = UserConfirmation::confirm_multi_agent_usage(task_description)?;
+            return Ok(if confirmed { AgentMode::MultiAgent } else { AgentMode::SingleCoder });
+        }
+
+        // If multi-agent is explicitly requested, ask for confirmation
+        if requested_multi_agent {
+            if skip_confirmations {
+                println!("{}", style("Using multi-agent mode (confirmations skipped)").yellow());
+                return Ok(AgentMode::MultiAgent);
+            }
+
+            let confirmed = UserConfirmation::confirm_multi_agent_usage(task_description)?;
+
+            if confirmed {
+                return Ok(AgentMode::MultiAgent);
+            } else {
+                println!("{}", style("Switching to single coder agent mode").yellow());
+                return Ok(AgentMode::SingleCoder);
+            }
+        }
+
+        // For auto mode, assess task complexity and recommend
+        if skip_confirmations {
+            println!("{}", style("Using single coder agent (confirmations skipped)").yellow());
+            return Ok(AgentMode::SingleCoder);
+        }
+
+        let complexity = UserConfirmation::assess_task_complexity(task_description)?;
+        let _recommended_mode = complexity.recommended_agent_mode();
+
+        match complexity {
+            TaskComplexity::Complex => {
+                // For complex tasks, offer multi-agent but don't force it
+                println!("{}", style("Complex task detected - Multi-agent mode recommended").blue().bold());
+
+                let confirmed = UserConfirmation::confirm_multi_agent_usage(task_description)?;
+
+                if confirmed {
+                    Ok(AgentMode::MultiAgent)
+                } else {
+                    println!("{}", style("Using single coder agent for complex task").yellow());
+                    Ok(AgentMode::SingleCoder)
+                }
+            },
+            TaskComplexity::Moderate => {
+                // For moderate tasks, default to single agent but offer choice
+                println!("{}", style("Moderate task - Single agent recommended").green());
+                println!("Single coder agent should handle this efficiently.");
+                Ok(AgentMode::SingleCoder)
+            },
+            TaskComplexity::Simple => {
+                // For simple tasks, always use single agent
+                println!("{}", style("Simple task - Using single coder agent").green());
+                Ok(AgentMode::SingleCoder)
+            }
+        }
+    }
+
+    /// Check if a model switch is safe and cost-effective
+    pub fn is_model_switch_safe(from_model: &str, to_model: &str) -> bool {
+        let from_id = ModelId::from_str(from_model).ok();
+        let to_id = ModelId::from_str(to_model).ok();
+
+        match (from_id, to_id) {
+            (Some(from), Some(to)) => {
+                // Switching to Pro model requires confirmation
+                !matches!(to, ModelId::Gemini25Pro) || matches!(from, ModelId::Gemini25Pro)
+            },
+            _ => true, // Unknown models are allowed
+        }
+    }
+
+    /// Display safety recommendations for the current configuration
+    pub fn display_safety_recommendations(
+        model: &str,
+        agent_mode: &AgentMode,
+        task_description: Option<&str>,
+    ) {
+        println!("{}", style(" Safety Configuration Summary").cyan().bold());
+        println!("Model: {}", style(model).green());
+        println!("Agent Mode: {}", style(format!("{:?}", agent_mode)).green());
+
+        if let Some(task) = task_description {
+            println!("Task: {}", style(task).cyan());
+        }
+
+        println!();
+
+        // Model-specific recommendations
+        match model {
+            "gemini-2.5-pro" => {
+                println!("{}", style("Using most capable model:").yellow());
+                println!("• Highest quality responses");
+                println!("• Higher cost per token");
+                println!("• Slower response times");
+            },
+            "gemini-2.5-flash" => {
+                println!("{}", style("⚡ Using balanced model:").green());
+                println!("• Good quality responses");
+                println!("• Reasonable cost");
+                println!("• Fast response times");
+            },
+            "gemini-2.5-flash-lite" => {
+                println!("{}", style("Using fast model:").blue());
+                println!("• Quick responses");
+                println!("• Most cost-effective");
+                println!("• Good for simple tasks");
+            },
+            _ => {},
+        }
+
+        // Agent mode recommendations
+        match agent_mode {
+            AgentMode::SingleCoder => {
+                println!("{}", style("Single Coder Agent:").green());
+                println!("• Direct and efficient");
+                println!("• Lower API costs");
+                println!("• Faster task completion");
+                println!("• Best for most development tasks");
+            },
+            AgentMode::MultiAgent => {
+                println!("{}", style("Multi-Agent System:").blue());
+                println!("• Specialized expertise");
+                println!("• Parallel task execution");
+                println!("• Enhanced verification");
+                println!("• Higher resource usage");
+            },
+        }
+
+        println!();
+    }
+
+    /// Validate resource usage and warn about potential costs
+    pub fn validate_resource_usage(
+        model: &str,
+        agent_mode: &AgentMode,
+        estimated_tokens: Option<usize>,
+    ) -> Result<bool> {
+        let mut warnings = Vec::new();
+
+        // Check for expensive model usage
+        if model == "gemini-2.5-pro" {
+            warnings.push("Using most expensive model (Gemini 2.5 Pro)");
+        }
+
+        // Check for multi-agent resource usage
+        if matches!(agent_mode, AgentMode::MultiAgent) {
+            warnings.push("Multi-agent mode will use multiple model calls");
+        }
+
+        // Check for high token usage
+        if let Some(tokens) = estimated_tokens {
+            if tokens > 10000 {
+                warnings.push("High token usage estimated (>10k tokens)");
+            }
+        }
+
+        if !warnings.is_empty() {
+            println!("{}", style(" Resource Usage Warning").yellow().bold());
+            for warning in &warnings {
+                println!("• {}", warning);
+            }
+            println!();
+
+            let confirmed = UserConfirmation::confirm_action(
+                "Do you want to proceed with these resource usage implications?",
+                false,
+            )?;
+
+            return Ok(confirmed);
+        }
+
+        Ok(true)
+    }
+}
+
+// Re-export ModelId::from_str for internal use
+impl ModelId {
+    /// Parse a model string into a ModelId
+    pub fn from_str(s: &str) -> Result<Self, &'static str> {
+        match s {
+            "gemini-2.5-flash-lite" => Ok(ModelId::Gemini25FlashLite),
+            "gemini-2.5-flash" => Ok(ModelId::Gemini25Flash),
+            "gemini-2.5-pro" => Ok(ModelId::Gemini25Pro),
+            "gemini-2.0-flash" => Ok(ModelId::Gemini20Flash),
+            _ => Err("Unknown model"),
+        }
+    }
+}

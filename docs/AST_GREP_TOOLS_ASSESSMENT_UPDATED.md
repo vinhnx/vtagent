@@ -6,20 +6,20 @@ After running tests and examining the code, here's the accurate status of AST-gr
 
 ### 1. Partially Implemented Tools
 
-#### `ast_grep_search` ✅ PARTIALLY IMPLEMENTED
+#### `ast_grep_search` PARTIALLY IMPLEMENTED
 - **Implementation**: Currently delegates to `rp_search` (ripgrep-based search)
 - **Status**: Works but does not provide true AST-grep functionality
 - **Behavior**: Performs text-based search rather than syntax-aware AST pattern matching
 
-#### `ast_grep_transform` ❌ NOT IMPLEMENTED
+#### `ast_grep_transform` NOT IMPLEMENTED
 - **Implementation**: Returns error "ast_grep_transform not implemented yet"
 - **Status**: Placeholder only
 
-#### `ast_grep_lint` ❌ NOT IMPLEMENTED
+#### `ast_grep_lint` NOT IMPLEMENTED
 - **Implementation**: Returns error "ast_grep_lint not implemented yet"
 - **Status**: Placeholder only
 
-#### `ast_grep_refactor` ❌ NOT IMPLEMENTED
+#### `ast_grep_refactor` NOT IMPLEMENTED
 - **Implementation**: Returns error "ast_grep_refactor not implemented yet"
 - **Status**: Placeholder only
 
@@ -49,10 +49,10 @@ async fn ast_grep_transform(&self, args: Value) -> Result<Value> {
 ### 4. Discrepancy Between Documentation and Implementation
 
 #### Documentation Claims
-✅ **COMPLETED**: ast-grep Integration - The Unstoppable Coding Monster
+**COMPLETED**: ast-grep Integration - The Unstoppable Coding Monster
 
 #### Reality
-❌ **PARTIALLY IMPLEMENTED**: Only one tool delegates to basic search, others are placeholders
+**PARTIALLY IMPLEMENTED**: Only one tool delegates to basic search, others are placeholders
 
 This represents a significant gap between claimed and actual functionality.
 

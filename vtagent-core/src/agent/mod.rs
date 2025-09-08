@@ -5,14 +5,18 @@ pub mod compaction; // Legacy - will be replaced by new modules
 pub mod config;
 pub mod core;
 pub mod engine;
+pub mod examples;
+pub mod integration;
 pub mod intelligence;
 pub mod multi_agent;
 pub mod multi_agent_tools;
+pub mod optimization;
 pub mod orchestrator;
 pub mod performance;
 pub mod runner;
 pub mod semantic;
 pub mod snapshots;
+pub mod verification;
 pub mod stats;
 pub mod types;
 

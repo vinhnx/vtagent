@@ -4,6 +4,7 @@
 //! It provides a centralized way to manage agent policies, tool permissions, and
 //! command allow lists.
 
+use crate::models::ModelId;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -455,7 +456,7 @@ fn default_max_empty_responses() -> usize {
     10
 }
 fn default_model() -> String {
-    "gemini-2.5-flash-lite".to_string()
+    ModelId::default().as_str().to_string()
 }
 fn default_api_key_env() -> String {
     "GEMINI_API_KEY".to_string()
@@ -560,11 +561,11 @@ fn default_execution_mode() -> String {
 }
 
 fn default_orchestrator_model() -> String {
-    "gemini-1.5-pro".to_string()
+    ModelId::default_orchestrator().as_str().to_string()
 }
 
 fn default_subagent_model() -> String {
-    "gemini-1.5-flash".to_string()
+    ModelId::default_subagent().as_str().to_string()
 }
 
 fn default_max_concurrent_subagents() -> usize {
@@ -856,5 +857,156 @@ impl ConfigManager {
             self.config = VTAgentConfig::load_from_file(path)?;
         }
         Ok(())
+    }
+}
+
+// Default configuration values for VTAgent multi-agent system
+//
+// This section contains all configurable constants to avoid magic numbers
+// and provide a centralized location for tuning system behavior.
+
+use std::time::Duration;
+
+/// Default multi-agent system configuration constants
+pub struct MultiAgentDefaults;
+
+impl MultiAgentDefaults {
+    /// Default maximum number of concurrent subagents
+    pub const MAX_CONCURRENT_SUBAGENTS: usize = 3;
+
+    /// Default task execution timeout (5 minutes)
+    pub const TASK_TIMEOUT_SECS: u64 = 300;
+
+    /// Default context window size for agents
+    pub const CONTEXT_WINDOW_SIZE: usize = 8192;
+
+    /// Default maximum number of context items
+    pub const MAX_CONTEXT_ITEMS: usize = 50;
+
+    /// Default enable task management
+    pub const ENABLE_TASK_MANAGEMENT: bool = true;
+
+    /// Default enable context sharing
+    pub const ENABLE_CONTEXT_SHARING: bool = true;
+
+    /// Default enable performance monitoring
+    pub const ENABLE_PERFORMANCE_MONITORING: bool = true;
+
+    /// Default enable multi-agent mode
+    pub const ENABLE_MULTI_AGENT: bool = false;  // Changed to false for single-agent default
+
+    /// Default enable context store
+    pub const CONTEXT_STORE_ENABLED: bool = true;
+
+    /// Create default task timeout duration
+    pub fn task_timeout() -> Duration {
+        Duration::from_secs(Self::TASK_TIMEOUT_SECS)
+    }
+}
+
+/// Default context store configuration constants
+pub struct ContextStoreDefaults;
+
+impl ContextStoreDefaults {
+    /// Default maximum number of contexts in store
+    pub const MAX_CONTEXTS: usize = 1000;
+
+    /// Default auto cleanup period in days
+    pub const AUTO_CLEANUP_DAYS: u64 = 7;
+
+    /// Default enable persistence
+    pub const ENABLE_PERSISTENCE: bool = true;
+
+    /// Default enable compression
+    pub const COMPRESSION_ENABLED: bool = true;
+
+    /// Default storage directory
+    pub const STORAGE_DIR: &'static str = ".vtagent/contexts";
+}
+
+/// Default performance monitoring configuration constants
+pub struct PerformanceDefaults;
+
+impl PerformanceDefaults {
+    /// Default metrics collection interval (30 seconds)
+    pub const METRICS_INTERVAL_SECS: u64 = 30;
+
+    /// Default metrics retention period (24 hours)
+    pub const METRICS_RETENTION_HOURS: u64 = 24;
+
+    /// Default performance analysis threshold (95th percentile)
+    pub const ANALYSIS_THRESHOLD_PERCENTILE: f64 = 0.95;
+
+    /// Default optimization trigger threshold (3 consecutive slow tasks)
+    pub const OPTIMIZATION_TRIGGER_COUNT: usize = 3;
+
+    /// Create default metrics collection interval
+    pub fn metrics_interval() -> Duration {
+        Duration::from_secs(Self::METRICS_INTERVAL_SECS)
+    }
+
+    /// Create default metrics retention duration
+    pub fn metrics_retention() -> Duration {
+        Duration::from_secs(Self::METRICS_RETENTION_HOURS * 3600)
+    }
+}
+
+/// Default verification configuration constants
+pub struct VerificationDefaults;
+
+impl VerificationDefaults {
+    /// Default minimum confidence threshold
+    pub const MIN_CONFIDENCE_THRESHOLD: f64 = 0.7;
+
+    /// Default minimum completeness threshold
+    pub const MIN_COMPLETENESS_THRESHOLD: f64 = 0.8;
+
+    /// Default maximum verification attempts
+    pub const MAX_VERIFICATION_ATTEMPTS: usize = 3;
+
+    /// Default verification timeout (60 seconds)
+    pub const VERIFICATION_TIMEOUT_SECS: u64 = 60;
+
+    /// Create default verification timeout
+    pub fn verification_timeout() -> Duration {
+        Duration::from_secs(Self::VERIFICATION_TIMEOUT_SECS)
+    }
+}
+
+/// Scenario-specific configuration constants
+pub struct ScenarioDefaults;
+
+impl ScenarioDefaults {
+    /// High performance scenario - More agents, shorter timeouts
+    pub const HIGH_PERF_MAX_AGENTS: usize = 5;
+    pub const HIGH_PERF_TIMEOUT_SECS: u64 = 120;
+    pub const HIGH_PERF_CONTEXT_WINDOW: usize = 4096;
+    pub const HIGH_PERF_MAX_CONTEXTS: usize = 25;
+
+    /// High quality scenario - Fewer agents, longer timeouts, larger context
+    pub const HIGH_QUALITY_MAX_AGENTS: usize = 2;
+    pub const HIGH_QUALITY_TIMEOUT_SECS: u64 = 600;
+    pub const HIGH_QUALITY_CONTEXT_WINDOW: usize = 16384;
+    pub const HIGH_QUALITY_MAX_CONTEXTS: usize = 100;
+
+    /// Balanced scenario - Standard settings
+    pub const BALANCED_MAX_AGENTS: usize = 3;
+    pub const BALANCED_TIMEOUT_SECS: u64 = 300;
+    pub const BALANCED_CONTEXT_WINDOW: usize = 8192;
+    pub const BALANCED_MAX_CONTEXTS: usize = 50;
+
+    /// Create high performance task timeout
+    pub fn high_perf_timeout() -> Duration {
+        Duration::from_secs(Self::HIGH_PERF_TIMEOUT_SECS)
+    }
+
+    /// Create high quality task timeout
+    pub fn high_quality_timeout() -> Duration {
+        Duration::from_secs(Self::HIGH_QUALITY_TIMEOUT_SECS)
+    }
+
+    /// Create balanced task timeout
+    pub fn balanced_timeout() -> Duration {
+        Duration::from_secs(Self::BALANCED_TIMEOUT_SECS)
     }
 }

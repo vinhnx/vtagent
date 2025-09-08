@@ -18,7 +18,9 @@ use vtagent_core::{
     config::{ConfigManager, ToolPolicy, VTAgentConfig},
     gemini::{Content, FunctionResponse, GenerateContentRequest, Part, Tool, ToolConfig},
     prompts::system::{SystemPromptConfig, generate_system_instruction_with_config},
+    safety::SafetyValidator,
     types::AgentConfig as CoreAgentConfig,
+    user_confirmation::{UserConfirmation, AgentMode},
 };
 use walkdir::WalkDir;
 
@@ -47,6 +49,14 @@ pub struct Cli {
     /// Enable verbose logging
     #[arg(long, global = true)]
     pub verbose: bool,
+
+    /// Force use of multi-agent mode (requires confirmation for safety)
+    #[arg(long, global = true)]
+    pub force_multi_agent: bool,
+
+    /// Skip safety confirmations (use with caution)
+    #[arg(long, global = true)]
+    pub skip_confirmations: bool,
 
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -159,23 +169,34 @@ async fn main() -> Result<()> {
         .unwrap_or(std::env::current_dir().context("cannot determine current dir")?);
 
     // Create agent configuration
-    let config = CoreAgentConfig {
+    let mut config = CoreAgentConfig {
         model: args.model.clone(),
         api_key: api_key.clone(),
         workspace: workspace.clone(),
         verbose: args.verbose,
     };
 
+    // Apply safety validations for model usage
+    // This ensures user explicit confirmation for expensive models
+    let validated_model = SafetyValidator::validate_model_usage(
+        &config.model,
+        Some("Interactive coding session"),
+        args.skip_confirmations
+    )?;
+
+    // Update config with validated model
+    config.model = validated_model;
+
     // Dispatch to appropriate command handler
     match args.command.unwrap_or(Commands::Chat) {
         Commands::Chat => {
-            handle_chat_command(&config).await?;
+            handle_chat_command(&config, args.force_multi_agent, args.skip_confirmations).await?;
         }
         Commands::ChatVerbose => {
             println!("Verbose chat mode selected");
             println!("This mode provides enhanced transparency features.");
             println!("(Not implemented in minimal version)");
-            handle_chat_command(&config).await?;
+            handle_chat_command(&config, args.force_multi_agent, args.skip_confirmations).await?;
         }
         Commands::Ask { prompt } => {
             let prompt_text = prompt.join(" ");
@@ -304,7 +325,7 @@ async fn main() -> Result<()> {
 }
 
 /// Handle the chat command
-async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
+async fn handle_chat_command(config: &CoreAgentConfig, force_multi_agent: bool, skip_confirmations: bool) -> Result<()> {
     eprintln!("[DEBUG] Entering handle_chat_command");
     eprintln!("[DEBUG] Workspace: {:?}", config.workspace);
     eprintln!("[DEBUG] Model: {}", config.model);
@@ -343,12 +364,32 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
     eprintln!("[DEBUG] Orchestrator model: {}", vtcode_config.multi_agent.orchestrator_model);
     eprintln!("[DEBUG] Subagent model: {}", vtcode_config.multi_agent.subagent_model);
 
-    // Initialize multi-agent system if enabled
-    let use_multi_agent = vtcode_config.multi_agent.enabled &&
+    // Apply safety validation for agent mode selection
+    // Default to single-agent mode for efficiency and cost control
+    let requested_multi_agent = vtcode_config.multi_agent.enabled &&
         (vtcode_config.multi_agent.execution_mode == "multi" ||
          vtcode_config.multi_agent.execution_mode == "auto");
 
+    // Validate agent mode with user confirmation for complex tasks
+    let agent_mode = SafetyValidator::validate_agent_mode(
+        "Interactive coding session - complexity will be assessed per task",
+        requested_multi_agent,
+        force_multi_agent,
+        skip_confirmations,
+    )?;
+
+    let use_multi_agent = matches!(agent_mode, AgentMode::MultiAgent);
+
+    eprintln!("[DEBUG] Requested multi-agent: {}", requested_multi_agent);
+    eprintln!("[DEBUG] Validated agent mode: {:?}", agent_mode);
     eprintln!("[DEBUG] Using multi-agent system: {}", use_multi_agent);
+
+    // Display safety configuration summary
+    SafetyValidator::display_safety_recommendations(
+        &config.model,
+        &agent_mode,
+        Some("Interactive coding session"),
+    );
 
     if use_multi_agent {
         // Initialize context store and task manager with session ID
@@ -509,7 +550,7 @@ async fn handle_chat_command(config: &CoreAgentConfig) -> Result<()> {
                          **Strategy**: Explorer → Coder → Verification workflow\n\
                          **Executing**: Delegating to Coder Agent for implementation...\n", input)
             } else if input.contains("debug") || input.contains("log") || input.contains("fix") {
-                format!("🔧 **Orchestrator Analysis**: Debugging/logging task detected - '{}'\n\
+                format!("**Orchestrator Analysis**: Debugging/logging task detected - '{}'\n\
                          **Strategy**: Explorer → Coder → Verification workflow\n\
                          **Executing**: Delegating to Coder Agent for implementation...\n", input)
             } else if input.contains("analyze") || input.contains("check") || input.contains("review") {

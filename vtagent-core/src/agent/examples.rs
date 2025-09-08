@@ -94,7 +94,7 @@ pub async fn demonstrate_multi_agent_system() -> Result<()> {
     demonstrate_performance_features(&status).await;
 
     // Shutdown system gracefully
-    println!("\n🔄 Shutting Down System");
+    println!("\nShutting Down System");
     println!("======================");
     system.shutdown().await?;
 
@@ -109,7 +109,7 @@ async fn execute_example_task(
     description: &str,
     agent_type: AgentType,
 ) -> Result<OptimizedTaskResult> {
-    println!("  🔄 Executing: {}", title);
+    println!("  Executing: {}", title);
     println!("     Agent Type: {:?}", agent_type);
     println!("     Description: {}", description);
 

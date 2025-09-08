@@ -162,7 +162,7 @@ restricted_tools = []
 - Orchestrator agents provide strategic oversight
 - Clear separation of concerns improves outcomes
 
-### 🔄 Strategic Delegation Patterns
+### Strategic Delegation Patterns
 - Intelligent task decomposition based on complexity
 - Context-aware agent selection
 - Multi-step verification workflows

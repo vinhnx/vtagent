@@ -162,7 +162,7 @@ Focus on: key decisions, actions taken, current state, and user requirements."#,
     };
 
     let mut client = make_client(config.api_key.clone(), config.model.clone());
-    println!("{}", style("🔄 Compressing conversation...").cyan());
+    println!("{}", style("Compressing conversation...").cyan());
 
     let compressed_response = client.generate_content(&compression_request).await?;
 

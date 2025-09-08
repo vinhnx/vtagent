@@ -128,9 +128,30 @@ pub fn generate_system_instruction_with_guidelines(
     Content::system_text(instruction)
 }
 
-/// Generate the main system instruction for the coding agent
-pub fn generate_system_instruction(_config: &SystemPromptConfig) -> Content {
-    let instruction = r#"You are a coding agent running in the VT Code CLI, a terminal-based coding assistant. You are expected to be precise, safe, and helpful.
+/// Read system prompt from markdown file
+fn read_system_prompt_from_md() -> String {
+    // Try to read from prompts/system.md relative to project root
+    let prompt_paths = [
+        "prompts/system.md",
+        "../prompts/system.md", 
+        "../../prompts/system.md",
+    ];
+    
+    for path in &prompt_paths {
+        if let Ok(content) = fs::read_to_string(path) {
+            // Extract the main system prompt from the markdown
+            if let Some(start) = content.find("```rust\nr#\"") {
+                if let Some(end) = content[start..].find("\"#\n```") {
+                    let prompt_start = start + 9; // Skip ```rust\nr#"
+                    let prompt_end = start + end;
+                    return content[prompt_start..prompt_end].to_string();
+                }
+            }
+        }
+    }
+    
+    // Fallback to hardcoded prompt if file not found
+    r#"You are a coding agent running in the VT Code CLI, a terminal-based coding assistant. You are expected to be precise, safe, and helpful.
 
 ## AVAILABLE TOOLS
 - **File Operations**: list_files, read_file, write_file, edit_file, delete_file
@@ -445,9 +466,32 @@ if isValid && isAllowed && isSecure {
 - Accept some duplication over unnecessary dependencies (don't abuse DRY).
 - Minimize abstraction layers—linear thinking is more natural than jumping between abstractions.
 
-Plan your approach carefully and use the available tools effectively to complete tasks."#;
+Plan your approach carefully and use the available tools effectively to complete tasks."#.to_string()
+}
 
-    Content::system_text(instruction.to_string())
+/// Read multi-agent prompt from markdown file
+fn read_multi_agent_prompt_from_md(agent_type: &str) -> String {
+    let filename = format!("{}_system.md", agent_type);
+    let prompt_paths = [
+        format!("prompts/{}", filename),
+        format!("../prompts/{}", filename),
+        format!("../../prompts/{}", filename),
+    ];
+    
+    for path in &prompt_paths {
+        if let Ok(content) = fs::read_to_string(path) {
+            return content;
+        }
+    }
+    
+    // Return empty string if file not found
+    String::new()
+}
+
+/// Generate the main system instruction for the coding agent
+pub fn generate_system_instruction(_config: &SystemPromptConfig) -> Content {
+    let instruction = read_system_prompt_from_md();
+    Content::system_text(instruction)
 }
 
 /// Generate a specialized system instruction for specific tasks
@@ -754,4 +798,19 @@ Please provide a refactored version that addresses these issues."#,
             vec!["improvement_goal", "file_path", "current_code", "problems"],
         ),
     ]
+}
+
+/// Get orchestrator agent prompt
+pub fn get_orchestrator_prompt() -> String {
+    read_multi_agent_prompt_from_md("orchestrator")
+}
+
+/// Get explorer agent prompt  
+pub fn get_explorer_prompt() -> String {
+    read_multi_agent_prompt_from_md("explorer")
+}
+
+/// Get coder agent prompt
+pub fn get_coder_prompt() -> String {
+    read_multi_agent_prompt_from_md("coder")
 }

@@ -124,3 +124,9 @@ for multi-agent, implement agent provider config at vtagent-core/src/agent/multi
 ---
 
 https://github.com/orhun/git-cliff
+
+---
+
+can you simplify vtconfig.toml and vtconfig.toml.example it has too many configuration and params. simplify but still keep the functionality
+
+---

@@ -26,6 +26,10 @@
     "list_files": { "allow": true },
     "read_file": { "allow": true },
     "write_file": { "allow": true },
-    "edit_file": { "allow": true }
+    "edit_file": { "allow": true },
+    "ast_grep_search": { "allow": true },
+    "ast_grep_transform": { "allow": true },
+    "ast_grep_lint": { "allow": true },
+    "ast_grep_refactor": { "allow": true }
   }
 }

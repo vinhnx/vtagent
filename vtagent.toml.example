@@ -1,108 +1,68 @@
-# VTAgent Configuration File
-# This file controls agent behavior, tool policies, and command permissions.
+# VTAgent Configuration File (Example)
+# This is a minimal configuration example for getting started with vtagent.
+# Copy this file to vtagent.toml and customize as needed.
 
 [agent]
-# Agent-wide settings
+# Basic agent settings
 max_conversation_turns = 1000
 max_session_duration_minutes = 60
 verbose_logging = false
 
-# Conversation management
-max_conversation_history = 100
-max_steps = 30
-max_empty_responses = 10
-
-# Default LLM settings
-default_model = "gemini-2.5-flash-lite"
+# AI Provider configuration
+provider = "gemini"
+default_model = "gemini-2.5-flash"
 api_key_env = "GEMINI_API_KEY"
 default_system_instruction = "You are a helpful coding assistant."
 
 [tools]
-# Default policy for tools not explicitly listed: "allow", "prompt", or "deny"
+# Default policy for tools: "allow", "prompt", or "deny"
 default_policy = "prompt"
 
-# Specific tool policies - override default_policy for individual tools
+# Override default policy for specific tools
 [tools.policies]
-# File operations
 read_file = "allow"
 write_file = "prompt"
-edit_file = "prompt"
-list_files = "allow"
 delete_file = "deny"
-
-# Search and analysis
-code_search = "allow"
-codebase_search = "allow"
-rp_search = "allow"
-
-# Build operations
-cargo_check = "allow"
-cargo_clippy = "allow"
-cargo_fmt = "allow"
-cargo_build = "prompt"
-cargo_test = "prompt"
-
-
-
-# Terminal operations
 run_terminal_cmd = "prompt"
-run_pty_cmd = "prompt"
-run_pty_cmd_streaming = "prompt"
 
 [commands]
-# Commands that can be executed automatically without user confirmation
-# Add common safe commands here to improve workflow efficiency
+# Safe commands that execute without confirmation
 allow_list = [
-    # Basic file operations
-    "ls", "pwd", "cd", "cat", "grep", "find", "head", "tail", "wc", "sort", "uniq",
-
-    # Git operations (read-only)
-    "git status", "git diff", "git log", "git branch", "git show",
-
-    # Build and test (safe operations)
-    "cargo check", "cargo clippy", "cargo fmt",
-
-    # Version checks
-    "python --version", "node --version", "rustc --version"
+    "ls", "pwd", "cat", "grep", "git status", "cargo check"
 ]
 
-# Commands that are always denied for security
+# Dangerous commands that are always blocked
 deny_list = [
-    "rm -rf", "sudo rm", "format", "fdisk", "mkfs",
-    "shutdown", "reboot", "halt", "poweroff",
-    "curl | sh", "wget | sh", "bash <(curl", "bash <(wget",
-    "chmod 777", "chown root", "passwd"
+    "rm -rf", "sudo rm", "shutdown", "format"
 ]
 
-# Patterns that require extra confirmation due to potential danger
+# Commands requiring extra confirmation
 dangerous_patterns = [
-    "rm -f", "git reset --hard", "git clean -f",
-    "docker system prune", "npm install -g",
-    "pip install", "cargo install"
+    "rm -f", "git reset --hard", "pip install"
 ]
-
-[pty]
-# Enable PTY functionality
-enabled = true
-# Default terminal size
-default_rows = 24
-default_cols = 80
-# Maximum number of concurrent PTY sessions
-max_sessions = 10
-# Timeout for PTY commands in seconds
-command_timeout_seconds = 300
 
 [security]
-# Require human confirmation for critical actions
 human_in_the_loop = true
-# Confirm before performing destructive actions
 confirm_destructive_actions = true
-# Log all executed commands
 log_all_commands = true
-# Maximum file size in MB that can be processed
 max_file_size_mb = 50
-# File extensions that are allowed to be processed
+# Common programming language extensions
 allowed_file_extensions = [
     ".rs", ".toml", ".json", ".md", ".txt", ".yaml", ".yml",
     ".js", ".ts", ".py", ".go", ".java", ".cpp", ".c", ".h"
 ]
+
+[pty]
+enabled = true
+default_rows = 24
+default_cols = 80
+max_sessions = 10
+command_timeout_seconds = 300
+
+[multi_agent]
+# Multi-agent system is disabled by default
+enabled = false
+# To enable multi-agent features, set enabled = true and uncomment additional settings below
+# execution_mode = "auto"
+# orchestrator_model = "gemini-2.5-flash"
+# subagent_model = "gemini-2.5-flash-lite"

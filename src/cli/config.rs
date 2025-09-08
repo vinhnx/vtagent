@@ -7,13 +7,13 @@ use std::io::Write;
 /// Handle the config command
 pub async fn handle_config_command(output: Option<&Path>) -> Result<()> {
     println!("{}", style("Generate configuration").blue().bold());
-    
+
     // Configuration generation implementation
     let config_content = generate_default_config();
-    
+
     if let Some(output_path) = output {
         println!("Output path: {}", output_path.display());
-        
+
         // Write to specified file
         let mut file = fs::File::create(output_path)?;
         file.write_all(config_content.as_bytes())?;
@@ -23,7 +23,7 @@ pub async fn handle_config_command(output: Option<&Path>) -> Result<()> {
         println!("\nGenerated configuration:\n");
         println!("{}", config_content);
     }
-    
+
     Ok(())
 }
 
@@ -34,7 +34,7 @@ fn generate_default_config() -> String {
 
 [model]
 # The default model to use
-name = "gemini-1.5-flash"
+name = "gpt-5"
 
 [workspace]
 # Workspace settings
@@ -53,8 +53,8 @@ allow_command_execution = true
 [multi_agent]
 # Multi-agent settings
 enabled = false
-orchestrator_model = "gemini-1.5-pro"
-subagent_model = "gemini-1.5-flash"
+orchestrator_model = "gemini-2.5-flash"
+subagent_model = "gemini-2.5-flash-lite"
 
 [context]
 # Context management settings

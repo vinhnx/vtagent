@@ -2,9 +2,9 @@
 
 use crate::gemini::{Content, GenerateContentRequest};
 use crate::llm::make_client;
-use crate::models::ModelId;
+use crate::config::models::ModelId;
 use crate::prompts::generate_lightweight_instruction;
-use crate::types::AgentConfig;
+use crate::config::types::AgentConfig;
 use anyhow::Result;
 
 /// Handle the ask command - single prompt without tools
@@ -31,7 +31,7 @@ pub async fn handle_ask_command(config: AgentConfig, prompt: Vec<String>) -> Res
         system_instruction: Some(system_instruction),
     };
 
-    let response = client.generate_content(&request).await?;
+    let response = client.generate(&request).await?;
 
     if let Some(candidate) = response.candidates.into_iter().next() {
         for part in candidate.content.parts {

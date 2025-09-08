@@ -1,6 +1,6 @@
 //! Command definitions and interfaces
 
-use crate::types::*;
+use crate::config::types::*;
 use anyhow::Result;
 
 /// Result of executing a command

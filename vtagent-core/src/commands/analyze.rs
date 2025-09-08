@@ -1,8 +1,8 @@
 //! Analyze command implementation - workspace analysis
 
 use crate::tools::ToolRegistry;
-use crate::tree_sitter::{CodeAnalyzer, TreeSitterAnalyzer};
-use crate::types::{AgentConfig, AnalysisDepth, OutputFormat};
+use crate::tools::tree_sitter::{CodeAnalyzer, TreeSitterAnalyzer};
+use crate::config::types::{AgentConfig, AnalysisDepth, OutputFormat};
 use anyhow::Result;
 use console::style;
 use serde_json::json;
@@ -35,7 +35,7 @@ pub async fn handle_analyze_command(
         }
     };
 
-    let registry = ToolRegistry::new(config.workspace.clone());
+    let mut registry = ToolRegistry::new(config.workspace.clone());
 
     // Step 1: Get high-level directory structure
     println!("{}", style("1. Getting workspace structure...").dim());
@@ -177,13 +177,13 @@ pub async fn handle_analyze_command(
 
 /// Perform Research-preview code analysis using tree-sitter
 async fn perform_tree_sitter_analysis(config: &AgentConfig) -> Result<()> {
-    use crate::tree_sitter::analyzer::LanguageSupport;
+    use crate::tools::tree_sitter::analyzer::LanguageSupport;
 
     let mut analyzer = TreeSitterAnalyzer::new()?;
     let code_analyzer = CodeAnalyzer::new(&LanguageSupport::Rust); // Default to Rust
 
     // Find code files to analyze
-    let registry = ToolRegistry::new(config.workspace.clone());
+    let mut registry = ToolRegistry::new(config.workspace.clone());
     let list_result = registry
         .execute_tool("list_files", json!({"path": ".", "recursive": true}))
         .await?;

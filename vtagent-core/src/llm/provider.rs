@@ -39,7 +39,7 @@ pub struct ToolDefinition {
 }
 
 /// Universal tool call
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ToolCall {
     pub id: String,
     pub name: String,

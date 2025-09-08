@@ -1,4 +1,4 @@
-use crate::constants::defaults;
+use crate::config::constants::defaults;
 use serde::{Deserialize, Serialize};
 
 /// Agent-wide configuration

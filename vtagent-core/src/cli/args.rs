@@ -1,6 +1,6 @@
 //! CLI argument parsing and configuration
 
-use crate::models::ModelId;
+use crate::config::models::ModelId;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -16,8 +16,12 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub model: Option<String>,
 
+    /// **LLM Provider** to use for requests\n\n**Available providers:**\n• `gemini` - Google Gemini (default)\n• `openai` - OpenAI GPT models\n• `anthropic` - Anthropic Claude models\n• `openrouter` - OpenRouter (multi-provider)\n• `lmstudio` - Local LMStudio models\n• `ollama` - Local Ollama models\n\n**Example:** --provider openai
+    #[arg(long, global = true)]
+    pub provider: Option<String>,
+
     /// **API key environment variable** to read\n\n**Checks in order:**\n1. Specified env var\n2. `GOOGLE_API_KEY`\n\n**Setup:** `export GEMINI_API_KEY="your_key"`
-    #[arg(long, global = true, default_value = crate::constants::defaults::DEFAULT_API_KEY_ENV)]
+    #[arg(long, global = true, default_value = crate::config::constants::defaults::DEFAULT_API_KEY_ENV)]
     pub api_key_env: String,
 
     /// **Workspace root directory** for file operations\n\n**Defaults to:** Current directory\n**All file operations** are restricted to this path
@@ -131,12 +135,64 @@ pub enum Commands {
         #[command(subcommand)]
         command: crate::cli::tool_policy_commands::ToolPolicyCommands,
     },
+
+    /// **Manage models and providers** - configure and switch between different LLM providers\n\n**Features:**\n• List available providers and models\n• Configure API keys and settings\n• Switch between providers\n• Test provider connectivity\n\n**Examples:**\n  vtagent models list\n  vtagent models set-provider openai\n  vtagent models set-model gpt-4o\n  vtagent models test openai
+    Models {
+        #[command(subcommand)]
+        command: ModelCommands,
+    },
+}
+
+/// Model management commands
+#[derive(Subcommand, Debug)]
+pub enum ModelCommands {
+    /// **List all available providers and models**\n\n**Shows:**\n• Available providers\n• Supported models per provider\n• Current configuration\n• Provider status\n\n**Usage:** vtagent models list
+    List,
+
+    /// **Set the default provider**\n\n**Example:** vtagent models set-provider openai
+    #[command(name = "set-provider")]
+    SetProvider {
+        /// **Provider name** to set as default\n\n**Options:** gemini, openai, anthropic, openrouter, lmstudio, ollama
+        provider: String,
+    },
+
+    /// **Set the default model**\n\n**Example:** vtagent models set-model gpt-4o
+    #[command(name = "set-model")]
+    SetModel {
+        /// **Model name** to set as default
+        model: String,
+    },
+
+    /// **Configure provider settings**\n\n**Examples:**\n  vtagent models config openai --api-key YOUR_KEY\n  vtagent models config lmstudio --base-url http://localhost:1234/v1
+    Config {
+        /// **Provider name** to configure
+        provider: String,
+
+        /// **API key** for the provider
+        #[arg(long)]
+        api_key: Option<String>,
+
+        /// **Base URL** for local providers (LMStudio, Ollama)
+        #[arg(long)]
+        base_url: Option<String>,
+
+        /// **Model name** for this provider
+        #[arg(long)]
+        model: Option<String>,
+    },
+
+    /// **Test provider connectivity**\n\n**Example:** vtagent models test openai
+    Test {
+        /// **Provider name** to test
+        provider: String,
+    },
 }
 
 /// Configuration file structure
 #[derive(Debug)]
 pub struct ConfigFile {
     pub model: Option<String>,
+    pub provider: Option<String>,
     pub api_key_env: Option<String>,
     pub verbose: Option<bool>,
     pub log_level: Option<String>,
@@ -176,6 +232,7 @@ impl Default for Cli {
     fn default() -> Self {
         Self {
             model: Some(ModelId::default().as_str().to_string()),
+            provider: Some("gemini".to_string()),
             api_key_env: "GEMINI_API_KEY".to_string(),
             workspace: None,
             async_file_ops: false,
@@ -230,6 +287,7 @@ impl Cli {
                 // No config file; return empty config
                 return Ok(ConfigFile {
                     model: None,
+                    provider: None,
                     api_key_env: None,
                     verbose: None,
                     log_level: None,
@@ -246,6 +304,7 @@ impl Cli {
         // Very small parser: key = value, supports quoted strings, booleans, and plain paths
         let mut cfg = ConfigFile {
             model: None,
+            provider: None,
             api_key_env: None,
             verbose: None,
             log_level: None,

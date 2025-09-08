@@ -1,10 +1,17 @@
-use super::provider::{LLMError, LLMProvider};
-use super::providers::{AnthropicProvider, GeminiProvider, OpenAIProvider};
+use crate::llm::provider::{LLMError, LLMProvider};
+use super::providers::{AnthropicProvider, GeminiProvider, LMStudioProvider, OllamaProvider, OpenAIProvider, OpenRouterProvider};
 use std::collections::HashMap;
 
 /// LLM provider factory and registry
 pub struct LLMFactory {
-    providers: HashMap<String, Box<dyn Fn(String) -> Box<dyn LLMProvider> + Send + Sync>>,
+    providers: HashMap<String, Box<dyn Fn(ProviderConfig) -> Box<dyn LLMProvider> + Send + Sync>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProviderConfig {
+    pub api_key: Option<String>,
+    pub base_url: Option<String>,
+    pub model: Option<String>,
 }
 
 impl LLMFactory {
@@ -16,17 +23,48 @@ impl LLMFactory {
         // Register built-in providers
         factory.register_provider(
             "gemini",
-            Box::new(|api_key| Box::new(GeminiProvider::new(api_key)) as Box<dyn LLMProvider>),
+            Box::new(|config| {
+                let api_key = config.api_key.unwrap_or_default();
+                Box::new(GeminiProvider::new(api_key)) as Box<dyn LLMProvider>
+            }),
         );
 
         factory.register_provider(
             "openai",
-            Box::new(|api_key| Box::new(OpenAIProvider::new(api_key)) as Box<dyn LLMProvider>),
+            Box::new(|config| {
+                let api_key = config.api_key.unwrap_or_default();
+                Box::new(OpenAIProvider::new(api_key)) as Box<dyn LLMProvider>
+            }),
         );
 
         factory.register_provider(
             "anthropic",
-            Box::new(|api_key| Box::new(AnthropicProvider::new(api_key)) as Box<dyn LLMProvider>),
+            Box::new(|config| {
+                let api_key = config.api_key.unwrap_or_default();
+                Box::new(AnthropicProvider::new(api_key)) as Box<dyn LLMProvider>
+            }),
+        );
+
+        factory.register_provider(
+            "openrouter",
+            Box::new(|config| {
+                let api_key = config.api_key.unwrap_or_default();
+                Box::new(OpenRouterProvider::new(api_key)) as Box<dyn LLMProvider>
+            }),
+        );
+
+        factory.register_provider(
+            "lmstudio",
+            Box::new(|config| {
+                Box::new(LMStudioProvider::new(config.api_key, config.base_url)) as Box<dyn LLMProvider>
+            }),
+        );
+
+        factory.register_provider(
+            "ollama",
+            Box::new(|config| {
+                Box::new(OllamaProvider::new(config.base_url)) as Box<dyn LLMProvider>
+            }),
         );
 
         factory
@@ -35,7 +73,7 @@ impl LLMFactory {
     /// Register a new provider
     pub fn register_provider<F>(&mut self, name: &str, factory_fn: F)
     where
-        F: Fn(String) -> Box<dyn LLMProvider> + Send + Sync + 'static,
+        F: Fn(ProviderConfig) -> Box<dyn LLMProvider> + Send + Sync + 'static,
     {
         self.providers
             .insert(name.to_string(), Box::new(factory_fn));
@@ -45,18 +83,50 @@ impl LLMFactory {
     pub fn create_provider(
         &self,
         provider_name: &str,
-        api_key: String,
+        config: ProviderConfig,
     ) -> Result<Box<dyn LLMProvider>, LLMError> {
         let factory_fn = self.providers.get(provider_name).ok_or_else(|| {
             LLMError::InvalidRequest(format!("Unknown provider: {}", provider_name))
         })?;
 
-        Ok(factory_fn(api_key))
+        Ok(factory_fn(config))
     }
 
     /// List available providers
     pub fn list_providers(&self) -> Vec<String> {
         self.providers.keys().cloned().collect()
+    }
+
+    /// Determine provider name from model string
+    pub fn provider_from_model(&self, model: &str) -> Option<String> {
+        let m = model.to_lowercase();
+        if m.starts_with("gpt-") || m.starts_with("o3") || m.starts_with("o1") {
+            Some("openai".to_string())
+        } else if m.starts_with("claude-") {
+            Some("anthropic".to_string())
+        } else if m.contains("gemini") || m.starts_with("palm") {
+            Some("gemini".to_string())
+        } else if m.contains("/") {
+            // Handle OpenRouter format: provider/model
+            if let Some(provider) = m.split('/').next() {
+                match provider {
+                    "anthropic" | "openai" | "google" | "meta-llama" | "mistralai" => {
+                        Some("openrouter".to_string())
+                    }
+                    _ => None,
+                }
+            } else {
+                None
+            }
+        } else if m.contains("llama") || m.contains("codellama") || m.contains("mistral")
+            || m.contains("mixtral") || m.contains("phi") || m.contains("orca")
+            || m.contains("vicuna") || m.contains("wizard") || m.contains("neural")
+            || m.contains("starling") || m.contains("llava") || m.contains("bakllava") {
+            // Common Ollama model patterns
+            Some("ollama".to_string())
+        } else {
+            None
+        }
     }
 }
 
@@ -90,5 +160,28 @@ pub fn create_provider_for_model(
         LLMError::InvalidRequest(format!("Cannot determine provider for model: {}", model))
     })?;
 
-    factory.create_provider(&provider_name, api_key)
+    let config = ProviderConfig {
+        api_key: Some(api_key),
+        base_url: None,
+        model: Some(model.to_string()),
+    };
+
+    factory.create_provider(&provider_name, config)
+}
+
+/// Create provider with full configuration
+pub fn create_provider_with_config(
+    provider_name: &str,
+    api_key: Option<String>,
+    base_url: Option<String>,
+    model: Option<String>,
+) -> Result<Box<dyn LLMProvider>, LLMError> {
+    let factory = get_factory();
+    let config = ProviderConfig {
+        api_key,
+        base_url,
+        model,
+    };
+
+    factory.create_provider(provider_name, config)
 }

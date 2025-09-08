@@ -1,4 +1,4 @@
-use super::super::provider::{
+use crate::llm::provider::{
     FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
     Usage,
 };
@@ -61,7 +61,7 @@ impl LLMProvider for OpenAIProvider {
     }
 
     fn supported_models(&self) -> Vec<String> {
-        use crate::constants::models;
+        use crate::config::constants::models;
         vec![models::GPT_5.to_string(), models::GPT_5_MINI.to_string()]
     }
 

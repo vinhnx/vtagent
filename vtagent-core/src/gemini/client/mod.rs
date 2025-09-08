@@ -102,7 +102,7 @@ impl Client {
     }
 
     /// Generate content with the Gemini API
-    pub async fn generate_content(
+    pub async fn generate(
         &mut self,
         request: &GenerateContentRequest,
     ) -> Result<GenerateContentResponse> {
@@ -137,7 +137,7 @@ impl Client {
     }
 
     /// Generate content with the Gemini API using streaming
-    pub async fn generate_content_stream<F>(
+    pub async fn generate_stream<F>(
         &mut self,
         request: &GenerateContentRequest,
         on_chunk: F,

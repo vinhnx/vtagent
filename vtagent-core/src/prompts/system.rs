@@ -1,5 +1,6 @@
 //! System instructions and prompt management
 
+use crate::config::types::CapabilityLevel;
 use crate::gemini::Content;
 use std::fs;
 use std::path::Path;
@@ -78,16 +79,16 @@ pub fn generate_system_instruction_with_config(
         }
 
         // Add PTY configuration info
-        if cfg.is_pty_enabled() {
+        if cfg.pty.enabled {
             instruction.push_str("- **PTY functionality**: Enabled\n");
-            let (rows, cols) = cfg.get_default_terminal_size();
+            let (rows, cols) = (cfg.pty.default_rows, cfg.pty.default_cols);
             instruction.push_str(&format!(
                 "- **Default terminal size**: {} rows × {} columns\n",
                 rows, cols
             ));
             instruction.push_str(&format!(
                 "- **PTY command timeout**: {} seconds\n",
-                cfg.get_pty_timeout_seconds()
+                cfg.pty.command_timeout_seconds
             ));
         } else {
             instruction.push_str("- **PTY functionality**: Disabled\n");
@@ -642,7 +643,7 @@ CORE GUIDELINES:
 - Follow Rust conventions and best practices
 - Write code for human brains—prioritize readability and maintainability
 - Extract complex conditionals into descriptive variables
-- Prefer early returns over nested ifs to focus on happy paths
+- Prefer early returns over nested ifs to focus on happy paths.
 
 NEWLY ADDED TOOLS:
 - **ast_grep_search**: Syntax-aware code search (e.g., "function $name($params) { $ }")
@@ -658,24 +659,24 @@ Plan your approach systematically throughout the conversation."#;
 }
 
 /// Generate system instruction for different capability levels
-pub fn generate_system_instruction_for_level(level: crate::types::CapabilityLevel) -> Content {
+pub fn generate_system_instruction_for_level(level: CapabilityLevel) -> Content {
     let instruction = match level {
-        crate::types::CapabilityLevel::Basic => {
+        CapabilityLevel::Basic => {
             "You are a helpful AI coding assistant. You can have conversations with the user but have no access to tools."
         }
-        crate::types::CapabilityLevel::FileReading => {
+        CapabilityLevel::FileReading => {
             "You are a helpful AI coding assistant. You can read files in the workspace using the read_file tool."
         }
-        crate::types::CapabilityLevel::FileListing => {
+        CapabilityLevel::FileListing => {
             "You are a helpful AI coding assistant. You can read files and list directory contents using the read_file and list_files tools."
         }
-        crate::types::CapabilityLevel::Bash => {
+        CapabilityLevel::Bash => {
             "You are a helpful AI coding assistant. You can read files, list directory contents, and run safe bash commands using the read_file, list_files, and bash tools."
         }
-        crate::types::CapabilityLevel::Editing => {
+        CapabilityLevel::Editing => {
             "You are a helpful AI coding assistant. You can read files, list directory contents, run safe bash commands, and edit files using the read_file, list_files, bash, and edit_file tools."
         }
-        crate::types::CapabilityLevel::CodeSearch => {
+        CapabilityLevel::CodeSearch => {
             "You are a helpful AI coding assistant. You have full file system access and can read files, list directory contents, run safe bash commands, edit files, and search code using the read_file, list_files, bash, edit_file, and code_search tools. You also have access to advanced AST-based tools: ast_grep_search and ast_grep_transform for syntax-aware code operations."
         }
     };

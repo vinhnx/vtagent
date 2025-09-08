@@ -328,7 +328,7 @@ impl DiffChatRenderer {
     }
 
     pub fn render_multiple_changes(&self, changes: Vec<(String, String, String)>) -> String {
-        let mut output = format!("\n🔄 Multiple File Changes ({} files)\n", changes.len());
+        let mut output = format!("\nMultiple File Changes ({} files)\n", changes.len());
         output.push_str("═".repeat(60).as_str());
         output.push_str("\n\n");
 

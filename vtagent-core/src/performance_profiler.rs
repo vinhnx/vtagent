@@ -133,7 +133,7 @@ impl PerformanceProfiler {
         let active_ops = self.active_operations.len();
         if active_ops > 10 {
             recommendations.push(format!(
-                "🔄 {} active operations may impact memory",
+                "{} active operations may impact memory",
                 active_ops
             ));
         }

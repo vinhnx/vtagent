@@ -212,3 +212,4 @@ This is a Rust project called "vtagent" that appears to be a code analysis tool 
 - Use `cargo check` instead of `cargo build` whenever possible
 - Use `cargo nextest` Instead of `cargo test
 - Put all markdown documentation files to ./docs folder. don't put any unrelated files in root folder. THIS IS IMPORTANT!
+- Put all report documentation (md) files to ./docs folder. don't put any unrelated files in root folder. THIS IS IMPORTANT!

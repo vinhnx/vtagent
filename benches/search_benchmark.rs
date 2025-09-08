@@ -135,7 +135,7 @@ fn benchmark_file_operations(c: &mut Criterion) {
 fn create_test_files(temp_dir: &TempDir) {
     // Create a large file for performance testing
     let large_content = format!(
-        "fn main() {\n    println!(\"Hello, world!\");\n}\n\n{}",
+        "fn main() {{\n    println!(\"Hello, world!\");\n}}\n\n{}",
         "line content\n".repeat(1000)
     );
     std::fs::write(temp_dir.path().join("large_file.txt"), large_content).unwrap();

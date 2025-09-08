@@ -225,11 +225,11 @@ vtagent chat --force-multi-agent --skip-confirmations
 
 ## Build Status
 
-✅ **Compilation**: All safety features compile successfully
-✅ **Integration**: Safety validations integrated into main workflow
-✅ **Dependencies**: dialoguer added for interactive prompts
-✅ **CLI**: New safety flags available and functional
-✅ **Defaults**: Single-agent mode now default for efficiency
+**Compilation**: All safety features compile successfully
+**Integration**: Safety validations integrated into main workflow
+**Dependencies**: dialoguer added for interactive prompts
+**CLI**: New safety flags available and functional
+**Defaults**: Single-agent mode now default for efficiency
 
 The safety implementation successfully addresses both critical requirements:
 1. **Model safety**: Explicit confirmation for expensive Gemini 2.5 Pro usage

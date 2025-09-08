@@ -1,7 +1,7 @@
 //! Multi-agent conversation loop with orchestrator-driven execution
 
 use vtagent_core::agent::{MultiAgentConfig, OrchestratorAgent, get_multi_agent_function_declarations, MultiAgentTools, execute_multi_agent_tool, ExecutionMode, VerificationStrategy, DelegationStrategy, ContextStoreConfig};
-use vtagent_core::config::{ConfigManager, VTAgentConfig, MultiAgentSystemConfig};
+use vtagent_core::config::{ConfigManager, VTAgentConfig, MultiAgentSystemConfig, MultiAgentDefaults, ContextStoreDefaults};
 use vtagent_core::llm::{make_client};
 use vtagent_core::types::{AgentConfig as CoreAgentConfig, *};
 use vtagent_core::gemini::{GenerateContentRequest, Content, Part, FunctionResponse, Tool, ToolConfig, FunctionDeclaration};
@@ -22,20 +22,26 @@ fn convert_multi_agent_config(system_config: &MultiAgentSystemConfig) -> MultiAg
     };
 
     MultiAgentConfig {
+        enable_multi_agent: MultiAgentDefaults::ENABLE_MULTI_AGENT,
         execution_mode,
         orchestrator_model: system_config.orchestrator_model.clone(),
         subagent_model: system_config.subagent_model.clone(),
         max_concurrent_subagents: system_config.max_concurrent_subagents,
         context_store_enabled: system_config.context_store_enabled,
-        enable_task_management: true, // Default value
-        verification_strategy: VerificationStrategy::Always, // Default value
-        delegation_strategy: DelegationStrategy::Adaptive, // Default value
+        enable_task_management: MultiAgentDefaults::ENABLE_TASK_MANAGEMENT,
+        enable_context_sharing: MultiAgentDefaults::ENABLE_CONTEXT_SHARING,
+        enable_performance_monitoring: MultiAgentDefaults::ENABLE_PERFORMANCE_MONITORING,
+        task_timeout: MultiAgentDefaults::task_timeout(),
+        context_window_size: MultiAgentDefaults::CONTEXT_WINDOW_SIZE,
+        max_context_items: MultiAgentDefaults::MAX_CONTEXT_ITEMS,
+        verification_strategy: VerificationStrategy::Always,
+        delegation_strategy: DelegationStrategy::Adaptive,
         context_store: ContextStoreConfig {
-            max_contexts: 1000,
-            auto_cleanup_days: 7,
-            enable_persistence: true,
-            compression_enabled: true,
-            storage_dir: ".vtagent/contexts".to_string(),
+            max_contexts: ContextStoreDefaults::MAX_CONTEXTS,
+            auto_cleanup_days: ContextStoreDefaults::AUTO_CLEANUP_DAYS,
+            enable_persistence: ContextStoreDefaults::ENABLE_PERSISTENCE,
+            compression_enabled: ContextStoreDefaults::COMPRESSION_ENABLED,
+            storage_dir: ContextStoreDefaults::STORAGE_DIR.to_string(),
         },
     }
 }

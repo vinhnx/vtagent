@@ -5,6 +5,7 @@ use crate::conversation_summarizer::ConversationSummarizer;
 use crate::decision_tracker::DecisionTracker;
 use crate::error_recovery::{ErrorRecoveryManager, ErrorType};
 use crate::llm::{AnyClient, make_client};
+use crate::models::ModelId;
 use crate::tools::{ToolRegistry, build_function_declarations};
 use crate::tree_sitter::{CodeAnalysis, TreeSitterAnalyzer};
 use crate::types::*;
@@ -473,7 +474,7 @@ impl AgentBuilder {
     pub fn new() -> Self {
         Self {
             config: AgentConfig {
-                model: "gemini-2.5-flash-lite".to_string(),
+                model: ModelId::default().as_str().to_string(),
                 api_key: String::new(),
                 workspace: std::env::current_dir()
                     .unwrap_or_else(|_| std::path::PathBuf::from(".")),

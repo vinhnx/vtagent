@@ -67,7 +67,7 @@ pub async fn handle_compress_context_command(
 
     println!(
         "{} {}",
-        style("📝 Original conversation length:").yellow(),
+        style("Original conversation length:").yellow(),
         sample_conversation.len()
     );
     println!(

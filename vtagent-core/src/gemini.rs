@@ -1,3 +1,4 @@
+use crate::models::ModelId;
 use crate::timeout_detector::{OperationType, TIMEOUT_DETECTOR};
 use anyhow::{Context, Result};
 use reqwest::{Client as ReqwestClient, StatusCode, Url};
@@ -359,7 +360,12 @@ impl Client {
                 self.model
             );
             eprintln!(
-                "Common Gemini model names: gemini-2.5-flash, gemini-2.5-flash-lite, gemini-2.0-flash, gemini-1.5-pro"
+                "Common Gemini model names: {}",
+                ModelId::all_models()
+                    .iter()
+                    .map(|m| m.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             );
         }
 
@@ -384,7 +390,12 @@ impl Client {
                 self.model
             );
             eprintln!(
-                "Common Gemini model names: gemini-2.5-flash, gemini-2.5-flash-lite, gemini-2.0-flash, gemini-1.5-pro"
+                "Common Gemini model names: {}",
+                ModelId::all_models()
+                    .iter()
+                    .map(|m| m.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             );
         }
 
@@ -406,7 +417,10 @@ impl Client {
                 // If the primary model fails, try fallback models
                 eprintln!("Primary model '{}' failed: {}", self.model, e);
 
-                let fallback_models = vec!["gemini-2.5-flash", "gemini-2.0-flash"];
+                let fallback_models: Vec<String> = ModelId::fallback_models()
+                    .iter()
+                    .map(|m| m.as_str().to_string())
+                    .collect();
 
                 for fallback_model in &fallback_models {
                     if fallback_model == &self.model {
@@ -437,9 +451,14 @@ impl Client {
                 // If all fallback models fail, return the original error
                 Err(anyhow::anyhow!(
                     "All models failed. Primary model '{}' error: {}. \n\
-                    Suggested working models: gemini-2.5-flash, gemini-2.0-flash, gemini-1.5-pro",
+                    Suggested working models: {}",
                     self.model,
-                    e
+                    e,
+                    ModelId::fallback_models()
+                        .iter()
+                        .map(|m| m.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
                 ))
             }
         }
@@ -529,10 +548,10 @@ impl Client {
                     eprintln!(
                         "This might be a model availability issue. Consider trying these models:"
                     );
-                    eprintln!("- gemini-2.5-flash (recommended fallback)");
-                    eprintln!("- gemini-2.0-flash");
-                    eprintln!("- gemini-1.5-pro");
-                    eprintln!("- gemini-1.5-flash");
+                    for (i, model) in ModelId::all_models().iter().enumerate() {
+                        let marker = if i == 0 { " (recommended fallback)" } else { "" };
+                        eprintln!("- {}{}", model.as_str(), marker);
+                    }
                 }
 
                 return Err(anyhow::anyhow!(msg));
@@ -557,8 +576,13 @@ impl Client {
                     1. The model '{}' is not available or doesn't exist\n\
                     2. Your API key doesn't have access to this model\n\
                     3. The API service is experiencing issues\n\n\
-                    Suggested models to try: gemini-2.5-flash, gemini-2.0-flash, gemini-1.5-pro",
-                    self.model
+                    Suggested models to try: {}",
+                    self.model,
+                    ModelId::fallback_models()
+                        .iter()
+                        .map(|m| m.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
                 ));
             }
 
@@ -978,12 +1002,17 @@ impl Client {
                         2. The API service is temporarily experiencing issues\n\
                         3. Your request format might be invalid\n\n\
                         Suggestions:\n\
-                        - Verify the model name is correct (try: gemini-2.5-flash-lite, gemini-2.0-flash, gemini-1.5-pro)\n\
+                        - Verify the model name is correct (try: {})\n\
                         - Check if your API key has access to this model\n\
                         - Wait a few minutes and retry the request\n\
                         - Try a different model if available\n\n\
                         Details: {}",
                         self.model,
+                        ModelId::all_models()
+                            .iter()
+                            .map(|m| m.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", "),
                         text
                     ));
                 }

@@ -4,9 +4,12 @@ use crate::agent::multi_agent::*;
 use crate::agent::runner::AgentRunner;
 use crate::llm::AnyClient;
 use crate::gemini::GenerateContentRequest;
+use crate::models::ModelId;
+use crate::orchestrator_retry::{RetryManager, is_empty_response};
 use anyhow::{Result, anyhow};
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{SystemTime, Duration};
+use tokio::time::sleep;
 
 /// Orchestrator agent for strategic coordination
 pub struct OrchestratorAgent {
@@ -18,6 +21,8 @@ pub struct OrchestratorAgent {
     context_store: Arc<std::sync::Mutex<ContextStore>>,
     /// Task manager for coordination
     task_manager: Arc<std::sync::Mutex<TaskManager>>,
+    /// Retry manager for error handling
+    retry_manager: std::sync::Mutex<RetryManager>,
     /// Session ID
     session_id: String,
     /// API key for agents
@@ -47,6 +52,7 @@ impl OrchestratorAgent {
             client,
             context_store,
             task_manager,
+            retry_manager: std::sync::Mutex::new(RetryManager::new()),
             session_id,
             api_key,
             workspace,
@@ -282,10 +288,77 @@ impl OrchestratorAgent {
 
     /// Execute orchestrator with LLM call
     pub async fn execute_orchestrator(&mut self, request: &GenerateContentRequest) -> Result<serde_json::Value> {
-        let response = self.client.generate_content(request).await
-            .map_err(|e| anyhow!("Orchestrator LLM call failed: {}", e))?;
+        let primary_model = self.config.orchestrator_model.parse::<ModelId>()
+            .unwrap_or(ModelId::default_orchestrator());
+        let fallback_model = self.config.subagent_model.parse::<ModelId>()
+            .unwrap_or(ModelId::default_subagent());
 
-        Ok(serde_json::to_value(response)?)
+        // First attempt with primary model (orchestrator model)
+        let mut last_error = None;
+        let max_retries = 3;
+        let mut delay_secs = 1;
+
+        for attempt in 0..max_retries {
+            eprintln!(
+                "Orchestrator attempt {}/{} using model {}",
+                attempt + 1,
+                max_retries,
+                primary_model.as_str()
+            );
+
+            match self.client.generate_content(request).await {
+                Ok(response) => {
+                    let response_json = serde_json::to_value(&response)?;
+
+                    // Check if response is empty or invalid
+                    if is_empty_response(&response_json) {
+                        last_error = Some(anyhow!("Empty or invalid response from orchestrator model {}", primary_model.as_str()));
+                        eprintln!("Empty response from {}, attempt {} failed", primary_model.as_str(), attempt + 1);
+                    } else {
+                        if attempt > 0 {
+                            eprintln!("Orchestrator succeeded on attempt {} with model {}", attempt + 1, primary_model.as_str());
+                        }
+                        return Ok(response_json);
+                    }
+                }
+                Err(e) => {
+                    last_error = Some(anyhow!("Orchestrator LLM call failed: {}", e));
+                    eprintln!("Attempt {} failed for orchestrator with model {}: {}", attempt + 1, primary_model.as_str(), e);
+                }
+            }
+
+            // Wait before retry if not the last attempt
+            if attempt < max_retries - 1 {
+                eprintln!("Waiting {} seconds before retry", delay_secs);
+                sleep(Duration::from_secs(delay_secs)).await;
+                delay_secs = std::cmp::min(delay_secs * 2, 60); // Exponential backoff with cap
+            }
+        }
+
+        // If primary model failed, try fallback model
+        eprintln!(
+            "Primary model {} failed after {} attempts. Trying fallback model {}",
+            primary_model.as_str(),
+            max_retries,
+            fallback_model.as_str()
+        );
+
+        match self.client.generate_content(request).await {
+            Ok(response) => {
+                let response_json = serde_json::to_value(&response)?;
+
+                if is_empty_response(&response_json) {
+                    Err(anyhow!("Fallback model {} also returned empty response", fallback_model.as_str()))
+                } else {
+                    eprintln!("Fallback model {} succeeded", fallback_model.as_str());
+                    Ok(response_json)
+                }
+            }
+            Err(e) => {
+                eprintln!("Fallback model {} also failed: {}", fallback_model.as_str(), e);
+                Err(last_error.unwrap_or_else(|| anyhow!("All orchestrator attempts failed")))
+            }
+        }
     }
 }
 

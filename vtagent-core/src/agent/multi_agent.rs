@@ -1,9 +1,10 @@
 //! Multi-agent system types and structures
 
-use anyhow::{Result, anyhow};
+use crate::config::{MultiAgentDefaults, ContextStoreDefaults};
+use crate::models::ModelId;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 /// Agent types in the multi-agent system
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -460,6 +461,8 @@ pub enum ExecutionMode {
 /// Multi-agent system configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MultiAgentConfig {
+    /// Enable multi-agent mode
+    pub enable_multi_agent: bool,
     /// Execution mode
     pub execution_mode: ExecutionMode,
     /// Model to use for orchestrator agent
@@ -472,6 +475,16 @@ pub struct MultiAgentConfig {
     pub context_store_enabled: bool,
     /// Enable task management
     pub enable_task_management: bool,
+    /// Enable context sharing between agents
+    pub enable_context_sharing: bool,
+    /// Enable performance monitoring
+    pub enable_performance_monitoring: bool,
+    /// Task execution timeout
+    pub task_timeout: Duration,
+    /// Context window size for agents
+    pub context_window_size: usize,
+    /// Maximum number of context items
+    pub max_context_items: usize,
     /// Verification strategy
     pub verification_strategy: VerificationStrategy,
     /// Delegation strategy
@@ -520,20 +533,26 @@ pub struct ContextStoreConfig {
 impl Default for MultiAgentConfig {
     fn default() -> Self {
         Self {
+            enable_multi_agent: MultiAgentDefaults::ENABLE_MULTI_AGENT,
             execution_mode: ExecutionMode::Auto,
-            orchestrator_model: "gemini-1.5-pro".to_string(),
-            subagent_model: "gemini-1.5-flash".to_string(),
-            max_concurrent_subagents: 3,
-            context_store_enabled: true,
-            enable_task_management: true,
+            orchestrator_model: ModelId::default_orchestrator().as_str().to_string(),
+            subagent_model: ModelId::default_subagent().as_str().to_string(),
+            max_concurrent_subagents: MultiAgentDefaults::MAX_CONCURRENT_SUBAGENTS,
+            context_store_enabled: MultiAgentDefaults::CONTEXT_STORE_ENABLED,
+            enable_task_management: MultiAgentDefaults::ENABLE_TASK_MANAGEMENT,
+            enable_context_sharing: MultiAgentDefaults::ENABLE_CONTEXT_SHARING,
+            enable_performance_monitoring: MultiAgentDefaults::ENABLE_PERFORMANCE_MONITORING,
+            task_timeout: MultiAgentDefaults::task_timeout(),
+            context_window_size: MultiAgentDefaults::CONTEXT_WINDOW_SIZE,
+            max_context_items: MultiAgentDefaults::MAX_CONTEXT_ITEMS,
             verification_strategy: VerificationStrategy::Always,
             delegation_strategy: DelegationStrategy::Adaptive,
             context_store: ContextStoreConfig {
-                max_contexts: 1000,
-                auto_cleanup_days: 7,
-                enable_persistence: true,
-                compression_enabled: true,
-                storage_dir: ".vtagent/contexts".to_string(),
+                max_contexts: ContextStoreDefaults::MAX_CONTEXTS,
+                auto_cleanup_days: ContextStoreDefaults::AUTO_CLEANUP_DAYS,
+                enable_persistence: ContextStoreDefaults::ENABLE_PERSISTENCE,
+                compression_enabled: ContextStoreDefaults::COMPRESSION_ENABLED,
+                storage_dir: ContextStoreDefaults::STORAGE_DIR.to_string(),
             },
         }
     }

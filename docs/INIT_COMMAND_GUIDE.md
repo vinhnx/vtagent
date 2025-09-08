@@ -17,7 +17,7 @@ The `/init` command in vtagent generates a standardized `AGENTS.md` file that se
 - **Git History Analysis**: Analyzes commit patterns to detect conventional commits vs. standard messages
 - **Project Structure Mapping**: Discovers source directories, test patterns, and configuration files
 
-### 📊 **Adaptive Content Generation**
+### **Adaptive Content Generation**
 - **Dynamic Section Inclusion**: Only includes sections relevant to the detected project type
 - **Word Count Optimization**: Prioritizes most important information within 200-400 words
 - **Technology-Specific Guidelines**: Tailors coding standards to detected languages and frameworks

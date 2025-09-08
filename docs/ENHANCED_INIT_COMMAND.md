@@ -6,7 +6,7 @@ The enhanced `/init` command now fully complies with the OpenAI Codex specificat
 
 ## Key Improvements Applied
 
-### ✅ **OpenAI Codex Compliance**
+### **OpenAI Codex Compliance**
 
 1. **Exact Title Format**: Uses "Repository Guidelines" as specified
 2. **200-400 Word Optimization**: Intelligent content prioritization within word limits
@@ -14,7 +14,7 @@ The enhanced `/init` command now fully complies with the OpenAI Codex specificat
 4. **Professional Tone**: Maintains instructional, actionable language throughout
 5. **Technology-Specific Content**: Adapts to detected languages and frameworks
 
-### ✅ **Enhanced Project Analysis**
+### **Enhanced Project Analysis**
 
 #### **Intelligent Language Detection**
 ```rust
@@ -45,7 +45,7 @@ The enhanced `/init` command now fully complies with the OpenAI Codex specificat
 - Maven/Gradle → standard Java/Kotlin workflows
 ```
 
-### ✅ **Smart Content Generation**
+### **Smart Content Generation**
 
 #### **Word Count Optimization**
 ```rust
@@ -66,7 +66,7 @@ fn generate_agents_md(analysis: &ProjectAnalysis) -> Result<String> {
 - **Conditional**: Build commands, coding style, testing guidelines
 - **Smart Omission**: Skips irrelevant sections to stay within word limits
 
-### ✅ **Technology-Specific Adaptations**
+### **Technology-Specific Adaptations**
 
 #### **Rust Projects**
 ```markdown
@@ -94,7 +94,7 @@ fn generate_agents_md(analysis: &ProjectAnalysis) -> Result<String> {
 - `npm run build` - Build for production
 ```
 
-### ✅ **Robust Error Handling**
+### **Robust Error Handling**
 
 #### **Graceful Fallbacks**
 ```rust

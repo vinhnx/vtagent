@@ -44,14 +44,18 @@ pub mod error_recovery;
 pub mod file_search;
 pub mod gemini;
 pub mod llm;
+pub mod models;
+pub mod orchestrator_retry;
 pub mod performance_monitor;
 pub mod performance_profiler;
 pub mod prompts;
 pub mod rp_search;
+pub mod safety;
 pub mod timeout_detector;
 pub mod tools;
 pub mod tree_sitter;
 pub mod types;
+pub mod user_confirmation;
 pub mod utils;
 pub mod vtagentgitignore;
 

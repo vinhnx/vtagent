@@ -86,8 +86,41 @@ https://ast-grep.github.io/llms-full.txt
 
 study prompt
 
-https://github.com/openai/codex/blob/main/codex-rs/core/prompt.md
+IMPORTANT: apply to vtagent https://github.com/openai/codex/blob/main/codex-rs/core/prompt.md
 
 --
 
 extract the system prompt in vtagent-core/src/prompts/system.rs to put in md vtagent/prompts/
+
+---
+
+https://ai.google.dev/gemma/docs/embeddinggemma/inference-embeddinggemma-with-sentence-transformers
+
+
+--
+
+implement dot folder config/cache like in user home
+/Users/vinh.nguyenxuan/.claude/projects
+
+check existing config and cache and move there
+
+---
+
+also implement model switch config on tui and cli at vtagent-core/src/models.rs
+
+--
+
+https://eval.16x.engineer/use-cases
+
+---
+
+for multi-agent, implement agent provider config at vtagent-core/src/agent/multi_agent.rs
+- For example, if the agent use Gemini, it should use Gemini models for agent core model and orchestrator/subagent accordingdly, if the agent use OpenAI, it should use GPT models. And Anthropic for Claude Opus Sonnet models.
+- Also implement model switch for single agent too
+- Make sure the multi-agent and single agent can work with different provider. not sticky to Gemini only. But gemini is the default
+- Update the docs accordingly
+- Run tests to verify multi-agent and single agent work, and core agent work with different provider
+
+---
+
+https://github.com/orhun/git-cliff

@@ -30,61 +30,47 @@ The agent follows proven patterns for reliable, long-running coding assistance:
 //! including tool implementations, LLM integration, and utility functions.
 
 // Public modules
-pub mod agent;
-pub mod api_keys;
-pub mod apply_patch;
-pub mod ast_grep;
 pub mod cli;
-pub mod code_completion;
+pub mod code;
 pub mod commands;
 pub mod config;
-pub mod constants;
-pub mod conversation_summarizer;
-pub mod decision_tracker;
-pub mod diff_renderer;
-pub mod error_recovery;
-pub mod file_search;
+pub mod core;
 pub mod gemini;
 pub mod llm;
-pub mod models;
-pub mod orchestrator_retry;
-pub mod performance_monitor;
-pub mod performance_profiler;
 pub mod prompts;
-pub mod rp_search;
-pub mod safety;
-pub mod timeout_detector;
 pub mod tool_policy;
 pub mod tools;
-pub mod tree_sitter;
-pub mod types;
-pub mod user_confirmation;
+pub mod ui;
 pub mod utils;
-pub mod vtagentgitignore;
 
 // Re-exports for convenience
-pub use agent::core::Agent;
 pub use cli::args::{Cli, Commands};
-pub use code_completion::{CompletionEngine, CompletionSuggestion};
+pub use code::code_completion::{CompletionEngine, CompletionSuggestion};
 pub use commands::stats::handle_stats_command;
 pub use config::{AgentConfig, VTAgentConfig};
-pub use diff_renderer::DiffRenderer;
+pub use core::agent::core::Agent;
 pub use gemini::{Content, FunctionDeclaration, Part};
 pub use llm::{AnyClient, make_client};
-pub use performance_profiler::PerformanceProfiler;
+pub use core::performance_profiler::PerformanceProfiler;
+pub use core::timeout_detector::TimeoutDetector;
 pub use prompts::{
     generate_lightweight_instruction, generate_specialized_instruction, generate_system_instruction,
 };
-pub use rp_search::RpSearchManager;
-pub use timeout_detector::TimeoutDetector;
+pub use tools::rp_search::RpSearchManager;
 pub use tool_policy::{ToolPolicy, ToolPolicyManager};
 pub use tools::{ToolRegistry, build_function_declarations, build_function_declarations_for_level};
-pub use tree_sitter::TreeSitterAnalyzer;
-pub use types::{
+pub use tools::tree_sitter::TreeSitterAnalyzer;
+pub use config::types::{
     AnalysisDepth, CapabilityLevel, CommandResult, CompressionLevel, ContextConfig, LoggingConfig,
     OutputFormat, PerformanceMetrics, SessionInfo, ToolConfig,
 };
-pub use vtagentgitignore::initialize_vtagent_gitignore;
+pub use ui::diff_renderer::DiffRenderer;
+pub use utils::vtagentgitignore::initialize_vtagent_gitignore;
+pub use core::conversation_summarizer::ConversationSummarizer;
+pub use core::context_compression::{ContextCompressor, ContextCompressionConfig, CompressedContext};
+pub use core::prompt_caching::{PromptCache, PromptOptimizer, PromptCacheConfig, CacheStats};
+pub use tools::advanced_search::{AdvancedSearchTool, SearchOptions};
+pub use utils::dot_config::{DotManager, DotConfig, UserPreferences, ProviderConfigs, CacheConfig, UiConfig, initialize_dot_folder, load_user_config, save_user_config};
 
 #[cfg(test)]
 mod tests {

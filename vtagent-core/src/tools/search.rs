@@ -1,7 +1,7 @@
 //! Search tool implementation with multiple modes
 
 use super::traits::{CacheableTool, ModeTool, Tool};
-use crate::rp_search::{RpSearchInput, RpSearchManager};
+use crate::tools::rp_search::{RpSearchInput, RpSearchManager};
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use serde_json::{Value, json};

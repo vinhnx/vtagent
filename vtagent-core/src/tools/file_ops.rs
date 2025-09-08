@@ -2,8 +2,8 @@
 
 use super::traits::{CacheableTool, FileTool, ModeTool, Tool};
 use super::types::*;
-use crate::rp_search::RpSearchManager;
-use crate::vtagentgitignore::should_exclude_file;
+use crate::tools::rp_search::RpSearchManager;
+use crate::utils::vtagentgitignore::should_exclude_file;
 use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use serde_json::{Value, json};

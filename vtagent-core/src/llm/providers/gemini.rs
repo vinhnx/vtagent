@@ -1,4 +1,4 @@
-use super::super::provider::{
+use crate::llm::provider::{
     FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
     Usage,
 };
@@ -62,7 +62,7 @@ impl LLMProvider for GeminiProvider {
     }
 
     fn supported_models(&self) -> Vec<String> {
-        use crate::constants::models;
+        use crate::config::constants::models;
         vec![
             models::GEMINI_2_5_FLASH.to_string(),
             models::GEMINI_2_5_FLASH_LITE.to_string(),

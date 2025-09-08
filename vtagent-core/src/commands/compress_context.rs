@@ -2,8 +2,8 @@
 
 use crate::gemini::{Content, FunctionResponse, GenerateContentRequest, Part};
 use crate::llm::make_client;
-use crate::models::ModelId;
-use crate::types::AgentConfig;
+use crate::config::models::ModelId;
+use crate::config::types::AgentConfig;
 use anyhow::Result;
 use console::style;
 use serde_json::json;
@@ -169,7 +169,7 @@ Focus on: key decisions, actions taken, current state, and user requirements."#,
     let mut client = make_client(config.api_key.clone(), model_id);
     println!("{}", style("Compressing conversation...").cyan());
 
-    let compressed_response = client.generate_content(&compression_request).await?;
+    let compressed_response = client.generate(&compression_request).await?;
 
     if let Some(candidate) = compressed_response.candidates.into_iter().next() {
         if let Some(content) = candidate.content.parts.into_iter().next() {

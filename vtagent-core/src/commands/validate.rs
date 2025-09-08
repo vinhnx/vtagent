@@ -1,7 +1,7 @@
 //! Validate command implementation - environment and configuration validation
 
 use crate::tools::ToolRegistry;
-use crate::types::AgentConfig;
+use crate::config::types::AgentConfig;
 use anyhow::Result;
 use console::style;
 use serde_json::json;
@@ -67,7 +67,7 @@ async fn check_api_connectivity(config: &AgentConfig) -> Result<()> {
     use crate::gemini::{Client, Content, GenerateContentRequest};
     use crate::prompts::generate_lightweight_instruction;
 
-    let client = Client::new(config.api_key.clone(), config.model.clone());
+    let mut client = Client::new(config.api_key.clone(), config.model.clone());
     let contents = vec![Content::user_text("Hello")];
     let system_instruction = generate_lightweight_instruction();
 
@@ -82,13 +82,13 @@ async fn check_api_connectivity(config: &AgentConfig) -> Result<()> {
         system_instruction: Some(system_instruction),
     };
 
-    client.generate_content(&request).await?;
+    client.generate(&request).await?;
     Ok(())
 }
 
 /// Check filesystem permissions
 async fn check_filesystem_permissions(config: &AgentConfig) -> Result<()> {
-    let registry = ToolRegistry::new(config.workspace.clone());
+    let mut registry = ToolRegistry::new(config.workspace.clone());
 
     // Try to list files in the workspace
     registry

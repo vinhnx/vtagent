@@ -17,6 +17,7 @@ use vtagent_core::tools::{ToolRegistry, build_function_declarations};
 use vtagent_core::{
     agent::multi_agent::{ContextStore, TaskManager},
     cli::tool_policy_commands::{ToolPolicyCommands, handle_tool_policy_command},
+    cli::{self, handle_models_command, ModelCommands},
     config::{ConfigManager, ToolPolicy, VTAgentConfig},
     gemini::{Content, FunctionResponse, GenerateContentRequest, Part, Tool, ToolConfig},
     models::{ModelId, Provider},
@@ -115,6 +116,12 @@ pub enum Commands {
     ToolPolicy {
         #[command(subcommand)]
         command: ToolPolicyCommands,
+    },
+    /// Manage models and their configurations
+    #[command(name = "models")]
+    Models {
+        #[command(subcommand)]
+        command: ModelsCommand,
     },
 }
 
@@ -387,6 +394,9 @@ async fn main() -> Result<()> {
         }
         Commands::ToolPolicy { command } => {
             handle_tool_policy_command(command).await?;
+        }
+        Commands::Models { command } => {
+            cli::handle_models_command(&args, &command).await?;
         }
     }
 

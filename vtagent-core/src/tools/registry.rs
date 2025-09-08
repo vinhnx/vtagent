@@ -5,9 +5,10 @@ use super::command::CommandTool;
 use super::file_ops::FileOpsTool;
 use super::search::SearchTool;
 use super::traits::Tool;
-use crate::ast_grep::AstGrepEngine;
+use crate::config::types::CapabilityLevel;
+use crate::tools::ast_grep::AstGrepEngine;
 use crate::gemini::FunctionDeclaration;
-use crate::rp_search::RpSearchManager;
+use crate::tools::rp_search::RpSearchManager;
 use crate::tool_policy::{ToolPolicy, ToolPolicyManager};
 use anyhow::{Result, anyhow};
 use serde_json::{Value, json};
@@ -270,26 +271,26 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
 
 /// Build function declarations filtered by capability level
 pub fn build_function_declarations_for_level(
-    level: crate::types::CapabilityLevel,
+    level: CapabilityLevel,
 ) -> Vec<FunctionDeclaration> {
     let all_declarations = build_function_declarations();
 
     match level {
-        crate::types::CapabilityLevel::Basic => vec![],
-        crate::types::CapabilityLevel::FileReading => vec![],
-        crate::types::CapabilityLevel::FileListing => all_declarations
+        CapabilityLevel::Basic => vec![],
+        CapabilityLevel::FileReading => vec![],
+        CapabilityLevel::FileListing => all_declarations
             .into_iter()
             .filter(|fd| fd.name == "list_files")
             .collect(),
-        crate::types::CapabilityLevel::Bash => all_declarations
+        CapabilityLevel::Bash => all_declarations
             .into_iter()
             .filter(|fd| fd.name == "list_files" || fd.name == "run_terminal_cmd")
             .collect(),
-        crate::types::CapabilityLevel::Editing => all_declarations
+        CapabilityLevel::Editing => all_declarations
             .into_iter()
             .filter(|fd| fd.name == "list_files" || fd.name == "run_terminal_cmd")
             .collect(),
-        crate::types::CapabilityLevel::CodeSearch => all_declarations
+        CapabilityLevel::CodeSearch => all_declarations
             .into_iter()
             .filter(|fd| {
                 fd.name == "list_files" || fd.name == "run_terminal_cmd" || fd.name == "rp_search"

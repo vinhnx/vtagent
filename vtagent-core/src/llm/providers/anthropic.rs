@@ -1,4 +1,4 @@
-use super::super::provider::{
+use crate::llm::provider::{
     FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
     Usage,
 };
@@ -62,7 +62,7 @@ impl LLMProvider for AnthropicProvider {
     }
 
     fn supported_models(&self) -> Vec<String> {
-        use crate::constants::models;
+        use crate::config::constants::models;
         vec![
             models::CLAUDE_SONNET_4_20250514.to_string(),
             models::CLAUDE_OPUS_4_1_20250805.to_string(),

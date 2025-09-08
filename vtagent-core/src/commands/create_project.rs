@@ -1,7 +1,7 @@
 //! Create project command implementation
 
 use crate::tools::ToolRegistry;
-use crate::types::AgentConfig;
+use crate::config::types::AgentConfig;
 use anyhow::{Result, anyhow};
 use console::style;
 use serde_json::json;
@@ -28,7 +28,7 @@ pub async fn handle_create_project_command(
         features.split(',').map(|s| s.trim().to_string()).collect()
     };
 
-    let registry = ToolRegistry::new(config.workspace.clone());
+    let mut registry = ToolRegistry::new(config.workspace.clone());
 
     // Step 1: Create project directory structure
     println!(

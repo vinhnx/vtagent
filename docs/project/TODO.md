@@ -1,17 +1,4 @@
 
-there are too many vtagent toml files. please review and       │
-│   consolidate and use unify single toml for different            │
-│   providers and uses case. and the toml config options           │
-│   must be simple. update the logic core that read the toml       │
-│   and adapt.make a plan this is important. ultrathink            │
-╰───────────────────────────────────────────────────────────
-
----
-
-
-https://github.com/google-gemini/gemini-cli-security
-
-
 --
 https://github.com/openai/completions-responses-migration-pack
 

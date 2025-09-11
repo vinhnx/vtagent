@@ -3,16 +3,16 @@
 
 # To specify which agents are active by default when --agents is not used,
 # uncomment and populate the following line. If omitted, all agents are active.
-# default_agents = [
-#     "copilot",
-#     "cursor",
-#     "codex",
-#     "agentsmd",
-#     "qwen",
-#     "gemini",
-#     "kiro",
-#     "kilocode",
-# ]
+default_agents = [
+    "claude",
+    "copilot",
+    "cursor",
+    "codex",
+    "agentsmd",
+    "qwen",
+    "gemini",
+    "kiro",
+]
 
 [mcp]
 # Enable/disable MCP propagation globally (default: true)

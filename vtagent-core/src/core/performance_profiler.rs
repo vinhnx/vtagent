@@ -204,7 +204,7 @@ impl PerformanceProfiler {
                 PerformanceStatus::Good => "",
                 PerformanceStatus::Slow(_) => "🐌",
                 PerformanceStatus::HighErrorRate(_) => "",
-                PerformanceStatus::HighMemoryUsage(_) => "🧠",
+                PerformanceStatus::HighMemoryUsage(_) => "[MEM]",
                 PerformanceStatus::Unknown => "❓",
             };
 

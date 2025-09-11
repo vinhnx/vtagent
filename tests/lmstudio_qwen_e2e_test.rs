@@ -60,7 +60,7 @@ async fn test_lmstudio_qwen_agent_loop() -> Result<()> {
 
     match result {
         Ok(task_result) => {
-            println!("✅ Task completed successfully!");
+            println!("[SUCCESS] Task completed successfully!");
             println!("Task ID: {}", task_result.task_id);
             println!("Execution time: {:?}", task_result.execution_time);
             println!("Agent used: {}", task_result.agent_used);
@@ -71,7 +71,7 @@ async fn test_lmstudio_qwen_agent_loop() -> Result<()> {
             assert!(task_result.results.summary.len() > 10); // Minimum reasonable response
         }
         Err(e) => {
-            eprintln!("❌ Task failed: {}", e);
+            eprintln!("[ERROR] Task failed: {}", e);
             return Err(e.into());
         }
     }
@@ -88,7 +88,7 @@ async fn test_lmstudio_qwen_agent_loop() -> Result<()> {
 
     match result {
         Ok(task_result) => {
-            println!("✅ Coding task completed successfully!");
+            println!("[SUCCESS] Coding task completed successfully!");
             println!("Task ID: {}", task_result.task_id);
             println!("Execution time: {:?}", task_result.execution_time);
             println!("Response: {}", task_result.results.summary);
@@ -103,7 +103,7 @@ async fn test_lmstudio_qwen_agent_loop() -> Result<()> {
             );
         }
         Err(e) => {
-            eprintln!("❌ Coding task failed: {}", e);
+            eprintln!("[ERROR] Coding task failed: {}", e);
             return Err(e.into());
         }
     }
@@ -120,7 +120,7 @@ async fn test_lmstudio_qwen_agent_loop() -> Result<()> {
 
     match result {
         Ok(task_result) => {
-            println!("✅ Explanation task completed successfully!");
+            println!("[SUCCESS] Explanation task completed successfully!");
             println!("Task ID: {}", task_result.task_id);
             println!("Execution time: {:?}", task_result.execution_time);
             println!(
@@ -137,7 +137,7 @@ async fn test_lmstudio_qwen_agent_loop() -> Result<()> {
             assert!(task_result.results.summary.len() > 50); // Minimum reasonable explanation
         }
         Err(e) => {
-            eprintln!("❌ Explanation task failed: {}", e);
+            eprintln!("[ERROR] Explanation task failed: {}", e);
             return Err(e.into());
         }
     }
@@ -154,7 +154,7 @@ async fn test_lmstudio_qwen_agent_loop() -> Result<()> {
     println!("\nShutting down system...");
     system.shutdown().await?;
 
-    println!("✅ All tests completed successfully!");
+    println!("[SUCCESS] All tests completed successfully!");
     Ok(())
 }
 
@@ -183,7 +183,7 @@ fn test_lmstudio_provider_creation() {
     assert_eq!(provider.backend_kind(), BackendKind::LMStudio);
     assert_eq!(provider.model_id(), "qwen/qwen3-1.7b");
 
-    println!("✅ LMStudio provider created successfully");
+    println!("[SUCCESS] LMStudio provider created successfully");
 }
 
 /// Test that we can create a MultiAgentSystem with LMStudio configuration
@@ -209,6 +209,6 @@ async fn test_lmstudio_multisystem_creation() -> Result<()> {
     // This should succeed without errors
     let system = MultiAgentSystem::new(config, api_key, workspace).await?;
 
-    println!("✅ MultiAgentSystem with LMStudio created successfully");
+    println!("[SUCCESS] MultiAgentSystem with LMStudio created successfully");
     Ok(())
 }

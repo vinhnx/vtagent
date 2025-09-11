@@ -1,3 +1,41 @@
+
+Conduct an exhaustive code review of the files event_loop.rs and runner.rs, meticulously analyzing all changes, additions, or modifications. Flag any alterations that could impact public behavior, break existing APIs, introduce subtle shifts in control flow, or compromise system stability. Verify cross-crate consistency by cross-referencing dependencies, ensuring no mismatches in types, interfaces, or behaviors across modules. Preserve every essential invariant, such as state management, error handling, concurrency safety, and performance characteristics. Guarantee zero regressions by simulating edge cases, tracing execution paths, and validating that all prior functionality remains intact.
+
+To execute this task effectively, adopt a structured approach: First, create a detailed plan outlining the step-by-step analysis (e.g., file-by-file breakdown, invariant checklists, API impact assessment, and regression test scenarios). Then, engage in ultrathinking mode—deep, iterative reasoning to uncover hidden issues, potential race conditions, or unintended side effects. Proceed horizontally through the long-form task, breaking it into manageable phases (e.g., syntax and semantics, runtime behavior, integration points) while maintaining persistence until the final goal of a comprehensive, regression-free validation is achieved. Document findings progressively, and conclude with a concise summary highlighting key flags, resolutions, consistencies verified, invariants upheld, and overall assurance of no regressions.
+
+--
+why Single agent mode only has Available tools: ["rp_search", "list_files", "run_terminal_cmd"] ?
+
+--
+make enum constants for message roles string, don't use hardcode string.
+
+--
+src/cli/chat.rs
+let system_instruction = SystemInstruction::new("You are a helpful coding assistant. You can help with programming tasks, code analysis, and file operations.");
+and // Convert Content to SystemInstruction
+let system_instruction = if let Some(part) = lightweight_instruction.parts.first() {
+    if let Some(text) = part.as_text() {
+        SystemInstruction::new(text)
+    } else {
+        SystemInstruction::new("You are a helpful coding assistant.")
+    }
+} else {
+    SystemInstruction::new("You are a helpful coding assistant.")
+};
+
+in
+vtagent-core/src/commands/ask.rs
+vtagent-core/src/commands/validate.rs
+
+-> make sure all  prompts instruction is linked with /prompts/*.md files for full prompts context. not just partial.
+
+--
+
+MessageRole::Tool => "user", // Gemini API only accepts "user" and "model" roles
+-> for this message role tool, make sure all places that use this role is updated for other providers that use tool role. use context7 or web search to find document and that use this role.
+
+--
+
 add kimi2 openrouter moonshotai/kimi-k2-0905
 
 --

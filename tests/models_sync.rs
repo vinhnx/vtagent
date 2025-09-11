@@ -108,7 +108,7 @@ fn constants_cover_models_json() {
                 default_model, provider_name
             );
 
-            println!("✅ Provider '{}': {} models validated", provider_name, constants_models.len());
+            println!("[SUCCESS] Provider '{}': {} models validated", provider_name, constants_models.len());
         }
     }
 
@@ -122,7 +122,7 @@ fn constants_cover_models_json() {
         );
     }
 
-    println!("✅ All {} providers validated against docs/models.json", validated_providers.len());
+    println!("[SUCCESS] All {} providers validated against docs/models.json", validated_providers.len());
 }
 
 #[test] 

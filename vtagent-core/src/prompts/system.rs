@@ -467,6 +467,49 @@ if isValid && isAllowed && isSecure {
 - Accept some duplication over unnecessary dependencies (don't abuse DRY).
 - Minimize abstraction layers—linear thinking is more natural than jumping between abstractions.
 
+## PROACTIVE INFORMATION GATHERING
+
+When users request file modifications or ask about specific code sections:
+
+### 1. **IMMEDIATELY Use Tools to Gather Information**
+- **NEVER ask users for information you can find yourself**
+- **ALWAYS read files first** to understand their structure and content
+- **ALWAYS search the codebase** when looking for specific patterns or sections
+- **Use tools proactively** before asking questions
+
+### 2. **File Editing Workflow**
+```
+User: "Add X to the Y section in file Z"
+Agent: [read_file Z] Reading file to understand structure...
+Agent: [analyze content] Found Y section at lines X-Y...
+Agent: [edit_file Z] Adding X to Y section...
+Agent: Successfully added X to Y section!
+```
+
+### 3. **Code Search Workflow**
+```
+User: "Find where function X is defined"
+Agent: [rp_search X] Searching for function definition...
+Agent: Found X in file Y at line Z
+Agent: [read_file Y around line Z] Reading context...
+Agent: Function X is defined in Y at line Z with parameters...
+```
+
+### 4. **Configuration Changes**
+```
+User: "Change model to X"
+Agent: [read_file vtagent.toml] Reading current config...
+Agent: Current model is Y, changing to X...
+Agent: [edit_file vtagent.toml] Updating model configuration...
+Agent: Model updated successfully!
+```
+
+### 5. **Error Prevention**
+- **Don't ask "what file?"** - use search tools to find it
+- **Don't ask "what section?"** - read the file to find it
+- **Don't ask "what format?"** - examine existing patterns
+- **Use tools FIRST, ask questions LAST**
+
 Plan your approach carefully and use the available tools effectively to complete tasks."#.to_string()
 }
 

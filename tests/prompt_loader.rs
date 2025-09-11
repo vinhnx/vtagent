@@ -109,7 +109,7 @@ fn actual_prompt_file_validation() {
                                content_lower.contains("command");
         assert!(has_tools_context, "System prompt should mention tools or functions");
         
-        println!("✅ System prompt file exists and contains {} characters", content.len());
+        println!("[SUCCESS] System prompt file exists and contains {} characters", content.len());
     } else {
         println!("ℹ️  System prompt file does not exist at: {}", prompt_path.display());
         println!("   This is expected if prompts/system.md hasn't been created yet.");
@@ -199,5 +199,5 @@ Always respond with helpful, accurate information about the codebase.
     // Restore original directory
     std::env::set_current_dir(original_dir).expect("Failed to restore directory");
     
-    println!("✅ Integration test completed successfully");
+    println!("[SUCCESS] Integration test completed successfully");
 }

@@ -10,11 +10,11 @@ async fn test_lmstudio_qwen_connection() -> Result<(), Box<dyn std::error::Error
     let client = reqwest::Client::new();
 
     // Test 1: Check if models endpoint is accessible
-    println!("🧪 Testing LMStudio connection...");
+    println!("[TEST] Testing LMStudio connection...");
     let models_response = client.get("http://localhost:1234/v1/models").send().await?;
 
     assert!(models_response.status().is_success());
-    println!("✅ LMStudio models endpoint is accessible");
+    println!("[SUCCESS] LMStudio models endpoint is accessible");
 
     // Test 2: Check if Qwen model is available
     let models_json: serde_json::Value = models_response.json().await?;
@@ -28,11 +28,11 @@ async fn test_lmstudio_qwen_connection() -> Result<(), Box<dyn std::error::Error
     });
 
     if !qwen_model_available {
-        println!("⚠️  Qwen model not found in LMStudio - skipping Qwen-specific tests");
+        println!("[WARNING] Qwen model not found in LMStudio - skipping Qwen-specific tests");
         return Ok(());
     }
 
-    println!("✅ Qwen model is available in LMStudio");
+    println!("[SUCCESS] Qwen model is available in LMStudio");
 
     // Test 3: Send a simple completion request to Qwen model
     println!("📤 Sending completion request to Qwen model...");
@@ -54,7 +54,7 @@ async fn test_lmstudio_qwen_connection() -> Result<(), Box<dyn std::error::Error
         .await?;
 
     assert!(completion_response.status().is_success());
-    println!("✅ Got successful response from Qwen model");
+    println!("[SUCCESS] Got successful response from Qwen model");
 
     // Test 4: Verify response content
     let completion_json: serde_json::Value = completion_response.json().await?;
@@ -63,8 +63,8 @@ async fn test_lmstudio_qwen_connection() -> Result<(), Box<dyn std::error::Error
         .unwrap_or("");
 
     assert!(!response_content.is_empty(), "Response content is empty");
-    println!("✅ Received non-empty response: {}", response_content);
+    println!("[SUCCESS] Received non-empty response: {}", response_content);
 
-    println!("🎉 All LMStudio/Qwen connection tests passed!");
+    println!("[SUCCESS] All LMStudio/Qwen connection tests passed!");
     Ok(())
 }

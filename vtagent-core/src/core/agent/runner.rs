@@ -45,9 +45,9 @@ impl crate::llm::client::LLMClient for LMStudioClientWrapper {
             .into_iter()
             .map(|content| {
                 let role = match content.role.as_str() {
-                    "user" => crate::llm::provider::MessageRole::User,
+                    crate::config::constants::message_roles::USER => crate::llm::provider::MessageRole::User,
                     "model" => crate::llm::provider::MessageRole::Assistant,
-                    "system" => crate::llm::provider::MessageRole::System,
+                    crate::config::constants::message_roles::SYSTEM => crate::llm::provider::MessageRole::System,
                     _ => crate::llm::provider::MessageRole::User,
                 };
 
@@ -141,6 +141,58 @@ pub struct AgentRunner {
 }
 
 impl AgentRunner {
+    /// Create informative progress message based on operation type
+    fn create_progress_message(&self, operation: &str, details: Option<&str>) -> String {
+        match operation {
+            "thinking" => "Analyzing request and planning approach...".to_string(),
+            "processing" => format!("Processing turn with {} model", self.client.model_id()),
+            "tool_call" => {
+                if let Some(tool) = details {
+                    format!("Executing {} tool for task completion", tool)
+                } else {
+                    "Executing tool to gather information".to_string()
+                }
+            },
+            "file_read" => {
+                if let Some(file) = details {
+                    format!("Reading {} to understand structure", file)
+                } else {
+                    "Reading file to analyze content".to_string()
+                }
+            },
+            "file_write" => {
+                if let Some(file) = details {
+                    format!("Writing changes to {}", file)
+                } else {
+                    "Writing file with requested changes".to_string()
+                }
+            },
+            "search" => {
+                if let Some(pattern) = details {
+                    format!("Searching codebase for '{}'", pattern)
+                } else {
+                    "Searching codebase for relevant information".to_string()
+                }
+            },
+            "terminal" => {
+                if let Some(cmd) = details {
+                    format!("Running terminal command: {}", cmd.split(' ').next().unwrap_or(cmd))
+                } else {
+                    "Executing terminal command".to_string()
+                }
+            },
+            "completed" => "Task completed successfully!".to_string(),
+            "error" => {
+                if let Some(err) = details {
+                    format!("Error encountered: {}", err)
+                } else {
+                    "An error occurred during execution".to_string()
+                }
+            },
+            _ => format!("{}...", operation)
+        }
+    }
+
     /// Create a new agent runner
     pub fn new(
         agent_type: AgentType,
@@ -202,19 +254,16 @@ impl AgentRunner {
         let pb = ProgressBar::new_spinner();
         pb.set_style(
             ProgressStyle::default_spinner()
-                .template("{spinner:.green} {msg}")
+                .template("{spinner:.green} {prefix:.bold.dim} {msg}")
                 .unwrap(),
         );
-        pb.set_message(format!(
-            "{} {} is thinking...",
-            self.agent_type,
-            style("🤖").cyan()
-        ));
+        pb.set_prefix(format!("[{}]", self.agent_type));
+        pb.set_message(self.create_progress_message("thinking", None));
         pb.enable_steady_tick(Duration::from_millis(100));
 
         println!(
             "{} Executing {} task: {}",
-            style("[AGENT]").magenta().bold(),
+            style("[AGENT]").blue().bold().on_black(),
             self.agent_type,
             task.title
         );
@@ -252,7 +301,7 @@ impl AgentRunner {
         let mut modified_files = Vec::new();
         let mut executed_commands = Vec::new();
         let mut warnings = Vec::new();
-        let has_completed = false;
+        let mut has_completed = false;
 
         // Agent execution loop (max 10 turns to prevent infinite loops)
         for turn in 0..10 {
@@ -263,7 +312,7 @@ impl AgentRunner {
             pb.set_message(format!(
                 "{} {} is processing turn {}...",
                 self.agent_type,
-                style("🧠").yellow(),
+                style("(PROC)").yellow().bold(),
                 turn + 1
             ));
 
@@ -280,7 +329,7 @@ impl AgentRunner {
                 .generate(&serde_json::to_string(&request)?)
                 .await
                 .map_err(|e| {
-                    pb.finish_with_message(format!("{} Failed", style("❌").red()));
+                    pb.finish_with_message(format!("{} Failed", style("(ERROR)").red().bold().on_black()));
                     anyhow!(
                         "Agent {} execution failed at turn {}: {}",
                         self.agent_type,
@@ -293,7 +342,7 @@ impl AgentRunner {
             pb.set_message(format!(
                 "{} {} received response, processing...",
                 self.agent_type,
-                style("📥").green()
+                style("(RECV)").green().bold()
             ));
 
             // Use response content directly
@@ -328,15 +377,15 @@ impl AgentRunner {
                                     match self.execute_tool(name, &arguments.clone()).await {
                                         Ok(result) => {
                                             pb.set_message(format!(
-                                                "{} {} tool executed successfully",
-                                                style("✅").green(),
-                                                name
-                                            ));
+                                        "{} {} tool executed successfully",
+                                        style("(OK)").green(),
+                                        name
+                                    ));
 
                                             // Add tool result to conversation
                                             let tool_result = serde_json::to_string(&result)?;
                                             conversation.push(Content {
-                                                role: "function".to_string(),
+                                                role: "user".to_string(), // Gemini API only accepts "user" and "model"
                                                 parts: vec![Part::Text {
                                                     text: format!(
                                                         "Tool {} result: {}",
@@ -360,19 +409,85 @@ impl AgentRunner {
                                         Err(e) => {
                                             pb.set_message(format!(
                                                 "{} {} tool failed: {}",
-                                                style("❌").red(),
+                                                style("(ERR)").red(),
                                                 name,
                                                 e
                                             ));
                                             warnings.push(format!("Tool {} failed: {}", name, e));
                                             conversation.push(Content {
-                                                role: "function".to_string(),
+                                                role: "user".to_string(), // Gemini API only accepts "user" and "model"
                                                 parts: vec![Part::Text {
                                                     text: format!("Tool {} failed: {}", name, e),
                                                 }],
                                             });
                                         }
                                     }
+                                }
+                            }
+                        }
+                    }
+                    // Check for Gemini functionCall format
+                    else if let Some(function_call) = tool_call_response.get("functionCall") {
+                        had_tool_call = true;
+
+                        if let (Some(name), Some(args)) = (
+                            function_call.get("name").and_then(|n| n.as_str()),
+                            function_call.get("args"),
+                        ) {
+                            println!(
+                                "{} [{}] Calling tool: {}",
+                                style("[TOOL_CALL]").blue().bold(),
+                                self.agent_type,
+                                name
+                            );
+
+                            // Execute the tool
+                            match self.execute_tool(name, args).await {
+                                Ok(result) => {
+                                    pb.set_message(format!(
+                                "{} {} tool executed successfully",
+                                style("(OK)").green(),
+                                name
+                            ));
+
+                                    // Add tool result to conversation
+                                    let tool_result = serde_json::to_string(&result)?;
+                                    conversation.push(Content {
+                                        role: "user".to_string(), // Gemini API only accepts "user" and "model"
+                                        parts: vec![Part::Text {
+                                            text: format!(
+                                                "Tool {} result: {}",
+                                                name, tool_result
+                                            ),
+                                        }],
+                                    });
+
+                                    // Track what the agent did
+                                    executed_commands.push(name.to_string());
+
+                                    // Special handling for certain tools
+                                    if name == "write_file" {
+                                        if let Some(filepath) =
+                                            args.get("path").and_then(|p| p.as_str())
+                                        {
+                                            modified_files.push(filepath.to_string());
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    pb.set_message(format!(
+                                        "{} {} tool failed: {}",
+                                        style("(ERR)").red().bold(),
+                                        name,
+                                        e
+                                    ));
+                                    warnings.push(format!("Tool {} failed: {}", name, e));
+                                    conversation.push(Content {
+                                        role: "user".to_string(), // Gemini API only accepts "user" and "model"
+                                        parts: vec![Part::Text {
+                                            text: format!("Tool {} failed: {}", name, e),
+                                        }],
+                                    });
                                 }
                             }
                         }
@@ -386,7 +501,7 @@ impl AgentRunner {
 
                         println!(
                             "{} [{}] Executing tool code: {}",
-                            style("[TOOL_EXEC]").cyan().bold(),
+                            style("[TOOL_EXEC]").cyan().bold().on_black(),
                             self.agent_type,
                             tool_code
                         );
@@ -396,7 +511,7 @@ impl AgentRunner {
                         if let Some((func_name, args_str)) = parse_tool_code(tool_code) {
                             println!(
                                 "{} [{}] Parsed tool: {} with args: {}",
-                                style("[TOOL_PARSE]").yellow().bold(),
+                                style("[TOOL_PARSE]").yellow().bold().on_black(),
                                 self.agent_type,
                                 func_name,
                                 args_str
@@ -409,15 +524,15 @@ impl AgentRunner {
                                     match self.execute_tool(&func_name, &arguments).await {
                                         Ok(result) => {
                                             pb.set_message(format!(
-                                                "{} {} tool executed successfully",
-                                                style("✅").green(),
-                                                func_name
-                                            ));
+                                        "{} {} tool executed successfully",
+                                        style("(OK)").green(),
+                                        func_name
+                                    ));
 
                                             // Add tool result to conversation
                                             let tool_result = serde_json::to_string(&result)?;
                                             conversation.push(Content {
-                                                role: "function".to_string(),
+                                                role: "user".to_string(), // Gemini API only accepts "user" and "model"
                                                 parts: vec![Part::Text {
                                                     text: format!(
                                                         "Tool {} result: {}",
@@ -441,14 +556,14 @@ impl AgentRunner {
                                         Err(e) => {
                                             pb.set_message(format!(
                                                 "{} {} tool failed: {}",
-                                                style("❌").red(),
+                                                style("(ERROR)").red().bold(),
                                                 func_name,
                                                 e
                                             ));
                                             warnings
                                                 .push(format!("Tool {} failed: {}", func_name, e));
                                             conversation.push(Content {
-                                                role: "function".to_string(),
+                                                role: "user".to_string(), // Gemini API only accepts "user" and "model"
                                                 parts: vec![Part::Text {
                                                     text: format!(
                                                         "Tool {} failed: {}",
@@ -466,7 +581,7 @@ impl AgentRunner {
                                     );
                                     warnings.push(error_msg.clone());
                                     conversation.push(Content {
-                                        role: "function".to_string(),
+                                        role: "user".to_string(), // Gemini API only accepts "user" and "model"
                                         parts: vec![Part::Text { text: error_msg }],
                                     });
                                 }
@@ -475,7 +590,7 @@ impl AgentRunner {
                             let error_msg = format!("Failed to parse tool code: {}", tool_code);
                             warnings.push(error_msg.clone());
                             conversation.push(Content {
-                                role: "function".to_string(),
+                                role: "user".to_string(), // Gemini API only accepts "user" and "model"
                                 parts: vec![Part::Text { text: error_msg }],
                             });
                         }
@@ -489,7 +604,7 @@ impl AgentRunner {
 
                         println!(
                             "{} [{}] Calling tool: {}",
-                            style("[TOOL_CALL]").blue().bold(),
+                            style("[TOOL_CALL]").blue().bold().on_black(),
                             self.agent_type,
                             tool_name
                         );
@@ -500,14 +615,14 @@ impl AgentRunner {
                                 Ok(result) => {
                                     pb.set_message(format!(
                                         "{} {} tool executed successfully",
-                                        style("✅").green(),
+                                        style("(SUCCESS)").green().bold(),
                                         tool_name
                                     ));
 
                                     // Add tool result to conversation
                                     let tool_result = serde_json::to_string(&result)?;
                                     conversation.push(Content {
-                                        role: "function".to_string(),
+                                        role: "user".to_string(), // Gemini API only accepts "user" and "model"
                                         parts: vec![Part::Text {
                                             text: format!(
                                                 "Tool {} result: {}",
@@ -531,13 +646,13 @@ impl AgentRunner {
                                 Err(e) => {
                                     pb.set_message(format!(
                                         "{} {} tool failed: {}",
-                                        style("❌").red(),
+                                        style("(ERROR)").red().bold(),
                                         tool_name,
                                         e
                                     ));
                                     warnings.push(format!("Tool {} failed: {}", tool_name, e));
                                     conversation.push(Content {
-                                        role: "function".to_string(),
+                                        role: "user".to_string(), // Gemini API only accepts "user" and "model"
                                         parts: vec![Part::Text {
                                             text: format!("Tool {} failed: {}", tool_name, e),
                                         }],
@@ -576,25 +691,107 @@ impl AgentRunner {
                     });
                 }
 
-                if !had_tool_call && !has_completed {
-                    // If no tool calls and not completed, we're done
+                // Check for task completion indicators in the response
+                if !has_completed {
+                    let response_lower = response.content.to_lowercase();
+
+                    // More comprehensive completion detection
+                    let completion_indicators = [
+                        "task completed", "task done", "finished", "complete", "summary",
+                        "i have successfully", "i've completed", "i have finished",
+                        "task accomplished", "mission accomplished", "objective achieved",
+                        "work is done", "all done", "completed successfully",
+                        "task execution complete", "operation finished"
+                    ];
+
+                    // Check if any completion indicator is present
+                    let is_completed = completion_indicators
+                        .iter()
+                        .any(|&indicator| response_lower.contains(indicator));
+
+                    // Also check for explicit completion statements
+                    let has_explicit_completion = response_lower.contains("the task is complete") ||
+                                                 response_lower.contains("task has been completed") ||
+                                                 response_lower.contains("i am done") ||
+                                                 response_lower.contains("that's all") ||
+                                                 response_lower.contains("no more actions needed");
+
+                    if is_completed || has_explicit_completion {
+                        has_completed = true;
+                        pb.set_message(format!(
+                            "{} {} completed task successfully",
+                            self.agent_type,
+                            style("(SUCCESS)").green().bold()
+                        ));
+                    }
+                }
+
+                // Improved loop termination logic
+                // Continue if: we had tool calls, task is not completed, and we haven't exceeded max turns
+                let should_continue = had_tool_call || (!has_completed && turn < 9);
+
+                if !should_continue {
+                    if has_completed {
+                        pb.set_message(format!(
+                            "{} {} finished - task completed",
+                            self.agent_type,
+                            style("(SUCCESS)").green().bold()
+                        ));
+                    } else if turn >= 9 {
+                        pb.set_message(format!(
+                            "{} {} finished - maximum turns reached",
+                            self.agent_type,
+                            style("(TIME)").yellow().bold()
+                        ));
+                    } else {
+                        pb.set_message(format!(
+                            "{} {} finished - no more actions needed",
+                            self.agent_type,
+                            style("(FINISH)").blue().bold()
+                        ));
+                    }
                     break;
                 }
             } else {
-                // Empty response, break the loop
-                break;
+                // Empty response - check if we should continue or if task is actually complete
+                if has_completed {
+                    pb.set_message(format!(
+                        "{} {} finished - task was completed earlier",
+                        self.agent_type,
+                        style("(SUCCESS)").green().bold()
+                    ));
+                    break;
+                } else if turn >= 9 {
+                    pb.set_message(format!(
+                        "{} {} finished - maximum turns reached with empty response",
+                        self.agent_type,
+                        style("(TIME)").yellow().bold()
+                    ));
+                    break;
+                } else {
+                    // Empty response but task not complete - this might indicate an issue
+                    pb.set_message(format!(
+                        "{} {} received empty response, continuing...",
+                        self.agent_type,
+                        style("(EMPTY)").yellow()
+                    ));
+                    // Don't break here, let the loop continue to give the agent another chance
+                }
             }
         }
 
         // Finish the progress bar
         pb.finish_with_message("Done");
 
+        // Generate meaningful summary based on agent actions
+        let summary = self.generate_task_summary(&modified_files, &executed_commands, &warnings, &conversation);
+
         // Return task results
         Ok(TaskResults {
             created_contexts,
             modified_files,
             executed_commands,
-            summary: "Task completed".to_string(),
+            summary,
             warnings,
         })
     }
@@ -679,6 +876,56 @@ impl AgentRunner {
                 ))
             }
         }
+    }
+
+    /// Generate a meaningful summary of the task execution
+    fn generate_task_summary(
+        &self,
+        modified_files: &[String],
+        executed_commands: &[String],
+        warnings: &[String],
+        conversation: &[Content],
+    ) -> String {
+        let mut summary = vec![];
+
+        // Add task title and agent type
+        summary.push(format!("Task: {}", conversation.get(0).and_then(|c| c.parts.get(0)).and_then(|p| p.as_text()).unwrap_or(&"".to_string())));
+        summary.push(format!("Agent Type: {:?}", self.agent_type));
+
+        // Add executed commands
+        if !executed_commands.is_empty() {
+            summary.push("Executed Commands:".to_string());
+            for command in executed_commands {
+                summary.push(format!(" - {}", command));
+            }
+        }
+
+        // Add modified files
+        if !modified_files.is_empty() {
+            summary.push("Modified Files:".to_string());
+            for file in modified_files {
+                summary.push(format!(" - {}", file));
+            }
+        }
+
+        // Add warnings if any
+        if !warnings.is_empty() {
+            summary.push("Warnings:".to_string());
+            for warning in warnings {
+                summary.push(format!(" - {}", warning));
+            }
+        }
+
+        // Add final status
+        let final_status = if conversation.last().map_or(false, |c| c.role == "model" && c.parts.iter().any(|p| p.as_text().map_or(false, |t| t.contains("completed") || t.contains("done") || t.contains("finished")))) {
+            "Task completed successfully".to_string()
+        } else {
+            "Task did not complete as expected".to_string()
+        };
+        summary.push(final_status);
+
+        // Join all parts with new lines
+        summary.join("\n")
     }
 }
 

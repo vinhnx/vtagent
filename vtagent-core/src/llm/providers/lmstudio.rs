@@ -29,7 +29,7 @@ impl LMStudioProvider {
         // Add system message if present
         if let Some(system_prompt) = &request.system_prompt {
             messages.push(json!({
-                "role": "system",
+                "role": crate::config::constants::message_roles::SYSTEM,
                 "content": system_prompt
             }));
         }
@@ -37,10 +37,10 @@ impl LMStudioProvider {
         // Convert messages
         for msg in &request.messages {
             let role = match msg.role {
-                MessageRole::System => "system",
-                MessageRole::User => "user",
-                MessageRole::Assistant => "assistant",
-                MessageRole::Tool => "tool",
+                MessageRole::System => crate::config::constants::message_roles::SYSTEM,
+                MessageRole::User => crate::config::constants::message_roles::USER,
+                MessageRole::Assistant => crate::config::constants::message_roles::ASSISTANT,
+                MessageRole::Tool => crate::config::constants::message_roles::TOOL,
             };
 
             let mut message = json!({
@@ -306,9 +306,9 @@ impl LLMClient for LMStudioProvider {
                         .into_iter()
                         .map(|content| {
                             let role = match content.role.as_str() {
-                                "user" => MessageRole::User,
+                                crate::config::constants::message_roles::USER => MessageRole::User,
                                 "model" => MessageRole::Assistant,
-                                "system" => MessageRole::System,
+                                crate::config::constants::message_roles::SYSTEM => MessageRole::System,
                                 _ => MessageRole::User,
                             };
 

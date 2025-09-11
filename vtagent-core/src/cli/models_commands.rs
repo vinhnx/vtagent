@@ -71,7 +71,7 @@ async fn handle_list_models(_cli: &Cli) -> Result<()> {
                 println!("{}{}", model_prefix, model.cyan());
             }
         } else {
-            println!("    {}", "❌ Configuration required".red());
+            println!("    {}", "[ERROR] Configuration required".red());
         }
 
         // Show provider configuration status
@@ -84,9 +84,9 @@ async fn handle_list_models(_cli: &Cli) -> Result<()> {
                     .map(|p| p.enabled)
                     .unwrap_or(false)
                 {
-                    println!("    {}", "✅ Configured".green());
+                    println!("    {}", "[SUCCESS] Configured".green());
                 } else {
-                    println!("    {}", "⚠️  Not configured".yellow());
+                    println!("    {}", "[WARNING] Not configured".yellow());
                 }
             }
             "anthropic" => {
@@ -96,9 +96,9 @@ async fn handle_list_models(_cli: &Cli) -> Result<()> {
                     .map(|p| p.enabled)
                     .unwrap_or(false)
                 {
-                    println!("    {}", "✅ Configured".green());
+                    println!("    {}", "[SUCCESS] Configured".green());
                 } else {
-                    println!("    {}", "⚠️  Not configured".yellow());
+                    println!("    {}", "[WARNING] Not configured".yellow());
                 }
             }
             "gemini" => {
@@ -108,9 +108,9 @@ async fn handle_list_models(_cli: &Cli) -> Result<()> {
                     .map(|p| p.enabled)
                     .unwrap_or(false)
                 {
-                    println!("    {}", "✅ Configured".green());
+                    println!("    {}", "[SUCCESS] Configured".green());
                 } else {
-                    println!("    {}", "⚠️  Not configured".yellow());
+                    println!("    {}", "[WARNING] Not configured".yellow());
                 }
             }
             "openrouter" => {
@@ -120,9 +120,9 @@ async fn handle_list_models(_cli: &Cli) -> Result<()> {
                     .map(|p| p.enabled)
                     .unwrap_or(false)
                 {
-                    println!("    {}", "✅ Configured".green());
+                    println!("    {}", "[SUCCESS] Configured".green());
                 } else {
-                    println!("    {}", "⚠️  Not configured".yellow());
+                    println!("    {}", "[WARNING] Not configured".yellow());
                 }
             }
             "lmstudio" => {
@@ -132,9 +132,9 @@ async fn handle_list_models(_cli: &Cli) -> Result<()> {
                     .map(|p| p.enabled)
                     .unwrap_or(false)
                 {
-                    println!("    {}", "✅ Configured".green());
+                    println!("    {}", "[SUCCESS] Configured".green());
                 } else {
-                    println!("    {}", "⚠️  Not configured".yellow());
+                    println!("    {}", "[WARNING] Not configured".yellow());
                 }
             }
             _ => {}
@@ -144,7 +144,7 @@ async fn handle_list_models(_cli: &Cli) -> Result<()> {
     }
 
     // Show current configuration summary
-    println!("{}", "📋 Current Configuration".bold().underline());
+    println!("{}", "[CONFIG] Current Configuration".bold().underline());
     println!("Provider: {}", current_provider.cyan());
     println!("Model: {}", current_model.cyan());
     println!(
@@ -179,8 +179,8 @@ async fn handle_set_provider(_cli: &Cli, provider: &str) -> Result<()> {
         config.preferences.default_provider = provider.to_string();
     })?;
 
-    println!("✅ Default provider set to: {}", provider.bold().green());
-    println!("💡 You may need to configure API keys for this provider using:");
+    println!("[SUCCESS] Default provider set to: {}", provider.bold().green());
+    println!("[INFO] You may need to configure API keys for this provider using:");
     println!(
         "   vtagent models config {} --api-key YOUR_API_KEY",
         provider
@@ -197,7 +197,7 @@ async fn handle_set_model(_cli: &Cli, model: &str) -> Result<()> {
         config.preferences.default_model = model.to_string();
     })?;
 
-    println!("✅ Default model set to: {}", model.bold().green());
+    println!("[SUCCESS] Default model set to: {}", model.bold().green());
 
     Ok(())
 }
@@ -278,7 +278,7 @@ async fn handle_config_provider(
     manager.save_config(&config)?;
 
     println!(
-        "✅ Provider {} configured successfully!",
+        "[SUCCESS] Provider {} configured successfully!",
         provider.bold().green()
     );
 
@@ -306,7 +306,7 @@ async fn handle_config_provider(
 
 /// Test provider connectivity
 async fn handle_test_provider(_cli: &Cli, provider: &str) -> Result<()> {
-    println!("🔍 Testing {} provider connectivity...", provider);
+    println!("[TEST] Testing {} provider connectivity...", provider);
 
     // Load configuration
     let config = load_user_config()?;
@@ -383,14 +383,14 @@ async fn handle_test_provider(_cli: &Cli, provider: &str) -> Result<()> {
                 .map(|c| c.to_lowercase().contains("ok"))
                 .unwrap_or(false)
             {
-                println!("✅ {} provider test successful!", provider.bold().green());
+                println!("[SUCCESS] {} provider test successful!", provider.bold().green());
                 println!(
                     "   Response: {}",
                     response.content.unwrap_or_default().trim()
                 );
             } else {
                 println!(
-                    "⚠️  {} provider responded but with unexpected content",
+                    "[WARNING] {} provider responded but with unexpected content",
                     provider.yellow()
                 );
                 println!(
@@ -400,8 +400,8 @@ async fn handle_test_provider(_cli: &Cli, provider: &str) -> Result<()> {
             }
         }
         Err(e) => {
-            println!("❌ {} provider test failed: {}", provider.red(), e);
-            println!("💡 Make sure your API key and configuration are correct");
+            println!("[ERROR] {} provider test failed: {}", provider.red(), e);
+            println!("[INFO] Make sure your API key and configuration are correct");
         }
     }
 

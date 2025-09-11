@@ -47,7 +47,7 @@ pub async fn demonstrate_multi_agent_system() -> Result<()> {
     // Create multi-agent system
     let mut system = MultiAgentSystem::new(config, api_key, workspace).await?;
 
-    println!("\n🎯 Executing Tasks Through Multi-Agent System");
+    println!("\n[EXEC] Executing Tasks Through Multi-Agent System");
     println!("=============================================");
 
     // Example 1: Code analysis task
@@ -87,13 +87,13 @@ pub async fn demonstrate_multi_agent_system() -> Result<()> {
     print_task_result(&result3, 3);
 
     // Show system status
-    println!("\n📈 System Status Report");
+    println!("[STATUS] System Status Report");
     println!("======================");
     let status = system.get_status_report().await;
     print_status_report(&status);
 
     // Demonstrate performance optimization
-    println!("\n⚡ Performance Optimization");
+    println!("\n[PERF] Performance Optimization");
     println!("===========================");
     demonstrate_performance_features(&status).await;
 
@@ -225,7 +225,7 @@ fn print_status_report(status: &crate::core::agent::integration::SystemStatusRep
 async fn demonstrate_performance_features(
     status: &crate::core::agent::integration::SystemStatusReport,
 ) {
-    println!("  🎯 Active Optimizations:");
+    println!("  [TARGET] Active Optimizations:");
 
     if !status.recommendations.is_empty() {
         println!("    Current Recommendations:");
@@ -242,7 +242,7 @@ async fn demonstrate_performance_features(
         println!("    System running optimally - no recommendations");
     }
 
-    println!("  \n  🔍 Performance Insights:");
+    println!("  \n  [INSIGHT] Performance Insights:");
 
     // Analyze queue performance
     let queue_stats = &status.performance_metrics.queue_stats;

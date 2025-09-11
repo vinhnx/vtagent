@@ -4,7 +4,7 @@ use console::style;
 
 /// Render markdown text to terminal with basic formatting
 pub fn render_markdown(text: &str) {
-    println!("{}", style("📄 Markdown Content").cyan().bold());
+    println!("{}", style("[MARKDOWN] Content").cyan().bold());
     println!("{}", style("─".repeat(50)).dim());
 
     for line in text.lines() {

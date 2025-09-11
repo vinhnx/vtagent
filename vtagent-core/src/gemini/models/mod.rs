@@ -13,6 +13,11 @@ pub struct Content {
     pub parts: Vec<Part>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemInstruction {
+    pub parts: Vec<Part>,
+}
+
 impl Content {
     pub fn user_text(text: impl Into<String>) -> Self {
         Content {
@@ -22,9 +27,13 @@ impl Content {
     }
 
     pub fn system_text(text: impl Into<String>) -> Self {
+        // This creates a Content for backwards compatibility
+        // For systemInstruction field, use SystemInstruction::new() instead
         Content {
-            role: "system".into(),
-            parts: vec![Part::Text { text: text.into() }],
+            role: "user".into(), // Convert system to user to avoid API error
+            parts: vec![Part::Text {
+                text: format!("System: {}", text.into())
+            }],
         }
     }
 
@@ -32,6 +41,14 @@ impl Content {
         Content {
             role: "user".into(),
             parts,
+        }
+    }
+}
+
+impl SystemInstruction {
+    pub fn new(text: impl Into<String>) -> Self {
+        SystemInstruction {
+            parts: vec![Part::Text { text: text.into() }],
         }
     }
 }

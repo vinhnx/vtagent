@@ -3,6 +3,7 @@
 use crate::config::models::ModelId;
 use crate::config::types::AgentConfig;
 use crate::gemini::{Content, FunctionResponse, GenerateContentRequest, Part};
+use crate::gemini::models::SystemInstruction;
 use crate::llm::make_client;
 use anyhow::Result;
 use console::style;
@@ -14,7 +15,7 @@ pub async fn handle_compress_context_command(
     _input: Option<std::path::PathBuf>,
     _output: Option<std::path::PathBuf>,
 ) -> Result<()> {
-    println!("{}", style("🧠 Context Compression Demo").cyan().bold());
+    println!("{}", style("[CONTEXT] Compression Demo").cyan().bold());
     println!(
         "{}",
         style("Following Cognition's context engineering principles...").dim()
@@ -155,7 +156,7 @@ COMPRESSED SUMMARY:"#,
             "maxOutputTokens": 1000,
             "temperature": 0.1
         })),
-        system_instruction: Some(Content::system_text(
+        system_instruction: Some(SystemInstruction::new(
             r#"You are an expert at compressing agent conversation history.
 Your goal is to create a compressed summary that maintains all critical information while being concise.
 Focus on: key decisions, actions taken, current state, and user requirements."#,

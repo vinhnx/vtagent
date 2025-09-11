@@ -14,18 +14,18 @@ async fn test_lmstudio_qwen_connection() -> Result<(), Box<dyn std::error::Error
         .build()?;
 
     // Test 1: Check if models endpoint is accessible
-    println!("🧪 Testing LMStudio connection...");
+    println!("[TEST] Testing LMStudio connection...");
     let models_response = client.get("http://localhost:1234/v1/models").send().await;
 
     if let Err(e) = models_response {
-        println!("⚠️  LMStudio is not running or not accessible: {}", e);
+        println!("[WARNING] LMStudio is not running or not accessible: {}", e);
         println!("Please start LMStudio and ensure it's running on http://localhost:1234");
         return Ok(());
     }
 
     let models_response = models_response?;
     assert!(models_response.status().is_success());
-    println!("✅ LMStudio models endpoint is accessible");
+    println!("[SUCCESS] LMStudio models endpoint is accessible");
 
     // Test 2: Check models response
     let models_json: serde_json::Value = models_response.json().await?;
@@ -41,7 +41,7 @@ async fn test_lmstudio_qwen_connection() -> Result<(), Box<dyn std::error::Error
         .collect();
 
     if qwen_models.is_empty() {
-        println!("⚠️  No Qwen models found in LMStudio");
+        println!("[WARNING] No Qwen models found in LMStudio");
         println!("Available models:");
         for model in models.iter() {
             if let Some(id) = model["id"].as_str() {
@@ -51,7 +51,7 @@ async fn test_lmstudio_qwen_connection() -> Result<(), Box<dyn std::error::Error
         return Ok(());
     }
 
-    println!("✅ Found Qwen models: {:?}", qwen_models);
+    println!("[SUCCESS] Found Qwen models: {:?}", qwen_models);
 
     // Test 3: Send a simple completion request to the first Qwen model
     let qwen_model = qwen_models[0];
@@ -79,7 +79,7 @@ async fn test_lmstudio_qwen_connection() -> Result<(), Box<dyn std::error::Error
 
     if let Err(e) = completion_response {
         println!(
-            "❌ Failed to send completion request to {}: {}",
+            "[ERROR] Failed to send completion request to {}: {}",
             qwen_model, e
         );
         return Err(e.into());
@@ -87,7 +87,7 @@ async fn test_lmstudio_qwen_connection() -> Result<(), Box<dyn std::error::Error
 
     let completion_response = completion_response?;
     assert!(completion_response.status().is_success());
-    println!("✅ Got successful response from Qwen model: {}", qwen_model);
+    println!("[SUCCESS] Got successful response from Qwen model: {}", qwen_model);
 
     // Test 4: Verify response content
     let completion_json: serde_json::Value = completion_response.json().await?;
@@ -97,11 +97,11 @@ async fn test_lmstudio_qwen_connection() -> Result<(), Box<dyn std::error::Error
 
     assert!(!response_content.is_empty(), "Response content is empty");
     println!(
-        "✅ Received non-empty response from {}: {}",
+        "[SUCCESS] Received non-empty response from {}: {}",
         qwen_model, response_content
     );
 
-    println!("🎉 All LMStudio/Qwen connection tests passed!");
+    println!("[SUCCESS] All LMStudio/Qwen connection tests passed!");
     Ok(())
 }
 
@@ -113,7 +113,7 @@ fn test_lmstudio_http_client_creation() {
         .build();
 
     assert!(client.is_ok());
-    println!("✅ LMStudio HTTP client created successfully");
+    println!("[SUCCESS] LMStudio HTTP client created successfully");
 }
 
 /// Test that we can parse JSON responses from LMStudio
@@ -148,7 +148,7 @@ fn test_lmstudio_json_parsing() {
     assert!(!response_content.is_empty());
     assert!(response_content.contains("Qwen"));
     println!(
-        "✅ Sample LMStudio JSON response parsed successfully: {}",
+        "[SUCCESS] Sample LMStudio JSON response parsed successfully: {}",
         response_content
     );
 }

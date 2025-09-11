@@ -10,7 +10,7 @@ use vtagent_core::llm::{
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🚀 Universal LLM Provider System Demo");
+    println!("[DEMO] Universal LLM Provider System Demo");
     println!("=====================================");
 
     // Demo 1: Provider Factory
@@ -43,13 +43,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Anthropic provider created: {}", anthropic.is_ok());
 
     // Demo 3: Unified Client Demo
-    println!("\n🎯 Unified Client Demo:");
+    println!("\n[CLIENT] Unified Client Demo:");
 
     let gemini_client =
         UnifiedLLMClient::new("gemini-2.5-flash".to_string(), "test_key".to_string());
     if let Ok(client) = gemini_client {
         println!(
-            "✅ Gemini client: {} ({})",
+            "[SUCCESS] Gemini client: {} ({})",
             client.model(),
             client.provider_name()
         );
@@ -58,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let openai_client = UnifiedLLMClient::new("gpt-5".to_string(), "test_key".to_string());
     if let Ok(client) = openai_client {
         println!(
-            "✅ OpenAI client: {} ({})",
+            "[SUCCESS] OpenAI client: {} ({})",
             client.model(),
             client.provider_name()
         );
@@ -70,14 +70,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     if let Ok(client) = anthropic_client {
         println!(
-            "✅ Anthropic client: {} ({})",
+            "[SUCCESS] Anthropic client: {} ({})",
             client.model(),
             client.provider_name()
         );
     }
 
     // Demo 4: Message Creation
-    println!("\n💬 Message Creation Demo:");
+    println!("\n[DEMO] Message Creation Demo:");
 
     let user_msg = Message::user("Hello, world!".to_string());
     println!("User message: '{}'", user_msg.content);
@@ -89,7 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("System message: '{}'", system_msg.content);
 
     // Demo 5: Provider Capabilities
-    println!("\n🔍 Provider Capabilities Demo:");
+    println!("\n[CAPABILITIES] Provider Capabilities Demo:");
 
     let gemini = GeminiProvider::new("test_key".to_string());
     println!("Gemini models: {:?}", gemini.supported_models());

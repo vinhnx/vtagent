@@ -88,6 +88,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         serde_json::to_string_pretty(&result)?
     );
 
-    println!("\n✅ All consolidated search tests completed successfully!");
+    println!("\n[SUCCESS] All consolidated search tests completed successfully!");
     Ok(())
 }

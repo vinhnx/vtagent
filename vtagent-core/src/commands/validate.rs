@@ -65,11 +65,23 @@ pub async fn handle_validate_command(
 /// Check API connectivity
 async fn check_api_connectivity(config: &AgentConfig) -> Result<()> {
     use crate::gemini::{Client, Content, GenerateContentRequest};
+    use crate::gemini::models::SystemInstruction;
     use crate::prompts::generate_lightweight_instruction;
 
     let mut client = Client::new(config.api_key.clone(), config.model.clone());
     let contents = vec![Content::user_text("Hello")];
-    let system_instruction = generate_lightweight_instruction();
+    let lightweight_instruction = generate_lightweight_instruction();
+
+    // Convert Content to SystemInstruction
+    let system_instruction = if let Some(part) = lightweight_instruction.parts.first() {
+        if let Some(text) = part.as_text() {
+            SystemInstruction::new(text)
+        } else {
+            SystemInstruction::new("You are a helpful coding assistant.")
+        }
+    } else {
+        SystemInstruction::new("You are a helpful coding assistant.")
+    };
 
     let request = GenerateContentRequest {
         contents,

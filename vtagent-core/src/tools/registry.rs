@@ -50,6 +50,7 @@ impl ToolRegistry {
             "run_terminal_cmd".to_string(),
             "read_file".to_string(),
             "write_file".to_string(),
+            "edit_file".to_string(),
         ];
 
         if let Err(e) = policy_manager.update_available_tools(available_tools) {
@@ -205,12 +206,63 @@ impl ToolRegistry {
         let current_content = read_result["content"].as_str()
             .ok_or_else(|| anyhow!("Failed to read file content"))?;
 
-        // Replace the old string with new string
-        if !current_content.contains(&input.old_str) {
-            return Err(anyhow!("Old string not found in file: {}", input.old_str));
+        // Try multiple matching strategies for better compatibility
+        let mut replacement_occurred = false;
+        let mut new_content = current_content.to_string();
+
+        // Strategy 1: Exact match (original behavior)
+        if current_content.contains(&input.old_str) {
+            new_content = current_content.replace(&input.old_str, &input.new_str);
+            replacement_occurred = new_content != current_content;
         }
 
-        let new_content = current_content.replace(&input.old_str, &input.new_str);
+        // Strategy 2: If exact match failed, try with normalized whitespace
+        if !replacement_occurred {
+            let normalized_content = Self::normalize_whitespace(current_content);
+            let normalized_old_str = Self::normalize_whitespace(&input.old_str);
+
+            if normalized_content.contains(&normalized_old_str) {
+                // Find the position in original content that corresponds to the normalized match
+                // This is a simplified approach - in practice, we'd need more sophisticated diffing
+                let old_lines: Vec<&str> = input.old_str.lines().collect();
+                let content_lines: Vec<&str> = current_content.lines().collect();
+
+                // Try to find a sequence of lines that match
+                for i in 0..=(content_lines.len().saturating_sub(old_lines.len())) {
+                    let window = &content_lines[i..i + old_lines.len()];
+                    if Self::lines_match(window, &old_lines) {
+                        // Found a match, reconstruct the replacement
+                        let before = content_lines[..i].join("\n");
+                        let after = content_lines[i + old_lines.len()..].join("\n");
+                        let replacement_lines: Vec<&str> = input.new_str.lines().collect();
+
+                        new_content = format!(
+                            "{}\n{}\n{}",
+                            before,
+                            replacement_lines.join("\n"),
+                            after
+                        );
+                        replacement_occurred = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // If no replacement occurred, provide detailed error
+        if !replacement_occurred {
+            let content_preview = if current_content.len() > 500 {
+                format!("{}...{}", &current_content[..250], &current_content[current_content.len().saturating_sub(250)..])
+            } else {
+                current_content.to_string()
+            };
+
+            return Err(anyhow!(
+                "Could not find text to replace in file.\n\nExpected to replace:\n{}\n\nFile content preview:\n{}",
+                input.old_str,
+                content_preview
+            ));
+        }
 
         // Write the modified content back
         let write_args = json!({
@@ -220,6 +272,41 @@ impl ToolRegistry {
         });
 
         self.file_ops_tool.write_file(write_args).await
+    }
+
+    /// Normalize whitespace for more flexible string matching
+    /// This handles common formatting differences like trailing spaces and indentation
+    fn normalize_whitespace(s: &str) -> String {
+        s.lines()
+            .map(|line| {
+                // Trim trailing whitespace but preserve leading indentation
+                let trimmed = line.trim_end();
+                // Only trim leading whitespace if the line is not empty
+                if trimmed.is_empty() {
+                    trimmed.to_string()
+                } else {
+                    // Preserve the line as-is but normalize trailing whitespace
+                    trimmed.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Check if lines match, allowing for whitespace differences
+    fn lines_match(content_lines: &[&str], expected_lines: &[&str]) -> bool {
+        if content_lines.len() != expected_lines.len() {
+            return false;
+        }
+
+        for (content_line, expected_line) in content_lines.iter().zip(expected_lines.iter()) {
+            // Trim both lines and compare
+            if content_line.trim() != expected_line.trim() {
+                return false;
+            }
+        }
+
+        true
     }
 
     pub async fn delete_file(&mut self, _args: Value) -> Result<Value> {
@@ -324,10 +411,10 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "File path to edit"},
-                    "old_string": {"type": "string", "description": "Exact text to replace (must match exactly)"},
-                    "new_string": {"type": "string", "description": "New text to replace with"}
+                    "old_str": {"type": "string", "description": "Exact text to replace (must match exactly)"},
+                    "new_str": {"type": "string", "description": "New text to replace with"}
                 },
-                "required": ["path", "old_string", "new_string"]
+                "required": ["path", "old_str", "new_str"]
             }),
         },
 

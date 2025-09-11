@@ -5,7 +5,7 @@
 ### 1. read_file
 - **Description**: Reads content from a file in the workspace
 - **Dependencies**: tokio::fs
-- **Parameters**: 
+- **Parameters**:
   - path (string): Path to the file to read
   - max_bytes (integer, optional): Maximum bytes to read
   - encoding (string, optional): Text encoding (default: utf-8)
@@ -36,7 +36,7 @@
 - **Dependencies**: tokio::fs
 - **Parameters**:
   - path (string): Path to the file to edit
-  - old_string (string): Text to replace
+  - old_str (string): Text to replace
   - new_string (string): Replacement text
   - encoding (string, optional): Text encoding (default: utf-8)
   - ast_grep_lint (boolean, optional): Run AST-grep lint analysis after editing (default: false)

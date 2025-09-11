@@ -38,8 +38,8 @@
 **Fix Applied**:
 - Implemented proper `edit_file` function that:
   1. Reads current file content using `read_file`
-  2. Checks if old_string exists in file
-  3. Replaces old_string with new_string
+  2. Checks if old_str exists in file
+  3. Replaces old_str with new_str
   4. Writes modified content back using `write_file`
 - Added proper error handling and validation
 

@@ -238,7 +238,7 @@ impl Phase1Status {
     }
 }
 
-/// Global performance monitor instance
+// /// Global performance monitor instance
 lazy_static! {
     pub static ref PERFORMANCE_MONITOR: PerformanceMonitor = PerformanceMonitor::new();
 }

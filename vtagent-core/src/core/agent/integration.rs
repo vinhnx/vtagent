@@ -4,6 +4,7 @@
 //! orchestrating all components including verification workflows and performance optimization.
 
 use crate::core::agent::multi_agent::*;
+use crate::core::agent::runner::AgentRunner;
 use crate::core::agent::optimization::{PerformanceConfig, PerformanceMonitor};
 use crate::core::agent::orchestrator::OrchestratorAgent;
 use crate::core::agent::verification::{VerificationConfig, VerificationWorkflow};
@@ -353,11 +354,11 @@ impl MultiAgentSystem {
             .await?;
 
         // Get agent info for execution (clone the needed data)
-        let agent_info = {
+        let (_agent, agent_info) = {
             let agent = self
                 .get_agent_by_id(&agent_id)
                 .ok_or_else(|| anyhow!("Agent {} not found", agent_id))?;
-            (agent.id.clone(), agent.agent_type)
+            (agent, (agent.id.clone(), agent.agent_type))
         };
 
         // Record active task
@@ -406,26 +407,7 @@ impl MultiAgentSystem {
                 let task_successful = verification_result.passed && results.warnings.is_empty();
 
                 // Extract token counts from the LLM response if available
-                let (input_tokens, output_tokens) = if let Some(response) = &results.llm_response {
-                    // Try to extract token counts from the response
-                    let input_tokens = response
-                        .usage_metadata
-                        .as_ref()
-                        .and_then(|usage| usage.get("prompt_token_count"))
-                        .and_then(|v| v.as_u64())
-                        .unwrap_or(0) as usize;
-
-                    let output_tokens = response
-                        .usage_metadata
-                        .as_ref()
-                        .and_then(|usage| usage.get("candidates_token_count"))
-                        .and_then(|v| v.as_u64())
-                        .unwrap_or(0) as usize;
-
-                    (input_tokens, output_tokens)
-                } else {
-                    (0, 0)
-                };
+                let (input_tokens, output_tokens) = (0, 0); // Placeholder since we don't have access to LLM response here
 
                 self.performance
                     .record_task_execution(
@@ -549,30 +531,31 @@ impl MultiAgentSystem {
         agent_id: &str,
         agent_type: AgentType,
     ) -> Result<TaskResults> {
-        // This is a simplified implementation - in reality, this would involve
-        // complex LLM interactions, tool usage, etc.
-
         eprintln!("Agent {} executing task: {}", agent_id, task.title);
 
-        // Simulate task execution with actual LLM call
-        let mock_results = TaskResults {
-            created_contexts: vec![format!("context_for_task_{}", task.id)],
-            modified_files: vec![],
-            executed_commands: vec![format!("execute_task_{}", task.id)],
-            summary: format!(
-                "Task '{}' completed by agent {} ({:?})\n\nDescription: {}\n\nExecution details:\n- Agent ID: {}\n- Agent Type: {:?}\n- Timestamp: {:?}",
-                task.title,
-                agent_id,
-                agent_type,
-                task.description,
-                agent_id,
-                agent_type,
-                SystemTime::now()
-            ),
-            warnings: vec![],
-        };
+        // Find the agent to get its client
+        let _agent = self
+            .get_agent_by_id(agent_id)
+            .ok_or_else(|| anyhow::anyhow!("Agent {} not found", agent_id))?;
 
-        Ok(mock_results)
+        // Create an agent runner for this specific agent
+        let mut runner = AgentRunner::new(
+            agent_type,
+            // For now, we'll use a default model - in a real implementation, 
+            // this should come from the agent configuration
+            crate::config::models::ModelId::default_subagent(),
+            // Use the API key from the multi-agent system
+            self.orchestrator.api_key.clone(),
+            // Use the workspace from the multi-agent system
+            self.orchestrator.workspace.clone(),
+            // Use the session ID from the multi-agent system
+            self.session.session_id.clone(),
+        )?;
+
+        // Execute the task with the runner
+        let results = runner.execute_task(task, &[]).await?;
+
+        Ok(results)
     }
 
     /// Execute a task with a specific agent

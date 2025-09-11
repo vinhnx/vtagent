@@ -578,7 +578,7 @@ impl Default for MultiAgentConfig {
             delegation_strategy: DelegationStrategy::Adaptive,
             context_store: ContextStoreConfig {
                 max_contexts: ContextStoreDefaults::MAX_CONTEXTS,
-                auto_cleanup_days: ContextStoreDefaults::AUTO_CLEANUP_DAYS,
+                auto_cleanup_days: ContextStoreDefaults::AUTO_CLEANUP_DAYS as u64,
                 enable_persistence: ContextStoreDefaults::ENABLE_PERSISTENCE,
                 compression_enabled: ContextStoreDefaults::COMPRESSION_ENABLED,
                 storage_dir: ContextStoreDefaults::STORAGE_DIR.to_string(),

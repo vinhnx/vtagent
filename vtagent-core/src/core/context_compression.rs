@@ -1,6 +1,7 @@
 use crate::llm::provider::{LLMProvider, LLMRequest, Message, MessageRole};
+use crate::config::constants::models;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+// std::collections::HashMap import removed as it's not used
 
 /// Context compression configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -219,7 +220,7 @@ impl ContextCompressor {
             ],
             system_prompt: None,
             tools: None,
-            model: "gpt-4o-mini".to_string(), // Use a lightweight model for summarization
+            model: models::GPT_5_MINI.to_string(), // Use a lightweight model for summarization
             max_tokens: Some(1000),
             temperature: Some(0.3),
             stream: false,

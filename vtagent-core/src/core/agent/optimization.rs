@@ -503,7 +503,7 @@ impl PerformanceMonitor {
     }
 
     /// Analyze model performance and suggest optimal models
-    pub async fn suggest_optimal_models(&self, agent_type: AgentType) -> Vec<ModelId> {
+    pub async fn suggest_optimal_models(&self, _agent_type: AgentType) -> Vec<ModelId> {
         let metrics = self.metrics.read().await;
         let mut model_scores: Vec<(String, f64)> = vec![];
 

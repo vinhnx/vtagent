@@ -31,15 +31,26 @@ pub async fn handle_ask_command(config: AgentConfig, prompt: Vec<String>) -> Res
         system_instruction: Some(system_instruction),
     };
 
-    let response = client.generate(&request).await?;
+    // Convert the request to a string prompt
+    let prompt = request.contents
+        .iter()
+        .map(|content| {
+            content.parts
+                .iter()
+                .map(|part| match part {
+                    crate::gemini::Part::Text { text } => text.clone(),
+                    _ => String::new(),
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n");
 
-    if let Some(candidate) = response.candidates.into_iter().next() {
-        for part in candidate.content.parts {
-            if let Some(text) = part.as_text() {
-                println!("{}", text);
-            }
-        }
-    }
+    let response = client.generate(&prompt).await?;
+
+    // Print the response content directly
+    println!("{}", response.content);
 
     Ok(())
 }

@@ -1,7 +1,9 @@
+use crate::llm::client::LLMClient;
 use crate::llm::provider::{
     FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
-    Usage,
 };
+use crate::llm::types as llm_types;
+use crate::config::constants::models;
 use async_trait::async_trait;
 use reqwest::Client as HttpClient;
 use serde_json::{Value, json};
@@ -36,8 +38,7 @@ impl LLMProvider for OpenAIProvider {
         let response = self
             .http_client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .header("Content-Type", "application/json")
+            .bearer_auth(&self.api_key)
             .json(&openai_request)
             .send()
             .await
@@ -52,26 +53,31 @@ impl LLMProvider for OpenAIProvider {
             )));
         }
 
-        let openai_response: Value = response
+        let response_json: Value = response
             .json()
             .await
-            .map_err(|e| LLMError::Provider(e.to_string()))?;
+            .map_err(|e| LLMError::Provider(format!("Failed to parse response: {}", e)))?;
 
-        self.convert_from_openai_format(openai_response)
+        self.parse_openai_response(response_json)
     }
 
     fn supported_models(&self) -> Vec<String> {
         use crate::config::constants::models;
-        vec![models::GPT_5.to_string(), models::GPT_5_MINI.to_string()]
+        vec![
+            models::GPT_5.to_string(),
+            models::GPT_5_MINI.to_string(),
+        ]
     }
 
     fn validate_request(&self, request: &LLMRequest) -> Result<(), LLMError> {
-        if !self.supported_models().contains(&request.model) {
-            return Err(LLMError::InvalidRequest(format!(
-                "Unsupported model: {}",
-                request.model
-            )));
+        if request.messages.is_empty() {
+            return Err(LLMError::InvalidRequest("Messages cannot be empty".to_string()));
         }
+
+        if request.model.is_empty() {
+            return Err(LLMError::InvalidRequest("Model cannot be empty".to_string()));
+        }
+
         Ok(())
     }
 }
@@ -81,58 +87,61 @@ impl OpenAIProvider {
         let mut messages = Vec::new();
 
         // Add system message if present
-        if let Some(system) = &request.system_prompt {
+        if let Some(system_prompt) = &request.system_prompt {
             messages.push(json!({
                 "role": "system",
-                "content": system
+                "content": system_prompt
             }));
         }
 
-        for message in &request.messages {
-            let role = match message.role {
+        // Convert messages
+        for msg in &request.messages {
+            let role = match msg.role {
                 MessageRole::System => "system",
                 MessageRole::User => "user",
                 MessageRole::Assistant => "assistant",
                 MessageRole::Tool => "tool",
             };
 
-            let mut msg = json!({
+            let mut message = json!({
                 "role": role,
-                "content": message.content
+                "content": msg.content
             });
 
-            // Add tool_call_id for tool messages
-            if message.role == MessageRole::Tool {
-                if let Some(tool_call_id) = &message.tool_call_id {
-                    msg["tool_call_id"] = json!(tool_call_id);
+            // Add tool call information if present
+            if let Some(tool_calls) = &msg.tool_calls {
+                if !tool_calls.is_empty() {
+                    let tool_calls_json: Vec<Value> = tool_calls
+                        .iter()
+                        .map(|tc| {
+                            json!({
+                                "id": tc.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tc.name,
+                                    "arguments": tc.arguments
+                                }
+                            })
+                        })
+                        .collect();
+                    message["tool_calls"] = Value::Array(tool_calls_json);
                 }
             }
 
-            // Add tool_calls for assistant messages
-            if let Some(tool_calls) = &message.tool_calls {
-                msg["tool_calls"] = json!(
-                    tool_calls
-                        .iter()
-                        .map(|tc| json!({
-                            "id": tc.id,
-                            "type": "function",
-                            "function": {
-                                "name": tc.name,
-                                "arguments": tc.arguments.to_string()
-                            }
-                        }))
-                        .collect::<Vec<_>>()
-                );
+            if let Some(tool_call_id) = &msg.tool_call_id {
+                message["tool_call_id"] = Value::String(tool_call_id.clone());
             }
 
-            messages.push(msg);
+            messages.push(message);
         }
 
         let mut openai_request = json!({
             "model": request.model,
-            "messages": messages
+            "messages": messages,
+            "stream": request.stream
         });
 
+        // Add optional parameters
         if let Some(max_tokens) = request.max_tokens {
             openai_request["max_tokens"] = json!(max_tokens);
         }
@@ -141,66 +150,104 @@ impl OpenAIProvider {
             openai_request["temperature"] = json!(temperature);
         }
 
+        // Add tools if present
         if let Some(tools) = &request.tools {
-            let openai_tools: Vec<Value> = tools
-                .iter()
-                .map(|tool| {
-                    json!({
-                        "type": "function",
-                        "function": {
-                            "name": tool.name,
-                            "description": tool.description,
-                            "parameters": tool.parameters
-                        }
+            if !tools.is_empty() {
+                let tools_json: Vec<Value> = tools
+                    .iter()
+                    .map(|tool| {
+                        json!({
+                            "type": "function",
+                            "function": {
+                                "name": tool.name,
+                                "description": tool.description,
+                                "parameters": tool.parameters
+                            }
+                        })
                     })
-                })
-                .collect();
-            openai_request["tools"] = json!(openai_tools);
+                    .collect();
+                openai_request["tools"] = Value::Array(tools_json);
+            }
         }
 
         Ok(openai_request)
     }
 
-    fn convert_from_openai_format(&self, response: Value) -> Result<LLMResponse, LLMError> {
-        let choices = response["choices"]
-            .as_array()
-            .ok_or_else(|| LLMError::Provider("No choices in response".to_string()))?;
+    fn parse_openai_response(&self, response_json: Value) -> Result<LLMResponse, LLMError> {
+        let choices = response_json
+            .get("choices")
+            .and_then(|c| c.as_array())
+            .ok_or_else(|| LLMError::Provider("Invalid response format: missing choices".to_string()))?;
 
-        let choice = choices
-            .first()
-            .ok_or_else(|| LLMError::Provider("No choice in response".to_string()))?;
+        if choices.is_empty() {
+            return Err(LLMError::Provider("No choices in response".to_string()));
+        }
 
-        let message = &choice["message"];
-        let content = message["content"].as_str().map(|s| s.to_string());
+        let choice = &choices[0];
+        let message = choice
+            .get("message")
+            .ok_or_else(|| LLMError::Provider("Invalid response format: missing message".to_string()))?;
 
-        let tool_calls = message["tool_calls"].as_array().map(|calls| {
-            calls
-                .iter()
-                .filter_map(|call| {
-                    Some(ToolCall {
-                        id: call["id"].as_str()?.to_string(),
-                        name: call["function"]["name"].as_str()?.to_string(),
-                        arguments: serde_json::from_str(call["function"]["arguments"].as_str()?)
-                            .ok()?,
+        let content = message
+            .get("content")
+            .and_then(|c| c.as_str())
+            .map(|s| s.to_string());
+
+        // Parse tool calls
+        let tool_calls = message
+            .get("tool_calls")
+            .and_then(|tc| tc.as_array())
+            .map(|calls| {
+                calls
+                    .iter()
+                    .filter_map(|call| {
+                        Some(ToolCall {
+                            id: call.get("id")?.as_str()?.to_string(),
+                            name: call
+                                .get("function")?
+                                .get("name")?
+                                .as_str()?
+                                .to_string(),
+                            arguments: call
+                                .get("function")
+                                .and_then(|f| f.get("arguments"))
+                                .cloned()
+                                .unwrap_or(Value::Null),
+                        })
                     })
-                })
-                .collect()
-        });
+                    .collect()
+            });
 
-        let usage = response["usage"].as_object().map(|u| Usage {
-            prompt_tokens: u["prompt_tokens"].as_u64().unwrap_or(0) as u32,
-            completion_tokens: u["completion_tokens"].as_u64().unwrap_or(0) as u32,
-            total_tokens: u["total_tokens"].as_u64().unwrap_or(0) as u32,
-        });
+        // Parse finish reason
+        let finish_reason = choice
+            .get("finish_reason")
+            .and_then(|fr| fr.as_str())
+            .map(|fr| match fr {
+                "stop" => FinishReason::Stop,
+                "length" => FinishReason::Length,
+                "tool_calls" => FinishReason::ToolCalls,
+                "content_filter" => FinishReason::ContentFilter,
+                _ => FinishReason::Error(fr.to_string()),
+            })
+            .unwrap_or(FinishReason::Stop);
 
-        let finish_reason = match choice["finish_reason"].as_str() {
-            Some("stop") => FinishReason::Stop,
-            Some("length") => FinishReason::Length,
-            Some("tool_calls") => FinishReason::ToolCalls,
-            Some("content_filter") => FinishReason::ContentFilter,
-            Some(other) => FinishReason::Error(other.to_string()),
-            None => FinishReason::Stop,
-        };
+        // Parse usage
+        let usage = response_json
+            .get("usage")
+            .map(|u| crate::llm::provider::Usage {
+                prompt_tokens: u
+                    .get("prompt_tokens")
+                    .and_then(|pt| pt.as_u64())
+                    .unwrap_or(0) as u32,
+                completion_tokens: u
+                    .get("completion_tokens")
+                    .and_then(|ct| ct.as_u64())
+                    .unwrap_or(0) as u32,
+                total_tokens: u
+                    .get("total_tokens")
+                    .and_then(|tt| tt.as_u64())
+                    .unwrap_or(0) as u32,
+            });
 
         Ok(LLMResponse {
             content,
@@ -208,5 +255,45 @@ impl OpenAIProvider {
             usage,
             finish_reason,
         })
+    }
+}
+
+#[async_trait]
+impl LLMClient for OpenAIProvider {
+    async fn generate(&mut self, prompt: &str) -> Result<llm_types::LLMResponse, LLMError> {
+        let request = LLMRequest {
+            messages: vec![Message {
+                role: MessageRole::User,
+                content: prompt.to_string(),
+                tool_calls: None,
+                tool_call_id: None,
+            }],
+            system_prompt: None,
+            tools: None,
+            model: "gpt-3.5-turbo".to_string(), // Default model
+            max_tokens: None,
+            temperature: None,
+            stream: false,
+        };
+
+        let response = LLMProvider::generate(self, request).await?;
+
+        Ok(llm_types::LLMResponse {
+            content: response.content.unwrap_or("".to_string()),
+            model: "gpt-3.5-turbo".to_string(),
+            usage: response.usage.map(|u| llm_types::Usage {
+                prompt_tokens: u.prompt_tokens as usize,
+                completion_tokens: u.completion_tokens as usize,
+                total_tokens: u.total_tokens as usize,
+            }),
+        })
+    }
+
+    fn backend_kind(&self) -> llm_types::BackendKind {
+        llm_types::BackendKind::OpenAI
+    }
+
+    fn model_id(&self) -> &str {
+        models::GPT_5
     }
 }

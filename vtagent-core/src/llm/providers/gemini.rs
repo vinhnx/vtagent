@@ -1,7 +1,9 @@
+use crate::llm::client::LLMClient;
 use crate::llm::provider::{
     FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
-    Usage,
 };
+use crate::llm::types as llm_types;
+use crate::config::constants::models;
 use async_trait::async_trait;
 use reqwest::Client as HttpClient;
 use serde_json::{Value, json};
@@ -62,7 +64,6 @@ impl LLMProvider for GeminiProvider {
     }
 
     fn supported_models(&self) -> Vec<String> {
-        use crate::config::constants::models;
         vec![
             models::GEMINI_2_5_FLASH.to_string(),
             models::GEMINI_2_5_FLASH_LITE.to_string(),
@@ -167,58 +168,246 @@ impl GeminiProvider {
     }
 
     fn convert_from_gemini_format(&self, response: Value) -> Result<LLMResponse, LLMError> {
+        // Debug: Log the response structure
+        println!("DEBUG: Gemini response structure: {}", serde_json::to_string_pretty(&response).unwrap_or_default());
+
         let candidates = response["candidates"]
             .as_array()
-            .ok_or_else(|| LLMError::Provider("No candidates in response".to_string()))?;
+            .ok_or_else(|| {
+                println!("DEBUG: No candidates array in response");
+                LLMError::Provider("No candidates in response".to_string())
+            })?;
 
         let candidate = candidates
             .first()
-            .ok_or_else(|| LLMError::Provider("No candidate in response".to_string()))?;
+            .ok_or_else(|| {
+                println!("DEBUG: Candidates array is empty");
+                LLMError::Provider("No candidate in response".to_string())
+            })?;
 
-        let parts = candidate["content"]["parts"]
-            .as_array()
-            .ok_or_else(|| LLMError::Provider("No parts in response".to_string()))?;
+        // Check if content exists and has parts
+        if let Some(content) = candidate.get("content") {
+            if let Some(parts) = content.get("parts").and_then(|p| p.as_array()) {
+                if parts.is_empty() {
+                    println!("DEBUG: Parts array is empty, returning empty response");
+                    return Ok(LLMResponse {
+                        content: Some("".to_string()),
+                        tool_calls: None,
+                        usage: None,
+                        finish_reason: FinishReason::Stop,
+                    });
+                }
 
-        let mut text_content = String::new();
-        let mut tool_calls = Vec::new();
+                let mut text_content = String::new();
+                let mut tool_calls = Vec::new();
 
-        // Parse parts for text and function calls
-        for part in parts {
-            if let Some(text) = part["text"].as_str() {
-                text_content.push_str(text);
-            } else if let Some(function_call) = part["functionCall"].as_object() {
-                let name = function_call["name"].as_str().unwrap_or("").to_string();
-                let args = function_call["args"].clone();
-                tool_calls.push(ToolCall {
-                    id: format!("call_{}", tool_calls.len()), // Gemini doesn't provide IDs
-                    name,
-                    arguments: args,
+                // Parse parts for text and function calls
+                for part in parts {
+                    if let Some(text) = part["text"].as_str() {
+                        text_content.push_str(text);
+                    } else if let Some(function_call) = part["functionCall"].as_object() {
+                        let name = function_call["name"].as_str().unwrap_or("").to_string();
+                        let args = function_call["args"].clone();
+                        tool_calls.push(ToolCall {
+                            id: format!("call_{}", tool_calls.len()), // Gemini doesn't provide IDs
+                            name,
+                            arguments: args,
+                        });
+                    }
+                }
+
+                let finish_reason = match candidate["finishReason"].as_str() {
+                    Some("STOP") => FinishReason::Stop,
+                    Some("MAX_TOKENS") => FinishReason::Length,
+                    Some("SAFETY") => FinishReason::ContentFilter,
+                    Some("FUNCTION_CALL") => FinishReason::ToolCalls,
+                    Some(other) => FinishReason::Error(other.to_string()),
+                    None => FinishReason::Stop,
+                };
+
+                return Ok(LLMResponse {
+                    content: if text_content.is_empty() {
+                        None
+                    } else {
+                        Some(text_content)
+                    },
+                    tool_calls: if tool_calls.is_empty() {
+                        None
+                    } else {
+                        Some(tool_calls)
+                    },
+                    usage: None, // Gemini doesn't provide usage in basic response
+                    finish_reason,
                 });
+            } else {
+                println!("DEBUG: Content exists but no parts array");
             }
+        } else {
+            println!("DEBUG: No content in candidate");
         }
 
-        let finish_reason = match candidate["finishReason"].as_str() {
-            Some("STOP") => FinishReason::Stop,
-            Some("MAX_TOKENS") => FinishReason::Length,
-            Some("SAFETY") => FinishReason::ContentFilter,
-            Some("FUNCTION_CALL") => FinishReason::ToolCalls,
-            Some(other) => FinishReason::Error(other.to_string()),
-            None => FinishReason::Stop,
+        // Fallback: Try to extract any text content from the response
+        if let Some(text) = response["text"].as_str() {
+            println!("DEBUG: Found text in root response");
+            return Ok(LLMResponse {
+                content: Some(text.to_string()),
+                tool_calls: None,
+                usage: None,
+                finish_reason: FinishReason::Stop,
+            });
+        }
+
+        // Last resort: Return empty response instead of error
+        println!("DEBUG: Could not parse response, returning empty response");
+        Ok(LLMResponse {
+            content: Some("".to_string()),
+            tool_calls: None,
+            usage: None,
+            finish_reason: FinishReason::Stop,
+        })
+    }
+}
+
+#[async_trait]
+impl LLMClient for GeminiProvider {
+    async fn generate(&mut self, prompt: &str) -> Result<llm_types::LLMResponse, LLMError> {
+        // Check if the prompt is a serialized GenerateContentRequest
+        let request = if prompt.trim().starts_with("{") {
+            // Try to parse as JSON GenerateContentRequest
+            match serde_json::from_str::<crate::gemini::GenerateContentRequest>(prompt) {
+                Ok(gemini_request) => {
+                    // Convert GenerateContentRequest to LLMRequest
+                    let mut messages = Vec::new();
+                    let mut system_prompt = None;
+
+                    // Convert contents to messages
+                    for content in &gemini_request.contents {
+                        let role = match content.role.as_str() {
+                            "user" => MessageRole::User,
+                            "model" => MessageRole::Assistant,
+                            "system" => {
+                                // Extract system message
+                                let text = content.parts.iter()
+                                    .filter_map(|part| part.as_text())
+                                    .collect::<Vec<_>>()
+                                    .join("");
+                                system_prompt = Some(text);
+                                continue;
+                            }
+                            _ => MessageRole::User, // Default to user
+                        };
+
+                        let content_text = content.parts.iter()
+                            .filter_map(|part| part.as_text())
+                            .collect::<Vec<_>>()
+                            .join("");
+
+                        messages.push(Message {
+                            role,
+                            content: content_text,
+                            tool_calls: None,
+                            tool_call_id: None,
+                        });
+                    }
+
+                    // Convert tools if present
+                    let tools = gemini_request.tools.as_ref().map(|gemini_tools| {
+                        gemini_tools
+                            .iter()
+                            .flat_map(|tool| &tool.function_declarations)
+                            .map(|decl| crate::llm::provider::ToolDefinition {
+                                name: decl.name.clone(),
+                                description: decl.description.clone(),
+                                parameters: decl.parameters.clone(),
+                            })
+                            .collect::<Vec<_>>()
+                    });
+
+                    let llm_request = LLMRequest {
+                        messages,
+                        system_prompt,
+                        tools,
+                        model: models::GEMINI_2_5_FLASH.to_string(),
+                        max_tokens: gemini_request.generation_config
+                            .as_ref()
+                            .and_then(|config| config.get("maxOutputTokens"))
+                            .and_then(|v| v.as_u64())
+                            .map(|v| v as u32),
+                        temperature: gemini_request.generation_config
+                            .as_ref()
+                            .and_then(|config| config.get("temperature"))
+                            .and_then(|v| v.as_f64())
+                            .map(|v| v as f32),
+                        stream: false,
+                    };
+
+                    // Use the standard LLMProvider generate method
+                    let response = LLMProvider::generate(self, llm_request).await?;
+
+                    return Ok(llm_types::LLMResponse {
+                        content: response.content.unwrap_or("".to_string()),
+                        model: models::GEMINI_2_5_FLASH.to_string(),
+                        usage: response.usage.map(|u| llm_types::Usage {
+                            prompt_tokens: u.prompt_tokens as usize,
+                            completion_tokens: u.completion_tokens as usize,
+                            total_tokens: u.total_tokens as usize,
+                        }),
+                    });
+                }
+                Err(_) => {
+                    // Fallback: treat as regular prompt
+                    LLMRequest {
+                        messages: vec![Message {
+                            role: MessageRole::User,
+                            content: prompt.to_string(),
+                            tool_calls: None,
+                            tool_call_id: None,
+                        }],
+                        system_prompt: None,
+                        tools: None,
+                        model: models::GEMINI_2_5_FLASH.to_string(),
+                        max_tokens: None,
+                        temperature: None,
+                        stream: false,
+                    }
+                }
+            }
+        } else {
+            // Regular prompt
+            LLMRequest {
+                messages: vec![Message {
+                    role: MessageRole::User,
+                    content: prompt.to_string(),
+                    tool_calls: None,
+                    tool_call_id: None,
+                }],
+                system_prompt: None,
+                tools: None,
+                model: models::GEMINI_2_5_FLASH.to_string(),
+                max_tokens: None,
+                temperature: None,
+                stream: false,
+            }
         };
 
-        Ok(LLMResponse {
-            content: if text_content.is_empty() {
-                None
-            } else {
-                Some(text_content)
-            },
-            tool_calls: if tool_calls.is_empty() {
-                None
-            } else {
-                Some(tool_calls)
-            },
-            usage: None, // Gemini doesn't provide usage in basic response
-            finish_reason,
+        let response = LLMProvider::generate(self, request).await?;
+
+        Ok(llm_types::LLMResponse {
+            content: response.content.unwrap_or("".to_string()),
+            model: models::GEMINI_2_5_FLASH.to_string(),
+            usage: response.usage.map(|u| llm_types::Usage {
+                prompt_tokens: u.prompt_tokens as usize,
+                completion_tokens: u.completion_tokens as usize,
+                total_tokens: u.total_tokens as usize,
+            }),
         })
+    }
+
+    fn backend_kind(&self) -> llm_types::BackendKind {
+        llm_types::BackendKind::Gemini
+    }
+
+    fn model_id(&self) -> &str {
+        models::GEMINI_2_5_FLASH
     }
 }

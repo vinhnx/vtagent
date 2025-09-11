@@ -1,10 +1,11 @@
 //! Model management command handlers
 
 use super::args::{Cli, ModelCommands};
-use crate::utils::dot_config::{get_dot_manager, load_user_config, save_user_config, DotConfig};
+use crate::llm::factory::{get_factory, create_provider_with_config};
+use crate::utils::dot_config::{get_dot_manager, load_user_config, DotConfig};
 use anyhow::{Result, anyhow};
 use owo_colors::*;
-use std::collections::HashMap;
+// No content change needed - this line doesn't exist
 
 /// Handle model management commands
 pub async fn handle_models_command(cli: &Cli, command: &ModelCommands) -> Result<()> {
@@ -24,7 +25,7 @@ async fn handle_list_models(_cli: &Cli) -> Result<()> {
     println!("{}", "🔧 Available LLM Providers & Models".bold().underline());
     println!();
 
-    let factory = get_factory();
+    let factory = get_factory().lock().unwrap();
 
     // Get current configuration
     let config = match load_user_config() {
@@ -39,7 +40,7 @@ async fn handle_list_models(_cli: &Cli) -> Result<()> {
     let providers = factory.list_providers();
 
     for provider_name in &providers {
-        let is_current = Some(provider_name.clone()) == current_provider;
+        let is_current = Some(provider_name.clone()) == Some(current_provider.clone());
         let prefix = if is_current { "▶️ " } else { "  " };
 
         println!("{}{}", prefix, provider_name.to_uppercase().bold());
@@ -53,7 +54,7 @@ async fn handle_list_models(_cli: &Cli) -> Result<()> {
         ) {
             let models = provider.supported_models();
             for model in models {
-                let is_current_model = Some(model.clone()) == current_model;
+                let is_current_model = Some(model.clone()) == Some(current_model.clone());
                 let model_prefix = if is_current_model { "  ⭐ " } else { "    " };
                 println!("{}{}", model_prefix, model.cyan());
             }
@@ -99,13 +100,6 @@ async fn handle_list_models(_cli: &Cli) -> Result<()> {
                         println!("    {}", "⚠️  Not configured".yellow());
                     }
                 }
-                "ollama" => {
-                    if providers_config.ollama.as_ref().map(|p| p.enabled).unwrap_or(false) {
-                        println!("    {}", "✅ Configured".green());
-                    } else {
-                        println!("    {}", "⚠️  Not configured".yellow());
-                    }
-                }
                 _ => {}
             }
 
@@ -114,7 +108,7 @@ async fn handle_list_models(_cli: &Cli) -> Result<()> {
 
     // Show current configuration summary
     println!("{}", "📋 Current Configuration".bold().underline());
-    println!("Provider: {}", current_provider.unwrap_or("Not set".to_string()).cyan());
+    println!("Provider: {}", current_provider.cyan());
     println!("Model: {}", current_model.cyan());
     println!("Temperature: {:.1}", config.preferences.temperature.unwrap_or(0.7));
     println!("Max Tokens: {}", config.preferences.max_tokens.unwrap_or(4096));
@@ -125,7 +119,7 @@ async fn handle_list_models(_cli: &Cli) -> Result<()> {
 /// Set the default provider
 async fn handle_set_provider(_cli: &Cli, provider: &str) -> Result<()> {
     // Validate provider exists
-    let factory = get_factory();
+    let factory = get_factory().lock().unwrap();
     let providers = factory.list_providers();
 
     if !providers.contains(&provider.to_string()) {
@@ -137,7 +131,7 @@ async fn handle_set_provider(_cli: &Cli, provider: &str) -> Result<()> {
     }
 
     // Update configuration
-    let manager = get_dot_manager()?;
+    let manager = get_dot_manager().lock().unwrap();
     manager.update_config(|config| {
         config.preferences.default_provider = provider.to_string();
     })?;
@@ -152,7 +146,7 @@ async fn handle_set_provider(_cli: &Cli, provider: &str) -> Result<()> {
 /// Set the default model
 async fn handle_set_model(_cli: &Cli, model: &str) -> Result<()> {
     // Update configuration
-    let manager = get_dot_manager()?;
+    let manager = get_dot_manager().lock().unwrap();
     manager.update_config(|config| {
         config.preferences.default_model = model.to_string();
     })?;
@@ -170,7 +164,7 @@ async fn handle_config_provider(
     base_url: Option<&str>,
     model: Option<&str>,
 ) -> Result<()> {
-    let manager = get_dot_manager()?;
+    let manager = get_dot_manager().lock().unwrap();
     let mut config = manager.load_config()?;
 
     // Providers config always exists, no need to check
@@ -229,16 +223,6 @@ async fn handle_config_provider(
                 provider_config.model = Some(m.to_string());
             }
             provider_config.enabled = true; // LMStudio can work without API key
-        }
-        "ollama" => {
-            let provider_config = providers.ollama.get_or_insert_with(Default::default);
-            if let Some(url) = base_url {
-                provider_config.base_url = Some(url.to_string());
-            }
-            if let Some(m) = model {
-                provider_config.model = Some(m.to_string());
-            }
-            provider_config.enabled = true; // Ollama works locally
         }
         _ => {
             return Err(anyhow!("Unknown provider: {}", provider));
@@ -303,11 +287,6 @@ async fn handle_test_provider(_cli: &Cli, provider: &str) -> Result<()> {
                 .ok_or_else(|| anyhow!("LMStudio provider not configured"))?;
             (cfg.api_key.clone(), cfg.base_url.clone(), cfg.model.clone())
         }
-        "ollama" => {
-            let cfg = providers.ollama.as_ref()
-                .ok_or_else(|| anyhow!("Ollama provider not configured"))?;
-            (cfg.api_key.clone(), cfg.base_url.clone(), cfg.model.clone())
-        }
         _ => {
             return Err(anyhow!("Unknown provider: {}", provider));
         }
@@ -318,7 +297,7 @@ async fn handle_test_provider(_cli: &Cli, provider: &str) -> Result<()> {
         provider,
         api_key,
         base_url,
-        model,
+        model.clone(),
     )?;
 
     // Test with a simple prompt
@@ -331,7 +310,7 @@ async fn handle_test_provider(_cli: &Cli, provider: &str) -> Result<()> {
         }],
         system_prompt: None,
         tools: None,
-        model: model.unwrap_or_else(|| "test".to_string()),
+        model: model.clone().unwrap_or_else(|| "test".to_string()),
         max_tokens: Some(10),
         temperature: Some(0.1),
         stream: false,

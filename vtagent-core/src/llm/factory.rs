@@ -1,6 +1,7 @@
 use crate::llm::provider::{LLMError, LLMProvider};
-use super::providers::{AnthropicProvider, GeminiProvider, LMStudioProvider, OllamaProvider, OpenAIProvider, OpenRouterProvider};
+use super::providers::{AnthropicProvider, GeminiProvider, OpenAIProvider, OpenRouterProvider};
 use std::collections::HashMap;
+use crate::llm::providers::LMStudioProvider;
 
 /// LLM provider factory and registry
 pub struct LLMFactory {
@@ -23,7 +24,7 @@ impl LLMFactory {
         // Register built-in providers
         factory.register_provider(
             "gemini",
-            Box::new(|config| {
+            Box::new(|config: ProviderConfig| {
                 let api_key = config.api_key.unwrap_or_default();
                 Box::new(GeminiProvider::new(api_key)) as Box<dyn LLMProvider>
             }),
@@ -31,7 +32,7 @@ impl LLMFactory {
 
         factory.register_provider(
             "openai",
-            Box::new(|config| {
+            Box::new(|config: ProviderConfig| {
                 let api_key = config.api_key.unwrap_or_default();
                 Box::new(OpenAIProvider::new(api_key)) as Box<dyn LLMProvider>
             }),
@@ -39,7 +40,7 @@ impl LLMFactory {
 
         factory.register_provider(
             "anthropic",
-            Box::new(|config| {
+            Box::new(|config: ProviderConfig| {
                 let api_key = config.api_key.unwrap_or_default();
                 Box::new(AnthropicProvider::new(api_key)) as Box<dyn LLMProvider>
             }),
@@ -47,7 +48,7 @@ impl LLMFactory {
 
         factory.register_provider(
             "openrouter",
-            Box::new(|config| {
+            Box::new(|config: ProviderConfig| {
                 let api_key = config.api_key.unwrap_or_default();
                 Box::new(OpenRouterProvider::new(api_key)) as Box<dyn LLMProvider>
             }),
@@ -55,15 +56,10 @@ impl LLMFactory {
 
         factory.register_provider(
             "lmstudio",
-            Box::new(|config| {
-                Box::new(LMStudioProvider::new(config.api_key, config.base_url)) as Box<dyn LLMProvider>
-            }),
-        );
-
-        factory.register_provider(
-            "ollama",
-            Box::new(|config| {
-                Box::new(OllamaProvider::new(config.base_url)) as Box<dyn LLMProvider>
+            Box::new(|config: ProviderConfig| {
+                let base_url = config.base_url.unwrap_or_else(|| "http://localhost:1234/v1".to_string());
+                let api_key = config.api_key;
+                Box::new(LMStudioProvider::new(api_key, Some(base_url))) as Box<dyn LLMProvider>
             }),
         );
 
@@ -118,12 +114,6 @@ impl LLMFactory {
             } else {
                 None
             }
-        } else if m.contains("llama") || m.contains("codellama") || m.contains("mistral")
-            || m.contains("mixtral") || m.contains("phi") || m.contains("orca")
-            || m.contains("vicuna") || m.contains("wizard") || m.contains("neural")
-            || m.contains("starling") || m.contains("llava") || m.contains("bakllava") {
-            // Common Ollama model patterns
-            Some("ollama".to_string())
         } else {
             None
         }
@@ -137,17 +127,13 @@ impl Default for LLMFactory {
 }
 
 /// Global factory instance
-static mut FACTORY: Option<LLMFactory> = None;
-static FACTORY_INIT: std::sync::Once = std::sync::Once::new();
+use std::sync::{LazyLock, Mutex};
+
+static FACTORY: LazyLock<Mutex<LLMFactory>> = LazyLock::new(|| Mutex::new(LLMFactory::new()));
 
 /// Get global factory instance
-pub fn get_factory() -> &'static LLMFactory {
-    unsafe {
-        FACTORY_INIT.call_once(|| {
-            FACTORY = Some(LLMFactory::new());
-        });
-        FACTORY.as_ref().unwrap()
-    }
+pub fn get_factory() -> &'static Mutex<LLMFactory> {
+    &FACTORY
 }
 
 /// Create provider from model name and API key
@@ -155,7 +141,7 @@ pub fn create_provider_for_model(
     model: &str,
     api_key: String,
 ) -> Result<Box<dyn LLMProvider>, LLMError> {
-    let factory = get_factory();
+    let factory = get_factory().lock().unwrap();
     let provider_name = factory.provider_from_model(model).ok_or_else(|| {
         LLMError::InvalidRequest(format!("Cannot determine provider for model: {}", model))
     })?;
@@ -176,7 +162,7 @@ pub fn create_provider_with_config(
     base_url: Option<String>,
     model: Option<String>,
 ) -> Result<Box<dyn LLMProvider>, LLMError> {
-    let factory = get_factory();
+    let factory = get_factory().lock().unwrap();
     let config = ProviderConfig {
         api_key,
         base_url,

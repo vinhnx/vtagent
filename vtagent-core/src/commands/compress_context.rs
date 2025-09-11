@@ -169,45 +169,43 @@ Focus on: key decisions, actions taken, current state, and user requirements."#,
     let mut client = make_client(config.api_key.clone(), model_id);
     println!("{}", style("Compressing conversation...").cyan());
 
-    let compressed_response = client.generate(&compression_request).await?;
+    // Convert the request to a string prompt
+    let _prompt = compression_request.contents
+        .iter()
+        .map(|content| {
+            content.parts
+                .iter()
+                .map(|part| match part {
+                    crate::gemini::Part::Text { text } => text.clone(),
+                    _ => String::new(),
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n");
 
-    if let Some(candidate) = compressed_response.candidates.into_iter().next() {
-        if let Some(content) = candidate.content.parts.into_iter().next() {
-            if let Part::Text { text } = content {
-                println!("{}", style("Compressed Summary:").green().bold());
-                println!("{}", text);
+    // Convert the compression request to a string prompt
+    let prompt = compression_request.contents
+        .iter()
+        .map(|content| {
+            content.parts
+                .iter()
+                .map(|part| match part {
+                    crate::gemini::Part::Text { text } => text.clone(),
+                    _ => String::new(),
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n");
 
-                // Estimate compression ratio
-                let original_chars: usize = sample_conversation
-                    .iter()
-                    .map(|c| {
-                        c.parts
-                            .iter()
-                            .map(|p| match p {
-                                Part::Text { text } => text.len(),
-                                _ => 100, // Rough estimate for tool calls
-                            })
-                            .sum::<usize>()
-                    })
-                    .sum();
+    let compressed_response = client.generate(&prompt).await?;
 
-                let compressed_chars = text.len();
-                let compression_ratio = original_chars as f64 / compressed_chars as f64;
-
-                println!(
-                    "\n{} {:.1}x",
-                    style("Compression ratio:").magenta().bold(),
-                    compression_ratio
-                );
-                println!(
-                    "{} {} → {} characters",
-                    style("📏 Size reduction:").magenta(),
-                    original_chars,
-                    compressed_chars
-                );
-            }
-        }
-    }
+    // Print the compressed response content directly
+    println!("{}", style("Compressed Summary:").green().bold());
+    println!("{}", compressed_response.content);
 
     println!("\n{}", style(" Key Principles Applied:").yellow().bold());
     println!("  • {}", style("Share full context and traces").dim());

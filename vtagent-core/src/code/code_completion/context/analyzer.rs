@@ -1,6 +1,6 @@
 use super::CompletionContext;
 use crate::tools::tree_sitter::TreeSitterAnalyzer;
-use tree_sitter::Point;
+// tree_sitter::Point import removed as it's not used
 
 /// Context analyzer for understanding code context
 pub struct ContextAnalyzer {
@@ -15,7 +15,7 @@ impl ContextAnalyzer {
     }
 
     /// Analyze code context at the given position
-    pub fn analyze(&self, source: &str, line: usize, column: usize) -> CompletionContext {
+    pub fn analyze(&mut self, source: &str, line: usize, column: usize) -> CompletionContext {
         let language = self.detect_language(source);
         let prefix = self.extract_prefix(source, line, column);
 
@@ -54,7 +54,7 @@ impl ContextAnalyzer {
         }
     }
 
-    fn extract_scope(&self, source: &str, line: usize, column: usize) -> Vec<String> {
+    fn extract_scope(&mut self, source: &str, line: usize, column: usize) -> Vec<String> {
         let language = self.detect_language(source);
 
         // Parse the source code
@@ -99,7 +99,8 @@ impl ContextAnalyzer {
         }
     }
 
-    fn extract_imports(&self, source: &str) -> Vec<String> {
+    /// Extract import statements from source code
+    fn extract_imports(&mut self, source: &str) -> Vec<String> {
         let language = self.detect_language(source);
 
         // Parse the source code
@@ -113,13 +114,14 @@ impl ContextAnalyzer {
             _ => crate::tools::tree_sitter::LanguageSupport::Rust,
         };
 
-        // Try to parse the source code
-        if let Ok(tree) = self.tree_sitter.parse(source, lang_support) {
+        // Clone the language support to avoid moving it
+        let lang_support_clone = lang_support.clone();
+        if let Ok(tree) = self.tree_sitter.parse(source, lang_support_clone) {
             let root_node = tree.root_node();
             let mut imports = Vec::new();
 
             // Walk the tree to find import/require statements
-            self.extract_imports_recursive(root_node, source, &lang_support, &mut imports);
+            self.extract_imports_recursive(root_node, source, &lang_support_clone, &mut imports);
 
             imports
         } else {
@@ -129,7 +131,7 @@ impl ContextAnalyzer {
 
     /// Recursively extract import statements from the syntax tree
     fn extract_imports_recursive(
-        &self,
+        &mut self,
         node: tree_sitter::Node,
         source: &str,
         language: &crate::tools::tree_sitter::LanguageSupport,
@@ -174,7 +176,8 @@ impl ContextAnalyzer {
         }
     }
 
-    fn extract_recent_symbols(&self, source: &str, line: usize) -> Vec<String> {
+    /// Extract recently used symbols from source code near the given line
+    fn extract_recent_symbols(&mut self, source: &str, line: usize) -> Vec<String> {
         let language = self.detect_language(source);
 
         // Parse the source code
@@ -190,13 +193,13 @@ impl ContextAnalyzer {
 
         // Try to parse the source code
         if let Ok(tree) = self.tree_sitter.parse(source, lang_support) {
-            let root_node = tree.root_node();
+            let _root_node = tree.root_node();
             let mut symbols = Vec::new();
 
             // Extract all symbols first
             if let Ok(extracted_symbols) =
                 self.tree_sitter
-                    .extract_symbols(&tree, source, &lang_support)
+                    .extract_symbols(&tree, source, lang_support.clone())
             {
                 // Filter symbols that appear before the given line
                 for symbol in extracted_symbols {
@@ -218,12 +221,12 @@ impl ContextAnalyzer {
     }
 
     /// Find the node that contains the given line/column position
-    fn find_node_at_position(
+    fn find_node_at_position<'a>(
         &self,
-        node: tree_sitter::Node,
+        node: tree_sitter::Node<'a>,
         line: usize,
         column: usize,
-    ) -> Option<tree_sitter::Node> {
+    ) -> Option<tree_sitter::Node<'a>> {
         let start_pos = node.start_position();
         let end_pos = node.end_position();
 

@@ -27,8 +27,8 @@ impl CoverageAnalyzer {
         
         let mut total_lines = 0;
         let mut covered_lines = 0;
-        let mut total_files = 0;
-        let mut test_files = 0;
+        let mut _total_files = 0;
+        let mut _test_files = 0;
         
         // Walk the directory to count lines and files
         for entry in WalkDir::new(project_path)
@@ -41,7 +41,7 @@ impl CoverageAnalyzer {
                     // Check if this is a source code file
                     let source_extensions = ["rs", "js", "ts", "py", "java", "cpp", "c", "go"];
                     if source_extensions.contains(&ext.to_str().unwrap_or("")) {
-                        total_files += 1;
+                        _total_files += 1;
                         
                         // Try to read the file and count lines
                         if let Ok(content) = fs::read_to_string(entry.path()) {
@@ -59,7 +59,7 @@ impl CoverageAnalyzer {
                 // Count test files
                 if let Some(file_name) = entry.path().file_name().and_then(|n| n.to_str()) {
                     if file_name.contains("test") || file_name.contains("spec") {
-                        test_files += 1;
+                        _test_files += 1;
                     }
                 }
             }

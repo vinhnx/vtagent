@@ -20,7 +20,7 @@ impl ComplexityAnalyzer {
     }
 
     /// Analyze complexity of a source file
-    pub fn analyze_file(&self, file_path: &Path, source: &str) -> ComplexityResult {
+    pub fn analyze_file(&self, _file_path: &Path, source: &str) -> ComplexityResult {
         // Calculate actual complexity metrics
         let lines_of_code = source.lines().count();
         
@@ -100,7 +100,7 @@ impl ComplexityAnalyzer {
         let mut complexity = 0.0;
         
         // Count nesting levels and complex structures
-        let mut nesting_level = 0;
+        let mut nesting_level: i32 = 0;
         for line in source.lines() {
             let trimmed = line.trim();
             

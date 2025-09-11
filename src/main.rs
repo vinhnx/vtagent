@@ -116,6 +116,7 @@ async fn handle_chat_command(_args: &Cli) -> Result<()> {
             .context("Multi-agent chat failed")?;
     } else {
         println!("{}", style("Single agent mode").cyan());
+        // For Gemini and other providers, use the single-agent chat with tools
         handle_single_agent_chat(&model_str, provider, &vtagent_config).await
             .context("Single agent chat failed")?;
     }
@@ -125,9 +126,30 @@ async fn handle_chat_command(_args: &Cli) -> Result<()> {
 
 /// Handle single agent chat mode
 async fn handle_single_agent_chat(model_str: &str, provider: &str, config: &VTAgentConfig) -> Result<()> {
+    use vtagent_core::llm::provider::ToolDefinition;
+
+    println!("DEBUG: Entered handle_single_agent_chat function");
+
+    // Initialize tool registry and function declarations
+    let mut tool_registry = vtagent_core::tools::ToolRegistry::new(std::env::current_dir().unwrap_or_default());
+    tool_registry.initialize_async().await?;
+    let function_declarations = vtagent_core::tools::build_function_declarations();
+
+    // Convert FunctionDeclaration to ToolDefinition
+    let tool_definitions: Vec<ToolDefinition> = function_declarations
+        .into_iter()
+        .map(|fd| ToolDefinition {
+            name: fd.name,
+            description: fd.description,
+            parameters: fd.parameters,
+        })
+        .collect();
+
+    println!("DEBUG: Available tools: {:?}", tool_definitions.iter().map(|t| &t.name).collect::<Vec<_>>());
+
     // For LMStudio, use the correct model name
     let model_str = if provider.eq_ignore_ascii_case("lmstudio") && model_str == "local-model" {
-        "qwen/qwen3-4b-2507"
+        "qwen/qwen3-2507"
     } else {
         model_str
     };
@@ -154,7 +176,7 @@ async fn handle_single_agent_chat(model_str: &str, provider: &str, config: &VTAg
     let client: Box<dyn LLMProvider> = if provider.eq_ignore_ascii_case("lmstudio") {
         // For LMStudio, use the correct model name
         let actual_model = if model_str == "local-model" {
-            "qwen/qwen3-4b-2507".to_string()
+            "qwen/qwen3-2507".to_string()
         } else {
             model_str.to_string()
         };
@@ -168,27 +190,40 @@ async fn handle_single_agent_chat(model_str: &str, provider: &str, config: &VTAg
 
         client_result
     } else {
-        // For other providers, we use the model-based approach
-        let model_id = model_str.parse::<ModelId>()
-            .map_err(|_| anyhow::anyhow!("Invalid model: {}", model_str))?;
-        let any_client: AnyClient = make_client(api_key, model_id);
-        // We'll use the simple prompt-based approach for other providers for now
-        // In a full implementation, we'd want to handle each provider properly
-        return handle_simple_prompt_chat(any_client).await
-            .context("Simple prompt chat failed");
+        // For Gemini and other providers, create the appropriate client
+        if provider.eq_ignore_ascii_case("gemini") {
+            // Create Gemini client
+            let client_result = create_provider_with_config(
+                "gemini",
+                Some(api_key),
+                None, // Gemini doesn't need a base URL
+                Some(model_str.to_string()),
+            ).context("Failed to create Gemini provider")?;
+            client_result
+        } else {
+            // For other providers, we use the model-based approach
+            let model_id = model_str.parse::<ModelId>()
+                .map_err(|_| anyhow::anyhow!("Invalid model: {}", model_str))?;
+            let any_client: AnyClient = make_client(api_key, model_id);
+            // We'll use the simple prompt-based approach for other providers for now
+            // In a full implementation, we'd want to handle each provider properly
+            return handle_simple_prompt_chat(any_client).await
+                .context("Simple prompt chat failed");
+        }
     };
 
     // Initialize conversation history
     let mut conversation_history = vec![
         Message {
             role: MessageRole::System,
-            content: "You are a helpful coding assistant. You can help with programming tasks, code analysis, and file operations.".to_string(),
+            content: "You are a helpful coding assistant for the VTAgent Rust project with access to file operations.\n\nMANDATORY TOOL USAGE:\n- When user asks 'what is this project about' or similar: IMMEDIATELY call list_files to see project structure, then call read_file on README.md\n- When user asks about code or files: Use read_file to read the relevant files\n- When user asks about project structure: Use list_files first\n\nTOOL CALL FORMAT: Always respond with a function call when you need to use tools. Do not give text responses for project questions without using tools first.\n\nAvailable tools:\n- list_files: List files and directories\n- read_file: Read file contents\n- rp_search: Search for patterns in code\n- run_terminal_cmd: Execute terminal commands".to_string(),
             tool_calls: None,
             tool_call_id: None,
         }
     ];
 
     loop {
+        println!("DEBUG: Starting input loop iteration");
         print!("> ");
         io::stdout().flush()
             .context("Failed to flush stdout")?;
@@ -203,6 +238,8 @@ async fn handle_single_agent_chat(model_str: &str, provider: &str, config: &VTAg
         }
 
         let input = input.trim();
+
+        println!("DEBUG: Processing input: '{}'", input);
 
         if input.eq_ignore_ascii_case("exit") || input.eq_ignore_ascii_case("quit") {
             println!("Goodbye!");
@@ -221,11 +258,76 @@ async fn handle_single_agent_chat(model_str: &str, provider: &str, config: &VTAg
             tool_call_id: None,
         });
 
-        // Create request
+        // Auto-gather context for project questions
+        let is_project_question = input.to_lowercase().contains("project") ||
+                                 input.to_lowercase().contains("what is this") ||
+                                 input.to_lowercase().contains("readme") ||
+                                 input.to_lowercase().contains("about");
+
+        println!("DEBUG: Input: '{}', Is project question: {}", input, is_project_question);
+
+        if is_project_question {
+            println!("{}: Gathering project context...", style("Context").green());
+
+            let mut context_parts = Vec::new();
+
+            // Try to read README.md
+            match tool_registry.execute_tool("read_file", serde_json::json!({"path": "README.md"})).await {
+                Ok(result) => {
+                    println!("{}: Found README.md", style("✅").green());
+                    context_parts.push(format!("README.md contents:\n{}", result));
+                }
+                Err(e) => {
+                    println!("{}: Could not read README.md: {}", style("⚠️").yellow(), e);
+                }
+            }
+
+            // Try to list files in root directory
+            match tool_registry.execute_tool("list_files", serde_json::json!({"path": "."})).await {
+                Ok(result) => {
+                    println!("{}: Listed project files", style("✅").green());
+                    context_parts.push(format!("Project structure:\n{}", result));
+                }
+                Err(e) => {
+                    println!("{}: Could not list files: {}", style("⚠️").yellow(), e);
+                }
+            }
+
+            // Add context to the user message
+            if !context_parts.is_empty() {
+                let context = context_parts.join("\n\n");
+                let user_message = format!("Question: {}\n\nProject Context:\n{}\n\nPlease answer the question based on the project context provided above.", input, context);
+                println!("DEBUG: Sending message with context (length: {} chars)", user_message.len());
+                conversation_history.push(Message {
+                    role: MessageRole::User,
+                    content: user_message,
+                    tool_calls: None,
+                    tool_call_id: None,
+                });
+            } else {
+                // No context gathered, proceed with original message
+                conversation_history.push(Message {
+                    role: MessageRole::User,
+                    content: input.to_string(),
+                    tool_calls: None,
+                    tool_call_id: None,
+                });
+            }
+        } else {
+            // No context gathering needed, proceed with original message
+            conversation_history.push(Message {
+                role: MessageRole::User,
+                content: input.to_string(),
+                tool_calls: None,
+                tool_call_id: None,
+            });
+        }
+
+        // Create request (moved from after user message addition)
         let request = LLMRequest {
             messages: conversation_history.clone(),
             system_prompt: None,
-            tools: None,
+            tools: Some(tool_definitions.clone()),
             model: model_str.to_string(),
             max_tokens: Some(1000),
             temperature: Some(0.7),
@@ -235,7 +337,70 @@ async fn handle_single_agent_chat(model_str: &str, provider: &str, config: &VTAg
         // Get response from AI
         match client.generate(request).await {
             Ok(response) => {
-                if let Some(content) = response.content {
+                // Handle tool calls first
+                if let Some(tool_calls) = &response.tool_calls {
+                    println!("{}: Executing {} tool call(s)", style("Tool").blue().bold(), tool_calls.len());
+
+                    for tool_call in tool_calls {
+                        println!("{}: Calling tool: {} with args: {}", style("TOOL").cyan(), tool_call.name, tool_call.arguments);
+
+                        // Execute the tool
+                        match tool_registry.execute_tool(&tool_call.name, tool_call.arguments.clone()).await {
+                            Ok(result) => {
+                                println!("{}: Tool {} executed successfully", style("✅").green(), tool_call.name);
+
+                                // Add tool result to conversation
+                                conversation_history.push(Message {
+                                    role: MessageRole::Tool,
+                                    content: serde_json::to_string(&result).unwrap_or_default(),
+                                    tool_calls: None,
+                                    tool_call_id: Some(tool_call.id.clone()),
+                                });
+                            }
+                            Err(e) => {
+                                println!("{}: Tool {} failed: {}", style("❌").red(), tool_call.name, e);
+
+                                // Add error result to conversation
+                                conversation_history.push(Message {
+                                    role: MessageRole::Tool,
+                                    content: format!("Tool {} failed: {}", tool_call.name, e),
+                                    tool_calls: None,
+                                    tool_call_id: Some(tool_call.id.clone()),
+                                });
+                            }
+                        }
+                    }
+
+                    // After executing tools, send another request to get the final response
+                    let follow_up_request = LLMRequest {
+                        messages: conversation_history.clone(),
+                        system_prompt: None,
+                        tools: Some(tool_definitions.clone()),
+                        model: model_str.to_string(),
+                        max_tokens: Some(1000),
+                        temperature: Some(0.7),
+                        stream: false,
+                    };
+
+                    match client.generate(follow_up_request).await {
+                        Ok(final_response) => {
+                            if let Some(content) = final_response.content {
+                                println!("{}", content);
+                                // Add final AI response to history
+                                conversation_history.push(Message {
+                                    role: MessageRole::Assistant,
+                                    content: content.clone(),
+                                    tool_calls: None,
+                                    tool_call_id: None,
+                                });
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("{}: Error in follow-up request: {:?}", style("Error").red(), e);
+                        }
+                    }
+                } else if let Some(content) = response.content {
+                    // No tool calls, just print the response
                     println!("{}", content);
                     // Add AI response to history
                     conversation_history.push(Message {

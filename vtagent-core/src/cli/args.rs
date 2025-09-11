@@ -12,11 +12,11 @@ use std::path::PathBuf;
     about = "**Research-preview Rust coding agent** powered by Gemini with Anthropic-inspired architecture\n\n**Features:**\n• Interactive AI coding assistant with Research-preview tool-calling\n• Multi-language support (Rust, Python, JavaScript, TypeScript, Go, Java)\n• Real-time diff rendering and async file operations\n• Rate limiting and tool call management\n• Markdown rendering for chat responses\n\n**Quick Start:**\n  export GEMINI_API_KEY=\"your_key\"\n  vtagent chat"
 )]
 pub struct Cli {
-    /// **Gemini model ID** (e.g., `gemini-2.5-flash-lite`, `gemini-2.5-flash`, `gemini-pro`)\n\n**Available models:**\n• `gemini-2.5-flash-lite` - Fastest, most cost-effective\n• `gemini-2.5-flash` - Fast, cost-effective\n• `gemini-pro` - More capable, slower\n• `gemini-2.5-pro` - Latest, most Research-preview
+    /// **Gemini model ID** (e.g., `gemini-2.5-flash-lite`, `gemini-2.5-flash`)\n\n**Available models:**\n• `gemini-2.5-flash-lite` - Fastest, most cost-effective\n• `gemini-2.5-flash` - Fast, cost-effective\n• `gemini-2.5-pro` - Latest, most capable
     #[arg(long, global = true)]
     pub model: Option<String>,
 
-    /// **LLM Provider** to use for requests\n\n**Available providers:**\n• `gemini` - Google Gemini (default)\n• `openai` - OpenAI GPT models\n• `anthropic` - Anthropic Claude models\n• `openrouter` - OpenRouter (multi-provider)\n• `lmstudio` - Local LMStudio models\n• `ollama` - Local Ollama models\n\n**Example:** --provider openai
+    /// **LLM Provider** to use for requests\n\n**Available providers:**\n• `gemini` - Google Gemini (default)\n• `openai` - OpenAI GPT models\n• `anthropic` - Anthropic Claude models\n• `openrouter` - OpenRouter (multi-provider)\n• `lmstudio` - Local LMStudio models\n\n**Example:** --provider openai
     #[arg(long, global = true)]
     pub provider: Option<String>,
 
@@ -152,7 +152,7 @@ pub enum ModelCommands {
     /// **Set the default provider**\n\n**Example:** vtagent models set-provider openai
     #[command(name = "set-provider")]
     SetProvider {
-        /// **Provider name** to set as default\n\n**Options:** gemini, openai, anthropic, openrouter, lmstudio, ollama
+        /// **Provider name** to set as default\n\n**Options:** gemini, openai, anthropic, openrouter, lmstudio
         provider: String,
     },
 
@@ -172,7 +172,7 @@ pub enum ModelCommands {
         #[arg(long)]
         api_key: Option<String>,
 
-        /// **Base URL** for local providers (LMStudio, Ollama)
+        /// **Base URL** for local providers (LMStudio)
         #[arg(long)]
         base_url: Option<String>,
 

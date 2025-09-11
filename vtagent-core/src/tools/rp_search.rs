@@ -238,7 +238,7 @@ impl RpSearchManager {
 
     /// Perform an actual ripgrep search with the given input parameters
     pub async fn perform_search(&self, input: RpSearchInput) -> Result<RpSearchResult> {
-        use std::path::Path;
+        // std::path::Path import removed as it's not directly used
         use std::process::Command;
 
         // Build the ripgrep command

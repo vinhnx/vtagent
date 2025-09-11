@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 /// Unified search tool with multiple modes
+#[derive(Clone)]
 pub struct SearchTool {
     workspace_root: PathBuf,
     rp_search: Arc<RpSearchManager>,

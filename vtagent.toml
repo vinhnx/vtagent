@@ -1,115 +1,40 @@
-# VTAgent Configuration File
-# This file controls agent behavior, tool policies, and command permissions.
-#
-# For API key configuration, you can use one of these methods (in order of priority):
-# 1. Environment variables (most secure): GEMINI_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY
-# 2. .env file (convenient for development): Create a .env file with your API keys
-# 3. Configuration file (least secure): Set api_key values below
-#
-# Example .env file:
-# GEMINI_API_KEY=your_gemini_api_key_here
-# ANTHROPIC_API_KEY=your_anthropic_api_key_here
-# OPENAI_API_KEY=your_openai_api_key_here
+# VTAgent Configuration - Updated Model Setup
 
 [agent]
-# Agent-wide settings
-max_conversation_turns = 1000
-max_session_duration_minutes = 60
-verbose_logging = false
-
-# Default LLM settings
+# default_model = "local-model"
 default_model = "gemini-2.5-flash-lite"
-api_key_env = "GEMINI_API_KEY"
-
-default_system_instruction = "You are a helpful coding assistant."
-
-[tools]
-# Default policy for tools not explicitly listed: "allow", "prompt", or "deny"
-default_policy = "prompt"
-
-# Specific tool policies - override default_policy for individual tools
-[tools.policies]
-# File operations
-read_file = "allow"
-write_file = "allow"
-list_files = "allow"
-delete_file = "prompt"
-
-# Search and analysis
-code_search = "allow"
-codebase_search = "allow"
-rp_search = "allow"
-
-# Terminal operations
-run_terminal_cmd = "prompt"
-
-[commands]
-# Commands that can be executed automatically without user confirmation
-allow_list = [
-    # Basic file operations
-    "ls", "pwd", "cat", "grep", "find", "head", "tail",
-
-    # Git operations (read-only)
-    "git status", "git diff", "git log", "git branch", "git show",
-
-    # Build and test (safe operations)
-    "cargo check", "cargo clippy", "cargo fmt",
-
-    # Version checks
-    "python --version", "node --version", "rustc --version",
-]
-
-# Commands that are always denied for security
-deny_list = [
-    "rm -rf", "sudo rm", "format", "fdisk", "mkfs",
-    "shutdown", "reboot", "halt", "poweroff",
-    "curl | sh", "wget | sh", "bash <(curl", "bash <(wget",
-    "chmod 777", "chown root", "passwd",
-]
-
-# Patterns that require extra confirmation due to potential danger
-dangerous_patterns = [
-    "rm -f", "git reset --hard", "git clean -f",
-    "docker system prune", "npm install -g",
-    "pip install", "cargo install",
-]
+provider = "gemini"
+max_turns = 150
 
 [security]
-# Require human confirmation for critical actions
 human_in_the_loop = true
-# Confirm before performing destructive actions
-confirm_destructive_actions = true
-# Log all executed commands
-log_all_commands = true
-# Maximum file size in MB that can be processed
-max_file_size_mb = 50
-# File extensions that are allowed to be processed
-allowed_file_extensions = [
-    ".rs", ".toml", ".json", ".md", ".txt", ".yaml", ".yml",
-    ".js", ".ts", ".py", ".go", ".java", ".cpp", ".c", ".h",
-]
+
+[multi_agent]
+enabled = false
+
+[lmstudio]
+# LMStudio-specific configuration
+base_url = "http://localhost:1234/v1"
+# Model to use for single-agent mode
+single_agent_model = "qwen/qwen3-4b-2507"
+# Model to use for multi-agent orchestrator
+orchestrator_model = "qwen/qwen3-4b-2507"
+# Model to use for multi-agent subagents
+subagent_model = "qwen/qwen3-4b-2507"
+# Enable LMStudio for multi-agent mode (previously forced to use Gemini)
+enable_multi_agent = true
+# Connection timeout in seconds
+connection_timeout_seconds = 30
+
+[tools]
+default_policy = "prompt"
+
+[commands]
+safe_commands = ["ls", "pwd", "cat", "grep", "git status", "git diff"]
 
 [pty]
-# Enable PTY functionality
 enabled = true
-# Default terminal size
 default_rows = 24
 default_cols = 80
-# Maximum number of concurrent PTY sessions
 max_sessions = 10
-# Timeout for PTY commands in seconds
 command_timeout_seconds = 300
-
-# Multi-Agent System (Research Preview)
-# Uncomment and configure the following section to enable multi-agent coordination
-# [multi_agent]
-# enabled = true
-# execution_mode = "auto"
-# orchestrator_model = "gemini-2.5-flash"
-# subagent_model = "gemini-2.5-flash-lite"
-# max_concurrent_subagents = 3
-# verification_strategy = "always"
-# delegation_strategy = "adaptive"
-# context_store_enabled = true
-# enable_task_management = true
-# debug_mode = false

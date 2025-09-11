@@ -1,3 +1,74 @@
+
+
+vtagent-core/src/llm/providers/openai.rs still use hardcode model id and old model in async_trait, use enum constants model from vtagent-core/src/config/constants.rs
+
+--
+
+check
+vtagent-core/src/llm/providers/lmstudio.rs still use hardcode model id and old model in async_trait, use enum constants model from vtagent-core/src/config/constants.rs
+
+--
+
+check
+vtagent-core/src/llm/providers/anthropic.rs still use hardcode model id and old model in async_trait, use enum constants model from vtagent-core/src/config/constants.rs
+
+_
+
+allow config reasoning effort level for agent model that support it. like claude, gpt-5, gemini, qwen3.
+
+--
+
+in vtagent.toml. add option to use 1 model for all agents, if multi-agent enabled, default true.
+
+
+---
+
+don't hardcode port "http://localhost:1234/v1" use enum constant from vtagent-core/src/config/constants.rs. update all places that use this hardcode value.
+
+---
+
+let system_prompt = match agent_type {
+            AgentType::Coder => {
+                include_str!("../../../../prompts/coder_system.md").to_string()
+            }
+            AgentType::Explorer => {
+                include_str!("../../../../prompts/explorer_system.md").to_string()
+            }
+            AgentType::Orchestrator => {
+                include_str!("../../../../prompts/orchestrator_system.md").to_string()
+            }
+            AgentType::Single => {
+                include_str!("../../../../prompts/system.md").to_string()
+            }
+        };
+
+is this path correct?
+
+--
+
+double check and cleanup vtagent-core/src/config/provider_abstraction.rs.
+
+--
+
+add kimi k2, glm-4.5 for openrouter models
+
+--
+add configure comments for all possible values for vtagent.toml (example: providers. models. values)
+
+--
+
+use context7 to update llm provider implement make sure tools call work and applicable generically regardless of provider/model
+
+--
+the agent loop was working on main branch. we did have a major refactor now. make sure agent loop still work.
+
+---
+
+also config the run the agent on lmstudio on dev mode by default. use single qwen/qwen3-4b-2507
+as all agents task in orchestrator and executor and planner  agent.
+
+--
+
 1. remove meta-llama, mistral models
 2. update anthropic models: claude-opus-4-1-20250805,  claude-sonnet-4-20250514. remove others
 3. update openai models: gpt-5,  gpt-5-mini. remove others

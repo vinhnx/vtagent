@@ -556,9 +556,6 @@ impl AnalysisUtils {
         // Implement a more sophisticated duplication analysis
         // This looks for similar code structures in the tree
 
-        let mut total_nodes = 0;
-        let mut duplicate_patterns = 0;
-
         // Traverse the tree and count nodes
         fn traverse_node(
             node: &SyntaxNode,
@@ -583,10 +580,10 @@ impl AnalysisUtils {
         }
 
         let mut node_counts = std::collections::HashMap::new();
-        total_nodes = traverse_node(&tree.root, &mut node_counts);
+        let total_nodes = traverse_node(&tree.root, &mut node_counts);
 
         // Count how many patterns appear more than once
-        duplicate_patterns = node_counts.values().filter(|&&count| count > 1).count();
+        let duplicate_patterns = node_counts.values().filter(|&&count| count > 1).count();
 
         // Calculate duplication ratio
         if total_nodes == 0 {

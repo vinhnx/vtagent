@@ -16,6 +16,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 /// Main tool registry that coordinates all tools
+#[derive(Clone)]
 pub struct ToolRegistry {
     workspace_root: PathBuf,
     search_tool: SearchTool,
@@ -75,6 +76,13 @@ impl ToolRegistry {
     /// Get workspace root
     pub fn workspace_root(&self) -> &PathBuf {
         &self.workspace_root
+    }
+
+    /// Initialize async components
+    pub async fn initialize_async(&mut self) -> Result<()> {
+        // Currently no async initialization needed
+        // This method exists for API compatibility
+        Ok(())
     }
 
     /// Execute a tool by name with policy checking

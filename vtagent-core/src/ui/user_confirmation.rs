@@ -6,7 +6,7 @@
 use anyhow::Result;
 use console::style;
 use dialoguer::{Confirm, Select};
-use std::io::{self, Write};
+// use std::io::Write;
 
 /// User confirmation utilities for safety-critical operations
 pub struct UserConfirmation;

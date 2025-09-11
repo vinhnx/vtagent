@@ -177,7 +177,7 @@ impl DiffRenderer {
         let mut lines = Vec::new();
         let mut additions = 0;
         let mut deletions = 0;
-        let mut changes = 0;
+        let _changes = 0;
 
         // Simple diff algorithm - can be enhanced with more sophisticated diffing
         let mut old_idx = 0;
@@ -248,7 +248,7 @@ impl DiffRenderer {
             }
         }
 
-        changes = additions + deletions;
+        let changes = additions + deletions;
 
         FileDiff {
             file_path: file_path.to_string(),

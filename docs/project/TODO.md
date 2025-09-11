@@ -1,3 +1,28 @@
+add kimi2 openrouter moonshotai/kimi-k2-0905
+
+--
+
+add glm-4.5 openrouter
+z-ai/glm-4.5
+
+--
+
+https://docs.rs/console/latest/console/
+
+--
+
+https://docs.rs/dialoguer/latest/dialoguer/
+
+--
+
+IMPORTANT: don't use emoji in agent runner message. this is extremely important.
+
+--
+
+https://x.com/AlexGDimakis/status/1965947230696910935
+
+
+--
 src/main.rs, double check use hardcode model id and old model in async_trait, use enum constants model from vtagent-core/src/config/constants.rs and model.json. make sure all places that use hardcode model id and old model in async_trait are updated.
 
 --

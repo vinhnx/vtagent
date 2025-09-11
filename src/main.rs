@@ -8,14 +8,38 @@ use console::style;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use vtagent_core::cli::args::{Cli, Commands};
-use vtagent_core::config::{ConfigManager, VTAgentConfig};
+use vtagent_core::config::constants::{models, prompts};
 use vtagent_core::config::models::{ModelId, Provider};
-use vtagent_core::config::constants::models;
-use vtagent_core::llm::{make_client, AnyClient};
-use vtagent_core::llm::factory::create_provider_with_config;
-use vtagent_core::llm::provider::{LLMProvider, LLMRequest, Message, MessageRole};
+use vtagent_core::config::{ConfigManager, VTAgentConfig};
 use vtagent_core::core::agent::integration::MultiAgentSystem;
 use vtagent_core::core::agent::multi_agent::{AgentType, MultiAgentConfig};
+use vtagent_core::llm::factory::create_provider_with_config;
+use vtagent_core::llm::provider::{LLMProvider, LLMRequest, Message, MessageRole};
+use vtagent_core::llm::{AnyClient, make_client};
+
+/// Load system prompt from configuration or default path
+fn load_system_prompt(_config: &VTAgentConfig) -> Result<String> {
+    use std::fs;
+
+    // Note: VTAgentConfig doesn't have prompts section yet, so use default for now
+    let path = prompts::DEFAULT_SYSTEM_PROMPT_PATH;
+
+    match fs::read_to_string(path) {
+        Ok(content) => Ok(content),
+        Err(_) => {
+            // If the file doesn't exist, return a simple fallback prompt with helpful error
+            eprintln!(
+                "Warning: Could not read system prompt from '{}'. Using fallback prompt.",
+                path
+            );
+            eprintln!(
+                "To customize: Create '{}' or configure [prompts].system in vtagent.toml",
+                path
+            );
+            Ok("You are a helpful coding assistant for the VTAgent Rust project with access to file operations.\n\nMANDATORY TOOL USAGE:\n- When user asks 'what is this project about' or similar: IMMEDIATELY call list_files to see project structure, then call read_file on README.md\n- When user asks about code or files: Use read_file to read the relevant files\n- When user asks about project structure: Use list_files first\n\nTOOL CALL FORMAT: Always respond with a function call when you need to use tools. Do not give text responses for project questions without using tools first.\n\nAvailable tools:\n- list_files: List files and directories\n- read_file: Read file contents\n- rp_search: Search for patterns in code\n- run_terminal_cmd: Execute terminal commands".to_string())
+        }
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -50,7 +74,10 @@ async fn main() -> Result<()> {
             println!("Performance command - Display performance metrics");
         }
         Some(Commands::CreateProject { name, features }) => {
-            println!("CreateProject command - Name: {}, Features: {:?}", name, features);
+            println!(
+                "CreateProject command - Name: {}, Features: {:?}",
+                name, features
+            );
         }
         Some(Commands::CompressContext) => {
             println!("CompressContext command - Compress conversation context");
@@ -83,12 +110,11 @@ async fn handle_chat_command(_args: &Cli) -> Result<()> {
     println!("VT Agent - Interactive AI Coding Assistant");
 
     // Determine workspace
-    let workspace = std::env::current_dir()
-        .context("Failed to determine current directory")?;
+    let workspace = std::env::current_dir().context("Failed to determine current directory")?;
 
     // Load configuration
-    let config_manager = ConfigManager::load_from_workspace(&workspace)
-        .context("Failed to load configuration")?;
+    let config_manager =
+        ConfigManager::load_from_workspace(&workspace).context("Failed to load configuration")?;
     let vtagent_config = config_manager.config();
 
     // Get model from config or use default
@@ -96,8 +122,8 @@ async fn handle_chat_command(_args: &Cli) -> Result<()> {
     let provider = &vtagent_config.agent.provider;
 
     // For LMStudio, use the correct model name
-    if provider.eq_ignore_ascii_case("lmstudio") && model_str == "local-model" {
-        model_str = "qwen/qwen3-4b-2507".to_string();
+    if provider.eq_ignore_ascii_case("lmstudio") && model_str == models::LMSTUDIO_LOCAL {
+        model_str = models::LMSTUDIO_QWEN_30B_A3B_2507.to_string();
     }
 
     // Validate configuration
@@ -112,12 +138,14 @@ async fn handle_chat_command(_args: &Cli) -> Result<()> {
     // Check if multi-agent is enabled
     if vtagent_config.multi_agent.enabled {
         println!("{}", style("Multi-agent mode enabled").green().bold());
-        handle_multi_agent_chat(&model_str, &workspace, &vtagent_config).await
+        handle_multi_agent_chat(&model_str, &workspace, &vtagent_config)
+            .await
             .context("Multi-agent chat failed")?;
     } else {
         println!("{}", style("Single agent mode").cyan());
         // For Gemini and other providers, use the single-agent chat with tools
-        handle_single_agent_chat(&model_str, provider, &vtagent_config).await
+        handle_single_agent_chat(&model_str, provider, &vtagent_config)
+            .await
             .context("Single agent chat failed")?;
     }
 
@@ -125,13 +153,18 @@ async fn handle_chat_command(_args: &Cli) -> Result<()> {
 }
 
 /// Handle single agent chat mode
-async fn handle_single_agent_chat(model_str: &str, provider: &str, config: &VTAgentConfig) -> Result<()> {
+async fn handle_single_agent_chat(
+    model_str: &str,
+    provider: &str,
+    config: &VTAgentConfig,
+) -> Result<()> {
     use vtagent_core::llm::provider::ToolDefinition;
 
     println!("DEBUG: Entered handle_single_agent_chat function");
 
     // Initialize tool registry and function declarations
-    let mut tool_registry = vtagent_core::tools::ToolRegistry::new(std::env::current_dir().unwrap_or_default());
+    let mut tool_registry =
+        vtagent_core::tools::ToolRegistry::new(std::env::current_dir().unwrap_or_default());
     tool_registry.initialize_async().await?;
     let function_declarations = vtagent_core::tools::build_function_declarations();
 
@@ -145,14 +178,18 @@ async fn handle_single_agent_chat(model_str: &str, provider: &str, config: &VTAg
         })
         .collect();
 
-    println!("DEBUG: Available tools: {:?}", tool_definitions.iter().map(|t| &t.name).collect::<Vec<_>>());
+    println!(
+        "DEBUG: Available tools: {:?}",
+        tool_definitions.iter().map(|t| &t.name).collect::<Vec<_>>()
+    );
 
     // For LMStudio, use the correct model name
-    let model_str = if provider.eq_ignore_ascii_case("lmstudio") && model_str == "local-model" {
-        "qwen/qwen3-2507"
-    } else {
-        model_str
-    };
+    let model_str =
+        if provider.eq_ignore_ascii_case("lmstudio") && model_str == models::LMSTUDIO_LOCAL {
+            models::LMSTUDIO_QWEN_30B_A3B_2507
+        } else {
+            model_str
+        };
 
     // Get API key from environment
     let api_key = if config.agent.provider.eq_ignore_ascii_case("lmstudio") {
@@ -165,18 +202,20 @@ async fn handle_single_agent_chat(model_str: &str, provider: &str, config: &VTAg
             })
             .unwrap_or_default()
     } else {
-        std::env::var(&config.agent.api_key_env)
-            .unwrap_or_else(|_| {
-                eprintln!("Warning: {} environment variable not set", config.agent.api_key_env);
-                String::new()
-            })
+        std::env::var(&config.agent.api_key_env).unwrap_or_else(|_| {
+            eprintln!(
+                "Warning: {} environment variable not set",
+                config.agent.api_key_env
+            );
+            String::new()
+        })
     };
 
     // Create client based on provider
     let client: Box<dyn LLMProvider> = if provider.eq_ignore_ascii_case("lmstudio") {
         // For LMStudio, use the correct model name
-        let actual_model = if model_str == "local-model" {
-            "qwen/qwen3-2507".to_string()
+        let actual_model = if model_str == models::LMSTUDIO_LOCAL {
+            models::LMSTUDIO_QWEN_30B_A3B_2507.to_string()
         } else {
             model_str.to_string()
         };
@@ -186,7 +225,8 @@ async fn handle_single_agent_chat(model_str: &str, provider: &str, config: &VTAg
             Some(api_key),
             Some("http://localhost:1234/v1".to_string()),
             Some(actual_model),
-        ).context("Failed to create LMStudio provider")?;
+        )
+        .context("Failed to create LMStudio provider")?;
 
         client_result
     } else {
@@ -198,38 +238,42 @@ async fn handle_single_agent_chat(model_str: &str, provider: &str, config: &VTAg
                 Some(api_key),
                 None, // Gemini doesn't need a base URL
                 Some(model_str.to_string()),
-            ).context("Failed to create Gemini provider")?;
+            )
+            .context("Failed to create Gemini provider")?;
             client_result
         } else {
             // For other providers, we use the model-based approach
-            let model_id = model_str.parse::<ModelId>()
+            let model_id = model_str
+                .parse::<ModelId>()
                 .map_err(|_| anyhow::anyhow!("Invalid model: {}", model_str))?;
             let any_client: AnyClient = make_client(api_key, model_id);
             // We'll use the simple prompt-based approach for other providers for now
             // In a full implementation, we'd want to handle each provider properly
-            return handle_simple_prompt_chat(any_client).await
+            return handle_simple_prompt_chat(any_client)
+                .await
                 .context("Simple prompt chat failed");
         }
     };
 
+    // Load system prompt from configuration or default path
+    let system_prompt = load_system_prompt(config)?;
+
     // Initialize conversation history
-    let mut conversation_history = vec![
-        Message {
-            role: MessageRole::System,
-            content: "You are a helpful coding assistant for the VTAgent Rust project with access to file operations.\n\nMANDATORY TOOL USAGE:\n- When user asks 'what is this project about' or similar: IMMEDIATELY call list_files to see project structure, then call read_file on README.md\n- When user asks about code or files: Use read_file to read the relevant files\n- When user asks about project structure: Use list_files first\n\nTOOL CALL FORMAT: Always respond with a function call when you need to use tools. Do not give text responses for project questions without using tools first.\n\nAvailable tools:\n- list_files: List files and directories\n- read_file: Read file contents\n- rp_search: Search for patterns in code\n- run_terminal_cmd: Execute terminal commands".to_string(),
-            tool_calls: None,
-            tool_call_id: None,
-        }
-    ];
+    let mut conversation_history = vec![Message {
+        role: MessageRole::System,
+        content: system_prompt,
+        tool_calls: None,
+        tool_call_id: None,
+    }];
 
     loop {
         println!("DEBUG: Starting input loop iteration");
         print!("> ");
-        io::stdout().flush()
-            .context("Failed to flush stdout")?;
+        io::stdout().flush().context("Failed to flush stdout")?;
 
         let mut input = String::new();
-        let bytes_read = io::stdin().read_line(&mut input)
+        let bytes_read = io::stdin()
+            .read_line(&mut input)
             .context("Failed to read input")?;
 
         // Check for EOF (when piping input)
@@ -259,12 +303,15 @@ async fn handle_single_agent_chat(model_str: &str, provider: &str, config: &VTAg
         });
 
         // Auto-gather context for project questions
-        let is_project_question = input.to_lowercase().contains("project") ||
-                                 input.to_lowercase().contains("what is this") ||
-                                 input.to_lowercase().contains("readme") ||
-                                 input.to_lowercase().contains("about");
+        let is_project_question = input.to_lowercase().contains("project")
+            || input.to_lowercase().contains("what is this")
+            || input.to_lowercase().contains("readme")
+            || input.to_lowercase().contains("about");
 
-        println!("DEBUG: Input: '{}', Is project question: {}", input, is_project_question);
+        println!(
+            "DEBUG: Input: '{}', Is project question: {}",
+            input, is_project_question
+        );
 
         if is_project_question {
             println!("{}: Gathering project context...", style("Context").green());
@@ -272,7 +319,10 @@ async fn handle_single_agent_chat(model_str: &str, provider: &str, config: &VTAg
             let mut context_parts = Vec::new();
 
             // Try to read README.md
-            match tool_registry.execute_tool("read_file", serde_json::json!({"path": "README.md"})).await {
+            match tool_registry
+                .execute_tool("read_file", serde_json::json!({"path": "README.md"}))
+                .await
+            {
                 Ok(result) => {
                     println!("{}: Found README.md", style("✅").green());
                     context_parts.push(format!("README.md contents:\n{}", result));
@@ -283,7 +333,10 @@ async fn handle_single_agent_chat(model_str: &str, provider: &str, config: &VTAg
             }
 
             // Try to list files in root directory
-            match tool_registry.execute_tool("list_files", serde_json::json!({"path": "."})).await {
+            match tool_registry
+                .execute_tool("list_files", serde_json::json!({"path": "."}))
+                .await
+            {
                 Ok(result) => {
                     println!("{}: Listed project files", style("✅").green());
                     context_parts.push(format!("Project structure:\n{}", result));
@@ -296,8 +349,14 @@ async fn handle_single_agent_chat(model_str: &str, provider: &str, config: &VTAg
             // Add context to the user message
             if !context_parts.is_empty() {
                 let context = context_parts.join("\n\n");
-                let user_message = format!("Question: {}\n\nProject Context:\n{}\n\nPlease answer the question based on the project context provided above.", input, context);
-                println!("DEBUG: Sending message with context (length: {} chars)", user_message.len());
+                let user_message = format!(
+                    "Question: {}\n\nProject Context:\n{}\n\nPlease answer the question based on the project context provided above.",
+                    input, context
+                );
+                println!(
+                    "DEBUG: Sending message with context (length: {} chars)",
+                    user_message.len()
+                );
                 conversation_history.push(Message {
                     role: MessageRole::User,
                     content: user_message,
@@ -339,15 +398,31 @@ async fn handle_single_agent_chat(model_str: &str, provider: &str, config: &VTAg
             Ok(response) => {
                 // Handle tool calls first
                 if let Some(tool_calls) = &response.tool_calls {
-                    println!("{}: Executing {} tool call(s)", style("Tool").blue().bold(), tool_calls.len());
+                    println!(
+                        "{}: Executing {} tool call(s)",
+                        style("Tool").blue().bold(),
+                        tool_calls.len()
+                    );
 
                     for tool_call in tool_calls {
-                        println!("{}: Calling tool: {} with args: {}", style("TOOL").cyan(), tool_call.name, tool_call.arguments);
+                        println!(
+                            "{}: Calling tool: {} with args: {}",
+                            style("TOOL").cyan(),
+                            tool_call.name,
+                            tool_call.arguments
+                        );
 
                         // Execute the tool
-                        match tool_registry.execute_tool(&tool_call.name, tool_call.arguments.clone()).await {
+                        match tool_registry
+                            .execute_tool(&tool_call.name, tool_call.arguments.clone())
+                            .await
+                        {
                             Ok(result) => {
-                                println!("{}: Tool {} executed successfully", style("✅").green(), tool_call.name);
+                                println!(
+                                    "{}: Tool {} executed successfully",
+                                    style("✅").green(),
+                                    tool_call.name
+                                );
 
                                 // Add tool result to conversation
                                 conversation_history.push(Message {
@@ -358,7 +433,12 @@ async fn handle_single_agent_chat(model_str: &str, provider: &str, config: &VTAg
                                 });
                             }
                             Err(e) => {
-                                println!("{}: Tool {} failed: {}", style("❌").red(), tool_call.name, e);
+                                println!(
+                                    "{}: Tool {} failed: {}",
+                                    style("❌").red(),
+                                    tool_call.name,
+                                    e
+                                );
 
                                 // Add error result to conversation
                                 conversation_history.push(Message {
@@ -396,7 +476,11 @@ async fn handle_single_agent_chat(model_str: &str, provider: &str, config: &VTAg
                             }
                         }
                         Err(e) => {
-                            eprintln!("{}: Error in follow-up request: {:?}", style("Error").red(), e);
+                            eprintln!(
+                                "{}: Error in follow-up request: {:?}",
+                                style("Error").red(),
+                                e
+                            );
                         }
                     }
                 } else if let Some(content) = response.content {
@@ -422,20 +506,22 @@ async fn handle_single_agent_chat(model_str: &str, provider: &str, config: &VTAg
     Ok(())
 }
 
-/// Handle simple prompt-based chat for non-LMStudio providers
+/// Handle simple prompt-based chat for non-LMStudio providers  
 async fn handle_simple_prompt_chat(mut client: AnyClient) -> Result<()> {
+    // Load system prompt - we don't have config here, so use a simple fallback
+    let system_prompt = std::fs::read_to_string(prompts::DEFAULT_SYSTEM_PROMPT_PATH)
+        .unwrap_or_else(|_| "You are a helpful coding assistant. You can help with programming tasks, code analysis, and file operations.".to_string());
+
     // Initialize conversation history
-    let mut conversation_history = vec![
-        "You are a helpful coding assistant. You can help with programming tasks, code analysis, and file operations.".to_string()
-    ];
+    let mut conversation_history = vec![system_prompt];
 
     loop {
         print!("> ");
-        io::stdout().flush()
-            .context("Failed to flush stdout")?;
+        io::stdout().flush().context("Failed to flush stdout")?;
 
         let mut input = String::new();
-        let bytes_read = io::stdin().read_line(&mut input)
+        let bytes_read = io::stdin()
+            .read_line(&mut input)
             .context("Failed to read input")?;
 
         // Check for EOF (when piping input)
@@ -477,16 +563,24 @@ async fn handle_simple_prompt_chat(mut client: AnyClient) -> Result<()> {
 }
 
 /// Handle multi-agent chat mode
-async fn handle_multi_agent_chat(model_str: &str, workspace: &PathBuf, config: &VTAgentConfig) -> Result<()> {
+async fn handle_multi_agent_chat(
+    model_str: &str,
+    workspace: &PathBuf,
+    config: &VTAgentConfig,
+) -> Result<()> {
     // Determine if we need to use fallback models for multi-agent
-    let (orchestrator_model, subagent_model) = if config.agent.provider.eq_ignore_ascii_case("lmstudio") {
-        // LMStudio now supports multi-agent mode with local models
-        eprintln!("Info: Using LMStudio local models for multi-agent system.");
-        // Use the actual model name that works with LMStudio
-        ("qwen/qwen3-2507".to_string(), "qwen/qwen3-2507".to_string())
-    } else {
-        (model_str.to_string(), model_str.to_string())
-    };
+    let (orchestrator_model, subagent_model) =
+        if config.agent.provider.eq_ignore_ascii_case("lmstudio") {
+            // LMStudio now supports multi-agent mode with local models
+            eprintln!("Info: Using LMStudio local models for multi-agent system.");
+            // Use the actual model name that works with LMStudio
+            (
+                models::LMSTUDIO_QWEN_30B_A3B_2507.to_string(),
+                models::LMSTUDIO_QWEN_30B_A3B_2507.to_string(),
+            )
+        } else {
+            (model_str.to_string(), model_str.to_string())
+        };
 
     // Create multi-agent configuration
     let multi_config = if config.agent.provider.eq_ignore_ascii_case("lmstudio") {
@@ -532,24 +626,27 @@ async fn handle_multi_agent_chat(model_str: &str, workspace: &PathBuf, config: &
             })
             .unwrap_or_default()
     } else {
-        std::env::var(&config.agent.api_key_env)
-            .unwrap_or_else(|_| {
-                eprintln!("Warning: {} environment variable not set", config.agent.api_key_env);
-                String::new()
-            })
+        std::env::var(&config.agent.api_key_env).unwrap_or_else(|_| {
+            eprintln!(
+                "Warning: {} environment variable not set",
+                config.agent.api_key_env
+            );
+            String::new()
+        })
     };
 
     // Create multi-agent system
-    let mut system = MultiAgentSystem::new(multi_config, api_key, workspace.clone()).await
+    let mut system = MultiAgentSystem::new(multi_config, api_key, workspace.clone())
+        .await
         .context("Failed to initialize multi-agent system")?;
 
     loop {
         print!("> ");
-        io::stdout().flush()
-            .context("Failed to flush stdout")?;
+        io::stdout().flush().context("Failed to flush stdout")?;
 
         let mut input = String::new();
-        let bytes_read = io::stdin().read_line(&mut input)
+        let bytes_read = io::stdin()
+            .read_line(&mut input)
             .context("Failed to read input")?;
 
         // Check for EOF (when piping input)
@@ -569,11 +666,10 @@ async fn handle_multi_agent_chat(model_str: &str, workspace: &PathBuf, config: &
         }
 
         // Execute task with multi-agent system
-        match system.execute_task_optimized(
-            "User Task".to_string(),
-            input.to_string(),
-            AgentType::Coder,
-        ).await {
+        match system
+            .execute_task_optimized("User Task".to_string(), input.to_string(), AgentType::Coder)
+            .await
+        {
             Ok(task_result) => {
                 println!("{}", task_result.results.summary);
             }
@@ -584,7 +680,9 @@ async fn handle_multi_agent_chat(model_str: &str, workspace: &PathBuf, config: &
     }
 
     // Shutdown system
-    system.shutdown().await
+    system
+        .shutdown()
+        .await
         .context("Failed to shutdown multi-agent system")?;
 
     Ok(())

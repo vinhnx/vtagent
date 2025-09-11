@@ -84,7 +84,12 @@ impl AdvancedSearchTool {
     }
 
     /// Perform regex-based search
-    async fn regex_search(&self, pattern: &str, path: &str, options: &SearchOptions) -> Result<Vec<Value>> {
+    async fn regex_search(
+        &self,
+        pattern: &str,
+        path: &str,
+        options: &SearchOptions,
+    ) -> Result<Vec<Value>> {
         let regex_flags = if options.case_sensitive { "" } else { "(?i)" };
         let regex_pattern = if options.whole_word {
             format!(r"{}\b{}\b", regex_flags, regex::escape(pattern))
@@ -92,19 +97,25 @@ impl AdvancedSearchTool {
             format!(r"{}{}", regex_flags, pattern)
         };
 
-        let regex = Regex::new(&regex_pattern)
-            .map_err(|e| anyhow!("Invalid regex pattern: {}", e))?;
+        let regex =
+            Regex::new(&regex_pattern).map_err(|e| anyhow!("Invalid regex pattern: {}", e))?;
 
         let mut results = Vec::new();
         let search_path = self.workspace_root.join(path);
 
-        self.search_files_recursive(&search_path, &regex, options, &mut results).await?;
+        self.search_files_recursive(&search_path, &regex, options, &mut results)
+            .await?;
 
         Ok(results)
     }
 
     /// Perform pattern-based search
-    async fn pattern_search(&self, pattern: &str, path: &str, options: &SearchOptions) -> Result<Vec<Value>> {
+    async fn pattern_search(
+        &self,
+        pattern: &str,
+        path: &str,
+        options: &SearchOptions,
+    ) -> Result<Vec<Value>> {
         let search_pattern = if options.whole_word {
             format!(r"\b{}\b", regex::escape(pattern))
         } else {
@@ -114,13 +125,14 @@ impl AdvancedSearchTool {
         let regex_flags = if options.case_sensitive { "" } else { "(?i)" };
         let regex_pattern = format!(r"{}{}", regex_flags, search_pattern);
 
-        let regex = Regex::new(&regex_pattern)
-            .map_err(|e| anyhow!("Invalid search pattern: {}", e))?;
+        let regex =
+            Regex::new(&regex_pattern).map_err(|e| anyhow!("Invalid search pattern: {}", e))?;
 
         let mut results = Vec::new();
         let search_path = self.workspace_root.join(path);
 
-        self.search_files_recursive(&search_path, &regex, options, &mut results).await?;
+        self.search_files_recursive(&search_path, &regex, options, &mut results)
+            .await?;
 
         Ok(results)
     }
@@ -143,17 +155,23 @@ impl AdvancedSearchTool {
             let path = entry.path();
 
             // Skip hidden files unless explicitly included
-            if !options.include_hidden && path.file_name()
-                .and_then(|n| n.to_str())
-                .map(|n| n.starts_with('.'))
-                .unwrap_or(false) {
+            if !options.include_hidden
+                && path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|n| n.starts_with('.'))
+                    .unwrap_or(false)
+            {
                 continue;
             }
 
             if path.is_dir() {
                 // Skip common directories that shouldn't be searched
                 if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
-                    if matches!(dir_name, "node_modules" | ".git" | "target" | "__pycache__" | ".next") {
+                    if matches!(
+                        dir_name,
+                        "node_modules" | ".git" | "target" | "__pycache__" | ".next"
+                    ) {
                         continue;
                     }
                 }
@@ -286,9 +304,10 @@ impl AdvancedSearchTool {
                 .into_iter()
                 .filter(|result| {
                     if let Some(file) = result.get("file").and_then(|f| f.as_str()) {
-                        !options.exclude_patterns.iter().any(|pattern| {
-                            self.matches_glob_pattern(file, pattern)
-                        })
+                        !options
+                            .exclude_patterns
+                            .iter()
+                            .any(|pattern| self.matches_glob_pattern(file, pattern))
                     } else {
                         true
                     }
@@ -328,7 +347,12 @@ impl AdvancedSearchTool {
     }
 
     /// Search for multiple terms with case-insensitive matching
-    pub async fn multi_term_search(&self, terms: &[String], path: &str, require_all: bool) -> Result<Value> {
+    pub async fn multi_term_search(
+        &self,
+        terms: &[String],
+        path: &str,
+        require_all: bool,
+    ) -> Result<Value> {
         let mut all_results = Vec::new();
         let mut term_matches = HashMap::new();
 
@@ -369,7 +393,10 @@ impl AdvancedSearchTool {
         // Group results by file
         for result in results {
             if let Some(file) = result.get("file").and_then(|f| f.as_str()) {
-                file_groups.entry(file.to_string()).or_insert_with(Vec::new).push(result);
+                file_groups
+                    .entry(file.to_string())
+                    .or_insert_with(Vec::new)
+                    .push(result);
             }
         }
 
@@ -377,14 +404,16 @@ impl AdvancedSearchTool {
         file_groups
             .into_iter()
             .filter(|(_, file_results)| {
-                let _file_path = file_results.first()
+                let _file_path = file_results
+                    .first()
                     .and_then(|r| r.get("file"))
                     .and_then(|f| f.as_str())
                     .unwrap_or("");
 
                 terms.iter().all(|term| {
                     file_results.iter().any(|result| {
-                        result.get("content")
+                        result
+                            .get("content")
                             .and_then(|c| c.as_str())
                             .map(|content| {
                                 if term_matches.contains_key(term) {
@@ -436,10 +465,7 @@ impl Tool for AdvancedSearchTool {
             .and_then(|q| q.as_str())
             .ok_or_else(|| anyhow!("Missing query parameter"))?;
 
-        let path = args
-            .get("path")
-            .and_then(|p| p.as_str())
-            .unwrap_or(".");
+        let path = args.get("path").and_then(|p| p.as_str()).unwrap_or(".");
 
         let options = SearchOptions {
             case_sensitive: args
@@ -450,10 +476,7 @@ impl Tool for AdvancedSearchTool {
                 .get("whole_word")
                 .and_then(|w| w.as_bool())
                 .unwrap_or(false),
-            regex: args
-                .get("regex")
-                .and_then(|r| r.as_bool())
-                .unwrap_or(false),
+            regex: args.get("regex").and_then(|r| r.as_bool()).unwrap_or(false),
             include_hidden: args
                 .get("include_hidden")
                 .and_then(|h| h.as_bool())
@@ -503,7 +526,9 @@ mod tests {
 
         // Create test file
         let test_file = workspace_root.join("test.txt");
-        tokio::fs::write(&test_file, "Hello World\nHELLO world\nhello WORLD").await.unwrap();
+        tokio::fs::write(&test_file, "Hello World\nHELLO world\nhello WORLD")
+            .await
+            .unwrap();
 
         let rp_search = Arc::new(RpSearchManager::new(workspace_root.clone()));
         let search_tool = AdvancedSearchTool::new(workspace_root, rp_search);
@@ -526,7 +551,9 @@ mod tests {
 
         // Create test file
         let test_file = workspace_root.join("test.txt");
-        tokio::fs::write(&test_file, "hello world\nhelloworld\nhello-world").await.unwrap();
+        tokio::fs::write(&test_file, "hello world\nhelloworld\nhello-world")
+            .await
+            .unwrap();
 
         let rp_search = Arc::new(RpSearchManager::new(workspace_root.clone()));
         let search_tool = AdvancedSearchTool::new(workspace_root, rp_search);

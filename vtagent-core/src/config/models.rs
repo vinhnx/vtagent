@@ -34,7 +34,12 @@ impl Provider {
 
     /// Get all supported providers
     pub fn all_providers() -> Vec<Provider> {
-        vec![Provider::Gemini, Provider::OpenAI, Provider::Anthropic, Provider::LMStudio]
+        vec![
+            Provider::Gemini,
+            Provider::OpenAI,
+            Provider::Anthropic,
+            Provider::LMStudio,
+        ]
     }
 }
 
@@ -261,7 +266,11 @@ impl ModelId {
     pub fn is_top_tier(&self) -> bool {
         matches!(
             self,
-            ModelId::Gemini25Pro | ModelId::GPT5 | ModelId::ClaudeSonnet4 | ModelId::ClaudeOpus41 | ModelId::LMStudioLocal
+            ModelId::Gemini25Pro
+                | ModelId::GPT5
+                | ModelId::ClaudeSonnet4
+                | ModelId::ClaudeOpus41
+                | ModelId::LMStudioLocal
         )
     }
 

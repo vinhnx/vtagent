@@ -4,13 +4,13 @@
 //! It provides a centralized way to manage agent policies, tool permissions, and
 //! command allow lists.
 
+pub mod constants;
 pub mod core;
 pub mod defaults;
 pub mod loader;
 pub mod models;
 pub mod multi_agent;
 pub mod types;
-pub mod constants;
 
 // Re-export main types for backward compatibility
 pub use core::{AgentConfig, CommandsConfig, SecurityConfig, ToolPolicy, ToolsConfig};

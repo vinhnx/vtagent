@@ -1,8 +1,8 @@
 //! Analyze command implementation - workspace analysis
 
+use crate::config::types::{AgentConfig, AnalysisDepth, OutputFormat};
 use crate::tools::ToolRegistry;
 use crate::tools::tree_sitter::{CodeAnalyzer, TreeSitterAnalyzer};
-use crate::config::types::{AgentConfig, AnalysisDepth, OutputFormat};
 use anyhow::Result;
 use console::style;
 use serde_json::json;

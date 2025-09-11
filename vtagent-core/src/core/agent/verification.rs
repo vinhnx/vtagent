@@ -3,8 +3,8 @@
 //! This module provides verification mechanisms to ensure task results meet quality standards
 //! before being accepted by the orchestrator.
 
-use crate::core::agent::multi_agent::{AgentType, Task, TaskResults};
 use crate::config::models::ModelId;
+use crate::core::agent::multi_agent::{AgentType, Task, TaskResults};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

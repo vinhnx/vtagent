@@ -1,15 +1,15 @@
 //! End-to-end test for LMStudio with Qwen model
-//! 
+//!
 //! This test validates that the agent loop works correctly with LMStudio
 //! using the Qwen/qwen3-1.7b model.
 
-use vtagent_core::core::agent::integration::MultiAgentSystem;
-use vtagent_core::core::agent::multi_agent::{AgentType, MultiAgentConfig};
-use vtagent_core::config::models::ModelId;
-use vtagent_core::llm::factory::{LLMFactory, ProviderConfig};
+use anyhow::Result;
 use std::path::PathBuf;
 use std::time::Duration;
-use anyhow::Result;
+use vtagent_core::config::models::ModelId;
+use vtagent_core::core::agent::integration::MultiAgentSystem;
+use vtagent_core::core::agent::multi_agent::{AgentType, MultiAgentConfig};
+use vtagent_core::llm::factory::{LLMFactory, ProviderConfig};
 
 #[tokio::test]
 async fn test_lmstudio_qwen_agent_loop() -> Result<()> {
@@ -42,7 +42,7 @@ async fn test_lmstudio_qwen_agent_loop() -> Result<()> {
     let workspace = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
     println!("Creating MultiAgentSystem with Qwen model...");
-    
+
     // Create multi-agent system
     let mut system = MultiAgentSystem::new(config, api_key, workspace).await?;
 
@@ -65,7 +65,7 @@ async fn test_lmstudio_qwen_agent_loop() -> Result<()> {
             println!("Execution time: {:?}", task_result.execution_time);
             println!("Agent used: {}", task_result.agent_used);
             println!("Response: {}", task_result.results.summary);
-            
+
             // Verify the response is not empty
             assert!(!task_result.results.summary.trim().is_empty());
             assert!(task_result.results.summary.len() > 10); // Minimum reasonable response
@@ -92,13 +92,13 @@ async fn test_lmstudio_qwen_agent_loop() -> Result<()> {
             println!("Task ID: {}", task_result.task_id);
             println!("Execution time: {:?}", task_result.execution_time);
             println!("Response: {}", task_result.results.summary);
-            
+
             // Verify the response contains Python code
             let response_lower = task_result.results.summary.to_lowercase();
             assert!(
-                response_lower.contains("def ") || 
-                response_lower.contains("def") ||
-                response_lower.contains("function"),
+                response_lower.contains("def ")
+                    || response_lower.contains("def")
+                    || response_lower.contains("function"),
                 "Response should contain function definition"
             );
         }
@@ -123,14 +123,15 @@ async fn test_lmstudio_qwen_agent_loop() -> Result<()> {
             println!("✅ Explanation task completed successfully!");
             println!("Task ID: {}", task_result.task_id);
             println!("Execution time: {:?}", task_result.execution_time);
-            println!("Response preview: {}", 
+            println!(
+                "Response preview: {}",
                 if task_result.results.summary.len() > 200 {
                     format!("{}...", &task_result.results.summary[..200])
                 } else {
                     task_result.results.summary.clone()
                 }
             );
-            
+
             // Verify the response is substantial
             assert!(!task_result.results.summary.trim().is_empty());
             assert!(task_result.results.summary.len() > 50); // Minimum reasonable explanation
@@ -160,10 +161,10 @@ async fn test_lmstudio_qwen_agent_loop() -> Result<()> {
 /// Check if LMStudio is running by attempting to connect to its API
 async fn is_lmstudio_running() -> bool {
     use reqwest::Client;
-    
+
     let client = Client::new();
     let url = "http://localhost:1234/v1/models";
-    
+
     match client.get(url).send().await {
         Ok(response) => response.status().is_success(),
         Err(_) => false,
@@ -173,15 +174,15 @@ async fn is_lmstudio_running() -> bool {
 /// Test LMStudio provider creation and basic functionality
 #[test]
 fn test_lmstudio_provider_creation() {
-    use vtagent_core::llm::llm_modular::providers::LMStudioProvider;
     use vtagent_core::llm::client::LLMClient;
+    use vtagent_core::llm::llm_modular::providers::LMStudioProvider;
     use vtagent_core::llm::types::BackendKind;
-    
+
     let provider = LMStudioProvider::local("qwen/qwen3-1.7b".to_string());
-    
+
     assert_eq!(provider.backend_kind(), BackendKind::LMStudio);
     assert_eq!(provider.model_id(), "qwen/qwen3-1.7b");
-    
+
     println!("✅ LMStudio provider created successfully");
 }
 
@@ -207,7 +208,7 @@ async fn test_lmstudio_multisystem_creation() -> Result<()> {
 
     // This should succeed without errors
     let system = MultiAgentSystem::new(config, api_key, workspace).await?;
-    
+
     println!("✅ MultiAgentSystem with LMStudio created successfully");
     Ok(())
 }

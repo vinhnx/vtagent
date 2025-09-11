@@ -1,6 +1,5 @@
 use crate::llm::provider::{
-    FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, MessageRole, ToolCall,
-    Usage,
+    FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, MessageRole, ToolCall, Usage,
 };
 use async_trait::async_trait;
 use reqwest::Client as HttpClient;
@@ -116,16 +115,18 @@ impl OpenRouterProvider {
         let choices = response_json
             .get("choices")
             .and_then(|c| c.as_array())
-            .ok_or_else(|| LLMError::Provider("Invalid response format: missing choices".to_string()))?;
+            .ok_or_else(|| {
+                LLMError::Provider("Invalid response format: missing choices".to_string())
+            })?;
 
         if choices.is_empty() {
             return Err(LLMError::Provider("No choices in response".to_string()));
         }
 
         let choice = &choices[0];
-        let message = choice
-            .get("message")
-            .ok_or_else(|| LLMError::Provider("Invalid response format: missing message".to_string()))?;
+        let message = choice.get("message").ok_or_else(|| {
+            LLMError::Provider("Invalid response format: missing message".to_string())
+        })?;
 
         let content = message
             .get("content")
@@ -142,11 +143,7 @@ impl OpenRouterProvider {
                     .filter_map(|call| {
                         Some(ToolCall {
                             id: call.get("id")?.as_str()?.to_string(),
-                            name: call
-                                .get("function")?
-                                .get("name")?
-                                .as_str()?
-                                .to_string(),
+                            name: call.get("function")?.get("name")?.as_str()?.to_string(),
                             arguments: call
                                 .get("function")
                                 .and_then(|f| f.get("arguments"))
@@ -171,22 +168,20 @@ impl OpenRouterProvider {
             .unwrap_or(FinishReason::Stop);
 
         // Parse usage
-        let usage = response_json
-            .get("usage")
-            .map(|u| Usage {
-                prompt_tokens: u
-                    .get("prompt_tokens")
-                    .and_then(|pt| pt.as_u64())
-                    .unwrap_or(0) as u32,
-                completion_tokens: u
-                    .get("completion_tokens")
-                    .and_then(|ct| ct.as_u64())
-                    .unwrap_or(0) as u32,
-                total_tokens: u
-                    .get("total_tokens")
-                    .and_then(|tt| tt.as_u64())
-                    .unwrap_or(0) as u32,
-            });
+        let usage = response_json.get("usage").map(|u| Usage {
+            prompt_tokens: u
+                .get("prompt_tokens")
+                .and_then(|pt| pt.as_u64())
+                .unwrap_or(0) as u32,
+            completion_tokens: u
+                .get("completion_tokens")
+                .and_then(|ct| ct.as_u64())
+                .unwrap_or(0) as u32,
+            total_tokens: u
+                .get("total_tokens")
+                .and_then(|tt| tt.as_u64())
+                .unwrap_or(0) as u32,
+        });
 
         Ok(LLMResponse {
             content,
@@ -255,11 +250,15 @@ impl LLMProvider for OpenRouterProvider {
 
     fn validate_request(&self, request: &LLMRequest) -> Result<(), LLMError> {
         if request.messages.is_empty() {
-            return Err(LLMError::InvalidRequest("Messages cannot be empty".to_string()));
+            return Err(LLMError::InvalidRequest(
+                "Messages cannot be empty".to_string(),
+            ));
         }
 
         if request.model.is_empty() {
-            return Err(LLMError::InvalidRequest("Model cannot be empty".to_string()));
+            return Err(LLMError::InvalidRequest(
+                "Model cannot be empty".to_string(),
+            ));
         }
 
         // Validate model is supported

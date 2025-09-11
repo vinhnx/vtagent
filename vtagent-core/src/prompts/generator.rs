@@ -26,15 +26,20 @@ impl SystemPromptGenerator {
         }
 
         // Personality
-        prompt_parts.push(PromptTemplates::personality_prompt(&self.config.personality).to_string());
+        prompt_parts
+            .push(PromptTemplates::personality_prompt(&self.config.personality).to_string());
 
         // Response style
-        prompt_parts.push(PromptTemplates::response_style_prompt(&self.config.response_style).to_string());
+        prompt_parts
+            .push(PromptTemplates::response_style_prompt(&self.config.response_style).to_string());
 
         // Tool usage if enabled
         if self.config.include_tools && !self.context.available_tools.is_empty() {
             prompt_parts.push(PromptTemplates::tool_usage_prompt().to_string());
-            prompt_parts.push(format!("Available tools: {}", self.context.available_tools.join(", ")));
+            prompt_parts.push(format!(
+                "Available tools: {}",
+                self.context.available_tools.join(", ")
+            ));
         }
 
         // Workspace context if enabled
@@ -45,7 +50,10 @@ impl SystemPromptGenerator {
             }
 
             if !self.context.languages.is_empty() {
-                prompt_parts.push(format!("Detected languages: {}", self.context.languages.join(", ")));
+                prompt_parts.push(format!(
+                    "Detected languages: {}",
+                    self.context.languages.join(", ")
+                ));
             }
 
             if let Some(project_type) = &self.context.project_type {

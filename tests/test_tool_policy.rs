@@ -10,7 +10,7 @@
 //! tempfile = "3.0"
 //! ```
 
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use console::style;
 use dialoguer::Confirm;
 use serde::{Deserialize, Serialize};
@@ -67,7 +67,7 @@ impl ToolPolicyManager {
     /// Create a new tool policy manager with custom path for testing
     pub fn new_with_path(config_path: PathBuf) -> Result<Self> {
         let config = Self::load_or_create_config(&config_path)?;
-        
+
         Ok(Self {
             config_path,
             config,
@@ -77,11 +77,10 @@ impl ToolPolicyManager {
     /// Load existing config or create new one with all tools as "prompt"
     fn load_or_create_config(config_path: &PathBuf) -> Result<ToolPolicyConfig> {
         if config_path.exists() {
-            let content = fs::read_to_string(config_path)
-                .context("Failed to read tool policy config")?;
-            
-            serde_json::from_str(&content)
-                .context("Failed to parse tool policy config")
+            let content =
+                fs::read_to_string(config_path).context("Failed to read tool policy config")?;
+
+            serde_json::from_str(&content).context("Failed to parse tool policy config")
         } else {
             // Create new config with empty tools list
             let config = ToolPolicyConfig::default();
@@ -91,35 +90,43 @@ impl ToolPolicyManager {
 
     /// Update the tool list and save configuration
     pub fn update_available_tools(&mut self, tools: Vec<String>) -> Result<()> {
-        let current_tools: std::collections::HashSet<_> = self.config.available_tools.iter().collect();
+        let current_tools: std::collections::HashSet<_> =
+            self.config.available_tools.iter().collect();
         let new_tools: std::collections::HashSet<_> = tools.iter().collect();
 
         // Add new tools as "prompt"
         for tool in &tools {
             if !current_tools.contains(tool) {
-                self.config.policies.insert(tool.clone(), ToolPolicy::Prompt);
+                self.config
+                    .policies
+                    .insert(tool.clone(), ToolPolicy::Prompt);
             }
         }
 
         // Remove deleted tools
-        let tools_to_remove: Vec<_> = self.config.policies.keys()
+        let tools_to_remove: Vec<_> = self
+            .config
+            .policies
+            .keys()
             .filter(|tool| !new_tools.contains(tool))
             .cloned()
             .collect();
-        
+
         for tool in tools_to_remove {
             self.config.policies.remove(&tool);
         }
 
         // Update available tools list
         self.config.available_tools = tools;
-        
+
         self.save_config()
     }
 
     /// Get policy for a specific tool
     pub fn get_policy(&self, tool_name: &str) -> ToolPolicy {
-        self.config.policies.get(tool_name)
+        self.config
+            .policies
+            .get(tool_name)
             .cloned()
             .unwrap_or(ToolPolicy::Prompt)
     }
@@ -134,10 +141,9 @@ impl ToolPolicyManager {
     fn save_config(&self) -> Result<()> {
         let content = serde_json::to_string_pretty(&self.config)
             .context("Failed to serialize tool policy config")?;
-        
-        fs::write(&self.config_path, content)
-            .context("Failed to write tool policy config")?;
-        
+
+        fs::write(&self.config_path, content).context("Failed to write tool policy config")?;
+
         Ok(())
     }
 
@@ -171,22 +177,24 @@ impl ToolPolicyManager {
                     ("DENY", "red")
                 }
             };
-            
+
             let status_styled = match color_name {
                 "green" => style(status).green(),
                 "yellow" => style(status).yellow(),
                 "red" => style(status).red(),
                 _ => style(status),
             };
-            
-            println!("  {} {}", 
+
+            println!(
+                "  {} {}",
                 style(format!("{:15}", tool)).cyan(),
                 status_styled
             );
         }
 
         println!();
-        println!("Summary: {} allowed, {} prompt, {} denied", 
+        println!(
+            "Summary: {} allowed, {} prompt, {} denied",
             style(allow_count).green(),
             style(prompt_count).yellow(),
             style(deny_count).red()
@@ -249,12 +257,24 @@ fn main() -> Result<()> {
 
     // Test 5: Check policy retrieval
     println!("{}", style("Test 5: Policy retrieval").yellow());
-    println!("read_file policy: {:?}", policy_manager.get_policy("read_file"));
-    println!("list_files policy: {:?}", policy_manager.get_policy("list_files"));
-    println!("nonexistent_tool policy: {:?}", policy_manager.get_policy("nonexistent_tool"));
+    println!(
+        "read_file policy: {:?}",
+        policy_manager.get_policy("read_file")
+    );
+    println!(
+        "list_files policy: {:?}",
+        policy_manager.get_policy("list_files")
+    );
+    println!(
+        "nonexistent_tool policy: {:?}",
+        policy_manager.get_policy("nonexistent_tool")
+    );
     println!();
 
-    println!("{}", style("✓ All tests completed successfully!").green().bold());
+    println!(
+        "{}",
+        style("✓ All tests completed successfully!").green().bold()
+    );
     println!("The tool policy system is working correctly.");
     println!();
     println!("Key features demonstrated:");

@@ -1,9 +1,9 @@
+use crate::config::constants::models;
 use crate::llm::client::LLMClient;
 use crate::llm::provider::{
     FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
 };
 use crate::llm::types as llm_types;
-use crate::config::constants::models;
 use async_trait::async_trait;
 use reqwest::Client as HttpClient;
 use serde_json::{Value, json};
@@ -169,21 +169,20 @@ impl GeminiProvider {
 
     fn convert_from_gemini_format(&self, response: Value) -> Result<LLMResponse, LLMError> {
         // Debug: Log the response structure
-        println!("DEBUG: Gemini response structure: {}", serde_json::to_string_pretty(&response).unwrap_or_default());
+        println!(
+            "DEBUG: Gemini response structure: {}",
+            serde_json::to_string_pretty(&response).unwrap_or_default()
+        );
 
-        let candidates = response["candidates"]
-            .as_array()
-            .ok_or_else(|| {
-                println!("DEBUG: No candidates array in response");
-                LLMError::Provider("No candidates in response".to_string())
-            })?;
+        let candidates = response["candidates"].as_array().ok_or_else(|| {
+            println!("DEBUG: No candidates array in response");
+            LLMError::Provider("No candidates in response".to_string())
+        })?;
 
-        let candidate = candidates
-            .first()
-            .ok_or_else(|| {
-                println!("DEBUG: Candidates array is empty");
-                LLMError::Provider("No candidate in response".to_string())
-            })?;
+        let candidate = candidates.first().ok_or_else(|| {
+            println!("DEBUG: Candidates array is empty");
+            LLMError::Provider("No candidate in response".to_string())
+        })?;
 
         // Check if content exists and has parts
         if let Some(content) = candidate.get("content") {
@@ -287,7 +286,9 @@ impl LLMClient for GeminiProvider {
                             "model" => MessageRole::Assistant,
                             "system" => {
                                 // Extract system message
-                                let text = content.parts.iter()
+                                let text = content
+                                    .parts
+                                    .iter()
                                     .filter_map(|part| part.as_text())
                                     .collect::<Vec<_>>()
                                     .join("");
@@ -297,7 +298,9 @@ impl LLMClient for GeminiProvider {
                             _ => MessageRole::User, // Default to user
                         };
 
-                        let content_text = content.parts.iter()
+                        let content_text = content
+                            .parts
+                            .iter()
                             .filter_map(|part| part.as_text())
                             .collect::<Vec<_>>()
                             .join("");
@@ -328,12 +331,14 @@ impl LLMClient for GeminiProvider {
                         system_prompt,
                         tools,
                         model: models::GEMINI_2_5_FLASH.to_string(),
-                        max_tokens: gemini_request.generation_config
+                        max_tokens: gemini_request
+                            .generation_config
                             .as_ref()
                             .and_then(|config| config.get("maxOutputTokens"))
                             .and_then(|v| v.as_u64())
                             .map(|v| v as u32),
-                        temperature: gemini_request.generation_config
+                        temperature: gemini_request
+                            .generation_config
                             .as_ref()
                             .and_then(|config| config.get("temperature"))
                             .and_then(|v| v.as_f64())

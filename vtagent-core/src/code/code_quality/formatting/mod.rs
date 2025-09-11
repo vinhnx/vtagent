@@ -1,6 +1,6 @@
-pub mod rustfmt;
-pub mod prettier;
 pub mod black;
+pub mod prettier;
+pub mod rustfmt;
 
 use crate::code::code_quality::config::FormatConfig;
 use std::path::Path;
@@ -26,12 +26,12 @@ impl FormattingOrchestrator {
         let mut orchestrator = Self {
             configs: Vec::new(),
         };
-        
+
         // Register default formatters
         orchestrator.register(FormatConfig::rustfmt());
         orchestrator.register(FormatConfig::prettier());
         orchestrator.register(FormatConfig::black());
-        
+
         orchestrator
     }
 
@@ -57,12 +57,12 @@ impl FormattingOrchestrator {
     async fn run_formatter(&self, config: &FormatConfig, file_path: &Path) -> FormatResult {
         // Execute the actual formatting tool
         let mut cmd = Command::new(&config.command[0]);
-        
+
         // Add arguments
         for arg in &config.args {
             cmd.arg(arg);
         }
-        
+
         // Add the file path as the last argument
         cmd.arg(file_path);
 
@@ -85,14 +85,12 @@ impl FormattingOrchestrator {
                     }
                 }
             }
-            Err(e) => {
-                FormatResult {
-                    success: false,
-                    formatted_content: None,
-                    error_message: Some(format!("Failed to execute {}: {}", config.tool_name, e)),
-                    tool_used: config.tool_name.clone(),
-                }
-            }
+            Err(e) => FormatResult {
+                success: false,
+                formatted_content: None,
+                error_message: Some(format!("Failed to execute {}: {}", config.tool_name, e)),
+                tool_used: config.tool_name.clone(),
+            },
         }
     }
 }

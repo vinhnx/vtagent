@@ -52,30 +52,35 @@ pub mod utils;
 pub use cli::args::{Cli, Commands};
 pub use code::code_completion::{CompletionEngine, CompletionSuggestion};
 pub use commands::stats::handle_stats_command;
-pub use config::{AgentConfig, VTAgentConfig};
-pub use core::agent::core::Agent;
-pub use gemini::{Content, FunctionDeclaration, Part};
-pub use llm::{AnyClient, make_client};
-pub use core::performance_profiler::PerformanceProfiler;
-pub use core::timeout_detector::TimeoutDetector;
-pub use prompts::{
-    generate_lightweight_instruction, generate_specialized_instruction, generate_system_instruction,
-};
-pub use tools::rp_search::RpSearchManager;
-pub use tool_policy::{ToolPolicy, ToolPolicyManager};
-pub use tools::{ToolRegistry, build_function_declarations, build_function_declarations_for_level};
-pub use tools::tree_sitter::TreeSitterAnalyzer;
 pub use config::types::{
     AnalysisDepth, CapabilityLevel, CommandResult, CompressionLevel, ContextConfig, LoggingConfig,
     OutputFormat, PerformanceMetrics, SessionInfo, ToolConfig,
 };
-pub use ui::diff_renderer::DiffRenderer;
-pub use utils::vtagentgitignore::initialize_vtagent_gitignore;
+pub use config::{AgentConfig, VTAgentConfig};
+pub use core::agent::core::Agent;
+pub use core::context_compression::{
+    CompressedContext, ContextCompressionConfig, ContextCompressor,
+};
 pub use core::conversation_summarizer::ConversationSummarizer;
-pub use core::context_compression::{ContextCompressor, ContextCompressionConfig, CompressedContext};
-pub use core::prompt_caching::{PromptCache, PromptOptimizer, PromptCacheConfig, CacheStats};
+pub use core::performance_profiler::PerformanceProfiler;
+pub use core::prompt_caching::{CacheStats, PromptCache, PromptCacheConfig, PromptOptimizer};
+pub use core::timeout_detector::TimeoutDetector;
+pub use gemini::{Content, FunctionDeclaration, Part};
+pub use llm::{AnyClient, make_client};
+pub use prompts::{
+    generate_lightweight_instruction, generate_specialized_instruction, generate_system_instruction,
+};
+pub use tool_policy::{ToolPolicy, ToolPolicyManager};
 pub use tools::advanced_search::{AdvancedSearchTool, SearchOptions};
-pub use utils::dot_config::{DotManager, DotConfig, UserPreferences, ProviderConfigs, CacheConfig, UiConfig, initialize_dot_folder, load_user_config, save_user_config};
+pub use tools::rp_search::RpSearchManager;
+pub use tools::tree_sitter::TreeSitterAnalyzer;
+pub use tools::{ToolRegistry, build_function_declarations, build_function_declarations_for_level};
+pub use ui::diff_renderer::DiffRenderer;
+pub use utils::dot_config::{
+    CacheConfig, DotConfig, DotManager, ProviderConfigs, UiConfig, UserPreferences,
+    initialize_dot_folder, load_user_config, save_user_config,
+};
+pub use utils::vtagentgitignore::initialize_vtagent_gitignore;
 
 #[cfg(test)]
 mod tests {

@@ -3,8 +3,8 @@
 //! This module provides performance monitoring, optimization strategies, and
 //! resource management for the multi-agent architecture.
 
-use crate::core::agent::multi_agent::AgentType;
 use crate::config::models::ModelId;
+use crate::core::agent::multi_agent::AgentType;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};

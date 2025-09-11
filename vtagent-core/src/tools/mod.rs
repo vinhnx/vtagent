@@ -9,18 +9,18 @@ pub mod cache;
 pub mod command;
 pub mod file_ops;
 pub mod registry;
+pub mod rp_search;
 pub mod search;
 pub mod traits;
 pub mod tree_sitter;
 pub mod types;
-pub mod rp_search;
 
 // Re-export main types and traits for backward compatibility
 pub use cache::FileCache;
 pub use registry::ToolRegistry;
+pub use rp_search::RpSearchManager;
 pub use traits::{Tool, ToolExecutor};
 pub use types::*;
-pub use rp_search::RpSearchManager;
 
 // Re-export function declarations for external use
 pub use registry::build_function_declarations;

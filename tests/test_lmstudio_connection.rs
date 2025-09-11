@@ -5,7 +5,7 @@ use vtagent_core::llm::provider::{LLMRequest, Message, MessageRole};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Testing LMStudio connection...");
-    
+
     // Create LMStudio provider
     let provider = create_provider_with_config(
         "lmstudio",
@@ -13,17 +13,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("http://localhost:1234/v1".to_string()),
         Some("qwen3-4b-2507".to_string()),
     )?;
-    
+
     // Create a simple request
     let request = LLMRequest {
-        messages: vec![
-            Message {
-                role: MessageRole::User,
-                content: "Say hello world".to_string(),
-                tool_calls: None,
-                tool_call_id: None,
-            }
-        ],
+        messages: vec![Message {
+            role: MessageRole::User,
+            content: "Say hello world".to_string(),
+            tool_calls: None,
+            tool_call_id: None,
+        }],
         system_prompt: None,
         tools: None,
         model: "qwen3-4b-2507".to_string(),
@@ -31,9 +29,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         temperature: Some(0.7),
         stream: false,
     };
-    
+
     println!("Sending request to LMStudio...");
-    
+
     // Send request
     match provider.generate(request).await {
         Ok(response) => {
@@ -43,6 +41,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("Error: {:?}", e);
         }
     }
-    
+
     Ok(())
 }

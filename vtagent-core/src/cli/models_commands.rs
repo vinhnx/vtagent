@@ -1,8 +1,8 @@
 //! Model management command handlers
 
 use super::args::{Cli, ModelCommands};
-use crate::llm::factory::{get_factory, create_provider_with_config};
-use crate::utils::dot_config::{get_dot_manager, load_user_config, DotConfig};
+use crate::llm::factory::{create_provider_with_config, get_factory};
+use crate::utils::dot_config::{DotConfig, get_dot_manager, load_user_config};
 use anyhow::{Result, anyhow};
 use owo_colors::*;
 // No content change needed - this line doesn't exist
@@ -13,8 +13,20 @@ pub async fn handle_models_command(cli: &Cli, command: &ModelCommands) -> Result
         ModelCommands::List => handle_list_models(cli).await,
         ModelCommands::SetProvider { provider } => handle_set_provider(cli, provider).await,
         ModelCommands::SetModel { model } => handle_set_model(cli, model).await,
-        ModelCommands::Config { provider, api_key, base_url, model } => {
-            handle_config_provider(cli, provider, api_key.as_deref(), base_url.as_deref(), model.as_deref()).await
+        ModelCommands::Config {
+            provider,
+            api_key,
+            base_url,
+            model,
+        } => {
+            handle_config_provider(
+                cli,
+                provider,
+                api_key.as_deref(),
+                base_url.as_deref(),
+                model.as_deref(),
+            )
+            .await
         }
         ModelCommands::Test { provider } => handle_test_provider(cli, provider).await,
     }
@@ -22,7 +34,10 @@ pub async fn handle_models_command(cli: &Cli, command: &ModelCommands) -> Result
 
 /// List all available providers and models
 async fn handle_list_models(_cli: &Cli) -> Result<()> {
-    println!("{}", "🔧 Available LLM Providers & Models".bold().underline());
+    println!(
+        "{}",
+        "🔧 Available LLM Providers & Models".bold().underline()
+    );
     println!();
 
     let factory = get_factory().lock().unwrap();
@@ -46,12 +61,9 @@ async fn handle_list_models(_cli: &Cli) -> Result<()> {
         println!("{}{}", prefix, provider_name.to_uppercase().bold());
 
         // Try to create provider to get supported models
-        if let Ok(provider) = create_provider_with_config(
-            provider_name,
-            Some("dummy_key".to_string()),
-            None,
-            None,
-        ) {
+        if let Ok(provider) =
+            create_provider_with_config(provider_name, Some("dummy_key".to_string()), None, None)
+        {
             let models = provider.supported_models();
             for model in models {
                 let is_current_model = Some(model.clone()) == Some(current_model.clone());
@@ -65,43 +77,68 @@ async fn handle_list_models(_cli: &Cli) -> Result<()> {
         // Show provider configuration status
         let providers_config = &config.providers;
         match provider_name.as_str() {
-                "openai" => {
-                    if providers_config.openai.as_ref().map(|p| p.enabled).unwrap_or(false) {
-                        println!("    {}", "✅ Configured".green());
-                    } else {
-                        println!("    {}", "⚠️  Not configured".yellow());
-                    }
+            "openai" => {
+                if providers_config
+                    .openai
+                    .as_ref()
+                    .map(|p| p.enabled)
+                    .unwrap_or(false)
+                {
+                    println!("    {}", "✅ Configured".green());
+                } else {
+                    println!("    {}", "⚠️  Not configured".yellow());
                 }
-                "anthropic" => {
-                    if providers_config.anthropic.as_ref().map(|p| p.enabled).unwrap_or(false) {
-                        println!("    {}", "✅ Configured".green());
-                    } else {
-                        println!("    {}", "⚠️  Not configured".yellow());
-                    }
-                }
-                "gemini" => {
-                    if providers_config.gemini.as_ref().map(|p| p.enabled).unwrap_or(false) {
-                        println!("    {}", "✅ Configured".green());
-                    } else {
-                        println!("    {}", "⚠️  Not configured".yellow());
-                    }
-                }
-                "openrouter" => {
-                    if providers_config.openrouter.as_ref().map(|p| p.enabled).unwrap_or(false) {
-                        println!("    {}", "✅ Configured".green());
-                    } else {
-                        println!("    {}", "⚠️  Not configured".yellow());
-                    }
-                }
-                "lmstudio" => {
-                    if providers_config.lmstudio.as_ref().map(|p| p.enabled).unwrap_or(false) {
-                        println!("    {}", "✅ Configured".green());
-                    } else {
-                        println!("    {}", "⚠️  Not configured".yellow());
-                    }
-                }
-                _ => {}
             }
+            "anthropic" => {
+                if providers_config
+                    .anthropic
+                    .as_ref()
+                    .map(|p| p.enabled)
+                    .unwrap_or(false)
+                {
+                    println!("    {}", "✅ Configured".green());
+                } else {
+                    println!("    {}", "⚠️  Not configured".yellow());
+                }
+            }
+            "gemini" => {
+                if providers_config
+                    .gemini
+                    .as_ref()
+                    .map(|p| p.enabled)
+                    .unwrap_or(false)
+                {
+                    println!("    {}", "✅ Configured".green());
+                } else {
+                    println!("    {}", "⚠️  Not configured".yellow());
+                }
+            }
+            "openrouter" => {
+                if providers_config
+                    .openrouter
+                    .as_ref()
+                    .map(|p| p.enabled)
+                    .unwrap_or(false)
+                {
+                    println!("    {}", "✅ Configured".green());
+                } else {
+                    println!("    {}", "⚠️  Not configured".yellow());
+                }
+            }
+            "lmstudio" => {
+                if providers_config
+                    .lmstudio
+                    .as_ref()
+                    .map(|p| p.enabled)
+                    .unwrap_or(false)
+                {
+                    println!("    {}", "✅ Configured".green());
+                } else {
+                    println!("    {}", "⚠️  Not configured".yellow());
+                }
+            }
+            _ => {}
+        }
 
         println!();
     }
@@ -110,8 +147,14 @@ async fn handle_list_models(_cli: &Cli) -> Result<()> {
     println!("{}", "📋 Current Configuration".bold().underline());
     println!("Provider: {}", current_provider.cyan());
     println!("Model: {}", current_model.cyan());
-    println!("Temperature: {:.1}", config.preferences.temperature.unwrap_or(0.7));
-    println!("Max Tokens: {}", config.preferences.max_tokens.unwrap_or(4096));
+    println!(
+        "Temperature: {:.1}",
+        config.preferences.temperature.unwrap_or(0.7)
+    );
+    println!(
+        "Max Tokens: {}",
+        config.preferences.max_tokens.unwrap_or(4096)
+    );
 
     Ok(())
 }
@@ -138,7 +181,10 @@ async fn handle_set_provider(_cli: &Cli, provider: &str) -> Result<()> {
 
     println!("✅ Default provider set to: {}", provider.bold().green());
     println!("💡 You may need to configure API keys for this provider using:");
-    println!("   vtagent models config {} --api-key YOUR_API_KEY", provider);
+    println!(
+        "   vtagent models config {} --api-key YOUR_API_KEY",
+        provider
+    );
 
     Ok(())
 }
@@ -231,14 +277,20 @@ async fn handle_config_provider(
 
     manager.save_config(&config)?;
 
-    println!("✅ Provider {} configured successfully!", provider.bold().green());
+    println!(
+        "✅ Provider {} configured successfully!",
+        provider.bold().green()
+    );
 
     if let Some(key) = api_key {
-        println!("   API Key: {}", if key.len() > 8 {
-            format!("{}****{}", &key[..4], &key[key.len()-4..])
-        } else {
-            "****".to_string()
-        });
+        println!(
+            "   API Key: {}",
+            if key.len() > 8 {
+                format!("{}****{}", &key[..4], &key[key.len() - 4..])
+            } else {
+                "****".to_string()
+            }
+        );
     }
 
     if let Some(url) = base_url {
@@ -263,27 +315,37 @@ async fn handle_test_provider(_cli: &Cli, provider: &str) -> Result<()> {
     // Get provider config
     let (api_key, base_url, model) = match provider {
         "openai" => {
-            let cfg = providers.openai.as_ref()
+            let cfg = providers
+                .openai
+                .as_ref()
                 .ok_or_else(|| anyhow!("OpenAI provider not configured"))?;
             (cfg.api_key.clone(), cfg.base_url.clone(), cfg.model.clone())
         }
         "anthropic" => {
-            let cfg = providers.anthropic.as_ref()
+            let cfg = providers
+                .anthropic
+                .as_ref()
                 .ok_or_else(|| anyhow!("Anthropic provider not configured"))?;
             (cfg.api_key.clone(), cfg.base_url.clone(), cfg.model.clone())
         }
         "gemini" => {
-            let cfg = providers.gemini.as_ref()
+            let cfg = providers
+                .gemini
+                .as_ref()
                 .ok_or_else(|| anyhow!("Gemini provider not configured"))?;
             (cfg.api_key.clone(), cfg.base_url.clone(), cfg.model.clone())
         }
         "openrouter" => {
-            let cfg = providers.openrouter.as_ref()
+            let cfg = providers
+                .openrouter
+                .as_ref()
                 .ok_or_else(|| anyhow!("OpenRouter provider not configured"))?;
             (cfg.api_key.clone(), cfg.base_url.clone(), cfg.model.clone())
         }
         "lmstudio" => {
-            let cfg = providers.lmstudio.as_ref()
+            let cfg = providers
+                .lmstudio
+                .as_ref()
                 .ok_or_else(|| anyhow!("LMStudio provider not configured"))?;
             (cfg.api_key.clone(), cfg.base_url.clone(), cfg.model.clone())
         }
@@ -293,18 +355,15 @@ async fn handle_test_provider(_cli: &Cli, provider: &str) -> Result<()> {
     };
 
     // Create provider instance
-    let provider_instance = create_provider_with_config(
-        provider,
-        api_key,
-        base_url,
-        model.clone(),
-    )?;
+    let provider_instance =
+        create_provider_with_config(provider, api_key, base_url, model.clone())?;
 
     // Test with a simple prompt
     let test_request = crate::llm::provider::LLMRequest {
         messages: vec![crate::llm::provider::Message {
             role: crate::llm::provider::MessageRole::User,
-            content: "Hello! Please respond with just 'OK' if you can read this message.".to_string(),
+            content: "Hello! Please respond with just 'OK' if you can read this message."
+                .to_string(),
             tool_calls: None,
             tool_call_id: None,
         }],
@@ -318,14 +377,26 @@ async fn handle_test_provider(_cli: &Cli, provider: &str) -> Result<()> {
 
     match provider_instance.generate(test_request).await {
         Ok(response) => {
-            if response.content.as_ref()
+            if response
+                .content
+                .as_ref()
                 .map(|c| c.to_lowercase().contains("ok"))
-                .unwrap_or(false) {
+                .unwrap_or(false)
+            {
                 println!("✅ {} provider test successful!", provider.bold().green());
-                println!("   Response: {}", response.content.unwrap_or_default().trim());
+                println!(
+                    "   Response: {}",
+                    response.content.unwrap_or_default().trim()
+                );
             } else {
-                println!("⚠️  {} provider responded but with unexpected content", provider.yellow());
-                println!("   Response: {}", response.content.unwrap_or_default().trim());
+                println!(
+                    "⚠️  {} provider responded but with unexpected content",
+                    provider.yellow()
+                );
+                println!(
+                    "   Response: {}",
+                    response.content.unwrap_or_default().trim()
+                );
             }
         }
         Err(e) => {

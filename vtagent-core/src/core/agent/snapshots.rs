@@ -13,10 +13,10 @@ use std::fs;
 use std::path::PathBuf;
 
 // Re-export types from other modules that we need
-use crate::core::agent::core::Agent;
-use crate::gemini::Content;
-use crate::core::performance_monitor::PerformanceMetrics;
 use crate::config::types::*;
+use crate::core::agent::core::Agent;
+use crate::core::performance_monitor::PerformanceMetrics;
+use crate::gemini::Content;
 
 /// Metadata for snapshot identification and management
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -343,11 +343,16 @@ impl SnapshotManager {
             total_decisions: decision_tracker_data.total_decisions,
             successful_decisions: decision_tracker_data.successful_decisions,
             failed_decisions: decision_tracker_data.failed_decisions,
-            recent_decisions: decision_tracker_data.recent_decisions
+            recent_decisions: decision_tracker_data
+                .recent_decisions
                 .iter()
                 .map(|d| format!("Decision {}: {}", d.id, d.reasoning))
                 .collect(),
-            available_tools: agent.decision_tracker().get_current_context().available_tools.clone(),
+            available_tools: agent
+                .decision_tracker()
+                .get_current_context()
+                .available_tools
+                .clone(),
         };
 
         // Extract error recovery data
@@ -355,11 +360,13 @@ impl SnapshotManager {
         let error_recovery = ErrorRecoverySnapshot {
             total_errors: error_stats.total_errors,
             resolved_errors: error_stats.resolved_errors,
-            error_patterns: error_stats.errors_by_type
+            error_patterns: error_stats
+                .errors_by_type
                 .iter()
                 .map(|(error_type, count)| format!("{:?}: {}", error_type, count))
                 .collect(),
-            recovery_attempts: error_stats.recent_errors
+            recovery_attempts: error_stats
+                .recent_errors
                 .iter()
                 .map(|e| format!("Error {}: {}", e.id, e.message))
                 .collect(),
@@ -369,26 +376,31 @@ impl SnapshotManager {
         let summaries = agent.summarizer().get_summaries();
         let summarizer = SummarizerSnapshot {
             total_summaries: summaries.len(),
-            latest_summary: agent.summarizer().get_latest_summary()
+            latest_summary: agent
+                .summarizer()
+                .get_latest_summary()
                 .map(|s| s.summary_text.clone()),
-            summary_history: summaries
-                .iter()
-                .map(|s| s.summary_text.clone())
-                .collect(),
+            summary_history: summaries.iter().map(|s| s.summary_text.clone()).collect(),
         };
 
         // Extract compaction engine data
-        let compaction_stats = agent.compaction_engine().get_statistics().await.unwrap_or_else(|_| {
-            crate::core::agent::stats::CompactionStatistics {
+        let compaction_stats = agent
+            .compaction_engine()
+            .get_statistics()
+            .await
+            .unwrap_or_else(|_| crate::core::agent::stats::CompactionStatistics {
                 total_messages: 0,
                 messages_by_priority: std::collections::HashMap::new(),
                 total_memory_usage: 0,
                 average_message_size: 0,
                 last_compaction_timestamp: 0,
                 compaction_frequency: 0.0,
-            }
-        });
-        let compaction_suggestions = agent.compaction_engine().get_compaction_suggestions().await.unwrap_or_else(|_| Vec::new());
+            });
+        let compaction_suggestions = agent
+            .compaction_engine()
+            .get_compaction_suggestions()
+            .await
+            .unwrap_or_else(|_| Vec::new());
         let compaction_engine = CompactionEngineSnapshot {
             total_compactions: compaction_stats.total_messages,
             memory_saved: compaction_stats.total_memory_usage,
@@ -402,11 +414,13 @@ impl SnapshotManager {
         // Extract tree-sitter analyzer data
         let tree_sitter_analyzer = agent.tree_sitter_analyzer();
         let tree_sitter_state = TreeSitterSnapshot {
-            loaded_languages: tree_sitter_analyzer.supported_languages()
+            loaded_languages: tree_sitter_analyzer
+                .supported_languages()
                 .iter()
                 .map(|l| format!("{}", l))
                 .collect(),
-            total_analyses: tree_sitter_analyzer.get_parser_stats()
+            total_analyses: tree_sitter_analyzer
+                .get_parser_stats()
                 .get("supported_languages")
                 .copied()
                 .unwrap_or(0),

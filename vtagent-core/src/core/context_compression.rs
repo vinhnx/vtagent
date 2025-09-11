@@ -1,5 +1,5 @@
-use crate::llm::provider::{LLMProvider, LLMRequest, Message, MessageRole};
 use crate::config::constants::models;
+use crate::llm::provider::{LLMProvider, LLMRequest, Message, MessageRole};
 use serde::{Deserialize, Serialize};
 // std::collections::HashMap import removed as it's not used
 
@@ -18,7 +18,7 @@ impl Default for ContextCompressionConfig {
     fn default() -> Self {
         Self {
             max_context_length: 128000, // ~128K tokens
-            compression_threshold: 0.8,  // 80% of max length
+            compression_threshold: 0.8, // 80% of max length
             summary_max_length: 2000,
             preserve_recent_turns: 5,
             preserve_system_messages: true,
@@ -60,11 +60,15 @@ impl ContextCompressor {
     /// Check if context needs compression
     pub fn needs_compression(&self, messages: &[Message]) -> bool {
         let total_length = self.calculate_context_length(messages);
-        total_length > (self.config.max_context_length as f64 * self.config.compression_threshold) as usize
+        total_length
+            > (self.config.max_context_length as f64 * self.config.compression_threshold) as usize
     }
 
     /// Compress context by summarizing older messages
-    pub async fn compress_context(&self, messages: &[Message]) -> Result<CompressedContext, ContextCompressionError> {
+    pub async fn compress_context(
+        &self,
+        messages: &[Message],
+    ) -> Result<CompressedContext, ContextCompressionError> {
         if messages.is_empty() {
             return Err(ContextCompressionError::EmptyContext);
         }
@@ -176,16 +180,31 @@ impl ContextCompressor {
     /// Check if message content contains error indicators
     fn contains_error_indicators(&self, content: &str) -> bool {
         let error_keywords = [
-            "error", "failed", "exception", "crash", "bug", "issue", "problem",
-            "unable", "cannot", "failed", "timeout", "connection refused",
+            "error",
+            "failed",
+            "exception",
+            "crash",
+            "bug",
+            "issue",
+            "problem",
+            "unable",
+            "cannot",
+            "failed",
+            "timeout",
+            "connection refused",
         ];
 
         let content_lower = content.to_lowercase();
-        error_keywords.iter().any(|&keyword| content_lower.contains(keyword))
+        error_keywords
+            .iter()
+            .any(|&keyword| content_lower.contains(keyword))
     }
 
     /// Generate summary of messages using LLM
-    async fn generate_summary(&self, messages: &[Message]) -> Result<String, ContextCompressionError> {
+    async fn generate_summary(
+        &self,
+        messages: &[Message],
+    ) -> Result<String, ContextCompressionError> {
         if messages.is_empty() {
             return Ok(String::new());
         }
@@ -196,7 +215,8 @@ impl ContextCompressor {
         let system_prompt = "You are a helpful assistant that summarizes conversations. \
                            Create a concise summary of the following conversation, \
                            focusing on key decisions, completed tasks, and important context. \
-                           Keep the summary under 500 words.".to_string();
+                           Keep the summary under 500 words."
+            .to_string();
 
         let user_prompt = format!(
             "Please summarize the following conversation:\n\n{}",
@@ -226,7 +246,10 @@ impl ContextCompressor {
             stream: false,
         };
 
-        let response = self.llm_provider.generate(request).await
+        let response = self
+            .llm_provider
+            .generate(request)
+            .await
             .map_err(|e| ContextCompressionError::LLMError(e.to_string()))?;
 
         Ok(response.content.unwrap_or_default())
@@ -248,9 +271,9 @@ impl ContextCompressor {
 
             if let Some(tool_calls) = &message.tool_calls {
                 for tool_call in tool_calls {
-                    text.push_str(&format!("Tool Call: {}({})\n",
-                        tool_call.name,
-                        tool_call.arguments
+                    text.push_str(&format!(
+                        "Tool Call: {}({})\n",
+                        tool_call.name, tool_call.arguments
                     ));
                 }
             }
@@ -294,8 +317,8 @@ pub enum ContextCompressionError {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::crate::llm::provider::{Message, MessageRole};
+    use super::*;
 
     #[test]
     fn test_context_length_calculation() {
@@ -317,7 +340,10 @@ mod tests {
         ];
 
         let length = compressor.calculate_context_length(&messages);
-        assert_eq!(length, ("Hello worldHi there! How can I help you?".len()) / 4);
+        assert_eq!(
+            length,
+            ("Hello worldHi there! How can I help you?".len()) / 4
+        );
     }
 
     #[test]
@@ -326,17 +352,14 @@ mod tests {
         config.max_context_length = 100;
         config.compression_threshold = 0.8;
 
-        let compressor = ContextCompressor::new(Box::new(MockProvider::new()))
-            .with_config(config);
+        let compressor = ContextCompressor::new(Box::new(MockProvider::new())).with_config(config);
 
-        let messages = vec![
-            Message {
-                role: MessageRole::User,
-                content: "x".repeat(400), // ~100 tokens
-                tool_calls: None,
-                tool_call_id: None,
-            },
-        ];
+        let messages = vec![Message {
+            role: MessageRole::User,
+            content: "x".repeat(400), // ~100 tokens
+            tool_calls: None,
+            tool_call_id: None,
+        }];
 
         assert!(compressor.needs_compression(&messages));
     }
@@ -352,10 +375,15 @@ mod tests {
 
     #[async_trait::async_trait]
     impl super::crate::llm::provider::LLMProvider for MockProvider {
-        fn name(&self) -> &str { "mock" }
+        fn name(&self) -> &str {
+            "mock"
+        }
 
-        async fn generate(&self, _request: super::crate::llm::provider::LLMRequest)
-            -> Result<super::crate::llm::provider::LLMResponse, super::crate::llm::provider::LLMError> {
+        async fn generate(
+            &self,
+            _request: super::crate::llm::provider::LLMRequest,
+        ) -> Result<super::crate::llm::provider::LLMResponse, super::crate::llm::provider::LLMError>
+        {
             Ok(super::crate::llm::provider::LLMResponse {
                 content: Some("Mock summary".to_string()),
                 tool_calls: None,
@@ -364,9 +392,15 @@ mod tests {
             })
         }
 
-        fn supported_models(&self) -> Vec<String> { vec!["mock".to_string()] }
+        fn supported_models(&self) -> Vec<String> {
+            vec!["mock".to_string()]
+        }
 
-        fn validate_request(&self, _request: &super::crate::llm::provider::LLMRequest)
-            -> Result<(), super::crate::llm::provider::LLMError> { Ok(()) }
+        fn validate_request(
+            &self,
+            _request: &super::crate::llm::provider::LLMRequest,
+        ) -> Result<(), super::crate::llm::provider::LLMError> {
+            Ok(())
+        }
     }
 }

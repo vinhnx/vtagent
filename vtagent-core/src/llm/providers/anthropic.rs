@@ -1,9 +1,9 @@
+use crate::config::constants::{model_helpers, models};
 use crate::llm::client::LLMClient;
 use crate::llm::provider::{
     FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, MessageRole, ToolCall,
 };
 use crate::llm::types as llm_types;
-use crate::config::constants::models;
 use async_trait::async_trait;
 use reqwest::Client as HttpClient;
 use serde_json::{Value, json};
@@ -64,20 +64,23 @@ impl LLMProvider for AnthropicProvider {
     }
 
     fn supported_models(&self) -> Vec<String> {
-        use crate::config::constants::models;
-        vec![
-            models::CLAUDE_SONNET_4_20250514.to_string(),
-            models::CLAUDE_OPUS_4_1_20250805.to_string(),
-        ]
+        models::anthropic::SUPPORTED_MODELS
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
     }
 
     fn validate_request(&self, request: &LLMRequest) -> Result<(), LLMError> {
         if request.messages.is_empty() {
-            return Err(LLMError::InvalidRequest("Messages cannot be empty".to_string()));
+            return Err(LLMError::InvalidRequest(
+                "Messages cannot be empty".to_string(),
+            ));
         }
 
         if request.model.is_empty() {
-            return Err(LLMError::InvalidRequest("Model cannot be empty".to_string()));
+            return Err(LLMError::InvalidRequest(
+                "Model cannot be empty".to_string(),
+            ));
         }
 
         Ok(())
@@ -157,7 +160,9 @@ impl AnthropicProvider {
         let content = response_json
             .get("content")
             .and_then(|c| c.as_array())
-            .ok_or_else(|| LLMError::Provider("Invalid response format: missing content".to_string()))?
+            .ok_or_else(|| {
+                LLMError::Provider("Invalid response format: missing content".to_string())
+            })?
             .iter()
             .filter_map(|item| item.get("text").and_then(|t| t.as_str()))
             .collect::<Vec<_>>()
@@ -206,12 +211,21 @@ impl AnthropicProvider {
                     .get("output_tokens")
                     .and_then(|ot| ot.as_u64())
                     .unwrap_or(0) as u32,
-                total_tokens: (u.get("input_tokens").and_then(|it| it.as_u64()).unwrap_or(0)
-                    + u.get("output_tokens").and_then(|ot| ot.as_u64()).unwrap_or(0)) as u32,
+                total_tokens: (u
+                    .get("input_tokens")
+                    .and_then(|it| it.as_u64())
+                    .unwrap_or(0)
+                    + u.get("output_tokens")
+                        .and_then(|ot| ot.as_u64())
+                        .unwrap_or(0)) as u32,
             });
 
         Ok(LLMResponse {
-            content: if content.is_empty() { None } else { Some(content) },
+            content: if content.is_empty() {
+                None
+            } else {
+                Some(content)
+            },
             tool_calls,
             usage,
             finish_reason,
@@ -222,6 +236,16 @@ impl AnthropicProvider {
 #[async_trait]
 impl LLMClient for AnthropicProvider {
     async fn generate(&mut self, prompt: &str) -> Result<llm_types::LLMResponse, LLMError> {
+        let model = models::anthropic::DEFAULT_MODEL.to_string();
+
+        // Validate the model
+        if !model_helpers::is_valid("anthropic", &model) {
+            return Err(LLMError::InvalidRequest(format!(
+                "Invalid Anthropic model '{}'. See docs/models.json",
+                model
+            )));
+        }
+
         let request = LLMRequest {
             messages: vec![crate::llm::provider::Message {
                 role: crate::llm::provider::MessageRole::User,
@@ -231,7 +255,7 @@ impl LLMClient for AnthropicProvider {
             }],
             system_prompt: None,
             tools: None,
-            model: models::CLAUDE_SONNET_4_20250514.to_string(), // Default model
+            model: model.clone(),
             max_tokens: Some(4096),
             temperature: None,
             stream: false,
@@ -241,7 +265,7 @@ impl LLMClient for AnthropicProvider {
 
         Ok(llm_types::LLMResponse {
             content: response.content.unwrap_or("".to_string()),
-            model: "claude-3-haiku-20240307".to_string(),
+            model,
             usage: response.usage.map(|u| llm_types::Usage {
                 prompt_tokens: u.prompt_tokens as usize,
                 completion_tokens: u.completion_tokens as usize,
@@ -255,6 +279,6 @@ impl LLMClient for AnthropicProvider {
     }
 
     fn model_id(&self) -> &str {
-        models::CLAUDE_SONNET_4_20250514
+        models::anthropic::DEFAULT_MODEL
     }
 }

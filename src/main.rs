@@ -36,7 +36,7 @@ fn load_system_prompt(_config: &VTAgentConfig) -> Result<String> {
                 "To customize: Create '{}' or configure [prompts].system in vtagent.toml",
                 path
             );
-            Ok("You are a helpful coding assistant for the VTAgent Rust project with access to file operations.\n\nMANDATORY TOOL USAGE:\n- When user asks 'what is this project about' or similar: IMMEDIATELY call list_files to see project structure, then call read_file on README.md\n- When user asks about code or files: Use read_file to read the relevant files\n- When user asks about project structure: Use list_files first\n\nTOOL CALL FORMAT: Always respond with a function call when you need to use tools. Do not give text responses for project questions without using tools first.\n\nAvailable tools:\n- list_files: List files and directories\n- read_file: Read file contents\n- rp_search: Search for patterns in code\n- run_terminal_cmd: Execute terminal commands".to_string())
+            Ok("You are a helpful coding assistant for the VTAgent Rust project with access to file operations.\n\n## IMPORTANT: ALWAYS USE TOOLS FOR FILE OPERATIONS\n\nWhen user asks to edit files, modify code, or add content:\n1. FIRST: Use read_file to understand the current file structure\n2. THEN: Use edit_file to make specific text replacements, OR use write_file to rewrite entire files\n3. Do NOT try to use terminal commands (sed, awk, etc.) for file editing\n\nWhen user asks about project questions:\n1. FIRST: Use list_files to see project structure\n2. THEN: Use read_file on relevant files like README.md\n\n## AVAILABLE TOOLS:\n- read_file: Read file contents to understand structure\n- write_file: Create new files or completely rewrite existing ones\n- edit_file: Replace specific text in files (use this for targeted edits)\n- list_files: List files and directories in a path\n- rp_search: Search for patterns in code\n- run_terminal_cmd: Execute terminal commands (NOT for file editing)\n\n## TOOL USAGE EXAMPLES:\nTo add a model constant:\n1. read_file('path/to/constants.rs') - understand structure\n2. edit_file(path='path/to/constants.rs', old_string='    pub const LAST_CONST: &str = \"value\";', new_string='    pub const LAST_CONST: &str = \"value\";\n    pub const NEW_CONST: &str = \"new_value\";')\n\nALWAYS use function calls, not text responses, when files need to be read or modified.".to_string())
         }
     }
 }
@@ -268,8 +268,12 @@ async fn handle_single_agent_chat(
 
     loop {
         println!("DEBUG: Starting input loop iteration");
+        println!("DEBUG: About to show prompt");
         print!("> ");
-        io::stdout().flush().context("Failed to flush stdout")?;
+        let flush_result = io::stdout().flush();
+        println!("DEBUG: Flush result: {:?}", flush_result);
+        flush_result.context("Failed to flush stdout")?;
+        println!("DEBUG: Prompt shown, waiting for input");
 
         let mut input = String::new();
         let bytes_read = io::stdin()
@@ -294,13 +298,7 @@ async fn handle_single_agent_chat(
             continue;
         }
 
-        // Add user message to history
-        conversation_history.push(Message {
-            role: MessageRole::User,
-            content: input.to_string(),
-            tool_calls: None,
-            tool_call_id: None,
-        });
+        // Don't add the user message yet - we'll add it after processing context
 
         // Auto-gather context for project questions
         let is_project_question = input.to_lowercase().contains("project")
@@ -309,12 +307,13 @@ async fn handle_single_agent_chat(
             || input.to_lowercase().contains("about");
 
         println!(
-            "DEBUG: Input: '{}', Is project question: {}",
+            "{} Input: '{}', Is project question: {}",
+            style("[DEBUG]").dim().on_black(),
             input, is_project_question
         );
 
         if is_project_question {
-            println!("{}: Gathering project context...", style("Context").green());
+            println!("{}: Gathering project context...", style("[CONTEXT]").green().bold().on_black());
 
             let mut context_parts = Vec::new();
 
@@ -324,11 +323,11 @@ async fn handle_single_agent_chat(
                 .await
             {
                 Ok(result) => {
-                    println!("{}: Found README.md", style("✅").green());
+                    println!("{}: Found README.md", style("(SUCCESS)").green().bold());
                     context_parts.push(format!("README.md contents:\n{}", result));
                 }
                 Err(e) => {
-                    println!("{}: Could not read README.md: {}", style("⚠️").yellow(), e);
+                    println!("{}: Could not read README.md: {}", style("(WARNING)").yellow().bold(), e);
                 }
             }
 
@@ -338,11 +337,11 @@ async fn handle_single_agent_chat(
                 .await
             {
                 Ok(result) => {
-                    println!("{}: Listed project files", style("✅").green());
+                    println!("{}: Listed project files", style("(SUCCESS)").green().bold());
                     context_parts.push(format!("Project structure:\n{}", result));
                 }
                 Err(e) => {
-                    println!("{}: Could not list files: {}", style("⚠️").yellow(), e);
+                    println!("{}: Could not list files: {}", style("(WARNING)").yellow().bold(), e);
                 }
             }
 
@@ -354,7 +353,8 @@ async fn handle_single_agent_chat(
                     input, context
                 );
                 println!(
-                    "DEBUG: Sending message with context (length: {} chars)",
+                    "{} Sending message with context (length: {} chars)",
+                    style("[DEBUG]").dim().on_black(),
                     user_message.len()
                 );
                 conversation_history.push(Message {
@@ -364,7 +364,7 @@ async fn handle_single_agent_chat(
                     tool_call_id: None,
                 });
             } else {
-                // No context gathered, proceed with original message
+                // No context gathered, use original message
                 conversation_history.push(Message {
                     role: MessageRole::User,
                     content: input.to_string(),
@@ -373,7 +373,7 @@ async fn handle_single_agent_chat(
                 });
             }
         } else {
-            // No context gathering needed, proceed with original message
+            // No context gathering needed, use original message
             conversation_history.push(Message {
                 role: MessageRole::User,
                 content: input.to_string(),
@@ -396,18 +396,43 @@ async fn handle_single_agent_chat(
         // Get response from AI
         match client.generate(request).await {
             Ok(response) => {
+                // Debug the response structure
+                println!("DEBUG: Response tool_calls: {:?}", response.tool_calls.is_some());
+                if let Some(ref tool_calls) = response.tool_calls {
+                    println!("DEBUG: Number of tool calls: {}", tool_calls.len());
+                } else {
+                    println!("DEBUG: No tool calls in response");
+                }
+
+                // Add assistant message to conversation history BEFORE processing tool calls
+                let assistant_content = if response.tool_calls.is_some() {
+                    // When there are tool calls, content should be empty
+                    String::new()
+                } else {
+                    // When there are no tool calls, use the response content
+                    response.content.clone().unwrap_or_default()
+                };
+
+                conversation_history.push(Message {
+                    role: MessageRole::Assistant,
+                    content: assistant_content,
+                    tool_calls: response.tool_calls.clone(),
+                    tool_call_id: None,
+                });
+
                 // Handle tool calls first
                 if let Some(tool_calls) = &response.tool_calls {
+                    // Assistant message already added above, proceed with tool execution
                     println!(
                         "{}: Executing {} tool call(s)",
-                        style("Tool").blue().bold(),
+                        style("[TOOL]").blue().bold().on_black(),
                         tool_calls.len()
                     );
 
                     for tool_call in tool_calls {
                         println!(
                             "{}: Calling tool: {} with args: {}",
-                            style("TOOL").cyan(),
+                            style("[TOOL_CALL]").cyan().bold().on_black(),
                             tool_call.name,
                             tool_call.arguments
                         );
@@ -420,7 +445,7 @@ async fn handle_single_agent_chat(
                             Ok(result) => {
                                 println!(
                                     "{}: Tool {} executed successfully",
-                                    style("✅").green(),
+                                    style("(SUCCESS)").green().bold(),
                                     tool_call.name
                                 );
 
@@ -435,7 +460,7 @@ async fn handle_single_agent_chat(
                             Err(e) => {
                                 println!(
                                     "{}: Tool {} failed: {}",
-                                    style("❌").red(),
+                                    style("(ERROR)").red().bold().on_black(),
                                     tool_call.name,
                                     e
                                 );
@@ -464,7 +489,95 @@ async fn handle_single_agent_chat(
 
                     match client.generate(follow_up_request).await {
                         Ok(final_response) => {
-                            if let Some(content) = final_response.content {
+                            // Check if the final response also contains tool calls
+                            if let Some(final_tool_calls) = &final_response.tool_calls {
+                                println!(
+                                    "{}: Follow-up response contains {} additional tool call(s)",
+                                    style("[TOOL]").blue().bold().on_black(),
+                                    final_tool_calls.len()
+                                );
+
+                                for tool_call in final_tool_calls {
+                                    println!(
+                                        "{}: Calling tool: {} with args: {}",
+                                        style("[TOOL_CALL]").cyan().bold().on_black(),
+                                        tool_call.name,
+                                        tool_call.arguments
+                                    );
+
+                                    // Execute the tool
+                                    match tool_registry
+                                        .execute_tool(&tool_call.name, tool_call.arguments.clone())
+                                        .await
+                                    {
+                                        Ok(result) => {
+                                            println!(
+                                                "{}: Tool {} executed successfully",
+                                                style("(SUCCESS)").green().bold(),
+                                                tool_call.name
+                                            );
+
+                                            // Add tool result to conversation
+                                            conversation_history.push(Message {
+                                                role: MessageRole::Tool,
+                                                content: serde_json::to_string(&result).unwrap_or_default(),
+                                                tool_calls: None,
+                                                tool_call_id: Some(tool_call.id.clone()),
+                                            });
+                                        }
+                                        Err(e) => {
+                                            println!(
+                                                "{}: Tool {} failed: {}",
+                                                style("(ERROR)").red().bold().on_black(),
+                                                tool_call.name,
+                                                e
+                                            );
+
+                                            // Add error result to conversation
+                                            conversation_history.push(Message {
+                                                role: MessageRole::Tool,
+                                                content: format!("Tool {} failed: {}", tool_call.name, e),
+                                                tool_calls: None,
+                                                tool_call_id: Some(tool_call.id.clone()),
+                                            });
+                                        }
+                                    }
+                                }
+
+                                // After executing follow-up tools, get the final response
+                                let final_follow_up_request = LLMRequest {
+                                    messages: conversation_history.clone(),
+                                    system_prompt: None,
+                                    tools: Some(tool_definitions.clone()),
+                                    model: model_str.to_string(),
+                                    max_tokens: Some(1000),
+                                    temperature: Some(0.7),
+                                    stream: false,
+                                };
+
+                                match client.generate(final_follow_up_request).await {
+                                    Ok(ultimate_response) => {
+                                        if let Some(content) = ultimate_response.content {
+                                            println!("{}", content);
+                                            // Add final AI response to history
+                                            conversation_history.push(Message {
+                                                role: MessageRole::Assistant,
+                                                content: content.clone(),
+                                                tool_calls: None,
+                                                tool_call_id: None,
+                                            });
+                                        }
+                                    }
+                                    Err(e) => {
+                                        eprintln!(
+                                            "{}: Error in ultimate follow-up request: {:?}",
+                                            style("[ERROR]").red().bold().on_black(),
+                                            e
+                                        );
+                                    }
+                                }
+                            } else if let Some(content) = final_response.content {
+                                // No additional tool calls, just print the response
                                 println!("{}", content);
                                 // Add final AI response to history
                                 conversation_history.push(Message {
@@ -478,7 +591,7 @@ async fn handle_single_agent_chat(
                         Err(e) => {
                             eprintln!(
                                 "{}: Error in follow-up request: {:?}",
-                                style("Error").red(),
+                                style("[ERROR]").red().bold().on_black(),
                                 e
                             );
                         }
@@ -486,19 +599,13 @@ async fn handle_single_agent_chat(
                 } else if let Some(content) = response.content {
                     // No tool calls, just print the response
                     println!("{}", content);
-                    // Add AI response to history
-                    conversation_history.push(Message {
-                        role: MessageRole::Assistant,
-                        content: content.clone(),
-                        tool_calls: None,
-                        tool_call_id: None,
-                    });
+                    // Assistant message already added above
                 } else {
-                    eprintln!("{}: Empty response from AI", style("Warning").yellow());
+                    eprintln!("{}: Empty response from AI", style("[WARNING]").yellow().bold());
                 }
             }
             Err(e) => {
-                eprintln!("{}: {:?}", style("Error").red(), e);
+                eprintln!("{}: {:?}", style("[ERROR]").red().bold().on_black(), e);
             }
         }
     }
@@ -506,7 +613,7 @@ async fn handle_single_agent_chat(
     Ok(())
 }
 
-/// Handle simple prompt-based chat for non-LMStudio providers  
+/// Handle simple prompt-based chat for non-LMStudio providers
 async fn handle_simple_prompt_chat(mut client: AnyClient) -> Result<()> {
     // Load system prompt - we don't have config here, so use a simple fallback
     let system_prompt = std::fs::read_to_string(prompts::DEFAULT_SYSTEM_PROMPT_PATH)
@@ -674,7 +781,7 @@ async fn handle_multi_agent_chat(
                 println!("{}", task_result.results.summary);
             }
             Err(e) => {
-                eprintln!("{}: {}", style("Error").red(), e);
+                eprintln!("{}: {}", style("[ERROR]").red().bold().on_black(), e);
             }
         }
     }

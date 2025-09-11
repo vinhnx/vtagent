@@ -99,9 +99,9 @@ impl AnthropicProvider {
             }
 
             let role = match msg.role {
-                MessageRole::User => "user",
-                MessageRole::Assistant => "assistant",
-                MessageRole::Tool => "user", // Anthropic treats tool responses as user messages
+                MessageRole::User => crate::config::constants::message_roles::USER,
+                MessageRole::Assistant => crate::config::constants::message_roles::ASSISTANT,
+                MessageRole::Tool => crate::config::constants::message_roles::USER, // Anthropic treats tool responses as user messages
                 MessageRole::System => continue, // Skip system messages
             };
 

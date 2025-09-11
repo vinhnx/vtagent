@@ -7,10 +7,10 @@ pub mod prompts {
 pub mod models {
     // Google/Gemini models
     pub mod google {
-        pub const DEFAULT_MODEL: &str = "gemini-2.5-flash";
+        pub const DEFAULT_MODEL: &str = "gemini-2.5-flash-lite";
         pub const SUPPORTED_MODELS: &[&str] = &[
-            "gemini-2.5-flash",
             "gemini-2.5-flash-lite",
+            "gemini-2.5-flash",
             "gemini-2.5-pro",
         ];
 
@@ -77,6 +77,21 @@ pub mod models {
         pub const QWEN_QWEN3_30B_A3B_2507: &str = "qwen/qwen3-30b-a3b-2507";
         pub const X_AI_GROK_CODE_FAST_1: &str = "x-ai/grok-code-fast-1";
         pub const DEEPSEEK_DEEPSEEK_CHAT_V3_1: &str = "deepseek/deepseek-chat-v3.1";
+        pub const GLM_4_5: &str = "z-ai/glm-4.5";
+        pub const SUPPORTED_MODELS: &[&str] = &[
+            "anthropic/claude-3.5-sonnet",
+            "anthropic/claude-3-haiku",
+            "openai/gpt-5",
+            "openai/gpt-5-mini",
+            "google/gemini-2.5-pro",
+            "google/gemini-2.5-flash",
+            "google/gemini-2.5-flash-lite",
+            "qwen/qwen3-coder",
+            "qwen/qwen3-30b-a3b-2507",
+            "x-ai/grok-code-fast-1",
+            "deepseek/deepseek-chat-v3.1",
+            "z-ai/glm-4.5",
+        ];
     }
 
     // Backwards compatibility - keep old constants working
@@ -105,6 +120,7 @@ pub mod models {
     pub const OPENROUTER_X_AI_GROK_CODE_FAST_1: &str = openrouter::X_AI_GROK_CODE_FAST_1;
     pub const OPENROUTER_DEEPSEEK_DEEPSEEK_CHAT_V3_1: &str =
         openrouter::DEEPSEEK_DEEPSEEK_CHAT_V3_1;
+    pub const OPENROUTER_GLM_4_5: &str = openrouter::GLM_4_5;
 }
 
 /// Model validation and helper functions
@@ -145,8 +161,16 @@ pub mod model_helpers {
 pub mod defaults {
     use super::models;
 
-    pub const DEFAULT_MODEL: &str = models::google::GEMINI_2_5_FLASH;
+    pub const DEFAULT_MODEL: &str = models::google::GEMINI_2_5_FLASH_LITE;
     pub const DEFAULT_CLI_MODEL: &str = models::google::GEMINI_2_5_FLASH;
     pub const DEFAULT_PROVIDER: &str = "gemini";
     pub const DEFAULT_API_KEY_ENV: &str = "GEMINI_API_KEY";
+}
+
+/// Message role constants to avoid hardcoding strings
+pub mod message_roles {
+    pub const SYSTEM: &str = "system";
+    pub const USER: &str = "user";
+    pub const ASSISTANT: &str = "assistant";
+    pub const TOOL: &str = "tool";
 }

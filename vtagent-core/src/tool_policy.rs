@@ -174,32 +174,55 @@ impl ToolPolicyManager {
         println!("You can change this later via configuration or CLI flags.");
         println!();
 
-        let confirmed = Confirm::new()
+        // Try to prompt user, but handle non-interactive environments
+        match Confirm::new()
             .with_prompt(format!("Allow the agent to use '{}'?", tool_name))
             .default(false)
-            .interact()?;
+            .interact()
+        {
+            Ok(confirmed) => {
+                if confirmed {
+                    println!(
+                        "{}",
+                        style(format!(
+                            "✓ Approved: '{}' tool will be allowed in future runs",
+                            tool_name
+                        ))
+                        .green()
+                    );
+                } else {
+                    println!(
+                        "{}",
+                        style(format!(
+                            "✗ Denied: '{}' tool will be blocked in future runs",
+                            tool_name
+                        ))
+                        .red()
+                    );
+                }
+                Ok(confirmed)
+            }
+            Err(e) => {
+                // Handle non-interactive environments
+                println!(
+                    "{}",
+                    style(format!(
+                        "Non-interactive environment detected: {}",
+                        e
+                    ))
+                    .yellow()
+                );
+                println!(
+                    "Since we can't prompt you interactively, '{}' tool will be denied for security.",
+                    tool_name
+                );
+                println!("You can change this later via configuration.");
+                println!();
 
-        if confirmed {
-            println!(
-                "{}",
-                style(format!(
-                    "✓ Approved: '{}' tool will be allowed in future runs",
-                    tool_name
-                ))
-                .green()
-            );
-        } else {
-            println!(
-                "{}",
-                style(format!(
-                    "✗ Denied: '{}' tool will be blocked in future runs",
-                    tool_name
-                ))
-                .red()
-            );
+                // In non-interactive mode, deny by default for security
+                Ok(false)
+            }
         }
-
-        Ok(confirmed)
     }
 
     /// Set policy for a specific tool

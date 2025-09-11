@@ -1,4 +1,4 @@
-use super::{Content, Tool, ToolConfig};
+use super::{Content, Tool, ToolConfig, SystemInstruction};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -10,7 +10,7 @@ pub struct GenerateContentRequest {
     #[serde(skip_serializing_if = "Option::is_none", rename = "toolConfig")]
     pub tool_config: Option<ToolConfig>,
     #[serde(skip_serializing_if = "Option::is_none", rename = "systemInstruction")]
-    pub system_instruction: Option<Content>,
+    pub system_instruction: Option<SystemInstruction>,
     #[serde(skip_serializing_if = "Option::is_none", rename = "generationConfig")]
     pub generation_config: Option<Value>,
 }

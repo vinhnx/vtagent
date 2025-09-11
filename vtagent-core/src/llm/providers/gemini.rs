@@ -12,14 +12,20 @@ pub struct GeminiProvider {
     api_key: String,
     http_client: HttpClient,
     base_url: String,
+    model: String,
 }
 
 impl GeminiProvider {
     pub fn new(api_key: String) -> Self {
+        Self::with_model(api_key, models::GEMINI_2_5_FLASH.to_string())
+    }
+
+    pub fn with_model(api_key: String, model: String) -> Self {
         Self {
             api_key,
             http_client: HttpClient::new(),
             base_url: "https://generativelanguage.googleapis.com/v1beta".to_string(),
+            model,
         }
     }
 }
@@ -91,7 +97,7 @@ impl GeminiProvider {
                 MessageRole::User => "user",
                 MessageRole::Assistant => "model",
                 MessageRole::System => continue,
-                MessageRole::Tool => "function",
+                MessageRole::Tool => "user", // Gemini API only accepts "user" and "model" roles
             };
 
             let mut parts = Vec::new();
@@ -282,9 +288,9 @@ impl LLMClient for GeminiProvider {
                     // Convert contents to messages
                     for content in &gemini_request.contents {
                         let role = match content.role.as_str() {
-                            "user" => MessageRole::User,
+                            crate::config::constants::message_roles::USER => MessageRole::User,
                             "model" => MessageRole::Assistant,
-                            "system" => {
+                            crate::config::constants::message_roles::SYSTEM => {
                                 // Extract system message
                                 let text = content
                                     .parts
@@ -330,7 +336,7 @@ impl LLMClient for GeminiProvider {
                         messages,
                         system_prompt,
                         tools,
-                        model: models::GEMINI_2_5_FLASH.to_string(),
+                        model: self.model.clone(),
                         max_tokens: gemini_request
                             .generation_config
                             .as_ref()
@@ -349,9 +355,31 @@ impl LLMClient for GeminiProvider {
                     // Use the standard LLMProvider generate method
                     let response = LLMProvider::generate(self, llm_request).await?;
 
+                    // If there are tool calls, include them in the response content as JSON
+                    let content = if let Some(tool_calls) = &response.tool_calls {
+                        if !tool_calls.is_empty() {
+                            // Create a JSON structure that the agent can parse
+                            let tool_call_json = json!({
+                                "tool_calls": tool_calls.iter().map(|tc| {
+                                    json!({
+                                        "function": {
+                                            "name": tc.name,
+                                            "arguments": tc.arguments
+                                        }
+                                    })
+                                }).collect::<Vec<_>>()
+                            });
+                            tool_call_json.to_string()
+                        } else {
+                            response.content.unwrap_or("".to_string())
+                        }
+                    } else {
+                        response.content.unwrap_or("".to_string())
+                    };
+
                     return Ok(llm_types::LLMResponse {
-                        content: response.content.unwrap_or("".to_string()),
-                        model: models::GEMINI_2_5_FLASH.to_string(),
+                        content,
+                        model: self.model.clone(),
                         usage: response.usage.map(|u| llm_types::Usage {
                             prompt_tokens: u.prompt_tokens as usize,
                             completion_tokens: u.completion_tokens as usize,
@@ -370,7 +398,7 @@ impl LLMClient for GeminiProvider {
                         }],
                         system_prompt: None,
                         tools: None,
-                        model: models::GEMINI_2_5_FLASH.to_string(),
+                        model: self.model.clone(),
                         max_tokens: None,
                         temperature: None,
                         stream: false,
@@ -388,7 +416,7 @@ impl LLMClient for GeminiProvider {
                 }],
                 system_prompt: None,
                 tools: None,
-                model: models::GEMINI_2_5_FLASH.to_string(),
+                model: self.model.clone(),
                 max_tokens: None,
                 temperature: None,
                 stream: false,
@@ -413,6 +441,6 @@ impl LLMClient for GeminiProvider {
     }
 
     fn model_id(&self) -> &str {
-        models::GEMINI_2_5_FLASH
+        &self.model
     }
 }

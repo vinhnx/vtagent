@@ -10,7 +10,7 @@ use crate::gemini::FunctionDeclaration;
 use crate::tool_policy::{ToolPolicy, ToolPolicyManager};
 use crate::tools::ast_grep::AstGrepEngine;
 use crate::tools::rp_search::RpSearchManager;
-use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow, Context};
 use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -98,6 +98,7 @@ impl ToolRegistry {
             "run_terminal_cmd" => self.command_tool.execute(args).await,
             "read_file" => self.file_ops_tool.read_file(args).await,
             "write_file" => self.file_ops_tool.write_file(args).await,
+            "edit_file" => self.edit_file(args).await,
             _ => Err(anyhow!("Unknown tool: {}", name)),
         }
     }
@@ -110,6 +111,7 @@ impl ToolRegistry {
             "run_terminal_cmd".to_string(),
             "read_file".to_string(),
             "write_file".to_string(),
+            "edit_file".to_string(),
         ]
     }
 
@@ -189,8 +191,35 @@ impl ToolRegistry {
         self.execute_tool("write_file", args).await
     }
 
-    pub async fn edit_file(&mut self, _args: Value) -> Result<Value> {
-        Err(anyhow!("edit_file not yet implemented in modular system"))
+    pub async fn edit_file(&mut self, args: Value) -> Result<Value> {
+        use crate::tools::types::EditInput;
+
+        let input: EditInput = serde_json::from_value(args).context("invalid edit_file args")?;
+
+        // Read the current file content
+        let read_args = json!({
+            "path": input.path
+        });
+
+        let read_result = self.file_ops_tool.read_file(read_args).await?;
+        let current_content = read_result["content"].as_str()
+            .ok_or_else(|| anyhow!("Failed to read file content"))?;
+
+        // Replace the old string with new string
+        if !current_content.contains(&input.old_str) {
+            return Err(anyhow!("Old string not found in file: {}", input.old_str));
+        }
+
+        let new_content = current_content.replace(&input.old_str, &input.new_str);
+
+        // Write the modified content back
+        let write_args = json!({
+            "path": input.path,
+            "content": new_content,
+            "mode": "overwrite"
+        });
+
+        self.file_ops_tool.write_file(write_args).await
     }
 
     pub async fn delete_file(&mut self, _args: Value) -> Result<Value> {
@@ -259,10 +288,53 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
             }),
         },
 
+        // File reading tool
+        FunctionDeclaration {
+            name: "read_file".to_string(),
+            description: "Read the contents of a file. Use this before editing to understand file structure.".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "File path to read"}
+                },
+                "required": ["path"]
+            }),
+        },
+
+        // File writing tool
+        FunctionDeclaration {
+            name: "write_file".to_string(),
+            description: "Write content to a file. Can create new files or overwrite existing ones. Use read_file first to understand current content before editing.".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "File path to write to"},
+                    "content": {"type": "string", "description": "Content to write to the file"},
+                    "mode": {"type": "string", "description": "Write mode: 'overwrite' (default) or 'append'", "default": "overwrite"}
+                },
+                "required": ["path", "content"]
+            }),
+        },
+
+        // File editing tool
+        FunctionDeclaration {
+            name: "edit_file".to_string(),
+            description: "Edit a file by replacing specific text. Use read_file first to understand the file structure and find exact text to replace.".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "File path to edit"},
+                    "old_string": {"type": "string", "description": "Exact text to replace (must match exactly)"},
+                    "new_string": {"type": "string", "description": "New text to replace with"}
+                },
+                "required": ["path", "old_string", "new_string"]
+            }),
+        },
+
         // Consolidated command execution tool
         FunctionDeclaration {
             name: "run_terminal_cmd".to_string(),
-            description: "Enhanced command execution tool with multiple modes: terminal (default), pty, streaming. Consolidates all command execution functionality.".to_string(),
+            description: "Enhanced command execution tool with multiple modes: terminal (default), pty, streaming. Use this for shell commands, not for file editing - use read_file/write_file/edit_file for file operations.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
@@ -283,23 +355,37 @@ pub fn build_function_declarations_for_level(level: CapabilityLevel) -> Vec<Func
 
     match level {
         CapabilityLevel::Basic => vec![],
-        CapabilityLevel::FileReading => vec![],
+        CapabilityLevel::FileReading => all_declarations
+            .into_iter()
+            .filter(|fd| fd.name == "read_file")
+            .collect(),
         CapabilityLevel::FileListing => all_declarations
             .into_iter()
-            .filter(|fd| fd.name == "list_files")
+            .filter(|fd| fd.name == "list_files" || fd.name == "read_file")
             .collect(),
         CapabilityLevel::Bash => all_declarations
             .into_iter()
-            .filter(|fd| fd.name == "list_files" || fd.name == "run_terminal_cmd")
+            .filter(|fd| fd.name == "list_files" || fd.name == "run_terminal_cmd" || fd.name == "read_file")
             .collect(),
         CapabilityLevel::Editing => all_declarations
             .into_iter()
-            .filter(|fd| fd.name == "list_files" || fd.name == "run_terminal_cmd")
+            .filter(|fd| {
+                fd.name == "list_files"
+                || fd.name == "read_file"
+                || fd.name == "write_file"
+                || fd.name == "edit_file"
+                || fd.name == "run_terminal_cmd"
+            })
             .collect(),
         CapabilityLevel::CodeSearch => all_declarations
             .into_iter()
             .filter(|fd| {
-                fd.name == "list_files" || fd.name == "run_terminal_cmd" || fd.name == "rp_search"
+                fd.name == "list_files"
+                || fd.name == "run_terminal_cmd"
+                || fd.name == "rp_search"
+                || fd.name == "read_file"
+                || fd.name == "write_file"
+                || fd.name == "edit_file"
             })
             .collect(),
     }

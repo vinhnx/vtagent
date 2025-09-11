@@ -10,11 +10,11 @@ async fn test_lmstudio_qwen_connection() -> Result<(), Box<dyn std::error::Error
     let client = reqwest::Client::new();
 
     // Test 1: Check if models endpoint is accessible
-    println!("🧪 Testing LMStudio connection...");
+    println!("[TEST] Testing LMStudio connection...");
     let models_response = client.get("http://localhost:1234/v1/models").send().await?;
 
     assert!(models_response.status().is_success());
-    println!("✅ LMStudio models endpoint is accessible");
+    println!("[SUCCESS] LMStudio models endpoint is accessible");
 
     // Test 2: Check if Qwen model is available
     let models_json: serde_json::Value = models_response.json().await?;
@@ -28,11 +28,11 @@ async fn test_lmstudio_qwen_connection() -> Result<(), Box<dyn std::error::Error
     });
 
     if !qwen_model_available {
-        println!("⚠️  Qwen model not found in LMStudio - skipping Qwen-specific tests");
+        println!("[WARNING] Qwen model not found in LMStudio - skipping Qwen-specific tests");
         return Ok(());
     }
 
-    println!("✅ Qwen model is available in LMStudio");
+    println!("[SUCCESS] Qwen model is available in LMStudio");
 
     // Test 3: Send a simple completion request to Qwen model
     println!("📤 Sending completion request to Qwen model...");
@@ -70,7 +70,7 @@ async fn test_lmstudio_qwen_connection() -> Result<(), Box<dyn std::error::Error
         {
             Ok(response) => {
                 if response.status().is_success() {
-                    println!("✅ Got successful response from Qwen model: {}", model_name);
+                    println!("[SUCCESS] Got successful response from Qwen model: {}", model_name);
                     
                     // Try to parse the response
                     match response.json::<serde_json::Value>().await {
@@ -80,7 +80,7 @@ async fn test_lmstudio_qwen_connection() -> Result<(), Box<dyn std::error::Error
                                 .unwrap_or("");
                             
                             if !response_content.is_empty() {
-                                println!("✅ Received non-empty response from {}: {}", model_name, response_content);
+                                println!("[SUCCESS] Received non-empty response from {}: {}", model_name, response_content);
                                 success = true;
                                 break;
                             } else {
@@ -103,12 +103,12 @@ async fn test_lmstudio_qwen_connection() -> Result<(), Box<dyn std::error::Error
 
     if !success {
         println!(
-            "❌ Failed to get response from any Qwen model. Last error: {}",
+            "[ERROR] Failed to get response from any Qwen model. Last error: {}",
             last_error
         );
         return Err(last_error.into());
     }
 
-    println!("🎉 All LMStudio/Qwen connection tests passed!");
+    println!("[SUCCESS] All LMStudio/Qwen connection tests passed!");
     Ok(())
 }

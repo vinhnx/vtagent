@@ -3,6 +3,7 @@ use console::style;
 use vtagent_core::{
     config::ConfigManager,
     gemini::{Tool, GenerateContentRequest, Content, Part},
+    gemini::models::SystemInstruction,
     llm::make_client,
     models::ModelId,
     tools::{ToolRegistry, build_function_declarations},
@@ -58,10 +59,11 @@ pub async fn handle_chat_command(config: &CoreAgentConfig, force_multi_agent: bo
     println!("{}", style("Single agent mode").cyan());
     println!("Type 'exit' to quit, 'help' for commands");
 
-    // Initialize conversation history
-    let mut conversation_history = vec![
-        Content::system_text("You are a helpful coding assistant. You can help with programming tasks, code analysis, and file operations.")
-    ];
+    // Initialize conversation history (no system messages in contents for Gemini)
+    let mut conversation_history: Vec<Content> = vec![];
+
+    // Create system instruction
+    let system_instruction = SystemInstruction::new("You are a helpful coding assistant. You can help with programming tasks, code analysis, and file operations.");
 
     loop {
         // Get user input
@@ -96,7 +98,7 @@ pub async fn handle_chat_command(config: &CoreAgentConfig, force_multi_agent: bo
             contents: conversation_history.clone(),
             tools: Some(tools.clone()),
             tool_config: None,
-            system_instruction: None,
+            system_instruction: Some(system_instruction.clone()),
             generation_config: None,
         };
 

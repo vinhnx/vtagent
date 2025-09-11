@@ -41,7 +41,7 @@ pub async fn handle_stats_command(
 }
 
 fn display_text_stats(config: &AgentConfig, metrics: &PerformanceMetrics, detailed: bool) {
-    println!("{} Configuration:", style("⚙️").dim());
+    println!("{} Configuration:", style("[CONFIG]").dim());
     println!("  Model: {}", style(&config.model).cyan());
     println!("  Workspace: {}", style(config.workspace.display()).cyan());
     println!(
@@ -64,7 +64,7 @@ fn display_text_stats(config: &AgentConfig, metrics: &PerformanceMetrics, detail
         }
     }
 
-    println!("\n{} Performance Metrics:", style("📈").dim());
+    println!("\n{} Performance Metrics:", style("[METRICS]").dim());
     println!(
         "  Session Duration: {} seconds",
         style(metrics.session_duration_seconds).cyan()

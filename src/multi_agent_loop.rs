@@ -17,6 +17,7 @@ use vtagent_core::config::{
 use vtagent_core::gemini::{
     Content, FunctionDeclaration, FunctionResponse, GenerateContentRequest, Part, Tool, ToolConfig,
 };
+use vtagent_core::gemini::models::SystemInstruction;
 use vtagent_core::llm::make_client;
 use vtagent_core::models::{ModelId, Provider};
 use vtagent_core::types::{AgentConfig as CoreAgentConfig, *};
@@ -255,7 +256,7 @@ pub async fn run_multi_agent_conversation(
         }
 
         // Create system instruction for orchestrator
-        let system_instruction = Content::system_text(format!(
+        let system_instruction = SystemInstruction::new(format!(
             "{}\n\n## Current Session\nSession ID: {}\nUser Request: {}",
             orchestrator_prompt, session_id, input
         ));

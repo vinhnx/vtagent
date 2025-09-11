@@ -2,7 +2,7 @@
 //! This verifies the universal LLM provider architecture works correctly
 
 fn main() {
-    println!("🔍 LLM Provider System Verification");
+    println!("[VERIFICATION] LLM Provider System Verification");
     println!("===================================");
 
     // Test 1: Provider Factory
@@ -29,7 +29,7 @@ fn main() {
     println!("\n6. Testing Anthropic Tool Message Handling...");
     test_anthropic_tool_handling();
 
-    println!("\n✅ All LLM Provider Tests Passed!");
+    println!("\n[SUCCESS] All LLM Provider Tests Passed!");
     println!("Universal LLM Provider System is working correctly.");
 }
 

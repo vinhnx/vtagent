@@ -3,6 +3,7 @@
 use crate::config::models::ModelId;
 use crate::config::types::AgentConfig;
 use crate::gemini::{Content, GenerateContentRequest};
+use crate::gemini::models::SystemInstruction;
 use crate::llm::make_client;
 use crate::prompts::generate_lightweight_instruction;
 use anyhow::Result;
@@ -21,7 +22,18 @@ pub async fn handle_ask_command(config: AgentConfig, prompt: Vec<String>) -> Res
     }
 
     let contents = vec![Content::user_text(prompt_text)];
-    let system_instruction = generate_lightweight_instruction();
+    let lightweight_instruction = generate_lightweight_instruction();
+
+    // Convert Content to SystemInstruction
+    let system_instruction = if let Some(part) = lightweight_instruction.parts.first() {
+        if let Some(text) = part.as_text() {
+            SystemInstruction::new(text)
+        } else {
+            SystemInstruction::new("You are a helpful coding assistant.")
+        }
+    } else {
+        SystemInstruction::new("You are a helpful coding assistant.")
+    };
 
     let request = GenerateContentRequest {
         contents,

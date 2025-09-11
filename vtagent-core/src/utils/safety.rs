@@ -200,7 +200,7 @@ impl SafetyValidator {
                 println!("• Slower response times");
             }
             s if s == models::GEMINI_2_5_FLASH => {
-                println!("{}", style("⚡ Using balanced model:").green());
+                println!("{}", style("[FAST] Using balanced model:").green());
                 println!("• Good quality responses");
                 println!("• Reasonable cost");
                 println!("• Fast response times");

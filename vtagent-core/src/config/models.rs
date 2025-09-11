@@ -220,7 +220,7 @@ impl ModelId {
     /// Get provider-specific defaults for orchestrator
     pub fn default_orchestrator_for_provider(provider: Provider) -> Self {
         match provider {
-            Provider::Gemini => ModelId::Gemini25Flash,
+            Provider::Gemini => ModelId::Gemini25FlashLite,
             Provider::OpenAI => ModelId::GPT5,
             Provider::Anthropic => ModelId::ClaudeSonnet4,
             Provider::LMStudio => ModelId::LMStudioLocal, // Use LMStudio local model

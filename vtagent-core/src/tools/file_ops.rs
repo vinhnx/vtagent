@@ -12,6 +12,7 @@ use std::sync::Arc;
 use walkdir::WalkDir;
 
 /// File operations tool with multiple modes
+#[derive(Clone)]
 pub struct FileOpsTool {
     workspace_root: PathBuf,
     rp_search: Arc<RpSearchManager>,

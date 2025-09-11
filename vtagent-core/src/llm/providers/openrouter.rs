@@ -1,10 +1,10 @@
 use crate::llm::provider::{
-    FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
-    ToolDefinition, Usage,
+    FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, MessageRole, ToolCall,
+    Usage,
 };
 use async_trait::async_trait;
 use reqwest::Client as HttpClient;
-use serde::{Deserialize, Serialize};
+// serde imports will be added back if needed
 use serde_json::{Value, json};
 
 pub struct OpenRouterProvider {
@@ -148,10 +148,10 @@ impl OpenRouterProvider {
                                 .as_str()?
                                 .to_string(),
                             arguments: call
-                                .get("function")?
-                                .get("arguments")?
-                                .clone()
-                                .unwrap_or_else(|| Value::Null),
+                                .get("function")
+                                .and_then(|f| f.get("arguments"))
+                                .cloned()
+                                .unwrap_or(Value::Null),
                         })
                     })
                     .collect()
@@ -238,17 +238,18 @@ impl LLMProvider for OpenRouterProvider {
     }
 
     fn supported_models(&self) -> Vec<String> {
+        use crate::config::constants::models;
         vec![
-            "anthropic/claude-3.5-sonnet".to_string(),
-            "anthropic/claude-3-haiku".to_string(),
-            "openai/gpt-4o".to_string(),
-            "openai/gpt-4o-mini".to_string(),
-            "google/gemini-pro-1.5".to_string(),
-            "meta-llama/llama-3.1-405b-instruct".to_string(),
-            "meta-llama/llama-3.1-70b-instruct".to_string(),
-            "meta-llama/llama-3.1-8b-instruct".to_string(),
-            "mistralai/mistral-7b-instruct".to_string(),
-            "mistralai/mixtral-8x7b-instruct".to_string(),
+            models::OPENROUTER_ANTHROPIC_CLAUDE_3_5_SONNET.to_string(),
+            models::OPENROUTER_ANTHROPIC_CLAUDE_3_HAIKU.to_string(),
+            models::OPENROUTER_OPENAI_GPT_5.to_string(),
+            models::OPENROUTER_OPENAI_GPT_5_MINI.to_string(),
+            models::OPENROUTER_GOOGLE_GEMINI_2_5_PRO.to_string(),
+            models::OPENROUTER_GOOGLE_GEMINI_2_5_FLASH.to_string(),
+            models::OPENROUTER_GOOGLE_GEMINI_2_5_FLASH_LITE.to_string(),
+            models::OPENROUTER_QWEN_QWEN3_CODER.to_string(),
+            models::OPENROUTER_X_AI_GROK_CODE_FAST_1.to_string(),
+            models::OPENROUTER_DEEPSEEK_DEEPSEEK_CHAT_V3_1.to_string(),
         ]
     }
 

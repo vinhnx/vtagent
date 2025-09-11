@@ -18,7 +18,7 @@ pub trait Tool: Send + Sync {
     fn description(&self) -> &'static str;
 
     /// Validate arguments before execution
-    fn validate_args(&self, args: &Value) -> Result<()> {
+    fn validate_args(&self, _args: &Value) -> Result<()> {
         // Default implementation - tools can override for specific validation
         Ok(())
     }
@@ -51,7 +51,7 @@ pub trait CacheableTool: Tool {
     fn cache_key(&self, args: &Value) -> String;
 
     /// Check if result should be cached
-    fn should_cache(&self, args: &Value) -> bool {
+    fn should_cache(&self, _args: &Value) -> bool {
         true // Default: cache everything
     }
 

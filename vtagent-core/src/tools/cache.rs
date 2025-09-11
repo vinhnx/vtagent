@@ -1,13 +1,13 @@
 //! Caching system for tool results
 
 use super::types::{EnhancedCacheEntry, EnhancedCacheStats};
-use dashmap::DashMap;
+// dashmap::DashMap import removed as it's not used
 use lru::LruCache;
 use once_cell::sync::Lazy;
 use serde_json::Value;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tokio::sync::RwLock;
 
 /// Global file cache instance

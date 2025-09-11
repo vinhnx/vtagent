@@ -50,15 +50,12 @@ aes-gcm = "0.10"
 humantime = "2.1"
 argon2 = "0.5"
 rand = "0.8"
-is-terminal = "0.4"
-terminal_size = "0.3"
-bubbletea-rs = "0.0.7"
-bubbletea-widgets = "0.1.11"
-lipgloss-extras = { version = "0.1.0", features = ["full"] }
-crossterm = "0.27"
+terminal_size = "0.4.3"
+is-terminal = "0.4.16"
+async-trait = "0.1.89"
+indicatif = "0.17"
 # PTY support
 rexpect = "0.6.2"
-async-trait = "0.1.89"
 # Dotenv support
 dotenvy = "0.15"
 # Home directory detection

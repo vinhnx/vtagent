@@ -30,7 +30,7 @@ pub enum TreeSitterError {
 }
 
 /// Language support enumeration
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, Hash, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, Hash, PartialEq)]
 pub enum LanguageSupport {
     Rust,
     Python,
@@ -170,7 +170,7 @@ impl TreeSitterAnalyzer {
 
     /// Extract symbols from a syntax tree
     pub fn extract_symbols(
-        &self,
+        &mut self,
         syntax_tree: &Tree,
         source_code: &str,
         language: LanguageSupport,
@@ -193,7 +193,7 @@ impl TreeSitterAnalyzer {
         symbols: &mut Vec<SymbolInfo>,
         parent_scope: Option<String>,
     ) -> Result<()> {
-        let node_text = &source_code[node.start_byte()..node.end_byte()];
+        let _node_text = &source_code[node.start_byte()..node.end_byte()];
         let kind = node.kind();
 
         // Extract symbols based on node type and language
@@ -365,7 +365,7 @@ impl TreeSitterAnalyzer {
         // Look for use statements and extern crate declarations
         if node.kind() == "use_declaration" {
             // Extract the path from the use statement
-            if let Some(path_node) = self
+            if let Some(_path_node) = self
                 .find_child_by_type(node, "use_list")
                 .or_else(|| self.find_child_by_type(node, "scoped_identifier"))
                 .or_else(|| self.find_child_by_type(node, "identifier"))
@@ -384,7 +384,7 @@ impl TreeSitterAnalyzer {
             }
         } else if node.kind() == "extern_crate_declaration" {
             // Extract crate name from extern crate declaration
-            if let Some(name_node) = self.find_child_by_type(node, "identifier") {
+            if let Some(_name_node) = self.find_child_by_type(node, "identifier") {
                 dependencies.push(DependencyInfo {
                     name: "unknown_crate".to_string(), // Would need more parsing for actual name
                     kind: DependencyKind::External,

@@ -52,6 +52,7 @@ impl Default for ToolPolicyConfig {
 }
 
 /// Tool policy manager
+#[derive(Clone)]
 pub struct ToolPolicyManager {
     config_path: PathBuf,
     config: ToolPolicyConfig,

@@ -35,10 +35,9 @@ pub struct ProviderConfigs {
     pub gemini: Option<ProviderConfig>,
     pub openrouter: Option<ProviderConfig>,
     pub lmstudio: Option<ProviderConfig>,
-    pub ollama: Option<ProviderConfig>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProviderConfig {
     pub api_key: Option<String>,
     pub base_url: Option<String>,
@@ -103,7 +102,6 @@ impl Default for ProviderConfigs {
             gemini: None,
             openrouter: None,
             lmstudio: None,
-            ollama: None,
         }
     }
 }
@@ -197,7 +195,7 @@ impl DotManager {
             .map_err(|e| DotError::Io(e))?;
 
         toml::from_str(&content)
-            .map_err(|e| DotError::Toml(e))
+            .map_err(|e| DotError::TomlDe(e))
     }
 
     /// Save configuration to disk
@@ -453,35 +451,31 @@ pub enum DotError {
     BackupNotFound(PathBuf),
 }
 
+use std::sync::{LazyLock, Mutex};
+
 /// Global dot manager instance
-static mut DOT_MANAGER: Option<DotManager> = None;
-static DOT_INIT: std::sync::Once = std::sync::Once::new();
+static DOT_MANAGER: LazyLock<Mutex<DotManager>> = LazyLock::new(|| Mutex::new(DotManager::new().unwrap()));
 
 /// Get global dot manager instance
-pub fn get_dot_manager() -> Result<&'static DotManager, DotError> {
-    unsafe {
-        DOT_INIT.call_once(|| {
-            DOT_MANAGER = Some(DotManager::new().unwrap());
-        });
-        Ok(DOT_MANAGER.as_ref().unwrap())
-    }
+pub fn get_dot_manager() -> &'static Mutex<DotManager> {
+    &DOT_MANAGER
 }
 
 /// Initialize dot folder (should be called at startup)
 pub fn initialize_dot_folder() -> Result<(), DotError> {
-    let manager = get_dot_manager()?;
+    let manager = get_dot_manager().lock().unwrap();
     manager.initialize()
 }
 
 /// Load user configuration
 pub fn load_user_config() -> Result<DotConfig, DotError> {
-    let manager = get_dot_manager()?;
+    let manager = get_dot_manager().lock().unwrap();
     manager.load_config()
 }
 
 /// Save user configuration
 pub fn save_user_config(config: &DotConfig) -> Result<(), DotError> {
-    let manager = get_dot_manager()?;
+    let manager = get_dot_manager().lock().unwrap();
     manager.save_config(config)
 }
 

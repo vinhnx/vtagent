@@ -1,7 +1,7 @@
 //! Advanced search tools with enhanced case-insensitive capabilities
 
-use super::traits::{Tool, ToolExecutor};
-use crate::tools::rp_search::{RpSearchInput, RpSearchManager};
+use super::traits::Tool;
+use crate::tools::rp_search::RpSearchManager;
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use regex::Regex;
@@ -53,15 +53,13 @@ impl AdvancedSearchTool {
 
     /// Perform advanced search with multiple options
     pub async fn search(&self, query: &str, path: &str, options: SearchOptions) -> Result<Value> {
-        let mut results = Vec::new();
-
-        if options.regex {
+        let results = if options.regex {
             // Use regex search
-            results = self.regex_search(query, path, &options).await?;
+            self.regex_search(query, path, &options).await?
         } else {
             // Use pattern-based search
-            results = self.pattern_search(query, path, &options).await?;
-        }
+            self.pattern_search(query, path, &options).await?
+        };
 
         // Apply post-processing filters
         let filtered_results = self.apply_filters(results, &options);
@@ -140,7 +138,6 @@ impl AdvancedSearchTool {
         }
 
         let mut entries = tokio::fs::read_dir(dir).await?;
-        let mut file_count = 0;
 
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
@@ -173,7 +170,7 @@ impl AdvancedSearchTool {
                 match self.search_file_content(&path, regex, options).await {
                     Ok(file_results) => {
                         results.extend(file_results);
-                        file_count += 1;
+                        // file_count += 1; // Not used, so removed
 
                         // Check if we've hit the max results limit
                         if results.len() >= options.max_results {
@@ -380,7 +377,7 @@ impl AdvancedSearchTool {
         file_groups
             .into_iter()
             .filter(|(_, file_results)| {
-                let file_path = file_results.first()
+                let _file_path = file_results.first()
                     .and_then(|r| r.get("file"))
                     .and_then(|f| f.as_str())
                     .unwrap_or("");

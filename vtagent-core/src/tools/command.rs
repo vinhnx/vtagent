@@ -4,13 +4,14 @@ use super::traits::{ModeTool, Tool};
 use super::types::*;
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
-use rexpect::session::PtySession;
+// PtySession import removed as it's not directly used
 use rexpect::spawn;
 use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::time::Duration;
 
 /// Command execution tool with multiple modes
+#[derive(Clone)]
 pub struct CommandTool {
     workspace_root: PathBuf,
 }

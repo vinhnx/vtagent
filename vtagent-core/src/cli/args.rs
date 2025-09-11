@@ -48,6 +48,10 @@ pub struct Cli {
     #[arg(long, global = true, default_value_t = 10)]
     pub max_tool_calls: usize,
 
+    /// **Enable debug output** for troubleshooting and development\n\n**Shows:**\n• Tool call details\n• API request/response info\n• Internal agent state\n• Performance metrics\n\n**Use for:** Debugging issues, understanding agent behavior
+    #[arg(long, global = true)]
+    pub debug: bool,
+
     /// Enable verbose logging and transparency features
     #[arg(long, global = true)]
     pub verbose: bool,
@@ -246,6 +250,7 @@ impl Default for Cli {
             no_color: false,
             force_multi_agent: false,
             skip_confirmations: false,
+            debug: false,
             command: Some(Commands::Chat),
         }
     }

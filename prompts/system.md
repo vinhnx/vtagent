@@ -118,7 +118,7 @@ You MUST adhere to the following criteria when solving queries:
 - Analyzing code for vulnerabilities is allowed.
 - Showing user code and tool call details is allowed.
 - Use the `edit_file` tool to edit files by replacing text, or `write_file` with "patch" mode for structured changes:
-  - For simple text replacement: `edit_file` with `old_string` and `new_string`
+  - For simple text replacement: `edit_file` with `old_str` and `new_str`
   - For complex patches: `write_file` with `mode: "patch"` and unified diff format
 
 If completing the user's task requires writing or modifying files, your code and final answer should follow these coding guidelines, though user instructions (i.e. AGENTS.md) may override these guidelines:

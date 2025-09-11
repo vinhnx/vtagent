@@ -234,11 +234,6 @@ impl LLMProvider for LMStudioProvider {
                 .await
                 .unwrap_or_else(|_| "Failed to read response body".to_string());
 
-            eprintln!(
-                "DEBUG: LMStudio HTTP error - Status: {}, Body: {}",
-                status, error_text
-            );
-
             // For local LMStudio, if we get 403 Forbidden, try without authentication
             if status == reqwest::StatusCode::FORBIDDEN && self.api_key.is_none() {
                 eprintln!(
@@ -375,7 +370,7 @@ impl LLMClient for LMStudioProvider {
                         }],
                         system_prompt: None,
                         tools: None,
-                        model: models::lmstudio::DEFAULT_MODEL.to_string(),
+                        model: models::lmstudio::DEFAULT_MODEL to_string(),
                         max_tokens: None,
                         temperature: None,
                         stream: false,
@@ -393,7 +388,7 @@ impl LLMClient for LMStudioProvider {
                 }],
                 system_prompt: None,
                 tools: None,
-                model: models::lmstudio::DEFAULT_MODEL.to_string(),
+                model: models::lmstudio::DEFAULT_MODEL to_string(),
                 max_tokens: None,
                 temperature: None,
                 stream: false,
@@ -402,7 +397,7 @@ impl LLMClient for LMStudioProvider {
 
         let response = LLMProvider::generate(self, request).await?;
 
-        let model = models::lmstudio::DEFAULT_MODEL.to_string();
+        let model = models::lmstudio::DEFAULT_MODEL to_string();
 
         // Validate the model
         if !model_helpers::is_valid("lmstudio", &model) {

@@ -20,25 +20,39 @@ use vtagent_core::llm::{AnyClient, make_client};
 /// Load system prompt from configuration or default path
 fn load_system_prompt(_config: &VTAgentConfig) -> Result<String> {
     use std::fs;
+    use std::path::Path;
 
-    // Note: VTAgentConfig doesn't have prompts section yet, so use default for now
-    let path = prompts::DEFAULT_SYSTEM_PROMPT_PATH;
+    // Try multiple possible paths for the system prompt file
+    let possible_paths = [
+        "prompts/system.md",           // From project root
+        "../prompts/system.md",        // From src/ or vtagent-core/
+        "../../prompts/system.md",     // From deeper subdirectories
+        "vtagent-core/src/prompts/system.md", // Direct path
+    ];
 
-    match fs::read_to_string(path) {
-        Ok(content) => Ok(content),
-        Err(_) => {
-            // If the file doesn't exist, return a simple fallback prompt with helpful error
-            eprintln!(
-                "Warning: Could not read system prompt from '{}'. Using fallback prompt.",
-                path
-            );
-            eprintln!(
-                "To customize: Create '{}' or configure [prompts].system in vtagent.toml",
-                path
-            );
-            Ok("You are a helpful coding assistant for the VTAgent Rust project with access to file operations.\n\n## IMPORTANT: ALWAYS USE TOOLS FOR FILE OPERATIONS\n\nWhen user asks to edit files, modify code, or add content:\n1. FIRST: Use read_file to understand the current file structure\n2. THEN: Use edit_file to make specific text replacements, OR use write_file to rewrite entire files\n3. Do NOT try to use terminal commands (sed, awk, etc.) for file editing\n\nWhen user asks about project questions:\n1. FIRST: Use list_files to see project structure\n2. THEN: Use read_file on relevant files like README.md\n\n## AVAILABLE TOOLS:\n- read_file: Read file contents to understand structure\n- write_file: Create new files or completely rewrite existing ones\n- edit_file: Replace specific text in files (use this for targeted edits)\n- list_files: List files and directories in a path\n- rp_search: Search for patterns in code\n- run_terminal_cmd: Execute terminal commands (NOT for file editing)\n\n## TOOL USAGE EXAMPLES:\nTo add a model constant:\n1. read_file('path/to/constants.rs') - understand structure\n2. edit_file(path='path/to/constants.rs', old_string='    pub const LAST_CONST: &str = \"value\";', new_string='    pub const LAST_CONST: &str = \"value\";\n    pub const NEW_CONST: &str = \"new_value\";')\n\nALWAYS use function calls, not text responses, when files need to be read or modified.".to_string())
+    for path in &possible_paths {
+        if Path::new(path).exists() {
+            match fs::read_to_string(path) {
+                Ok(content) => {
+                    // Try to extract the system prompt from markdown format
+                    if let Some(start) = content.find("```rust\nr#\"") {
+                        if let Some(end) = content[start..].find("\"#\n```") {
+                            let prompt_start = start + 9; // Skip ```rust\nr#"
+                            let prompt_end = start + end;
+                            return Ok(content[prompt_start..prompt_end].to_string());
+                        }
+                    }
+                    // If not in markdown format, return as-is
+                    return Ok(content);
+                }
+                Err(_) => continue,
+            }
         }
     }
+
+    // Fallback to inline prompt if file not found
+    eprintln!("Warning: Could not find system.md file, using inline fallback");
+    Ok("You are a helpful coding assistant for the VTAgent Rust project with access to file operations.\n\n## IMPORTANT: ALWAYS USE TOOLS FOR FILE OPERATIONS\n\nWhen user asks to edit files, modify code, or add content:\n1. FIRST: Use read_file to understand the current file structure\n2. THEN: Use edit_file to make specific text replacements, OR use write_file to rewrite entire files\n3. Do NOT try to use terminal commands (sed, awk, etc.) for file editing\n\nWhen user asks about project questions:\n1. FIRST: Use list_files to see project structure\n2. THEN: Use read_file on relevant files like README.md\n\n## AVAILABLE TOOLS:\n- read_file: Read file contents to understand structure\n- write_file: Create new files or completely rewrite existing ones\n- edit_file: Replace specific text in files (use this for targeted edits)\n- list_files: List files and directories in a path\n- rp_search: Search for patterns in code\n- run_terminal_cmd: Execute terminal commands (NOT for file editing)\n\n## TOOL USAGE EXAMPLES:\nTo add a model constant:\n1. read_file('path/to/constants.rs') - understand structure\n2. edit_file(path='path/to/constants.rs', old_str='    pub const LAST_CONST: &str = \"value\";', new_str='    pub const LAST_CONST: &str = \"value\";\n    pub const NEW_CONST: &str = \"new_value\";')\n\nALWAYS use function calls, not text responses, when files need to be read or modified.".to_string())
 }
 
 #[tokio::main]
@@ -106,7 +120,7 @@ async fn main() -> Result<()> {
 }
 
 /// Handle the chat command - interactive REPL
-async fn handle_chat_command(_args: &Cli) -> Result<()> {
+async fn handle_chat_command(args: &Cli) -> Result<()> {
     println!("VT Agent - Interactive AI Coding Assistant");
 
     // Determine workspace
@@ -131,6 +145,9 @@ async fn handle_chat_command(_args: &Cli) -> Result<()> {
         bail!("No model configured. Please set a model in your vtagent.toml configuration file.");
     }
 
+    if args.debug {
+        println!("Debug mode enabled");
+    }
     println!("Using {} with model: {}", provider, model_str);
     println!("Type 'exit' or 'quit' to end the conversation.");
     println!();
@@ -144,7 +161,7 @@ async fn handle_chat_command(_args: &Cli) -> Result<()> {
     } else {
         println!("{}", style("Single agent mode").cyan());
         // For Gemini and other providers, use the single-agent chat with tools
-        handle_single_agent_chat(&model_str, provider, &vtagent_config)
+        handle_single_agent_chat(&model_str, provider, &vtagent_config, args.debug)
             .await
             .context("Single agent chat failed")?;
     }
@@ -157,10 +174,13 @@ async fn handle_single_agent_chat(
     model_str: &str,
     provider: &str,
     config: &VTAgentConfig,
+    debug_enabled: bool,
 ) -> Result<()> {
     use vtagent_core::llm::provider::ToolDefinition;
 
-    println!("DEBUG: Entered handle_single_agent_chat function");
+    if debug_enabled {
+        println!("DEBUG: Entered handle_single_agent_chat function");
+    }
 
     // Initialize tool registry and function declarations
     let mut tool_registry =
@@ -178,10 +198,12 @@ async fn handle_single_agent_chat(
         })
         .collect();
 
-    println!(
-        "DEBUG: Available tools: {:?}",
-        tool_definitions.iter().map(|t| &t.name).collect::<Vec<_>>()
-    );
+    if debug_enabled {
+        println!(
+            "DEBUG: Available tools: {:?}",
+            tool_definitions.iter().map(|t| &t.name).collect::<Vec<_>>()
+        );
+    }
 
     // For LMStudio, use the correct model name
     let model_str =
@@ -261,19 +283,27 @@ async fn handle_single_agent_chat(
     // Initialize conversation history
     let mut conversation_history = vec![Message {
         role: MessageRole::System,
-        content: system_prompt,
+        content: system_prompt.clone(),
         tool_calls: None,
         tool_call_id: None,
     }];
 
     loop {
-        println!("DEBUG: Starting input loop iteration");
-        println!("DEBUG: About to show prompt");
-        print!("> ");
+        if debug_enabled {
+            println!("DEBUG: Starting input loop iteration");
+            println!("DEBUG: About to show prompt");
+        }
+
+        // Enhanced REPL prompt with better formatting
+        print!("{}", style("[AGENT] vtagent").cyan().bold());
+        print!("{}", style(" ❯ ").white().bold());
         let flush_result = io::stdout().flush();
-        println!("DEBUG: Flush result: {:?}", flush_result);
+
+        if debug_enabled {
+            println!("DEBUG: Flush result: {:?}", flush_result);
+            println!("DEBUG: Prompt shown, waiting for input");
+        }
         flush_result.context("Failed to flush stdout")?;
-        println!("DEBUG: Prompt shown, waiting for input");
 
         let mut input = String::new();
         let bytes_read = io::stdin()
@@ -282,15 +312,18 @@ async fn handle_single_agent_chat(
 
         // Check for EOF (when piping input)
         if bytes_read == 0 {
+            println!("\n{}", style("[EXIT] Goodbye! Thanks for using vtagent.").green().italic());
             break;
         }
 
         let input = input.trim();
 
-        println!("DEBUG: Processing input: '{}'", input);
+        if debug_enabled {
+            println!("DEBUG: Processing input: '{}'", input);
+        }
 
         if input.eq_ignore_ascii_case("exit") || input.eq_ignore_ascii_case("quit") {
-            println!("Goodbye!");
+            println!("\n{}", style("[EXIT] Session ended. Thanks for using vtagent!").green().bold());
             break;
         }
 
@@ -397,11 +430,13 @@ async fn handle_single_agent_chat(
         match client.generate(request).await {
             Ok(response) => {
                 // Debug the response structure
-                println!("DEBUG: Response tool_calls: {:?}", response.tool_calls.is_some());
-                if let Some(ref tool_calls) = response.tool_calls {
-                    println!("DEBUG: Number of tool calls: {}", tool_calls.len());
-                } else {
-                    println!("DEBUG: No tool calls in response");
+                if debug_enabled {
+                    println!("DEBUG: Response tool_calls: {:?}", response.tool_calls.is_some());
+                    if let Some(ref tool_calls) = response.tool_calls {
+                        println!("DEBUG: Number of tool calls: {}", tool_calls.len());
+                    } else {
+                        println!("DEBUG: No tool calls in response");
+                    }
                 }
 
                 // Add assistant message to conversation history BEFORE processing tool calls
@@ -424,17 +459,17 @@ async fn handle_single_agent_chat(
                 if let Some(tool_calls) = &response.tool_calls {
                     // Assistant message already added above, proceed with tool execution
                     println!(
-                        "{}: Executing {} tool call(s)",
-                        style("[TOOL]").blue().bold().on_black(),
-                        tool_calls.len()
+                        "\n{} {} tool call(s) to execute",
+                        style("🔧").blue(),
+                        style(tool_calls.len()).bold()
                     );
 
-                    for tool_call in tool_calls {
+                    for (tool_call_index, tool_call) in tool_calls.iter().enumerate() {
                         println!(
-                            "{}: Calling tool: {} with args: {}",
-                            style("[TOOL_CALL]").cyan().bold().on_black(),
-                            tool_call.name,
-                            tool_call.arguments
+                            "{} {} {}",
+                            style(format!("  {}.", tool_call_index + 1)).dim(),
+                            style(&tool_call.name).cyan().bold(),
+                            style(&tool_call.arguments).dim()
                         );
 
                         // Execute the tool
@@ -444,9 +479,9 @@ async fn handle_single_agent_chat(
                         {
                             Ok(result) => {
                                 println!(
-                                    "{}: Tool {} executed successfully",
-                                    style("(SUCCESS)").green().bold(),
-                                    tool_call.name
+                                    "{} {} executed successfully",
+                                    style("[SUCCESS]").green(),
+                                    style(&tool_call.name).cyan().bold()
                                 );
 
                                 // Add tool result to conversation
@@ -456,13 +491,21 @@ async fn handle_single_agent_chat(
                                     tool_calls: None,
                                     tool_call_id: Some(tool_call.id.clone()),
                                 });
+
+                                // If this is the last tool call, show completion message
+                                if tool_call_index == tool_calls.len() - 1 {
+                                    println!(
+                                        "\n{} All tool calls completed successfully",
+                                        style("[CELEBRATION]").green().bold()
+                                    );
+                                }
                             }
                             Err(e) => {
                                 println!(
-                                    "{}: Tool {} failed: {}",
-                                    style("(ERROR)").red().bold().on_black(),
-                                    tool_call.name,
-                                    e
+                                    "{} {} failed: {}",
+                                    style("[ERROR]").red(),
+                                    style(&tool_call.name).cyan().bold(),
+                                    style(&e).red()
                                 );
 
                                 // Add error result to conversation
@@ -479,7 +522,7 @@ async fn handle_single_agent_chat(
                     // After executing tools, send another request to get the final response
                     let follow_up_request = LLMRequest {
                         messages: conversation_history.clone(),
-                        system_prompt: None,
+                        system_prompt: Some(system_prompt.clone()),
                         tools: Some(tool_definitions.clone()),
                         model: model_str.to_string(),
                         max_tokens: Some(1000),
@@ -497,7 +540,7 @@ async fn handle_single_agent_chat(
                                     final_tool_calls.len()
                                 );
 
-                                for tool_call in final_tool_calls {
+                                for (tool_call_index, tool_call) in final_tool_calls.iter().enumerate() {
                                     println!(
                                         "{}: Calling tool: {} with args: {}",
                                         style("[TOOL_CALL]").cyan().bold().on_black(),
@@ -524,6 +567,14 @@ async fn handle_single_agent_chat(
                                                 tool_calls: None,
                                                 tool_call_id: Some(tool_call.id.clone()),
                                             });
+
+                                            // If this is the last follow-up tool call, show completion message
+                                            if tool_call_index == final_tool_calls.len() - 1 {
+                                                println!(
+                                                    "{}: All follow-up tool calls completed. Ready for next command.",
+                                                    style("[STATUS]").blue().bold()
+                                                );
+                                            }
                                         }
                                         Err(e) => {
                                             println!(
@@ -547,7 +598,7 @@ async fn handle_single_agent_chat(
                                 // After executing follow-up tools, get the final response
                                 let final_follow_up_request = LLMRequest {
                                     messages: conversation_history.clone(),
-                                    system_prompt: None,
+                                    system_prompt: Some(system_prompt.clone()),
                                     tools: Some(tool_definitions.clone()),
                                     model: model_str.to_string(),
                                     max_tokens: Some(1000),
@@ -610,6 +661,30 @@ async fn handle_single_agent_chat(
         }
     }
 
+    // Provide a summary of what was accomplished
+    if !conversation_history.is_empty() {
+        println!("\n{}", style("═".repeat(50)).cyan());
+        println!("{}", style("[SUMMARY] SESSION SUMMARY").cyan().bold());
+        println!("{}", style("═".repeat(50)).cyan());
+
+        // Count tool calls and user interactions
+        let tool_calls = conversation_history.iter()
+            .filter(|msg| msg.tool_calls.is_some())
+            .count();
+
+        if tool_calls > 0 {
+            println!("{} {} tool call(s) executed",
+                    style("🔧").blue(),
+                    style(tool_calls).bold());
+        }
+
+        println!("{} Session completed successfully!",
+                style("[SUCCESS]").green().bold());
+        println!("{} Ready for your next task!",
+                style("[LAUNCH]").green());
+        println!("{}", style("═".repeat(50)).cyan());
+    }
+
     Ok(())
 }
 
@@ -639,7 +714,7 @@ async fn handle_simple_prompt_chat(mut client: AnyClient) -> Result<()> {
         let input = input.trim();
 
         if input.eq_ignore_ascii_case("exit") || input.eq_ignore_ascii_case("quit") {
-            println!("Goodbye!");
+            println!("\n{}", style("[EXIT] Session ended. Thanks for using vtagent!").green().bold());
             break;
         }
 
@@ -764,7 +839,7 @@ async fn handle_multi_agent_chat(
         let input = input.trim();
 
         if input.eq_ignore_ascii_case("exit") || input.eq_ignore_ascii_case("quit") {
-            println!("Goodbye!");
+            println!("\n{}", style("[EXIT] Session ended. Thanks for using vtagent!").green().bold());
             break;
         }
 

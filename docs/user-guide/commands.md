@@ -59,7 +59,7 @@ Ask: Search for TODO|FIXME across the repo with 2 lines of context in .rs files
 - `list_files(path, max_items?, include_hidden?)`
 - `read_file(path, max_bytes?)`
 - `write_file(path, content, overwrite?)`
-- `edit_file(path, old_string, new_string)`
+- `edit_file(path, old_str, new_str)`
 
 ## Tips
 

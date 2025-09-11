@@ -174,19 +174,11 @@ impl GeminiProvider {
     }
 
     fn convert_from_gemini_format(&self, response: Value) -> Result<LLMResponse, LLMError> {
-        // Debug: Log the response structure
-        println!(
-            "DEBUG: Gemini response structure: {}",
-            serde_json::to_string_pretty(&response).unwrap_or_default()
-        );
-
         let candidates = response["candidates"].as_array().ok_or_else(|| {
-            println!("DEBUG: No candidates array in response");
             LLMError::Provider("No candidates in response".to_string())
         })?;
 
         let candidate = candidates.first().ok_or_else(|| {
-            println!("DEBUG: Candidates array is empty");
             LLMError::Provider("No candidate in response".to_string())
         })?;
 
@@ -194,7 +186,6 @@ impl GeminiProvider {
         if let Some(content) = candidate.get("content") {
             if let Some(parts) = content.get("parts").and_then(|p| p.as_array()) {
                 if parts.is_empty() {
-                    println!("DEBUG: Parts array is empty, returning empty response");
                     return Ok(LLMResponse {
                         content: Some("".to_string()),
                         tool_calls: None,
@@ -245,15 +236,26 @@ impl GeminiProvider {
                     finish_reason,
                 });
             } else {
-                println!("DEBUG: Content exists but no parts array");
+                // Content exists but no parts array - return empty response
+                return Ok(LLMResponse {
+                    content: Some("".to_string()),
+                    tool_calls: None,
+                    usage: None,
+                    finish_reason: FinishReason::Stop,
+                });
             }
         } else {
-            println!("DEBUG: No content in candidate");
+            // No content in candidate - return empty response
+            return Ok(LLMResponse {
+                content: Some("".to_string()),
+                tool_calls: None,
+                usage: None,
+                finish_reason: FinishReason::Stop,
+            });
         }
 
         // Fallback: Try to extract any text content from the response
         if let Some(text) = response["text"].as_str() {
-            println!("DEBUG: Found text in root response");
             return Ok(LLMResponse {
                 content: Some(text.to_string()),
                 tool_calls: None,
@@ -263,7 +265,6 @@ impl GeminiProvider {
         }
 
         // Last resort: Return empty response instead of error
-        println!("DEBUG: Could not parse response, returning empty response");
         Ok(LLMResponse {
             content: Some("".to_string()),
             tool_calls: None,

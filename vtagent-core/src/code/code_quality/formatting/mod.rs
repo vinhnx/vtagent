@@ -5,7 +5,7 @@ pub mod black;
 use crate::code::code_quality::config::FormatConfig;
 use std::path::Path;
 use std::process::Command;
-use anyhow::{Result, Context};
+// use anyhow::Result;
 
 /// Result of formatting operation
 #[derive(Debug, Clone)]

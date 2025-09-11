@@ -5,7 +5,7 @@ pub mod pylint;
 use crate::code::code_quality::config::{LintConfig, LintSeverity};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use anyhow::{Result, Context};
+// use anyhow::Result;
 
 /// Individual lint finding
 #[derive(Debug, Clone)]

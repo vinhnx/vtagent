@@ -27,7 +27,7 @@ MessageRole::Tool => {
                 "content": message.content
             })
         }).collect();
-        
+
         messages.push(json!({
             "role": "user",
             "content": tool_results
@@ -108,17 +108,6 @@ let response = client.generate(messages, system_prompt).await?;
 | **Anthropic** | x-api-key header | Messages API | tool_result blocks | ✅ Fixed |
 
 ### 🔧 **Technical Verification Results**
-
-#### **✅ Auto-Detection System**
-```rust
-// Verified working correctly
-"gpt-4o" → "openai"           ✅
-"gpt-3.5-turbo" → "openai"    ✅
-"claude-3-5-sonnet" → "anthropic" ✅
-"claude-3-opus" → "anthropic" ✅
-"gemini-2.5-flash" → "gemini" ✅
-"gemini-1.5-pro" → "gemini"   ✅
-"unknown-model" → None        ✅
 ```
 
 #### **✅ Message Creation System**
@@ -138,7 +127,7 @@ anthropic.name() == "anthropic"     ✅
 
 // Supported models correctly reported
 gemini.supported_models()     ✅ 4+ models
-openai.supported_models()     ✅ 4+ models  
+openai.supported_models()     ✅ 4+ models
 anthropic.supported_models()  ✅ 4+ models
 ```
 

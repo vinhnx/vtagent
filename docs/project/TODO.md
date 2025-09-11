@@ -1,16 +1,32 @@
+src/main.rs, double check use hardcode model id and old model in async_trait, use enum constants model from vtagent-core/src/config/constants.rs and model.json. make sure all places that use hardcode model id and old model in async_trait are updated.
+
+--
+
+let mut conversation_history = vec![
+    Message {
+        role: MessageRole::System,
+        content: "You are a helpful coding assistant. You can help with programming tasks, code analysis, and file operations.".to_string(),
+        content: "You are a helpful coding assistant for the VTAgent Rust project with access to file operations.\n\nMANDATORY TOOL USAGE:\n- When user asks 'what is this project about' or similar: IMMEDIATELY call list_files to see project structure, then call read_file on README.md\n- When user asks about code or files: Use read_file to read the relevant files\n- When user asks about project structure: Use list_files first\n\nTOOL CALL FORMAT: Always respond with a function call when you need to use tools. Do not give text responses for project questions without using tools first.\n\nAvailable tools:\n- list_files: List files and directories\n- read_file: Read file contents\n- rp_search: Search for patterns in code\n- run_terminal_cmd: Execute terminal commands".to_string(),
+        tool_calls: None,
+        tool_call_id: None,
+    }
+];
 
 
-vtagent-core/src/llm/providers/openai.rs still use hardcode model id and old model in async_trait, use enum constants model from vtagent-core/src/config/constants.rs
+make sure this prompts is linked with /prompts/*.md files for full prompts context.
+
+---
+vtagent-core/src/llm/providers/openai.rs still use hardcode model id and old model in async_trait, use enum constants model from vtagent-core/src/config/constants.rs and model.json
 
 --
 
 check
-vtagent-core/src/llm/providers/lmstudio.rs still use hardcode model id and old model in async_trait, use enum constants model from vtagent-core/src/config/constants.rs
+vtagent-core/src/llm/providers/lmstudio.rs still use hardcode model id and old model in async_trait, use enum constants model from vtagent-core/src/config/constants.rs and model.json
 
 --
 
 check
-vtagent-core/src/llm/providers/anthropic.rs still use hardcode model id and old model in async_trait, use enum constants model from vtagent-core/src/config/constants.rs
+vtagent-core/src/llm/providers/anthropic.rs still use hardcode model id and old model in async_trait, use enum constants model from vtagent-core/src/config/constants.rs and model.json
 
 _
 

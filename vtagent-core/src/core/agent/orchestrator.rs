@@ -14,7 +14,7 @@ use tokio::time::sleep;
 /// Orchestrator agent for strategic coordination
 pub struct OrchestratorAgent {
     /// Agent configuration
-    config: MultiAgentConfig,
+    pub config: MultiAgentConfig,
     /// LLM client for orchestrator
     client: AnyClient,
     /// Context store for knowledge management
@@ -26,9 +26,9 @@ pub struct OrchestratorAgent {
     /// Session ID
     session_id: String,
     /// API key for agents
-    api_key: String,
+    pub api_key: String,
     /// Workspace path
-    workspace: std::path::PathBuf,
+    pub workspace: std::path::PathBuf,
 }
 
 impl OrchestratorAgent {
@@ -339,7 +339,7 @@ impl OrchestratorAgent {
         // Create an explorer agent runner
         let mut runner = AgentRunner::new(
             AgentType::Explorer,
-            self.config.subagent_model.clone(),
+            self.config.subagent_model.parse().unwrap_or(ModelId::default_subagent()),
             self.api_key.clone(),
             self.workspace.clone(),
             self.session_id.clone(),
@@ -358,7 +358,7 @@ impl OrchestratorAgent {
         // Create a coder agent runner
         let mut runner = AgentRunner::new(
             AgentType::Coder,
-            self.config.subagent_model.clone(),
+            self.config.subagent_model.parse().unwrap_or(ModelId::default_subagent()),
             self.api_key.clone(),
             self.workspace.clone(),
             self.session_id.clone(),
@@ -397,7 +397,7 @@ impl OrchestratorAgent {
                 primary_model.as_str()
             );
 
-            match self.client.generate(request).await {
+            match self.client.generate(&serde_json::to_string(&request)?).await {
                 Ok(response) => {
                     let response_json = serde_json::to_value(&response)?;
 
@@ -450,7 +450,7 @@ impl OrchestratorAgent {
             fallback_model.as_str()
         );
 
-        match self.client.generate(request).await {
+        match self.client.generate(&serde_json::to_string(&request)?).await {
             Ok(response) => {
                 let response_json = serde_json::to_value(&response)?;
 

@@ -1,7 +1,9 @@
+use crate::llm::client::LLMClient;
 use crate::llm::provider::{
-    FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
-    Usage,
+    FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, MessageRole, ToolCall,
 };
+use crate::llm::types as llm_types;
+use crate::config::constants::models;
 use async_trait::async_trait;
 use reqwest::Client as HttpClient;
 use serde_json::{Value, json};
@@ -38,7 +40,7 @@ impl LLMProvider for AnthropicProvider {
             .post(&url)
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
-            .header("Content-Type", "application/json")
+            .header("content-type", "application/json")
             .json(&anthropic_request)
             .send()
             .await
@@ -53,12 +55,12 @@ impl LLMProvider for AnthropicProvider {
             )));
         }
 
-        let anthropic_response: Value = response
+        let response_json: Value = response
             .json()
             .await
-            .map_err(|e| LLMError::Provider(e.to_string()))?;
+            .map_err(|e| LLMError::Provider(format!("Failed to parse response: {}", e)))?;
 
-        self.convert_from_anthropic_format(anthropic_response)
+        self.parse_anthropic_response(response_json)
     }
 
     fn supported_models(&self) -> Vec<String> {
@@ -70,12 +72,14 @@ impl LLMProvider for AnthropicProvider {
     }
 
     fn validate_request(&self, request: &LLMRequest) -> Result<(), LLMError> {
-        if !self.supported_models().contains(&request.model) {
-            return Err(LLMError::InvalidRequest(format!(
-                "Unsupported model: {}",
-                request.model
-            )));
+        if request.messages.is_empty() {
+            return Err(LLMError::InvalidRequest("Messages cannot be empty".to_string()));
         }
+
+        if request.model.is_empty() {
+            return Err(LLMError::InvalidRequest("Model cannot be empty".to_string()));
+        }
+
         Ok(())
     }
 }
@@ -84,165 +88,173 @@ impl AnthropicProvider {
     fn convert_to_anthropic_format(&self, request: &LLMRequest) -> Result<Value, LLMError> {
         let mut messages = Vec::new();
 
-        for message in &request.messages {
-            match message.role {
-                MessageRole::User => {
-                    messages.push(json!({
-                        "role": "user",
-                        "content": message.content
-                    }));
-                }
-                MessageRole::Assistant => {
-                    let mut content = Vec::new();
-
-                    // Add text content if present
-                    if !message.content.is_empty() {
-                        content.push(json!({
-                            "type": "text",
-                            "text": message.content
-                        }));
-                    }
-
-                    // Add tool_use blocks if present
-                    if let Some(tool_calls) = &message.tool_calls {
-                        for tool_call in tool_calls {
-                            content.push(json!({
-                                "type": "tool_use",
-                                "id": tool_call.id,
-                                "name": tool_call.name,
-                                "input": tool_call.arguments
-                            }));
-                        }
-                    }
-
-                    messages.push(json!({
-                        "role": "assistant",
-                        "content": content
-                    }));
-                }
-                MessageRole::System => continue, // Handle separately
-                MessageRole::Tool => {
-                    // Tool results should be user messages with tool_result content blocks
-                    if let Some(tool_calls) = &message.tool_calls {
-                        let tool_results: Vec<Value> = tool_calls
-                            .iter()
-                            .map(|call| {
-                                json!({
-                                    "type": "tool_result",
-                                    "tool_use_id": call.id,
-                                    "content": message.content
-                                })
-                            })
-                            .collect();
-
-                        messages.push(json!({
-                            "role": "user",
-                            "content": tool_results
-                        }));
-                    } else {
-                        // Fallback: treat as regular user message
-                        messages.push(json!({
-                            "role": "user",
-                            "content": message.content
-                        }));
-                    }
-                }
+        // Convert messages (Anthropic doesn't have system messages in the messages array)
+        for msg in &request.messages {
+            // Skip system messages as they're handled separately
+            if msg.role == MessageRole::System {
+                continue;
             }
+
+            let role = match msg.role {
+                MessageRole::User => "user",
+                MessageRole::Assistant => "assistant",
+                MessageRole::Tool => "user", // Anthropic treats tool responses as user messages
+                MessageRole::System => continue, // Skip system messages
+            };
+
+            let message = json!({
+                "role": role,
+                "content": msg.content
+            });
+
+            messages.push(message);
         }
 
         let mut anthropic_request = json!({
             "model": request.model,
             "messages": messages,
-            "max_tokens": request.max_tokens.unwrap_or(4096)
+            "stream": request.stream
         });
 
-        if let Some(system) = &request.system_prompt {
-            anthropic_request["system"] = json!(system);
+        // Add system message if present
+        if let Some(system_prompt) = &request.system_prompt {
+            anthropic_request["system"] = json!(system_prompt);
+        }
+
+        // Add optional parameters
+        if let Some(max_tokens) = request.max_tokens {
+            anthropic_request["max_tokens"] = json!(max_tokens);
+        } else {
+            // Anthropic requires max_tokens
+            anthropic_request["max_tokens"] = json!(4096);
         }
 
         if let Some(temperature) = request.temperature {
             anthropic_request["temperature"] = json!(temperature);
         }
 
-        // Handle tools if present
+        // Add tools if present
         if let Some(tools) = &request.tools {
-            let anthropic_tools: Vec<Value> = tools
-                .iter()
-                .map(|tool| {
-                    json!({
-                        "name": tool.name,
-                        "description": tool.description,
-                        "input_schema": tool.parameters
+            if !tools.is_empty() {
+                let tools_json: Vec<Value> = tools
+                    .iter()
+                    .map(|tool| {
+                        json!({
+                            "name": tool.name,
+                            "description": tool.description,
+                            "input_schema": tool.parameters
+                        })
                     })
-                })
-                .collect();
-            anthropic_request["tools"] = json!(anthropic_tools);
+                    .collect();
+                anthropic_request["tools"] = Value::Array(tools_json);
+            }
         }
 
         Ok(anthropic_request)
     }
 
-    fn convert_from_anthropic_format(&self, response: Value) -> Result<LLMResponse, LLMError> {
-        let content_array = response["content"]
-            .as_array()
-            .ok_or_else(|| LLMError::Provider("No content array in response".to_string()))?;
+    fn parse_anthropic_response(&self, response_json: Value) -> Result<LLMResponse, LLMError> {
+        let content = response_json
+            .get("content")
+            .and_then(|c| c.as_array())
+            .ok_or_else(|| LLMError::Provider("Invalid response format: missing content".to_string()))?
+            .iter()
+            .filter_map(|item| item.get("text").and_then(|t| t.as_str()))
+            .collect::<Vec<_>>()
+            .join("");
 
-        let mut text_content = String::new();
-        let mut tool_calls = Vec::new();
+        // Parse tool calls
+        let tool_calls = response_json
+            .get("tool_calls")
+            .and_then(|tc| tc.as_array())
+            .map(|calls| {
+                calls
+                    .iter()
+                    .filter_map(|call| {
+                        Some(ToolCall {
+                            id: call.get("id")?.as_str()?.to_string(),
+                            name: call.get("name")?.as_str()?.to_string(),
+                            arguments: call.get("input").cloned().unwrap_or(Value::Null),
+                        })
+                    })
+                    .collect()
+            });
 
-        // Parse content blocks
-        for content_block in content_array {
-            match content_block["type"].as_str() {
-                Some("text") => {
-                    if let Some(text) = content_block["text"].as_str() {
-                        text_content.push_str(text);
-                    }
-                }
-                Some("tool_use") => {
-                    if let (Some(id), Some(name)) =
-                        (content_block["id"].as_str(), content_block["name"].as_str())
-                    {
-                        let input = content_block["input"].clone();
-                        tool_calls.push(ToolCall {
-                            id: id.to_string(),
-                            name: name.to_string(),
-                            arguments: input,
-                        });
-                    }
-                }
-                _ => {} // Ignore unknown content types
-            }
-        }
+        // Parse finish reason
+        let stop_reason = response_json
+            .get("stop_reason")
+            .and_then(|sr| sr.as_str())
+            .unwrap_or("end_turn");
 
-        let usage = response["usage"].as_object().map(|u| Usage {
-            prompt_tokens: u["input_tokens"].as_u64().unwrap_or(0) as u32,
-            completion_tokens: u["output_tokens"].as_u64().unwrap_or(0) as u32,
-            total_tokens: (u["input_tokens"].as_u64().unwrap_or(0)
-                + u["output_tokens"].as_u64().unwrap_or(0)) as u32,
-        });
-
-        let finish_reason = match response["stop_reason"].as_str() {
-            Some("end_turn") => FinishReason::Stop,
-            Some("max_tokens") => FinishReason::Length,
-            Some("stop_sequence") => FinishReason::Stop,
-            Some("tool_use") => FinishReason::ToolCalls,
-            Some(other) => FinishReason::Error(other.to_string()),
-            None => FinishReason::Stop,
+        let finish_reason = match stop_reason {
+            "end_turn" => FinishReason::Stop,
+            "max_tokens" => FinishReason::Length,
+            "stop_sequence" => FinishReason::Stop,
+            "tool_use" => FinishReason::ToolCalls,
+            _ => FinishReason::Stop,
         };
 
+        // Parse usage
+        let usage = response_json
+            .get("usage")
+            .map(|u| crate::llm::provider::Usage {
+                prompt_tokens: u
+                    .get("input_tokens")
+                    .and_then(|it| it.as_u64())
+                    .unwrap_or(0) as u32,
+                completion_tokens: u
+                    .get("output_tokens")
+                    .and_then(|ot| ot.as_u64())
+                    .unwrap_or(0) as u32,
+                total_tokens: (u.get("input_tokens").and_then(|it| it.as_u64()).unwrap_or(0)
+                    + u.get("output_tokens").and_then(|ot| ot.as_u64()).unwrap_or(0)) as u32,
+            });
+
         Ok(LLMResponse {
-            content: if text_content.is_empty() {
-                None
-            } else {
-                Some(text_content)
-            },
-            tool_calls: if tool_calls.is_empty() {
-                None
-            } else {
-                Some(tool_calls)
-            },
+            content: if content.is_empty() { None } else { Some(content) },
+            tool_calls,
             usage,
             finish_reason,
         })
+    }
+}
+
+#[async_trait]
+impl LLMClient for AnthropicProvider {
+    async fn generate(&mut self, prompt: &str) -> Result<llm_types::LLMResponse, LLMError> {
+        let request = LLMRequest {
+            messages: vec![crate::llm::provider::Message {
+                role: crate::llm::provider::MessageRole::User,
+                content: prompt.to_string(),
+                tool_calls: None,
+                tool_call_id: None,
+            }],
+            system_prompt: None,
+            tools: None,
+            model: models::CLAUDE_SONNET_4_20250514.to_string(), // Default model
+            max_tokens: Some(4096),
+            temperature: None,
+            stream: false,
+        };
+
+        let response = LLMProvider::generate(self, request).await?;
+
+        Ok(llm_types::LLMResponse {
+            content: response.content.unwrap_or("".to_string()),
+            model: "claude-3-haiku-20240307".to_string(),
+            usage: response.usage.map(|u| llm_types::Usage {
+                prompt_tokens: u.prompt_tokens as usize,
+                completion_tokens: u.completion_tokens as usize,
+                total_tokens: u.total_tokens as usize,
+            }),
+        })
+    }
+
+    fn backend_kind(&self) -> llm_types::BackendKind {
+        llm_types::BackendKind::Anthropic
+    }
+
+    fn model_id(&self) -> &str {
+        models::CLAUDE_SONNET_4_20250514
     }
 }

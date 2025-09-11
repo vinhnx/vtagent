@@ -7,8 +7,10 @@ pub mod providers;
 pub mod client;
 pub mod provider;
 pub mod types;
+pub mod factory;
 
 // Re-export main types for backward compatibility
 pub use client::{make_client, AnyClient};
 pub use types::{BackendKind, LLMResponse, LLMError};
 pub use providers::{GeminiProvider, OpenAIProvider, AnthropicProvider};
+pub use factory::{get_factory, create_provider_with_config};

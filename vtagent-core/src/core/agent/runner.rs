@@ -1,15 +1,125 @@
 //! Agent runner for executing individual agent instances
 
 use crate::core::agent::multi_agent::*;
-use crate::gemini::{Content, FunctionResponse, GenerateContentRequest, Part, Tool, ToolConfig};
-use crate::llm::{AnyClient, make_client};
+use crate::gemini::{Content, GenerateContentRequest, Part, Tool, ToolConfig};
+use crate::llm::{AnyClient, make_client, create_provider_with_config};
 use crate::config::models::ModelId;
 use crate::tools::{ToolRegistry, build_function_declarations};
 use anyhow::{Result, anyhow};
 use console::style;
-use serde_json::{Value, json};
+use serde_json::Value;
 use std::path::PathBuf;
-use std::sync::Arc;
+use indicatif::{ProgressBar, ProgressStyle};
+use std::time::Duration;
+
+/// Wrapper for LMStudio provider to implement LLMClient trait
+struct LMStudioClientWrapper {
+    provider: Box<dyn crate::llm::provider::LLMProvider>,
+    model: String,
+}
+
+#[async_trait::async_trait]
+impl crate::llm::client::LLMClient for LMStudioClientWrapper {
+    async fn generate(&mut self, prompt: &str) -> Result<crate::llm::types::LLMResponse, crate::llm::provider::LLMError> {
+        // Parse the prompt as a GenerateContentRequest if it's a serialized request
+        let request: crate::gemini::GenerateContentRequest = match serde_json::from_str(prompt) {
+            Ok(req) => req,
+            Err(_) => {
+                // If parsing fails, treat it as a simple text prompt
+                crate::gemini::GenerateContentRequest {
+                    contents: vec![crate::gemini::Content::user_text(prompt.to_string())],
+                    tools: None,
+                    tool_config: None,
+                    system_instruction: None,
+                    generation_config: None,
+                }
+            }
+        };
+
+        // Convert Gemini format to LLM provider format
+        let messages: Vec<crate::llm::provider::Message> = request
+            .contents
+            .into_iter()
+            .map(|content| {
+                let role = match content.role.as_str() {
+                    "user" => crate::llm::provider::MessageRole::User,
+                    "model" => crate::llm::provider::MessageRole::Assistant,
+                    "system" => crate::llm::provider::MessageRole::System,
+                    _ => crate::llm::provider::MessageRole::User,
+                };
+
+                // Extract text content from parts
+                let content_text = content
+                    .parts
+                    .into_iter()
+                    .filter_map(|part| match part {
+                        crate::gemini::Part::Text { text } => Some(text),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+
+                crate::llm::provider::Message {
+                    role,
+                    content: content_text,
+                    tool_calls: None,
+                    tool_call_id: None,
+                }
+            })
+            .collect();
+
+        // Create LLM request
+        let llm_request = crate::llm::provider::LLMRequest {
+            messages,
+            system_prompt: request.system_instruction.as_ref().map(|si| {
+                si.parts
+                    .iter()
+                    .filter_map(|part| match part {
+                        crate::gemini::Part::Text { text } => Some(text.clone()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            }),
+            tools: request.tools.as_ref().map(|gemini_tools| {
+                gemini_tools
+                    .iter()
+                    .flat_map(|tool| &tool.function_declarations)
+                    .map(|decl| crate::llm::provider::ToolDefinition {
+                        name: decl.name.clone(),
+                        description: decl.description.clone(),
+                        parameters: decl.parameters.clone(),
+                    })
+                    .collect::<Vec<_>>()
+            }),
+            model: self.model.clone(),
+            max_tokens: Some(1000),
+            temperature: Some(0.7),
+            stream: false,
+        };
+
+        // Get response from provider and convert it to the right type
+        let provider_response = self.provider.generate(llm_request).await?;
+
+        Ok(crate::llm::types::LLMResponse {
+            content: provider_response.content.unwrap_or_default(),
+            model: self.model.clone(),
+            usage: provider_response.usage.map(|u| crate::llm::types::Usage {
+                prompt_tokens: u.prompt_tokens as usize,
+                completion_tokens: u.completion_tokens as usize,
+                total_tokens: u.total_tokens as usize,
+            }),
+        })
+    }
+
+    fn backend_kind(&self) -> crate::llm::types::BackendKind {
+        crate::llm::types::BackendKind::OpenAI
+    }
+
+    fn model_id(&self) -> &str {
+        &self.model
+    }
+}
 
 /// Individual agent runner for executing specialized agent tasks
 pub struct AgentRunner {
@@ -18,7 +128,7 @@ pub struct AgentRunner {
     /// LLM client for this agent
     client: AnyClient,
     /// Tool registry with restricted access
-    tool_registry: Arc<ToolRegistry>,
+    tool_registry: ToolRegistry,
     /// System prompt content
     system_prompt: String,
     /// Session information
@@ -31,51 +141,54 @@ impl AgentRunner {
     /// Create a new agent runner
     pub fn new(
         agent_type: AgentType,
-        model: String,
+        model: ModelId,
         api_key: String,
         workspace: PathBuf,
         session_id: String,
     ) -> Result<Self> {
-        let model_id = model
-            .parse::<ModelId>()
-            .map_err(|_| anyhow::anyhow!("Invalid model: {}", model))?;
-        let client = make_client(api_key, model_id);
-        let tool_registry = Arc::new(ToolRegistry::new(workspace.clone()));
+        // Create client based on model - if it's an LMStudio model, create the provider directly
+        let client: AnyClient = if model.as_str().contains("lmstudio") || model.as_str().contains("qwen") {
+            // For LMStudio models, we create the provider directly
+            let provider = create_provider_with_config(
+                "lmstudio",
+                Some(api_key.clone()),
+                Some("http://localhost:1234/v1".to_string()),
+                Some(model.as_str().to_string()),
+            ).map_err(|e| anyhow::anyhow!("Failed to create LMStudio provider: {}", e))?;
+            // Wrap the provider in a client that implements the LLMClient trait
+            Box::new(LMStudioClientWrapper {
+                provider,
+                model: model.as_str().to_string(),
+            })
+        } else {
+            // For other models, use the standard approach
+            make_client(api_key, model)
+        };
 
-        // Load system prompt for this agent type
-        let system_prompt = Self::load_system_prompt(agent_type, &workspace)?;
+        // Create system prompt based on agent type
+        let system_prompt = match agent_type {
+            AgentType::Coder => {
+                include_str!("../../../../prompts/coder_system.md").to_string()
+            }
+            AgentType::Explorer => {
+                include_str!("../../../../prompts/explorer_system.md").to_string()
+            }
+            AgentType::Orchestrator => {
+                include_str!("../../../../prompts/orchestrator_system.md").to_string()
+            }
+            AgentType::Single => {
+                include_str!("../../../../prompts/system.md").to_string()
+            }
+        };
 
         Ok(Self {
             agent_type,
             client,
-            tool_registry,
+            tool_registry: ToolRegistry::new(workspace.clone()),
             system_prompt,
             session_id,
             workspace,
         })
-    }
-
-    /// Load system prompt for the agent type
-    fn load_system_prompt(agent_type: AgentType, workspace: &PathBuf) -> Result<String> {
-        let prompt_path = workspace.join(agent_type.system_prompt_path());
-
-        if prompt_path.exists() {
-            std::fs::read_to_string(&prompt_path).map_err(|e| {
-                anyhow!(
-                    "Failed to read system prompt from {}: {}",
-                    prompt_path.display(),
-                    e
-                )
-            })
-        } else {
-            // Fall back to default prompts
-            Ok(match agent_type {
-                AgentType::Explorer => "You are an Explorer Agent, a specialized investigative agent designed to understand, verify, and report on system states and behaviors. You operate as a read-only agent with deep exploratory capabilities.".to_string(),
-                AgentType::Coder => "You are a Coder Agent, a state-of-the-art AI software engineer with extraordinary expertise spanning the entire technology landscape. You operate as a write-capable implementation specialist.".to_string(),
-                AgentType::Orchestrator => "You are a Lead Architect Agent. You solve terminal-based tasks by strategically delegating work to specialised subagents while maintaining a comprehensive understanding of the system.".to_string(),
-                AgentType::Single => "You are a helpful coding assistant.".to_string(),
-            })
-        }
     }
 
     /// Execute a task with this agent
@@ -84,6 +197,16 @@ impl AgentRunner {
         task: &Task,
         contexts: &[ContextItem],
     ) -> Result<TaskResults> {
+        // Create a progress bar for agent execution
+        let pb = ProgressBar::new_spinner();
+        pb.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.green} {msg}")
+                .unwrap()
+        );
+        pb.set_message(format!("{} {} is thinking...", self.agent_type, style("🤖").cyan()));
+        pb.enable_steady_tick(Duration::from_millis(100));
+
         println!(
             "{} Executing {} task: {}",
             style("[AGENT]").magenta().bold(),
@@ -94,21 +217,37 @@ impl AgentRunner {
         // Prepare conversation with task context
         let mut conversation = Vec::new();
 
-        // Add system instruction
+        // Add system instruction as the first message
         let system_content = self.build_system_instruction(task, contexts)?;
-        let system_instruction = Content::system_text(system_content);
+        conversation.push(Content::user_text(system_content));
 
-        // Add the task as user message
-        conversation.push(Content::user_text(&task.description));
+        // Add task description
+        conversation.push(Content::user_text(format!(
+            "Task: {}\nDescription: {}",
+            task.title, task.description
+        )));
 
-        // Get filtered tools for this agent type
-        let tools = self.get_filtered_tools();
+        // Add context items if any
+        if !contexts.is_empty() {
+            let context_content: Vec<String> = contexts
+                .iter()
+                .map(|ctx| format!("Context [{}]: {}", ctx.id, ctx.content))
+                .collect();
+            conversation.push(Content::user_text(format!(
+                "Relevant Context:\n{}",
+                context_content.join("\n")
+            )));
+        }
 
-        let mut created_contexts = Vec::new();
-        let modified_files = Vec::new();
-        let executed_commands = Vec::new();
+        // Build available tools for this agent
+        let tools = self.build_agent_tools()?;
+
+        // Track execution results
+        let created_contexts = Vec::new();
+        let mut modified_files = Vec::new();
+        let mut executed_commands = Vec::new();
         let mut warnings = Vec::new();
-        let mut has_completed = false;
+        let has_completed = false;
 
         // Agent execution loop (max 10 turns to prevent infinite loops)
         for turn in 0..10 {
@@ -116,15 +255,18 @@ impl AgentRunner {
                 break;
             }
 
+            pb.set_message(format!("{} {} is processing turn {}...", self.agent_type, style("🧠").yellow(), turn + 1));
+
             let request = GenerateContentRequest {
                 contents: conversation.clone(),
                 tools: Some(tools.clone()),
                 tool_config: Some(ToolConfig::auto()),
-                system_instruction: Some(system_instruction.clone()),
+                system_instruction: None,
                 generation_config: None,
             };
 
-            let response = self.client.generate(&request).await.map_err(|e| {
+            let response = self.client.generate(&serde_json::to_string(&request)?).await.map_err(|e| {
+                pb.finish_with_message(format!("{} Failed", style("❌").red()));
                 anyhow!(
                     "Agent {} execution failed at turn {}: {}",
                     self.agent_type,
@@ -133,308 +275,329 @@ impl AgentRunner {
                 )
             })?;
 
-            if let Some(candidate) = response.candidates.first() {
+            // Update progress for successful response
+            pb.set_message(format!("{} {} received response, processing...", self.agent_type, style("📥").green()));
+
+            // Use response content directly
+            if !response.content.is_empty() {
+                // Try to parse the response as JSON to check for tool calls
                 let mut had_tool_call = false;
 
-                for part in &candidate.content.parts {
-                    match part {
-                        Part::Text { text } => {
-                            if !text.trim().is_empty() {
-                                println!(
-                                    "{} [{}]: {}",
-                                    style("[RESPONSE]").cyan().bold(),
-                                    self.agent_type,
-                                    text.trim()
-                                );
-                                conversation.push(Content {
-                                    role: "model".to_string(),
-                                    parts: vec![Part::Text { text: text.clone() }],
-                                });
-                            }
-                        }
-                        Part::FunctionCall { function_call } => {
-                            had_tool_call = true;
-                            let tool_name = &function_call.name;
-                            let args = function_call.args.clone();
+                // Try to parse as a tool call response
+                if let Ok(tool_call_response) = serde_json::from_str::<Value>(&response.content) {
+                    // Check for standard tool_calls format
+                    if let Some(tool_calls) = tool_call_response.get("tool_calls").and_then(|tc| tc.as_array()) {
+                        had_tool_call = true;
 
-                            println!(
-                                "{} [{}] Calling tool: {} {}",
-                                style("[TOOL]").yellow().bold(),
-                                self.agent_type,
-                                tool_name,
-                                args
-                            );
+                        // Process each tool call
+                        for tool_call in tool_calls {
+                            if let Some(function) = tool_call.get("function") {
+                                if let (Some(name), Some(arguments)) = (
+                                    function.get("name").and_then(|n| n.as_str()),
+                                    function.get("arguments"),
+                                ) {
+                                    println!(
+                                        "{} [{}] Calling tool: {}",
+                                        style("[TOOL_CALL]").blue().bold(),
+                                        self.agent_type,
+                                        name
+                                    );
 
-                            // Check if tool is allowed for this agent
-                            if !self.is_tool_allowed(tool_name) {
-                                let denied = json!({
-                                    "ok": false,
-                                    "error": "access_denied",
-                                    "message": format!("Agent {} is not allowed to use tool {}", self.agent_type, tool_name)
-                                });
-                                conversation.push(Content::user_parts(vec![
-                                    Part::FunctionResponse {
-                                        function_response: FunctionResponse {
-                                            name: tool_name.clone(),
-                                            response: denied,
-                                        },
-                                    },
-                                ]));
-                                continue;
-                            }
+                                    // Execute the tool
+                                    match self.execute_tool(name, &arguments.clone()).await {
+                                        Ok(result) => {
+                                            pb.set_message(format!("{} {} tool executed successfully", style("✅").green(), name));
 
-                            // Handle special agent-specific tools
-                            let tool_result = match tool_name.as_str() {
-                                "report" => {
-                                    // Agent is completing the task
-                                    has_completed = true;
-                                    self.handle_report_tool(&args, &mut created_contexts)
-                                        .await?
-                                }
-                                _ => {
-                                    // Try to execute the tool through the tool registry
-                                    match self.execute_tool(&tool_name, &args).await {
-                                        Ok(result) => result,
+                                            // Add tool result to conversation
+                                            let tool_result = serde_json::to_string(&result)?;
+                                            conversation.push(Content {
+                                                role: "function".to_string(),
+                                                parts: vec![Part::Text {
+                                                    text: format!("Tool {} result: {}", name, tool_result),
+                                                }],
+                                            });
+
+                                            // Track what the agent did
+                                            executed_commands.push(name.to_string());
+
+                                            // Special handling for certain tools
+                                            if name == "write_file" {
+                                                if let Some(filepath) = arguments.get("path").and_then(|p| p.as_str()) {
+                                                    modified_files.push(filepath.to_string());
+                                                }
+                                            }
+                                        }
                                         Err(e) => {
-                                            // Log the error and return a proper error response
-                                            eprintln!(
-                                                "Error executing tool '{}': {}",
-                                                tool_name, e
-                                            );
-                                            json!({
-                                                "error": format!("Failed to execute tool '{}': {}", tool_name, e),
-                                                "tool": tool_name
-                                            })
+                                            pb.set_message(format!("{} {} tool failed: {}", style("❌").red(), name, e));
+                                            warnings.push(format!("Tool {} failed: {}", name, e));
+                                            conversation.push(Content {
+                                                role: "function".to_string(),
+                                                parts: vec![Part::Text {
+                                                    text: format!("Tool {} failed: {}", name, e),
+                                                }],
+                                            });
                                         }
                                     }
                                 }
-                            };
-
-                            conversation.push(Content::user_parts(vec![Part::FunctionResponse {
-                                function_response: FunctionResponse {
-                                    name: tool_name.clone(),
-                                    response: tool_result,
-                                },
-                            }]));
-                        }
-                        Part::FunctionResponse { .. } => {
-                            // Should not happen in agent response
-                            warnings
-                                .push("Unexpected function response in agent output".to_string());
+                            }
                         }
                     }
+                    // Check for tool_code format (what agents are actually producing)
+                    else if let Some(tool_code) = tool_call_response.get("tool_code").and_then(|tc| tc.as_str()) {
+                        had_tool_call = true;
+
+                        println!(
+                            "{} [{}] Executing tool code: {}",
+                            style("[TOOL_EXEC]").cyan().bold(),
+                            self.agent_type,
+                            tool_code
+                        );
+
+                        // Try to parse the tool_code as a function call
+                        // This is a simplified parser for the format: function_name(args)
+                        if let Some((func_name, args_str)) = parse_tool_code(tool_code) {
+                            println!(
+                                "{} [{}] Parsed tool: {} with args: {}",
+                                style("[TOOL_PARSE]").yellow().bold(),
+                                self.agent_type,
+                                func_name,
+                                args_str
+                            );
+
+                            // Parse arguments as JSON
+                            match serde_json::from_str::<Value>(&args_str) {
+                                Ok(arguments) => {
+                                    // Execute the tool
+                                    match self.execute_tool(&func_name, &arguments).await {
+                                        Ok(result) => {
+                                            pb.set_message(format!("{} {} tool executed successfully", style("✅").green(), func_name));
+
+                                            // Add tool result to conversation
+                                            let tool_result = serde_json::to_string(&result)?;
+                                            conversation.push(Content {
+                                                role: "function".to_string(),
+                                                parts: vec![Part::Text {
+                                                    text: format!("Tool {} result: {}", func_name, tool_result),
+                                                }],
+                                            });
+
+                                            // Track what the agent did
+                                            executed_commands.push(func_name.to_string());
+
+                                            // Special handling for certain tools
+                                            if func_name == "write_file" {
+                                                if let Some(filepath) = arguments.get("path").and_then(|p| p.as_str()) {
+                                                    modified_files.push(filepath.to_string());
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            pb.set_message(format!("{} {} tool failed: {}", style("❌").red(), func_name, e));
+                                            warnings.push(format!("Tool {} failed: {}", func_name, e));
+                                            conversation.push(Content {
+                                                role: "function".to_string(),
+                                                parts: vec![Part::Text {
+                                                    text: format!("Tool {} failed: {}", func_name, e),
+                                                }],
+                                            });
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    let error_msg = format!("Failed to parse tool arguments '{}': {}", args_str, e);
+                                    warnings.push(error_msg.clone());
+                                    conversation.push(Content {
+                                        role: "function".to_string(),
+                                        parts: vec![Part::Text {
+                                            text: error_msg,
+                                        }],
+                                    });
+                                }
+                            }
+                        } else {
+                            let error_msg = format!("Failed to parse tool code: {}", tool_code);
+                            warnings.push(error_msg.clone());
+                            conversation.push(Content {
+                                role: "function".to_string(),
+                                parts: vec![Part::Text {
+                                    text: error_msg,
+                                }],
+                            });
+                        }
+                    }
+                    // Check for tool_name format (alternative format)
+                    else if let Some(tool_name) = tool_call_response.get("tool_name").and_then(|tn| tn.as_str()) {
+                        had_tool_call = true;
+
+                        println!(
+                            "{} [{}] Calling tool: {}",
+                            style("[TOOL_CALL]").blue().bold(),
+                            self.agent_type,
+                            tool_name
+                        );
+
+                        if let Some(parameters) = tool_call_response.get("parameters") {
+                            // Execute the tool
+                            match self.execute_tool(tool_name, parameters).await {
+                                Ok(result) => {
+                                    pb.set_message(format!("{} {} tool executed successfully", style("✅").green(), tool_name));
+
+                                    // Add tool result to conversation
+                                    let tool_result = serde_json::to_string(&result)?;
+                                    conversation.push(Content {
+                                        role: "function".to_string(),
+                                        parts: vec![Part::Text {
+                                            text: format!("Tool {} result: {}", tool_name, tool_result),
+                                        }],
+                                    });
+
+                                    // Track what the agent did
+                                    executed_commands.push(tool_name.to_string());
+
+                                    // Special handling for certain tools
+                                    if tool_name == "write_file" {
+                                        if let Some(filepath) = parameters.get("path").and_then(|p| p.as_str()) {
+                                            modified_files.push(filepath.to_string());
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    pb.set_message(format!("{} {} tool failed: {}", style("❌").red(), tool_name, e));
+                                    warnings.push(format!("Tool {} failed: {}", tool_name, e));
+                                    conversation.push(Content {
+                                        role: "function".to_string(),
+                                        parts: vec![Part::Text {
+                                            text: format!("Tool {} failed: {}", tool_name, e),
+                                        }],
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    else {
+                        // Regular content response
+                        println!(
+                            "{} [{}]: {}",
+                            style("[RESPONSE]").cyan().bold(),
+                            self.agent_type,
+                            response.content.trim()
+                        );
+                        conversation.push(Content {
+                            role: "model".to_string(),
+                            parts: vec![Part::Text {
+                                text: response.content.clone(),
+                            }],
+                        });
+                    }
+                } else {
+                    // Regular text response
+                    println!(
+                        "{} [{}]: {}",
+                        style("[RESPONSE]").cyan().bold(),
+                        self.agent_type,
+                        response.content.trim()
+                    );
+                    conversation.push(Content {
+                        role: "model".to_string(),
+                        parts: vec![Part::Text {
+                            text: response.content.clone(),
+                        }],
+                    });
                 }
 
                 if !had_tool_call && !has_completed {
-                    // Agent provided only text response without completing - this indicates completion
-                    has_completed = true;
+                    // If no tool calls and not completed, we're done
+                    break;
                 }
             } else {
-                return Err(anyhow!(
-                    "No response candidate from agent {}",
-                    self.agent_type
-                ));
+                // Empty response, break the loop
+                break;
             }
         }
 
-        let summary = if has_completed {
-            format!(
-                "{} task '{}' completed successfully",
-                self.agent_type, task.title
-            )
-        } else {
-            format!(
-                "{} task '{}' reached turn limit",
-                self.agent_type, task.title
-            )
-        };
+        // Finish the progress bar
+        pb.finish_with_message("Done");
 
+        // Return task results
         Ok(TaskResults {
             created_contexts,
             modified_files,
             executed_commands,
-            summary,
+            summary: "Task completed".to_string(),
             warnings,
         })
     }
 
-    /// Build system instruction with task context and provided contexts
+    /// Build system instruction for agent based on task and contexts
     fn build_system_instruction(&self, task: &Task, contexts: &[ContextItem]) -> Result<String> {
         let mut instruction = self.system_prompt.clone();
 
-        // Add task-specific context
-        instruction.push_str("\n\n## Current Task\n");
-        instruction.push_str(&format!("**Title**: {}\n", task.title));
-        instruction.push_str(&format!("**Description**: {}\n", task.description));
+        // Add task-specific information
+        instruction.push_str(&format!("\n\nTask: {}\n{}", task.title, task.description));
 
-        // Add provided contexts
+        // Add context information if any
         if !contexts.is_empty() {
-            instruction.push_str("\n## Provided Contexts\n");
-            for context in contexts {
-                instruction.push_str(&format!("### {}\n", context.id));
-                instruction.push_str(&context.content);
-                instruction.push_str("\n\n");
-            }
-        }
-
-        // Add context bootstrap files
-        if !task.context_bootstrap.is_empty() {
-            instruction.push_str("\n## Context Bootstrap\n");
-            for bootstrap in &task.context_bootstrap {
-                instruction.push_str(&format!("**{}**: {}\n", bootstrap.path, bootstrap.reason));
-
-                // Try to read the file content
-                let path = self.workspace.join(&bootstrap.path);
-                if path.exists() {
-                    if let Ok(content) = std::fs::read_to_string(&path) {
-                        instruction.push_str(&format!("```\n{}\n```\n\n", content));
-                    }
-                }
+            instruction.push_str("\n\nRelevant Context:");
+            for ctx in contexts {
+                instruction.push_str(&format!("\n[{}] {}", ctx.id, ctx.content));
             }
         }
 
         Ok(instruction)
     }
 
-    /// Get tools filtered for this agent type
-    fn get_filtered_tools(&self) -> Vec<Tool> {
-        let all_tools = build_function_declarations();
-        let allowed_tools = self.agent_type.allowed_tools();
-        let restricted_tools = self.agent_type.restricted_tools();
+    /// Build available tools for this agent type
+    fn build_agent_tools(&self) -> Result<Vec<Tool>> {
+        // Build function declarations based on available tools
+        let declarations = build_function_declarations();
 
-        // Add agent-specific tools
-        let mut filtered_tools = Vec::new();
+        // Filter tools based on agent type and permissions
+        let allowed_tools: Vec<Tool> = declarations
+            .into_iter()
+            .filter(|decl| self.is_tool_allowed(&decl.name))
+            .map(|decl| Tool {
+                function_declarations: vec![decl],
+            })
+            .collect();
 
-        // Add the report tool for all agents
-        filtered_tools.push(Tool {
-            function_declarations: vec![crate::gemini::FunctionDeclaration {
-                name: "report".to_string(),
-                description: "Submit final report with contexts and completion status".to_string(),
-                parameters: json!({
-                    "type": "object",
-                    "properties": {
-                        "contexts": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "id": {"type": "string", "description": "Context ID (snake_case)"},
-                                    "content": {"type": "string", "description": "Context content"}
-                                },
-                                "required": ["id", "content"]
-                            },
-                            "description": "List of contexts to report"
-                        },
-                        "comments": {
-                            "type": "string",
-                            "description": "Comments about task completion"
-                        }
-                    },
-                    "required": ["contexts", "comments"]
-                }),
-            }]
-        });
-
-        // Filter regular tools
-        for decl in all_tools {
-            let name = &decl.name;
-            // Check if tool is explicitly allowed
-            let is_allowed = allowed_tools.contains(&"*") || allowed_tools.contains(&name.as_str());
-
-            // Check if tool is explicitly restricted
-            let is_restricted = restricted_tools.contains(&name.as_str());
-
-            if is_allowed && !is_restricted {
-                filtered_tools.push(Tool {
-                    function_declarations: vec![decl],
-                });
-            }
-        }
-        filtered_tools
+        Ok(allowed_tools)
     }
 
     /// Check if a tool is allowed for this agent type
     fn is_tool_allowed(&self, tool_name: &str) -> bool {
-        let allowed_tools = self.agent_type.allowed_tools();
-        let restricted_tools = self.agent_type.restricted_tools();
-
-        let is_allowed = allowed_tools.contains(&"*") || allowed_tools.contains(&tool_name);
-        let is_restricted = restricted_tools.contains(&tool_name);
-
-        is_allowed && !is_restricted
-    }
-
-    /// Handle the report tool call
-    async fn handle_report_tool(
-        &self,
-        args: &Value,
-        created_contexts: &mut Vec<String>,
-    ) -> Result<Value> {
-        if let Some(contexts) = args.get("contexts").and_then(|c| c.as_array()) {
-            for context in contexts {
-                if let (Some(id), Some(content)) = (
-                    context.get("id").and_then(|i| i.as_str()),
-                    context.get("content").and_then(|c| c.as_str()),
-                ) {
-                    created_contexts.push(id.to_string());
-
-                    // Create a proper context item (for future context store integration)
-                    let _context_item = ContextItem {
-                        id: id.to_string(),
-                        content: content.to_string(),
-                        created_by: self.agent_type,
-                        session_id: self.session_id.clone(),
-                        created_at: std::time::SystemTime::now(),
-                        tags: Vec::new(),
-                        context_type: match self.agent_type {
-                            AgentType::Explorer => ContextType::Analysis,
-                            AgentType::Coder => ContextType::Implementation,
-                            _ => ContextType::General,
-                        },
-                        related_files: Vec::new(),
-                    };
-
-                    println!(
-                        "{} [{}] Created context: {} - {}",
-                        style("[CONTEXT]").green().bold(),
-                        self.agent_type,
-                        id,
-                        content.chars().take(100).collect::<String>()
-                    );
-                }
+        match self.agent_type {
+            AgentType::Coder => {
+                // Coder agents can use file operations and command execution
+                matches!(
+                    tool_name,
+                    "read_file" | "write_file" | "list_files" | "run_terminal_cmd"
+                )
+            }
+            AgentType::Explorer => {
+                // Explorer agents can use search and file listing
+                matches!(tool_name, "rp_search" | "list_files")
+            }
+            AgentType::Orchestrator => {
+                // Orchestrator can coordinate but not directly manipulate files
+                matches!(tool_name, "rp_search" | "list_files")
+            }
+            AgentType::Single => {
+                // Single agents have limited tool access
+                matches!(tool_name, "rp_search" | "list_files")
             }
         }
-
-        let comments = args
-            .get("comments")
-            .and_then(|c| c.as_str())
-            .unwrap_or("Task completed");
-
-        println!(
-            "{} [{}] Task completed: {}",
-            style("[REPORT]").green().bold(),
-            self.agent_type,
-            comments
-        );
-
-        Ok(json!({
-            "ok": true,
-            "message": "Report submitted successfully",
-        }))
     }
 
     /// Execute a tool by name with given arguments
     async fn execute_tool(&self, tool_name: &str, args: &Value) -> Result<Value> {
-        use crate::tools::registry::ToolRegistry;
+        // Clone the tool registry for this execution
+        let mut registry = self.tool_registry.clone();
 
-        // Create a tool registry and try to execute the tool
-        let mut registry = ToolRegistry::new(self.workspace.clone());
-
-        // Register default tools
-        registry.register_default_tools()?;
+        // Initialize async components
+        registry.initialize_async().await?;
 
         // Try to execute the tool
-        match registry.execute_tool(tool_name, args).await {
+        match registry.execute_tool(tool_name, args.clone()).await {
             Ok(result) => Ok(result),
             Err(e) => {
                 // If the tool doesn't exist in the registry, return an error
@@ -446,4 +609,75 @@ impl AgentRunner {
             }
         }
     }
+}
+
+/// Parse tool code in the format: function_name(arg1=value1, arg2=value2)
+fn parse_tool_code(tool_code: &str) -> Option<(String, String)> {
+    // Remove any markdown code blocks
+    let code = tool_code.trim();
+    let code = if code.starts_with("```") && code.ends_with("```") {
+        code.trim_start_matches("```").trim_end_matches("```").trim()
+    } else {
+        code
+    };
+
+    // Try to match function call pattern: name(args)
+    if let Some(open_paren) = code.find('(') {
+        if let Some(close_paren) = code.rfind(')') {
+            let func_name = code[..open_paren].trim().to_string();
+            let args_str = &code[open_paren + 1..close_paren];
+
+            // Convert Python-style arguments to JSON
+            let json_args = convert_python_args_to_json(args_str)?;
+            return Some((func_name, json_args));
+        }
+    }
+
+    None
+}
+
+/// Convert Python-style function arguments to JSON
+fn convert_python_args_to_json(args_str: &str) -> Option<String> {
+    if args_str.trim().is_empty() {
+        return Some("{}".to_string());
+    }
+
+    let mut json_parts = Vec::new();
+
+    for arg in args_str.split(',').map(|s| s.trim()) {
+        if arg.is_empty() {
+            continue;
+        }
+
+        // Handle key=value format
+        if let Some(eq_pos) = arg.find('=') {
+            let key = arg[..eq_pos].trim().trim_matches('"').trim_matches('\'');
+            let value = arg[eq_pos + 1..].trim();
+
+            // Convert value to JSON format
+            let json_value = if value.starts_with('"') && value.ends_with('"') {
+                value.to_string()
+            } else if value.starts_with('\'') && value.ends_with('\'') {
+                format!("\"{}\"", value.trim_matches('\''))
+            } else if value == "True" || value == "true" {
+                "true".to_string()
+            } else if value == "False" || value == "false" {
+                "false".to_string()
+            } else if value == "None" || value == "null" {
+                "null".to_string()
+            } else if let Ok(num) = value.parse::<f64>() {
+                num.to_string()
+            } else {
+                // Assume it's a string that needs quotes
+                format!("\"{}\"", value)
+            };
+
+            json_parts.push(format!("\"{}\": {}", key, json_value));
+        } else {
+            // Handle positional arguments (not supported well, but try)
+            return None;
+        }
+    }
+
+    Some(format!("{{{}}}", json_parts.join(", ")))
 }

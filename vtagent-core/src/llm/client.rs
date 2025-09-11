@@ -1,5 +1,6 @@
-use super::providers::{GeminiProvider, OpenAIProvider, AnthropicProvider};
-use super::types::{BackendKind, LLMResponse, LLMError};
+use super::providers::{GeminiProvider, OpenAIProvider, AnthropicProvider, LMStudioProvider};
+use super::provider::LLMError;
+use super::types::{BackendKind, LLMResponse};
 use crate::config::models::{ModelId, Provider};
 use async_trait::async_trait;
 
@@ -18,13 +19,16 @@ pub type AnyClient = Box<dyn LLMClient>;
 pub fn make_client(api_key: String, model: ModelId) -> AnyClient {
     match model.provider() {
         Provider::Gemini => {
-            Box::new(GeminiProvider::new(api_key, model.to_string()))
+            Box::new(GeminiProvider::new(api_key))
         }
         Provider::OpenAI => {
-            Box::new(OpenAIProvider::new(api_key, model.to_string()))
+            Box::new(OpenAIProvider::new(api_key))
         }
         Provider::Anthropic => {
-            Box::new(AnthropicProvider::new(api_key, model.to_string()))
+            Box::new(AnthropicProvider::new(api_key))
+        }
+        Provider::LMStudio => {
+            Box::new(LMStudioProvider::new(None, Some("http://localhost:1234/v1".to_string())))
         }
     }
 }

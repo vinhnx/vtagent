@@ -30,17 +30,17 @@ impl MultiAgentTools {
             _ => return Err(anyhow!("Invalid agent_type: {}", agent_type)),
         };
 
-        let title = params["title"]
+        let _title = params["title"]
             .as_str()
             .ok_or_else(|| anyhow!("Missing title parameter"))?
             .to_string();
 
-        let description = params["description"]
+        let _description = params["description"]
             .as_str()
             .ok_or_else(|| anyhow!("Missing description parameter"))?
             .to_string();
 
-        let context_refs = if let Some(refs) = params["context_refs"].as_array() {
+        let _context_refs = if let Some(refs) = params["context_refs"].as_array() {
             refs.iter()
                 .filter_map(|v| v.as_str())
                 .map(|s| s.to_string())
@@ -49,7 +49,7 @@ impl MultiAgentTools {
             Vec::new()
         };
 
-        let context_bootstrap = if let Some(bootstrap) = params["context_bootstrap"].as_array() {
+        let _context_bootstrap = if let Some(bootstrap) = params["context_bootstrap"].as_array() {
             bootstrap
                 .iter()
                 .filter_map(|item| {
@@ -65,7 +65,7 @@ impl MultiAgentTools {
             Vec::new()
         };
 
-        let priority = if let Some(priority_str) = params["priority"].as_str() {
+        let _priority = if let Some(priority_str) = params["priority"].as_str() {
             match priority_str {
                 "low" => TaskPriority::Low,
                 "normal" => TaskPriority::Normal,
@@ -78,7 +78,7 @@ impl MultiAgentTools {
         };
 
         let task_id = {
-            let orchestrator = self.orchestrator.lock().unwrap();
+            let _orchestrator = self.orchestrator.lock().unwrap();
             format!(
                 "task_{}_{}",
                 match agent_type {

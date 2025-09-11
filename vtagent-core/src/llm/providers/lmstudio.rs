@@ -1,7 +1,7 @@
-use crate::llm::provider::{
-    FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
-    ToolDefinition, Usage,
-};
+use crate::llm::client::LLMClient;
+use crate::llm::provider::{FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall};
+use crate::llm::types as llm_types;
+use crate::config::constants::models;
 use async_trait::async_trait;
 use reqwest::Client as HttpClient;
 use serde_json::{Value, json};
@@ -88,9 +88,9 @@ impl LMStudioProvider {
             openai_request["temperature"] = json!(temperature);
         }
 
-        // Add tools if present
+        // Add tools if present (but skip for LMStudio as it may not support them)
         if let Some(tools) = &request.tools {
-            if !tools.is_empty() {
+            if !tools.is_empty() && !request.model.contains("lmstudio") && !request.model.contains("qwen") {
                 let tools_json: Vec<Value> = tools
                     .iter()
                     .map(|tool| {
@@ -147,10 +147,10 @@ impl LMStudioProvider {
                                 .as_str()?
                                 .to_string(),
                             arguments: call
-                                .get("function")?
-                                .get("arguments")?
-                                .clone()
-                                .unwrap_or_else(|| Value::Null),
+                                .get("function")
+                                .and_then(|f| f.get("arguments"))
+                                .cloned()
+                                .unwrap_or(Value::Null),
                         })
                     })
                     .collect()
@@ -172,7 +172,7 @@ impl LMStudioProvider {
         // Parse usage
         let usage = response_json
             .get("usage")
-            .map(|u| Usage {
+            .map(|u| crate::llm::provider::Usage {
                 prompt_tokens: u
                     .get("prompt_tokens")
                     .and_then(|pt| pt.as_u64())
@@ -225,7 +225,23 @@ impl LLMProvider for LMStudioProvider {
 
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
+            let error_text = response.text().await.unwrap_or_else(|_| "Failed to read response body".to_string());
+
+            eprintln!("DEBUG: LMStudio HTTP error - Status: {}, Body: {}", status, error_text);
+
+            // For local LMStudio, if we get 403 Forbidden, try without authentication
+            if status == reqwest::StatusCode::FORBIDDEN && self.api_key.is_none() {
+                eprintln!("Warning: LMStudio server requires authentication but no API key provided. This might indicate LMStudio has authentication enabled.");
+                eprintln!("To fix this:");
+                eprintln!("1. In LMStudio, go to 'Local Inference' -> 'Settings'");
+                eprintln!("2. Disable 'Enable API Key' or set an API key");
+                eprintln!("3. Or set LMSTUDIO_API_KEY environment variable");
+                return Err(LLMError::Provider(format!(
+                    "HTTP {}: {}. LMStudio authentication required but not configured.",
+                    status, error_text
+                )));
+            }
+
             return Err(LLMError::Provider(format!(
                 "HTTP {}: {}",
                 status, error_text
@@ -243,19 +259,7 @@ impl LLMProvider for LMStudioProvider {
     fn supported_models(&self) -> Vec<String> {
         // LMStudio supports any model loaded locally
         vec![
-            "local-model".to_string(), // Generic placeholder
-            "llama-2-7b-chat".to_string(),
-            "llama-2-13b-chat".to_string(),
-            "llama-2-70b-chat".to_string(),
-            "codellama-7b-instruct".to_string(),
-            "codellama-13b-instruct".to_string(),
-            "codellama-34b-instruct".to_string(),
-            "mistral-7b-instruct".to_string(),
-            "mixtral-8x7b-instruct".to_string(),
-            "phi-2".to_string(),
-            "orca-2-7b".to_string(),
-            "vicuna-7b".to_string(),
-            "wizardlm-7b".to_string(),
+            models::LMSTUDIO_LOCAL.to_string(), // Generic placeholder
         ]
     }
 
@@ -269,5 +273,135 @@ impl LLMProvider for LMStudioProvider {
         }
 
         Ok(())
+    }
+}
+
+#[async_trait]
+impl LLMClient for LMStudioProvider {
+    async fn generate(&mut self, prompt: &str) -> Result<llm_types::LLMResponse, LLMError> {
+        // Check if the prompt is a serialized GenerateContentRequest
+        let request = if prompt.trim().starts_with("GenerateContentRequest") {
+            // Try to parse as GenerateContentRequest
+            match serde_json::from_str::<crate::gemini::GenerateContentRequest>(prompt) {
+                Ok(gemini_request) => {
+                    // Convert Gemini format to LLMRequest
+                    let messages: Vec<Message> = gemini_request
+                        .contents
+                        .into_iter()
+                        .map(|content| {
+                            let role = match content.role.as_str() {
+                                "user" => MessageRole::User,
+                                "model" => MessageRole::Assistant,
+                                "system" => MessageRole::System,
+                                _ => MessageRole::User,
+                            };
+
+                            let content_text = content
+                                .parts
+                                .iter()
+                                .filter_map(|part| match part {
+                                    crate::gemini::Part::Text { text } => Some(text.clone()),
+                                    _ => None,
+                                })
+                                .collect::<Vec<_>>()
+                                .join("\n");
+
+                            Message {
+                                role,
+                                content: content_text,
+                                tool_calls: None,
+                                tool_call_id: None,
+                            }
+                        })
+                        .collect();
+
+                    let system_prompt = gemini_request.system_instruction.as_ref().map(|si| {
+                        si.parts
+                            .iter()
+                            .filter_map(|part| match part {
+                                crate::gemini::Part::Text { text } => Some(text.clone()),
+                                _ => None,
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    });
+
+                    let tools = gemini_request.tools.as_ref().map(|gemini_tools| {
+                        gemini_tools
+                            .iter()
+                            .flat_map(|tool| &tool.function_declarations)
+                            .map(|decl| crate::llm::provider::ToolDefinition {
+                                name: decl.name.clone(),
+                                description: decl.description.clone(),
+                                parameters: decl.parameters.clone(),
+                            })
+                            .collect::<Vec<_>>()
+                    });
+
+                    LLMRequest {
+                        messages,
+                        system_prompt,
+                        tools,
+                        model: "qwen/qwen3-1.7b".to_string(), // Use the model that works
+                        max_tokens: Some(1000),
+                        temperature: Some(0.7),
+                        stream: false,
+                    }
+                }
+                Err(_) => {
+                    // Fallback: treat as regular prompt
+                    LLMRequest {
+                        messages: vec![Message {
+                            role: MessageRole::User,
+                            content: prompt.to_string(),
+                            tool_calls: None,
+                            tool_call_id: None,
+                        }],
+                        system_prompt: None,
+                        tools: None,
+                        model: "qwen/qwen3-1.7b".to_string(),
+                        max_tokens: None,
+                        temperature: None,
+                        stream: false,
+                    }
+                }
+            }
+        } else {
+            // Regular prompt
+            LLMRequest {
+                messages: vec![Message {
+                    role: MessageRole::User,
+                    content: prompt.to_string(),
+                    tool_calls: None,
+                    tool_call_id: None,
+                }],
+                system_prompt: None,
+                tools: None,
+                model: "qwen/qwen3-1.7b".to_string(),
+                max_tokens: None,
+                temperature: None,
+                stream: false,
+            }
+        };
+
+        let response = LLMProvider::generate(self, request).await?;
+
+        Ok(llm_types::LLMResponse {
+            content: response.content.unwrap_or("".to_string()),
+            model: "qwen/qwen3-1.7b".to_string(),
+            usage: response.usage.map(|u| llm_types::Usage {
+                prompt_tokens: u.prompt_tokens as usize,
+                completion_tokens: u.completion_tokens as usize,
+                total_tokens: u.total_tokens as usize,
+            }),
+        })
+    }
+
+    fn backend_kind(&self) -> llm_types::BackendKind {
+        llm_types::BackendKind::LMStudio
+    }
+
+    fn model_id(&self) -> &str {
+        "qwen/qwen3-1.7b"
     }
 }

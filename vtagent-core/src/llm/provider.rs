@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// Universal LLM request structure
@@ -14,7 +15,7 @@ pub struct LLMRequest {
 }
 
 /// Universal message structure
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Message {
     pub role: MessageRole,
     pub content: String,
@@ -22,7 +23,7 @@ pub struct Message {
     pub tool_call_id: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum MessageRole {
     System,
     User,
@@ -31,7 +32,7 @@ pub enum MessageRole {
 }
 
 /// Universal tool definition
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolDefinition {
     pub name: String,
     pub description: String,
@@ -39,7 +40,7 @@ pub struct ToolDefinition {
 }
 
 /// Universal tool call
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ToolCall {
     pub id: String,
     pub name: String,
@@ -84,10 +85,10 @@ pub trait LLMProvider: Send + Sync {
     async fn stream(
         &self,
         request: LLMRequest,
-    ) -> Result<Box<dyn Stream<Item = LLMResponse>>, LLMError> {
+    ) -> Result<Box<dyn futures::Stream<Item = LLMResponse> + Unpin + Send>, LLMError> {
         // Default implementation falls back to non-streaming
         let response = self.generate(request).await?;
-        Ok(Box::new(futures::stream::once(async { response })))
+        Ok(Box::new(futures::stream::once(async { response }).boxed()))
     }
 
     /// Get supported models
@@ -111,4 +112,17 @@ pub enum LLMError {
     Provider(String),
 }
 
-use futures::Stream;
+// Implement conversion from provider::LLMError to llm::types::LLMError
+impl From<LLMError> for crate::llm::types::LLMError {
+    fn from(err: LLMError) -> crate::llm::types::LLMError {
+        match err {
+            LLMError::Authentication(msg) => crate::llm::types::LLMError::ApiError(msg),
+            LLMError::RateLimit => crate::llm::types::LLMError::RateLimit,
+            LLMError::InvalidRequest(msg) => crate::llm::types::LLMError::InvalidRequest(msg),
+            LLMError::Network(msg) => crate::llm::types::LLMError::NetworkError(msg),
+            LLMError::Provider(msg) => crate::llm::types::LLMError::ApiError(msg),
+        }
+    }
+}
+
+use futures::StreamExt;

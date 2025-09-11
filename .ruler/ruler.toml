@@ -12,6 +12,7 @@ default_agents = [
     "qwen",
     "gemini",
     "kiro",
+    "warp",
 ]
 
 [mcp]

@@ -34,13 +34,18 @@ pub mod cli;
 pub mod code;
 pub mod commands;
 pub mod config;
+pub mod constants;
 pub mod core;
 pub mod gemini;
 pub mod llm;
+pub mod models;
 pub mod prompts;
+pub mod safety;
 pub mod tool_policy;
 pub mod tools;
+pub mod types;
 pub mod ui;
+pub mod user_confirmation;
 pub mod utils;
 
 // Re-exports for convenience

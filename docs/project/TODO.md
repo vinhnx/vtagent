@@ -1,3 +1,26 @@
+1. remove meta-llama, mistral models
+2. update anthropic models: claude-opus-4-1-20250805,  claude-sonnet-4-20250514. remove others
+3. update openai models: gpt-5,  gpt-5-mini. remove others
+4. update gemini models: gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
+5. remove ollama provider completely
+6. update all tests and document and config completely for the models sync
+---
+
+https://github.com/krypticmouse/DSRs/tree/main
+https://github.com/krypticmouse/DSRs/tree/main/crates/dspy-rs/examples
+
+--
+https://github.com/tokio-rs/tracing
+
+--
+https://x.com/krypticmouse/status/1965807238347645137
+--
+
+can we remove?
+
+[text](../../vtagent_minimal.toml) [text](../../vtagent_simple.toml)
+--
+https://github.com/gyscos/cursive
 
 --
 https://github.com/openai/completions-responses-migration-pack

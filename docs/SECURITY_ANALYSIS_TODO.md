@@ -1,0 +1,236 @@
+- [x] Define the audit scope.
+- [x] SAST Recon on .codex/config.json
+- [x] SAST Recon on .codex/config.toml
+- [x] SAST Recon on .cursor/mcp.json
+- [x] SAST Recon on .cursor/rules/ruler_cursor_instructions.mdc
+- [x] SAST Recon on .env.example
+- [x] SAST Recon on .github/copilot-instructions.md
+- [x] SAST Recon on .gitignore
+- [x] SAST Recon on .kilocode/mcp.json
+- [x] SAST Recon on .kilocode/rules/ruler_kilocode_instructions.md
+- [x] SAST Recon on .kiro/steering/ruler_kiro_instructions.md
+- [x] SAST Recon on .ruler/AGENTS.md
+- [x] SAST Recon on .ruler/ruler.toml
+- [x] SAST Recon on .serena/memories/project_overview.md
+- [x] SAST Recon on .vtagent/tool-policy.json
+- [x] SAST Recon on AGENTS.md
+- [x] SAST Recon on Cargo.toml
+- [x] SAST Recon on README.md
+- [x] SAST Recon on benches/search_benchmark.rs
+- [x] SAST Recon on benches/tree_sitter_benchmark.rs
+- [x] SAST Recon on docs/CONFIGURATION.md
+- [x] SAST Recon on docs/CONFIGURATION_IMPLEMENTATION.md
+- [x] SAST Recon on docs/DEBUG_MODE_IMPLEMENTATION.md
+- [x] SAST Recon on docs/ENHANCED_INIT_COMMAND.md
+- [x] SAST Recon on docs/IMPLEMENTATION_SUMMARY.md
+- [x] SAST Recon on docs/INIT_COMMAND_GUIDE.md
+- [x] SAST Recon on docs/SAFETY_IMPLEMENTATION.md
+- [x] SAST Recon on docs/TOOL_POLICY_IMPLEMENTATION.md
+- [x] SAST Recon on docs/tool-policy-system.md
+- [x] SAST Recon on examples/llm_provider_verification.rs
+- [x] SAST Recon on examples/model_verification.rs
+- [x] SAST Recon on examples/universal_llm_demo.rs
+- [x] SAST Recon on models-api.json
+- [x] SAST Recon on prompts/coder_system.md
+- [x] SAST Recon on prompts/codex_alignment_analysis.md
+- [x] SAST Recon on prompts/codex_integration_guide.md
+- [x] SAST Recon on prompts/codex_tool_recommendations.md
+- [ ] SAST Recon on prompts/explorer_system.md
+- [ ] SAST Recon on prompts/orchestrator_system.md
+- [ ] SAST Recon on prompts/system.md
+- [ ] SAST Recon on prompts/system_codex_enhanced.md
+- [ ] SAST Recon on scripts/README.md
+- [ ] SAST Recon on scripts/run-debug.sh
+- [ ] SAST Recon on scripts/run.sh
+- [ ] SAST Recon on scripts/setup.sh
+- [ ] SAST Recon on scripts/test_multi_agent.sh
+- [ ] SAST Recon on scripts/validate_refactoring.sh
+- [ ] SAST Recon on scripts/verify_groq_implementation.py
+- [ ] SAST Recon on src/cli/analyze.rs
+- [ ] SAST Recon on src/cli/chat.rs
+- [ ] SAST Recon on src/cli/config.rs
+- [ ] SAST Recon on src/cli/create_project.rs
+- [ ] SAST Recon on src/cli/init.rs
+- [ ] SAST Recon on src/cli/mod.rs
+- [ ] SAST Recon on src/main.rs
+- [ ] SAST Recon on src/multi_agent_loop.rs
+- [ ] SAST Recon on tests/groq_provider_test.rs
+- [ ] SAST Recon on tests/integration_modular.rs
+- [ ] SAST Recon on tests/llm_focused_test.rs
+- [ ] SAST Recon on tests/llm_provider_integration.rs
+- [ ] SAST Recon on tests/llm_providers_test.rs
+- [ ] SAST Recon on tests/lmstudio_config_test.rs
+- [ ] SAST Recon on tests/lmstudio_provider_test.rs
+- [ ] SAST Recon on tests/model_test.py
+- [ ] SAST Recon on tests/model_test.rs
+- [ ] SAST Recon on tests/openrouter_provider_test.rs
+- [ ] SAST Recon on tests/prompt_extraction_test.rs
+- [ ] SAST Recon on tests/simple_model_test.rs
+- [ ] SAST Recon on tests/standalone_model_test.rs
+- [ ] SAST Recon on tests/test_consolidated_search.rs
+- [ ] SAST Recon on tests/test_model_methods.rs
+- [ ] SAST Recon on tests/test_model_parsing.rs
+- [ ] SAST Recon on tests/test_new_tools.rs
+- [ ] SAST Recon on tests/test_tool_policy.rs
+- [ ] SAST Recon on tests/tool_call_verification.rs
+- [ ] SAST Recon on vtagent-core/Cargo.toml
+- [ ] SAST Recon on vtagent-core/src/cli/args.rs
+- [ ] SAST Recon on vtagent-core/src/cli/commands.rs
+- [ ] SAST Recon on vtagent-core/src/cli/mod.rs
+- [ ] SAST Recon on vtagent-core/src/cli/models_commands.rs
+- [ ] SAST Recon on vtagent-core/src/cli/tool_policy_commands.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_completion/cache/mod.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_completion/context/analyzer.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_completion/context/mod.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_completion/context/scope.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_completion/engine/mod.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_completion/engine/ranking.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_completion/engine/suggestions.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_completion/languages/mod.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_completion/languages/python.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_completion/languages/rust.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_completion/languages/typescript.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_completion/learning/data.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_completion/learning/feedback.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_completion/learning/mod.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_completion/mod.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_quality/config/format.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_quality/config/lint.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_quality/config/mod.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_quality/formatting/black.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_quality/formatting/mod.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_quality/formatting/prettier.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_quality/formatting/rustfmt.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_quality/linting/clippy.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_quality/linting/eslint.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_quality/linting/mod.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_quality/linting/pylint.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_quality/metrics/complexity.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_quality/metrics/coverage.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_quality/metrics/mod.rs
+- [ ] SAST Recon on vtagent-core/src/code/code_quality/mod.rs
+- [ ] SAST Recon on vtagent-core/src/code/mod.rs
+- [ ] SAST Recon on vtagent-core/src/commands/analyze.rs
+- [ ] SAST Recon on vtagent-core/src/commands/ask.rs
+- [ ] SAST Recon on vtagent-core/src/commands/compress_context.rs
+- [ ] SAST Recon on vtagent-core/src/commands/create_project.rs
+- [ ] SAST Recon on vtagent-core/src/commands/init.rs
+- [ ] SAST Recon on vtagent-core/src/commands/stats.rs
+- [ ] SAST Recon on vtagent-core/src/commands/validate.rs
+- [ ] SAST Recon on vtagent-core/src/config/api_keys.rs
+- [ ] SAST Recon on vtagent-core/src/config/builders.rs
+- [ ] SAST Recon on vtagent-core/src/config/constants.rs
+- [ ] SAST Recon on vtagent-core/src/config/core/agent.rs
+- [ ] SAST Recon on vtagent-core/src/config/core/commands.rs
+- [ ] SAST Recon on vtagent-core/src/config/core/mod.rs
+- [ ] SAST Recon on vtagent-core/src/config/core/security.rs
+- [ ] SAST Recon on vtagent-core/src/config/core/tools.rs
+- [ ] SAST Recon on vtagent-core/src/config/defaults/mod.rs
+- [ ] SAST Recon on vtagent-core/src/config/loader/mod.rs
+- [ ] SAST Recon on vtagent-core/src/config/mod.rs
+- [ ] SAST Recon on vtagent-core/src/config/model_definitions.rs
+- [ ] SAST Recon on vtagent-core/src/config/model_traits.rs
+- [ ] SAST Recon on vtagent-core/src/config/models.rs
+- [ ] SAST Recon on vtagent-core/src/config/multi_agent/mod.rs
+- [ ] SAST Recon on vtagent-core/src/config/provider_definitions.rs
+- [ ] SAST Recon on vtagent-core/src/config/types/mod.rs
+- [ ] SAST Recon on vtagent-core/src/config/validation.rs
+- [ ] SAST Recon on vtagent-core/src/core/agent/chat.rs
+- [ ] SAST Recon on vtagent-core/src/core/agent/compaction.rs
+- [ ] SAST Recon on vtagent-core/src/core/agent/config.rs
+- [ ] SAST Recon on vtagent-core/src/core/agent/core.rs
+- [ ] SAST Recon on vtagent-core/src/core/agent/engine.rs
+- [ ] SAST Recon on vtagent-core/src/core/agent/examples.rs
+- [ ] SAST Recon on vtagent-core/src/core/agent/integration.rs
+- [ ] SAST Recon on vtagent-core/src/core/agent/intelligence.rs
+- [ ] SAST Recon on vtagent-core/src/core/agent/mod.rs
+- [ ] SAST Recon on vtagent-core/src/core/agent/multi_agent.rs
+- [ ] SAST Recon on vtagent-core/src/core/agent/multi_agent_tools.rs
+- [ ] SAST Recon on vtagent-core/src/core/agent/optimization.rs
+- [ ] SAST Recon on vtagent-core/src/core/agent/orchestrator.rs
+- [ ] SAST Recon on vtagent-core/src/core/agent/performance.rs
+- [ ] SAST Recon on vtagent-core/src/core/agent/runner.rs
+- [ ] SAST Recon on vtagent-core/src/core/agent/semantic.rs
+- [ ] SAST Recon on vtagent-core/src/core/agent/snapshots.rs
+- [ ] SAST Recon on vtagent-core/src/core/agent/stats.rs
+- [ ] SAST Recon on vtagent-core/src/core/agent/types.rs
+- [ ] SAST Recon on vtagent-core/src/core/agent/verification.rs
+- [ ] SAST Recon on vtagent-core/src/core/context_compression.rs
+- [ ] SAST Recon on vtagent-core/src/core/conversation_summarizer.rs
+- [ ] SAST Recon on vtagent-core/src/core/decision_tracker.rs
+- [ ] SAST Recon on vtagent-core/src/core/error_recovery.rs
+- [ ] SAST Recon on vtagent-core/src/core/mod.rs
+- [ ] SAST Recon on vtagent-core/src/core/orchestrator_retry.rs
+- [ ] SAST Recon on vtagent-core/src/core/performance_monitor.rs
+- [ ] SAST Recon on vtagent-core/src/core/performance_profiler.rs
+- [ ] SAST Recon on vtagent-core/src/core/prompt_caching.rs
+- [ ] SAST Recon on vtagent-core/src/core/timeout_detector.rs
+- [ ] SAST Recon on vtagent-core/src/gemini/client/config.rs
+- [ ] SAST Recon on vtagent-core/src/gemini/client/mod.rs
+- [ ] SAST Recon on vtagent-core/src/gemini/client/retry.rs
+- [ ] SAST Recon on vtagent-core/src/gemini/function_calling/mod.rs
+- [ ] SAST Recon on vtagent-core/src/gemini/mod.rs
+- [ ] SAST Recon on vtagent-core/src/gemini/models/mod.rs
+- [ ] SAST Recon on vtagent-core/src/gemini/models/request.rs
+- [ ] SAST Recon on vtagent-core/src/gemini/models/response.rs
+- [ ] SAST Recon on vtagent-core/src/gemini/streaming/errors.rs
+- [ ] SAST Recon on vtagent-core/src/gemini/streaming/mod.rs
+- [ ] SAST Recon on vtagent-core/src/gemini/streaming/processor.rs
+- [ ] SAST Recon on vtagent-core/src/lib.rs
+- [ ] SAST Recon on vtagent-core/src/llm/client.rs
+- [ ] SAST Recon on vtagent-core/src/llm/factory.rs
+- [ ] SAST Recon on vtagent-core/src/llm/llm_modular/mod.rs
+- [ ] SAST Recon on vtagent-core/src/llm/llm_modular/providers/anthropic.rs
+- [ ] SAST Recon on vtagent-core/src/llm/llm_modular/providers/gemini.rs
+- [ ] SAST Recon on vtagent-core/src/llm/llm_modular/providers/groq.rs
+- [ ] SAST Recon on vtagent-core/src/llm/llm_modular/providers/lmstudio.rs
+- [ ] SAST Recon on vtagent-core/src/llm/llm_modular/providers/mod.rs
+- [ ] SAST Recon on vtagent-core/src/llm/llm_modular/providers/openai.rs
+- [ ] SAST Recon on vtagent-core/src/llm/llm_modular/providers/openrouter.rs
+- [ ] SAST Recon on vtagent-core/src/llm/mod.rs
+- [ ] SAST Recon on vtagent-core/src/llm/provider.rs
+- [ ] SAST Recon on vtagent-core/src/llm/providers/anthropic.rs
+- [ ] SAST Recon on vtagent-core/src/llm/providers/gemini.rs
+- [ ] SAST Recon on vtagent-core/src/llm/providers/openai.rs
+- [ ] SAST Recon on vtagent-core/src/llm/providers/openrouter.rs
+- [ ] SAST Recon on vtagent-core/src/llm/providers/mod.rs
+- [ ] SAST Recon on vtagent-core/src/llm/types.rs
+- [ ] SAST Recon on vtagent-core/src/prompts/config.rs
+- [ ] SAST Recon on vtagent-core/src/prompts/context.rs
+- [ ] SAST Recon on vtagent-core/src/prompts/generator.rs
+- [ ] SAST Recon on vtagent-core/src/prompts/mod.rs
+- [ ] SAST Recon on vtagent-core/src/prompts/system.rs
+- [ ] SAST Recon on vtagent-core/src/prompts/templates.rs
+- [ ] SAST Recon on vtagent-core/src/tool_policy.rs
+- [ ] SAST Recon on vtagent-core/src/tools/advanced_search.rs
+- [ ] SAST Recon on vtagent-core/src/tools/apply_patch.rs
+- [ ] SAST Recon on vtagent-core/src/tools/ast_grep.rs
+- [ ] SAST Recon on vtagent-core/src/tools/cache.rs
+- [ ] SAST Recon on vtagent-core/src/tools/command.rs
+- [ ] SAST Recon on vtagent-core/src/tools/file_ops.rs
+- [ ] SAST Recon on vtagent-core/src/tools/file_search.rs
+- [ ] SAST Recon on vtagent-core/src/tools/mod.rs
+- [ ] SAST Recon on vtagent-core/src/tools/registry.rs
+- [ ] SAST Recon on vtagent-core/src/tools/rp_search.rs
+- [ ] SAST Recon on vtagent-core/src/tools/search.rs
+- [ ] SAST Recon on vtagent-core/src/tools/traits.rs
+- [ ] SAST Recon on vtagent-core/src/tools/tree_sitter/analysis.rs
+- [ ] SAST Recon on vtagent-core/src/tools/tree_sitter/analyzer.rs
+- [ ] SAST Recon on vtagent-core/src/tools/tree_sitter/languages.rs
+- [ ] SAST Recon on vtagent-core/src/tools/tree_sitter/mod.rs
+- [ ] SAST Recon on vtagent-core/src/tools/tree_sitter/navigation.rs
+- [ ] SAST Recon on vtagent-core/src/tools/tree_sitter/refactoring.rs
+- [ ] SAST Recon on vtagent-core/src/tools/types.rs
+- [ ] SAST Recon on vtagent-core/src/ui/diff_renderer.rs
+- [ ] SAST Recon on vtagent-core/src/ui/mod.rs
+- [ ] SAST Recon on vtagent-core/src/ui/user_confirmation.rs
+- [ ] SAST Recon on vtagent-core/src/utils/async_file_ops.rs
+- [ ] SAST Recon on vtagent-core/src/utils/dot_config.rs
+- [ ] SAST Recon on vtagent-core/src/utils/mod.rs
+- [ ] SAST Recon on vtagent-core/src/utils/safety.rs
+- [ ] SAST Recon on vtagent-core/src/utils/utils.rs
+- [ ] SAST Recon on vtagent-core/src/utils/vtagentgitignore.rs
+- [ ] SAST Recon on vtagent-core/tests/pty_test.rs
+- [ ] SAST Recon on vtagent.toml
+- [ ] SAST Recon on vtagent.toml.example
+- [ ] Conduct the final review of all findings as per your **Minimizing False Positives** operating principle and generate the final report.

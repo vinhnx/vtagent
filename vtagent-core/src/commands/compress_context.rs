@@ -1,9 +1,9 @@
 //! Compress context command implementation
 
-use crate::gemini::{Content, FunctionResponse, GenerateContentRequest, Part};
-use crate::llm::make_client;
 use crate::config::models::ModelId;
 use crate::config::types::AgentConfig;
+use crate::gemini::{Content, FunctionResponse, GenerateContentRequest, Part};
+use crate::llm::make_client;
 use anyhow::Result;
 use console::style;
 use serde_json::json;
@@ -170,10 +170,12 @@ Focus on: key decisions, actions taken, current state, and user requirements."#,
     println!("{}", style("Compressing conversation...").cyan());
 
     // Convert the request to a string prompt
-    let _prompt = compression_request.contents
+    let _prompt = compression_request
+        .contents
         .iter()
         .map(|content| {
-            content.parts
+            content
+                .parts
                 .iter()
                 .map(|part| match part {
                     crate::gemini::Part::Text { text } => text.clone(),
@@ -186,10 +188,12 @@ Focus on: key decisions, actions taken, current state, and user requirements."#,
         .join("\n\n");
 
     // Convert the compression request to a string prompt
-    let prompt = compression_request.contents
+    let prompt = compression_request
+        .contents
         .iter()
         .map(|content| {
-            content.parts
+            content
+                .parts
                 .iter()
                 .map(|part| match part {
                     crate::gemini::Part::Text { text } => text.clone(),

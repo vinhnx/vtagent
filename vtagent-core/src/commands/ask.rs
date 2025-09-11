@@ -1,10 +1,10 @@
 //! Ask command implementation - single prompt without tools
 
+use crate::config::models::ModelId;
+use crate::config::types::AgentConfig;
 use crate::gemini::{Content, GenerateContentRequest};
 use crate::llm::make_client;
-use crate::config::models::ModelId;
 use crate::prompts::generate_lightweight_instruction;
-use crate::config::types::AgentConfig;
 use anyhow::Result;
 
 /// Handle the ask command - single prompt without tools
@@ -32,10 +32,12 @@ pub async fn handle_ask_command(config: AgentConfig, prompt: Vec<String>) -> Res
     };
 
     // Convert the request to a string prompt
-    let prompt = request.contents
+    let prompt = request
+        .contents
         .iter()
         .map(|content| {
-            content.parts
+            content
+                .parts
                 .iter()
                 .map(|part| match part {
                     crate::gemini::Part::Text { text } => text.clone(),

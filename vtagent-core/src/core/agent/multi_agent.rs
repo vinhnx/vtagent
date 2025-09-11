@@ -1,7 +1,7 @@
 //! Multi-agent system types and structures
 
-use crate::config::{ContextStoreDefaults, MultiAgentDefaults};
 use crate::config::models::{ModelId, Provider};
+use crate::config::{ContextStoreDefaults, MultiAgentDefaults};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};

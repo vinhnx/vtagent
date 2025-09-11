@@ -1,7 +1,9 @@
+use crate::config::constants::{model_helpers, models};
 use crate::llm::client::LLMClient;
-use crate::llm::provider::{FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall};
+use crate::llm::provider::{
+    FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
+};
 use crate::llm::types as llm_types;
-use crate::config::constants::models;
 use async_trait::async_trait;
 use reqwest::Client as HttpClient;
 use serde_json::{Value, json};
@@ -90,7 +92,10 @@ impl LMStudioProvider {
 
         // Add tools if present (but skip for LMStudio as it may not support them)
         if let Some(tools) = &request.tools {
-            if !tools.is_empty() && !request.model.contains("lmstudio") && !request.model.contains("qwen") {
+            if !tools.is_empty()
+                && !request.model.contains("lmstudio")
+                && !request.model.contains("qwen")
+            {
                 let tools_json: Vec<Value> = tools
                     .iter()
                     .map(|tool| {
@@ -115,16 +120,18 @@ impl LMStudioProvider {
         let choices = response_json
             .get("choices")
             .and_then(|c| c.as_array())
-            .ok_or_else(|| LLMError::Provider("Invalid response format: missing choices".to_string()))?;
+            .ok_or_else(|| {
+                LLMError::Provider("Invalid response format: missing choices".to_string())
+            })?;
 
         if choices.is_empty() {
             return Err(LLMError::Provider("No choices in response".to_string()));
         }
 
         let choice = &choices[0];
-        let message = choice
-            .get("message")
-            .ok_or_else(|| LLMError::Provider("Invalid response format: missing message".to_string()))?;
+        let message = choice.get("message").ok_or_else(|| {
+            LLMError::Provider("Invalid response format: missing message".to_string())
+        })?;
 
         let content = message
             .get("content")
@@ -141,11 +148,7 @@ impl LMStudioProvider {
                     .filter_map(|call| {
                         Some(ToolCall {
                             id: call.get("id")?.as_str()?.to_string(),
-                            name: call
-                                .get("function")?
-                                .get("name")?
-                                .as_str()?
-                                .to_string(),
+                            name: call.get("function")?.get("name")?.as_str()?.to_string(),
                             arguments: call
                                 .get("function")
                                 .and_then(|f| f.get("arguments"))
@@ -214,7 +217,8 @@ impl LLMProvider for LMStudioProvider {
 
         // Add authorization header if API key is provided
         if let Some(api_key) = &self.api_key {
-            request_builder = request_builder.header("Authorization", format!("Bearer {}", api_key));
+            request_builder =
+                request_builder.header("Authorization", format!("Bearer {}", api_key));
         }
 
         let response = request_builder
@@ -225,13 +229,21 @@ impl LLMProvider for LMStudioProvider {
 
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await.unwrap_or_else(|_| "Failed to read response body".to_string());
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Failed to read response body".to_string());
 
-            eprintln!("DEBUG: LMStudio HTTP error - Status: {}, Body: {}", status, error_text);
+            eprintln!(
+                "DEBUG: LMStudio HTTP error - Status: {}, Body: {}",
+                status, error_text
+            );
 
             // For local LMStudio, if we get 403 Forbidden, try without authentication
             if status == reqwest::StatusCode::FORBIDDEN && self.api_key.is_none() {
-                eprintln!("Warning: LMStudio server requires authentication but no API key provided. This might indicate LMStudio has authentication enabled.");
+                eprintln!(
+                    "Warning: LMStudio server requires authentication but no API key provided. This might indicate LMStudio has authentication enabled."
+                );
                 eprintln!("To fix this:");
                 eprintln!("1. In LMStudio, go to 'Local Inference' -> 'Settings'");
                 eprintln!("2. Disable 'Enable API Key' or set an API key");
@@ -257,19 +269,23 @@ impl LLMProvider for LMStudioProvider {
     }
 
     fn supported_models(&self) -> Vec<String> {
-        // LMStudio supports any model loaded locally
-        vec![
-            models::LMSTUDIO_LOCAL.to_string(), // Generic placeholder
-        ]
+        models::lmstudio::SUPPORTED_MODELS
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
     }
 
     fn validate_request(&self, request: &LLMRequest) -> Result<(), LLMError> {
         if request.messages.is_empty() {
-            return Err(LLMError::InvalidRequest("Messages cannot be empty".to_string()));
+            return Err(LLMError::InvalidRequest(
+                "Messages cannot be empty".to_string(),
+            ));
         }
 
         if request.model.is_empty() {
-            return Err(LLMError::InvalidRequest("Model cannot be empty".to_string()));
+            return Err(LLMError::InvalidRequest(
+                "Model cannot be empty".to_string(),
+            ));
         }
 
         Ok(())
@@ -342,7 +358,7 @@ impl LLMClient for LMStudioProvider {
                         messages,
                         system_prompt,
                         tools,
-                        model: "qwen/qwen3-1.7b".to_string(), // Use the model that works
+                        model: models::lmstudio::DEFAULT_MODEL.to_string(),
                         max_tokens: Some(1000),
                         temperature: Some(0.7),
                         stream: false,
@@ -359,7 +375,7 @@ impl LLMClient for LMStudioProvider {
                         }],
                         system_prompt: None,
                         tools: None,
-                        model: "qwen/qwen3-1.7b".to_string(),
+                        model: models::lmstudio::DEFAULT_MODEL.to_string(),
                         max_tokens: None,
                         temperature: None,
                         stream: false,
@@ -377,7 +393,7 @@ impl LLMClient for LMStudioProvider {
                 }],
                 system_prompt: None,
                 tools: None,
-                model: "qwen/qwen3-1.7b".to_string(),
+                model: models::lmstudio::DEFAULT_MODEL.to_string(),
                 max_tokens: None,
                 temperature: None,
                 stream: false,
@@ -386,9 +402,19 @@ impl LLMClient for LMStudioProvider {
 
         let response = LLMProvider::generate(self, request).await?;
 
+        let model = models::lmstudio::DEFAULT_MODEL.to_string();
+
+        // Validate the model
+        if !model_helpers::is_valid("lmstudio", &model) {
+            return Err(LLMError::InvalidRequest(format!(
+                "Invalid LMStudio model '{}'. See docs/models.json",
+                model
+            )));
+        }
+
         Ok(llm_types::LLMResponse {
             content: response.content.unwrap_or("".to_string()),
-            model: "qwen/qwen3-1.7b".to_string(),
+            model,
             usage: response.usage.map(|u| llm_types::Usage {
                 prompt_tokens: u.prompt_tokens as usize,
                 completion_tokens: u.completion_tokens as usize,
@@ -402,6 +428,6 @@ impl LLMClient for LMStudioProvider {
     }
 
     fn model_id(&self) -> &str {
-        "qwen/qwen3-1.7b"
+        models::lmstudio::DEFAULT_MODEL
     }
 }

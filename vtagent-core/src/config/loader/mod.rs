@@ -59,10 +59,11 @@ impl VTAgentConfig {
             let default_config = VTAgentConfig::default();
             let config_content = toml::to_string_pretty(&default_config)
                 .context("Failed to serialize default configuration")?;
-            
-            fs::write(&config_path, config_content)
-                .with_context(|| format!("Failed to write config file: {}", config_path.display()))?;
-            
+
+            fs::write(&config_path, config_content).with_context(|| {
+                format!("Failed to write config file: {}", config_path.display())
+            })?;
+
             created_files.push("vtagent.toml".to_string());
         }
 
@@ -70,9 +71,13 @@ impl VTAgentConfig {
         let gitignore_path = workspace.join(".vtagentgitignore");
         if !gitignore_path.exists() || force {
             let gitignore_content = Self::default_vtagent_gitignore();
-            fs::write(&gitignore_path, gitignore_content)
-                .with_context(|| format!("Failed to write gitignore file: {}", gitignore_path.display()))?;
-            
+            fs::write(&gitignore_path, gitignore_content).with_context(|| {
+                format!(
+                    "Failed to write gitignore file: {}",
+                    gitignore_path.display()
+                )
+            })?;
+
             created_files.push(".vtagentgitignore".to_string());
         }
 
@@ -95,7 +100,8 @@ target/, build/, dist/, node_modules/, vendor/
 
 # IDE files (comprehensive)
 .vscode/, .idea/, *.swp, *.swo
-"#.to_string()
+"#
+        .to_string()
     }
 
     /// Create sample configuration file
@@ -104,10 +110,10 @@ target/, build/, dist/, node_modules/, vendor/
         let default_config = VTAgentConfig::default();
         let config_content = toml::to_string_pretty(&default_config)
             .context("Failed to serialize default configuration")?;
-        
+
         fs::write(output, config_content)
             .with_context(|| format!("Failed to write config file: {}", output.display()))?;
-        
+
         Ok(())
     }
 }

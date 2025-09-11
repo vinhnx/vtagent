@@ -6,10 +6,10 @@ use super::file_ops::FileOpsTool;
 use super::search::SearchTool;
 use super::traits::Tool;
 use crate::config::types::CapabilityLevel;
-use crate::tools::ast_grep::AstGrepEngine;
 use crate::gemini::FunctionDeclaration;
-use crate::tools::rp_search::RpSearchManager;
 use crate::tool_policy::{ToolPolicy, ToolPolicyManager};
+use crate::tools::ast_grep::AstGrepEngine;
+use crate::tools::rp_search::RpSearchManager;
 use anyhow::{Result, anyhow};
 use serde_json::{Value, json};
 use std::path::PathBuf;
@@ -278,9 +278,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
 }
 
 /// Build function declarations filtered by capability level
-pub fn build_function_declarations_for_level(
-    level: CapabilityLevel,
-) -> Vec<FunctionDeclaration> {
+pub fn build_function_declarations_for_level(level: CapabilityLevel) -> Vec<FunctionDeclaration> {
     let all_declarations = build_function_declarations();
 
     match level {

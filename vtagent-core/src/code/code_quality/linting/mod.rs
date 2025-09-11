@@ -38,12 +38,12 @@ impl LintingOrchestrator {
         let mut orchestrator = Self {
             configs: Vec::new(),
         };
-        
+
         // Register default linters
         orchestrator.register(LintConfig::clippy());
         orchestrator.register(LintConfig::eslint());
         orchestrator.register(LintConfig::pylint());
-        
+
         orchestrator
     }
 
@@ -70,12 +70,12 @@ impl LintingOrchestrator {
     async fn run_linter(&self, config: &LintConfig, path: &Path) -> Option<LintResult> {
         // Execute the actual linting tool
         let mut cmd = Command::new(&config.command[0]);
-        
+
         // Add arguments
         for arg in &config.args {
             cmd.arg(arg);
         }
-        
+
         // Add the path as the last argument
         cmd.arg(path);
 
@@ -84,7 +84,7 @@ impl LintingOrchestrator {
                 if output.status.success() {
                     // Parse the lint output based on the tool
                     let findings = self.parse_lint_output(config, &output.stdout, path);
-                    
+
                     Some(LintResult {
                         success: true,
                         findings,
@@ -101,20 +101,23 @@ impl LintingOrchestrator {
                     })
                 }
             }
-            Err(e) => {
-                Some(LintResult {
-                    success: false,
-                    findings: Vec::new(),
-                    error_message: Some(format!("Failed to execute {}: {}", config.tool_name, e)),
-                    tool_used: config.tool_name.clone(),
-                })
-            }
+            Err(e) => Some(LintResult {
+                success: false,
+                findings: Vec::new(),
+                error_message: Some(format!("Failed to execute {}: {}", config.tool_name, e)),
+                tool_used: config.tool_name.clone(),
+            }),
         }
     }
-    
-    fn parse_lint_output(&self, config: &LintConfig, output: &[u8], base_path: &Path) -> Vec<LintFinding> {
+
+    fn parse_lint_output(
+        &self,
+        config: &LintConfig,
+        output: &[u8],
+        base_path: &Path,
+    ) -> Vec<LintFinding> {
         let output_str = String::from_utf8_lossy(output);
-        
+
         // Parse based on the tool used
         match config.tool_name.as_str() {
             "clippy" => self.parse_clippy_output(&output_str, base_path),
@@ -123,19 +126,19 @@ impl LintingOrchestrator {
             _ => Vec::new(), // Unknown tool, return empty findings
         }
     }
-    
+
     fn parse_clippy_output(&self, _output: &str, _base_path: &Path) -> Vec<LintFinding> {
         // In a real implementation, this would parse clippy's JSON output
         // For now, return empty vector
         Vec::new()
     }
-    
+
     fn parse_eslint_output(&self, _output: &str, _base_path: &Path) -> Vec<LintFinding> {
         // In a real implementation, this would parse ESLint's JSON output
         // For now, return empty vector
         Vec::new()
     }
-    
+
     fn parse_pylint_output(&self, _output: &str, _base_path: &Path) -> Vec<LintFinding> {
         // In a real implementation, this would parse pylint's JSON output
         // For now, return empty vector

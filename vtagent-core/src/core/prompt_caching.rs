@@ -116,13 +116,17 @@ impl PromptCache {
     pub fn stats(&self) -> CacheStats {
         let total_entries = self.cache.len();
         let total_usage = self.cache.values().map(|e| e.usage_count).sum::<u32>();
-        let total_tokens_saved = self.cache.values()
+        let total_tokens_saved = self
+            .cache
+            .values()
             .filter_map(|e| e.tokens_saved)
             .sum::<u32>();
         let avg_quality = if !self.cache.is_empty() {
-            self.cache.values()
+            self.cache
+                .values()
                 .filter_map(|e| e.quality_score)
-                .sum::<f64>() / self.cache.len() as f64
+                .sum::<f64>()
+                / self.cache.len() as f64
         } else {
             0.0
         };
@@ -144,7 +148,7 @@ impl PromptCache {
 
     /// Generate hash for prompt
     pub fn hash_prompt(prompt: &str) -> String {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(prompt.as_bytes());
         format!("{:x}", hasher.finalize())
@@ -157,15 +161,13 @@ impl PromptCache {
         }
 
         // Ensure cache directory exists
-        fs::create_dir_all(&self.config.cache_dir)
-            .map_err(|e| PromptCacheError::Io(e))?;
+        fs::create_dir_all(&self.config.cache_dir).map_err(|e| PromptCacheError::Io(e))?;
 
         let cache_path = self.config.cache_dir.join("prompt_cache.json");
         let data = serde_json::to_string_pretty(&self.cache)
             .map_err(|e| PromptCacheError::Serialization(e))?;
 
-        fs::write(cache_path, data)
-            .map_err(|e| PromptCacheError::Io(e))?;
+        fs::write(cache_path, data).map_err(|e| PromptCacheError::Io(e))?;
 
         Ok(())
     }
@@ -178,11 +180,9 @@ impl PromptCache {
             return Ok(());
         }
 
-        let data = fs::read_to_string(cache_path)
-            .map_err(|e| PromptCacheError::Io(e))?;
+        let data = fs::read_to_string(cache_path).map_err(|e| PromptCacheError::Io(e))?;
 
-        self.cache = serde_json::from_str(&data)
-            .map_err(|e| PromptCacheError::Serialization(e))?;
+        self.cache = serde_json::from_str(&data).map_err(|e| PromptCacheError::Serialization(e))?;
 
         Ok(())
     }
@@ -192,9 +192,8 @@ impl PromptCache {
         let now = Self::current_timestamp();
         let max_age_seconds = self.config.max_age_days * 24 * 60 * 60;
 
-        self.cache.retain(|_, entry| {
-            now - entry.created_at < max_age_seconds
-        });
+        self.cache
+            .retain(|_, entry| now - entry.created_at < max_age_seconds);
 
         self.dirty = true;
         Ok(())
@@ -207,7 +206,8 @@ impl PromptCache {
         }
 
         // Find the oldest entry
-        let oldest_key = self.cache
+        let oldest_key = self
+            .cache
             .iter()
             .min_by_key(|(_, entry)| entry.last_used)
             .map(|(key, _)| key.clone())
@@ -290,7 +290,9 @@ impl PromptOptimizer {
         }
 
         // Generate optimized prompt
-        let optimized = self.generate_optimized_prompt(original_prompt, target_model, context).await?;
+        let optimized = self
+            .generate_optimized_prompt(original_prompt, target_model, context)
+            .await?;
 
         // Calculate tokens saved (rough estimate)
         let original_tokens = Self::estimate_tokens(original_prompt);
@@ -348,7 +350,7 @@ impl PromptOptimizer {
              4. Ensure the prompt is appropriate for the target model\n\
              5. Maintain the original intent and requirements\n\
              6. Keep the optimized prompt concise but comprehensive\n\n\
-             Provide only the optimized prompt without any explanation or additional text."
+             Provide only the optimized prompt without any explanation or additional text.",
         );
 
         let request = crate::llm::provider::LLMRequest {
@@ -374,10 +376,15 @@ impl PromptOptimizer {
             stream: false,
         };
 
-        let response = self.llm_provider.generate(request).await
+        let response = self
+            .llm_provider
+            .generate(request)
+            .await
             .map_err(|e| PromptOptimizationError::LLMError(e.to_string()))?;
 
-        Ok(response.content.unwrap_or_else(|| original_prompt.to_string()))
+        Ok(response
+            .content
+            .unwrap_or_else(|| original_prompt.to_string()))
     }
 
     /// Estimate token count (rough approximation)
@@ -409,8 +416,10 @@ pub enum PromptOptimizationError {
 
 #[cfg(test)]
 mod tests {
+    use super::crate::llm::provider::{
+        FinishReason, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole,
+    };
     use super::*;
-    use super::crate::llm::provider::{LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, FinishReason};
 
     #[test]
     fn test_prompt_hash() {
@@ -450,10 +459,14 @@ mod tests {
 
     #[async_trait::async_trait]
     impl LLMProvider for MockProvider {
-        fn name(&self) -> &str { "mock" }
+        fn name(&self) -> &str {
+            "mock"
+        }
 
-        async fn generate(&self, _request: LLMRequest)
-            -> Result<LLMResponse, super::crate::llm::provider::LLMError> {
+        async fn generate(
+            &self,
+            _request: LLMRequest,
+        ) -> Result<LLMResponse, super::crate::llm::provider::LLMError> {
             Ok(LLMResponse {
                 content: Some("Optimized prompt".to_string()),
                 tool_calls: None,
@@ -462,9 +475,15 @@ mod tests {
             })
         }
 
-        fn supported_models(&self) -> Vec<String> { vec!["mock".to_string()] }
+        fn supported_models(&self) -> Vec<String> {
+            vec!["mock".to_string()]
+        }
 
-        fn validate_request(&self, _request: &super::crate::llm::provider::LLMRequest)
-            -> Result<(), super::crate::llm::provider::LLMError> { Ok(()) }
+        fn validate_request(
+            &self,
+            _request: &super::crate::llm::provider::LLMRequest,
+        ) -> Result<(), super::crate::llm::provider::LLMError> {
+            Ok(())
+        }
     }
 }

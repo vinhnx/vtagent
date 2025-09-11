@@ -1,6 +1,8 @@
 //! Core tree-sitter analyzer for code parsing and analysis
 
-use crate::tools::tree_sitter::analysis::{CodeAnalysis, DependencyInfo, DependencyKind, CodeMetrics};
+use crate::tools::tree_sitter::analysis::{
+    CodeAnalysis, CodeMetrics, DependencyInfo, DependencyKind,
+};
 use crate::tools::tree_sitter::languages::*;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -500,11 +502,7 @@ impl TreeSitterAnalyzer {
     }
 
     /// Calculate code metrics from a syntax tree
-    pub fn calculate_metrics(
-        &self,
-        syntax_tree: &Tree,
-        source_code: &str,
-    ) -> Result<CodeMetrics> {
+    pub fn calculate_metrics(&self, syntax_tree: &Tree, source_code: &str) -> Result<CodeMetrics> {
         let root_node = syntax_tree.root_node();
         let lines = source_code.lines().collect::<Vec<_>>();
 
@@ -727,7 +725,7 @@ impl TreeSitterAnalyzer {
         self.current_file = file_path.to_string_lossy().to_string();
 
         let tree = self.parse(source_code, language.clone())?;
-        
+
         // Extract actual symbols and dependencies
         let symbols = self.extract_symbols(&tree, source_code, language.clone())?;
         let dependencies = self.extract_dependencies(&tree, language.clone())?;

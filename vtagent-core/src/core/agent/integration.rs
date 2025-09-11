@@ -3,13 +3,13 @@
 //! This module provides the main integration point for the multi-agent system,
 //! orchestrating all components including verification workflows and performance optimization.
 
+use crate::config::models::ModelId;
 use crate::core::agent::multi_agent::*;
-use crate::core::agent::runner::AgentRunner;
 use crate::core::agent::optimization::{PerformanceConfig, PerformanceMonitor};
 use crate::core::agent::orchestrator::OrchestratorAgent;
+use crate::core::agent::runner::AgentRunner;
 use crate::core::agent::verification::{VerificationConfig, VerificationWorkflow};
 use crate::llm::{AnyClient, make_client};
-use crate::config::models::ModelId;
 use anyhow::{Result, anyhow};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -541,7 +541,7 @@ impl MultiAgentSystem {
         // Create an agent runner for this specific agent
         let mut runner = AgentRunner::new(
             agent_type,
-            // For now, we'll use a default model - in a real implementation, 
+            // For now, we'll use a default model - in a real implementation,
             // this should come from the agent configuration
             crate::config::models::ModelId::default_subagent(),
             // Use the API key from the multi-agent system

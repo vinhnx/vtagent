@@ -1,7 +1,7 @@
 //! Create project command implementation
 
-use crate::tools::ToolRegistry;
 use crate::config::types::AgentConfig;
+use crate::tools::ToolRegistry;
 use anyhow::{Result, anyhow};
 use console::style;
 use serde_json::json;

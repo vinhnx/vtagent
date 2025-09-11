@@ -1,15 +1,15 @@
 //! Agent runner for executing individual agent instances
 
+use crate::config::models::ModelId;
 use crate::core::agent::multi_agent::*;
 use crate::gemini::{Content, GenerateContentRequest, Part, Tool, ToolConfig};
-use crate::llm::{AnyClient, make_client, create_provider_with_config};
-use crate::config::models::ModelId;
+use crate::llm::{AnyClient, create_provider_with_config, make_client};
 use crate::tools::{ToolRegistry, build_function_declarations};
 use anyhow::{Result, anyhow};
 use console::style;
+use indicatif::{ProgressBar, ProgressStyle};
 use serde_json::Value;
 use std::path::PathBuf;
-use indicatif::{ProgressBar, ProgressStyle};
 use std::time::Duration;
 
 /// Wrapper for LMStudio provider to implement LLMClient trait
@@ -20,7 +20,10 @@ struct LMStudioClientWrapper {
 
 #[async_trait::async_trait]
 impl crate::llm::client::LLMClient for LMStudioClientWrapper {
-    async fn generate(&mut self, prompt: &str) -> Result<crate::llm::types::LLMResponse, crate::llm::provider::LLMError> {
+    async fn generate(
+        &mut self,
+        prompt: &str,
+    ) -> Result<crate::llm::types::LLMResponse, crate::llm::provider::LLMError> {
         // Parse the prompt as a GenerateContentRequest if it's a serialized request
         let request: crate::gemini::GenerateContentRequest = match serde_json::from_str(prompt) {
             Ok(req) => req,
@@ -147,38 +150,36 @@ impl AgentRunner {
         session_id: String,
     ) -> Result<Self> {
         // Create client based on model - if it's an LMStudio model, create the provider directly
-        let client: AnyClient = if model.as_str().contains("lmstudio") || model.as_str().contains("qwen") {
-            // For LMStudio models, we create the provider directly
-            let provider = create_provider_with_config(
-                "lmstudio",
-                Some(api_key.clone()),
-                Some("http://localhost:1234/v1".to_string()),
-                Some(model.as_str().to_string()),
-            ).map_err(|e| anyhow::anyhow!("Failed to create LMStudio provider: {}", e))?;
-            // Wrap the provider in a client that implements the LLMClient trait
-            Box::new(LMStudioClientWrapper {
-                provider,
-                model: model.as_str().to_string(),
-            })
-        } else {
-            // For other models, use the standard approach
-            make_client(api_key, model)
-        };
+        let client: AnyClient =
+            if model.as_str().contains("lmstudio") || model.as_str().contains("qwen") {
+                // For LMStudio models, we create the provider directly
+                let provider = create_provider_with_config(
+                    "lmstudio",
+                    Some(api_key.clone()),
+                    Some("http://localhost:1234/v1".to_string()),
+                    Some(model.as_str().to_string()),
+                )
+                .map_err(|e| anyhow::anyhow!("Failed to create LMStudio provider: {}", e))?;
+                // Wrap the provider in a client that implements the LLMClient trait
+                Box::new(LMStudioClientWrapper {
+                    provider,
+                    model: model.as_str().to_string(),
+                })
+            } else {
+                // For other models, use the standard approach
+                make_client(api_key, model)
+            };
 
         // Create system prompt based on agent type
         let system_prompt = match agent_type {
-            AgentType::Coder => {
-                include_str!("../../../../prompts/coder_system.md").to_string()
-            }
+            AgentType::Coder => include_str!("../../../../prompts/coder_system.md").to_string(),
             AgentType::Explorer => {
                 include_str!("../../../../prompts/explorer_system.md").to_string()
             }
             AgentType::Orchestrator => {
                 include_str!("../../../../prompts/orchestrator_system.md").to_string()
             }
-            AgentType::Single => {
-                include_str!("../../../../prompts/system.md").to_string()
-            }
+            AgentType::Single => include_str!("../../../../prompts/system.md").to_string(),
         };
 
         Ok(Self {
@@ -202,9 +203,13 @@ impl AgentRunner {
         pb.set_style(
             ProgressStyle::default_spinner()
                 .template("{spinner:.green} {msg}")
-                .unwrap()
+                .unwrap(),
         );
-        pb.set_message(format!("{} {} is thinking...", self.agent_type, style("🤖").cyan()));
+        pb.set_message(format!(
+            "{} {} is thinking...",
+            self.agent_type,
+            style("🤖").cyan()
+        ));
         pb.enable_steady_tick(Duration::from_millis(100));
 
         println!(
@@ -255,7 +260,12 @@ impl AgentRunner {
                 break;
             }
 
-            pb.set_message(format!("{} {} is processing turn {}...", self.agent_type, style("🧠").yellow(), turn + 1));
+            pb.set_message(format!(
+                "{} {} is processing turn {}...",
+                self.agent_type,
+                style("🧠").yellow(),
+                turn + 1
+            ));
 
             let request = GenerateContentRequest {
                 contents: conversation.clone(),
@@ -265,18 +275,26 @@ impl AgentRunner {
                 generation_config: None,
             };
 
-            let response = self.client.generate(&serde_json::to_string(&request)?).await.map_err(|e| {
-                pb.finish_with_message(format!("{} Failed", style("❌").red()));
-                anyhow!(
-                    "Agent {} execution failed at turn {}: {}",
-                    self.agent_type,
-                    turn,
-                    e
-                )
-            })?;
+            let response = self
+                .client
+                .generate(&serde_json::to_string(&request)?)
+                .await
+                .map_err(|e| {
+                    pb.finish_with_message(format!("{} Failed", style("❌").red()));
+                    anyhow!(
+                        "Agent {} execution failed at turn {}: {}",
+                        self.agent_type,
+                        turn,
+                        e
+                    )
+                })?;
 
             // Update progress for successful response
-            pb.set_message(format!("{} {} received response, processing...", self.agent_type, style("📥").green()));
+            pb.set_message(format!(
+                "{} {} received response, processing...",
+                self.agent_type,
+                style("📥").green()
+            ));
 
             // Use response content directly
             if !response.content.is_empty() {
@@ -286,7 +304,10 @@ impl AgentRunner {
                 // Try to parse as a tool call response
                 if let Ok(tool_call_response) = serde_json::from_str::<Value>(&response.content) {
                     // Check for standard tool_calls format
-                    if let Some(tool_calls) = tool_call_response.get("tool_calls").and_then(|tc| tc.as_array()) {
+                    if let Some(tool_calls) = tool_call_response
+                        .get("tool_calls")
+                        .and_then(|tc| tc.as_array())
+                    {
                         had_tool_call = true;
 
                         // Process each tool call
@@ -306,14 +327,21 @@ impl AgentRunner {
                                     // Execute the tool
                                     match self.execute_tool(name, &arguments.clone()).await {
                                         Ok(result) => {
-                                            pb.set_message(format!("{} {} tool executed successfully", style("✅").green(), name));
+                                            pb.set_message(format!(
+                                                "{} {} tool executed successfully",
+                                                style("✅").green(),
+                                                name
+                                            ));
 
                                             // Add tool result to conversation
                                             let tool_result = serde_json::to_string(&result)?;
                                             conversation.push(Content {
                                                 role: "function".to_string(),
                                                 parts: vec![Part::Text {
-                                                    text: format!("Tool {} result: {}", name, tool_result),
+                                                    text: format!(
+                                                        "Tool {} result: {}",
+                                                        name, tool_result
+                                                    ),
                                                 }],
                                             });
 
@@ -322,13 +350,20 @@ impl AgentRunner {
 
                                             // Special handling for certain tools
                                             if name == "write_file" {
-                                                if let Some(filepath) = arguments.get("path").and_then(|p| p.as_str()) {
+                                                if let Some(filepath) =
+                                                    arguments.get("path").and_then(|p| p.as_str())
+                                                {
                                                     modified_files.push(filepath.to_string());
                                                 }
                                             }
                                         }
                                         Err(e) => {
-                                            pb.set_message(format!("{} {} tool failed: {}", style("❌").red(), name, e));
+                                            pb.set_message(format!(
+                                                "{} {} tool failed: {}",
+                                                style("❌").red(),
+                                                name,
+                                                e
+                                            ));
                                             warnings.push(format!("Tool {} failed: {}", name, e));
                                             conversation.push(Content {
                                                 role: "function".to_string(),
@@ -343,7 +378,10 @@ impl AgentRunner {
                         }
                     }
                     // Check for tool_code format (what agents are actually producing)
-                    else if let Some(tool_code) = tool_call_response.get("tool_code").and_then(|tc| tc.as_str()) {
+                    else if let Some(tool_code) = tool_call_response
+                        .get("tool_code")
+                        .and_then(|tc| tc.as_str())
+                    {
                         had_tool_call = true;
 
                         println!(
@@ -370,14 +408,21 @@ impl AgentRunner {
                                     // Execute the tool
                                     match self.execute_tool(&func_name, &arguments).await {
                                         Ok(result) => {
-                                            pb.set_message(format!("{} {} tool executed successfully", style("✅").green(), func_name));
+                                            pb.set_message(format!(
+                                                "{} {} tool executed successfully",
+                                                style("✅").green(),
+                                                func_name
+                                            ));
 
                                             // Add tool result to conversation
                                             let tool_result = serde_json::to_string(&result)?;
                                             conversation.push(Content {
                                                 role: "function".to_string(),
                                                 parts: vec![Part::Text {
-                                                    text: format!("Tool {} result: {}", func_name, tool_result),
+                                                    text: format!(
+                                                        "Tool {} result: {}",
+                                                        func_name, tool_result
+                                                    ),
                                                 }],
                                             });
 
@@ -386,31 +431,43 @@ impl AgentRunner {
 
                                             // Special handling for certain tools
                                             if func_name == "write_file" {
-                                                if let Some(filepath) = arguments.get("path").and_then(|p| p.as_str()) {
+                                                if let Some(filepath) =
+                                                    arguments.get("path").and_then(|p| p.as_str())
+                                                {
                                                     modified_files.push(filepath.to_string());
                                                 }
                                             }
                                         }
                                         Err(e) => {
-                                            pb.set_message(format!("{} {} tool failed: {}", style("❌").red(), func_name, e));
-                                            warnings.push(format!("Tool {} failed: {}", func_name, e));
+                                            pb.set_message(format!(
+                                                "{} {} tool failed: {}",
+                                                style("❌").red(),
+                                                func_name,
+                                                e
+                                            ));
+                                            warnings
+                                                .push(format!("Tool {} failed: {}", func_name, e));
                                             conversation.push(Content {
                                                 role: "function".to_string(),
                                                 parts: vec![Part::Text {
-                                                    text: format!("Tool {} failed: {}", func_name, e),
+                                                    text: format!(
+                                                        "Tool {} failed: {}",
+                                                        func_name, e
+                                                    ),
                                                 }],
                                             });
                                         }
                                     }
                                 }
                                 Err(e) => {
-                                    let error_msg = format!("Failed to parse tool arguments '{}': {}", args_str, e);
+                                    let error_msg = format!(
+                                        "Failed to parse tool arguments '{}': {}",
+                                        args_str, e
+                                    );
                                     warnings.push(error_msg.clone());
                                     conversation.push(Content {
                                         role: "function".to_string(),
-                                        parts: vec![Part::Text {
-                                            text: error_msg,
-                                        }],
+                                        parts: vec![Part::Text { text: error_msg }],
                                     });
                                 }
                             }
@@ -419,14 +476,15 @@ impl AgentRunner {
                             warnings.push(error_msg.clone());
                             conversation.push(Content {
                                 role: "function".to_string(),
-                                parts: vec![Part::Text {
-                                    text: error_msg,
-                                }],
+                                parts: vec![Part::Text { text: error_msg }],
                             });
                         }
                     }
                     // Check for tool_name format (alternative format)
-                    else if let Some(tool_name) = tool_call_response.get("tool_name").and_then(|tn| tn.as_str()) {
+                    else if let Some(tool_name) = tool_call_response
+                        .get("tool_name")
+                        .and_then(|tn| tn.as_str())
+                    {
                         had_tool_call = true;
 
                         println!(
@@ -440,14 +498,21 @@ impl AgentRunner {
                             // Execute the tool
                             match self.execute_tool(tool_name, parameters).await {
                                 Ok(result) => {
-                                    pb.set_message(format!("{} {} tool executed successfully", style("✅").green(), tool_name));
+                                    pb.set_message(format!(
+                                        "{} {} tool executed successfully",
+                                        style("✅").green(),
+                                        tool_name
+                                    ));
 
                                     // Add tool result to conversation
                                     let tool_result = serde_json::to_string(&result)?;
                                     conversation.push(Content {
                                         role: "function".to_string(),
                                         parts: vec![Part::Text {
-                                            text: format!("Tool {} result: {}", tool_name, tool_result),
+                                            text: format!(
+                                                "Tool {} result: {}",
+                                                tool_name, tool_result
+                                            ),
                                         }],
                                     });
 
@@ -456,13 +521,20 @@ impl AgentRunner {
 
                                     // Special handling for certain tools
                                     if tool_name == "write_file" {
-                                        if let Some(filepath) = parameters.get("path").and_then(|p| p.as_str()) {
+                                        if let Some(filepath) =
+                                            parameters.get("path").and_then(|p| p.as_str())
+                                        {
                                             modified_files.push(filepath.to_string());
                                         }
                                     }
                                 }
                                 Err(e) => {
-                                    pb.set_message(format!("{} {} tool failed: {}", style("❌").red(), tool_name, e));
+                                    pb.set_message(format!(
+                                        "{} {} tool failed: {}",
+                                        style("❌").red(),
+                                        tool_name,
+                                        e
+                                    ));
                                     warnings.push(format!("Tool {} failed: {}", tool_name, e));
                                     conversation.push(Content {
                                         role: "function".to_string(),
@@ -473,8 +545,7 @@ impl AgentRunner {
                                 }
                             }
                         }
-                    }
-                    else {
+                    } else {
                         // Regular content response
                         println!(
                             "{} [{}]: {}",
@@ -616,7 +687,9 @@ fn parse_tool_code(tool_code: &str) -> Option<(String, String)> {
     // Remove any markdown code blocks
     let code = tool_code.trim();
     let code = if code.starts_with("```") && code.ends_with("```") {
-        code.trim_start_matches("```").trim_end_matches("```").trim()
+        code.trim_start_matches("```")
+            .trim_end_matches("```")
+            .trim()
     } else {
         code
     };

@@ -1,9 +1,9 @@
+use crate::config::constants::{model_helpers, models};
 use crate::llm::client::LLMClient;
 use crate::llm::provider::{
     FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
 };
 use crate::llm::types as llm_types;
-use crate::config::constants::models;
 use async_trait::async_trait;
 use reqwest::Client as HttpClient;
 use serde_json::{Value, json};
@@ -62,20 +62,23 @@ impl LLMProvider for OpenAIProvider {
     }
 
     fn supported_models(&self) -> Vec<String> {
-        use crate::config::constants::models;
-        vec![
-            models::GPT_5.to_string(),
-            models::GPT_5_MINI.to_string(),
-        ]
+        models::openai::SUPPORTED_MODELS
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
     }
 
     fn validate_request(&self, request: &LLMRequest) -> Result<(), LLMError> {
         if request.messages.is_empty() {
-            return Err(LLMError::InvalidRequest("Messages cannot be empty".to_string()));
+            return Err(LLMError::InvalidRequest(
+                "Messages cannot be empty".to_string(),
+            ));
         }
 
         if request.model.is_empty() {
-            return Err(LLMError::InvalidRequest("Model cannot be empty".to_string()));
+            return Err(LLMError::InvalidRequest(
+                "Model cannot be empty".to_string(),
+            ));
         }
 
         Ok(())
@@ -177,16 +180,18 @@ impl OpenAIProvider {
         let choices = response_json
             .get("choices")
             .and_then(|c| c.as_array())
-            .ok_or_else(|| LLMError::Provider("Invalid response format: missing choices".to_string()))?;
+            .ok_or_else(|| {
+                LLMError::Provider("Invalid response format: missing choices".to_string())
+            })?;
 
         if choices.is_empty() {
             return Err(LLMError::Provider("No choices in response".to_string()));
         }
 
         let choice = &choices[0];
-        let message = choice
-            .get("message")
-            .ok_or_else(|| LLMError::Provider("Invalid response format: missing message".to_string()))?;
+        let message = choice.get("message").ok_or_else(|| {
+            LLMError::Provider("Invalid response format: missing message".to_string())
+        })?;
 
         let content = message
             .get("content")
@@ -203,11 +208,7 @@ impl OpenAIProvider {
                     .filter_map(|call| {
                         Some(ToolCall {
                             id: call.get("id")?.as_str()?.to_string(),
-                            name: call
-                                .get("function")?
-                                .get("name")?
-                                .as_str()?
-                                .to_string(),
+                            name: call.get("function")?.get("name")?.as_str()?.to_string(),
                             arguments: call
                                 .get("function")
                                 .and_then(|f| f.get("arguments"))
@@ -261,6 +262,16 @@ impl OpenAIProvider {
 #[async_trait]
 impl LLMClient for OpenAIProvider {
     async fn generate(&mut self, prompt: &str) -> Result<llm_types::LLMResponse, LLMError> {
+        let model = models::openai::DEFAULT_MODEL.to_string();
+
+        // Validate the model
+        if !model_helpers::is_valid("openai", &model) {
+            return Err(LLMError::InvalidRequest(format!(
+                "Invalid OpenAI model '{}'. See docs/models.json",
+                model
+            )));
+        }
+
         let request = LLMRequest {
             messages: vec![Message {
                 role: MessageRole::User,
@@ -270,7 +281,7 @@ impl LLMClient for OpenAIProvider {
             }],
             system_prompt: None,
             tools: None,
-            model: "gpt-3.5-turbo".to_string(), // Default model
+            model: model.clone(),
             max_tokens: None,
             temperature: None,
             stream: false,
@@ -280,7 +291,7 @@ impl LLMClient for OpenAIProvider {
 
         Ok(llm_types::LLMResponse {
             content: response.content.unwrap_or("".to_string()),
-            model: "gpt-3.5-turbo".to_string(),
+            model,
             usage: response.usage.map(|u| llm_types::Usage {
                 prompt_tokens: u.prompt_tokens as usize,
                 completion_tokens: u.completion_tokens as usize,
@@ -294,6 +305,6 @@ impl LLMClient for OpenAIProvider {
     }
 
     fn model_id(&self) -> &str {
-        models::GPT_5
+        models::openai::DEFAULT_MODEL
     }
 }

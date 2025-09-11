@@ -1,14 +1,14 @@
 //! Core agent implementation and orchestration
 
+use crate::config::models::ModelId;
+use crate::config::types::*;
 use crate::core::agent::compaction::CompactionEngine;
 use crate::core::conversation_summarizer::ConversationSummarizer;
 use crate::core::decision_tracker::DecisionTracker;
 use crate::core::error_recovery::{ErrorRecoveryManager, ErrorType};
 use crate::llm::{AnyClient, make_client};
-use crate::config::models::ModelId;
-use crate::tools::{ToolRegistry, build_function_declarations};
 use crate::tools::tree_sitter::{CodeAnalysis, TreeSitterAnalyzer};
-use crate::config::types::*;
+use crate::tools::{ToolRegistry, build_function_declarations};
 use anyhow::{Result, anyhow};
 use console::style;
 use std::sync::Arc;
@@ -241,7 +241,9 @@ impl Agent {
     }
 
     /// Perform intelligent message compaction
-    pub async fn compact_messages(&self) -> Result<crate::core::agent::compaction::CompactionResult> {
+    pub async fn compact_messages(
+        &self,
+    ) -> Result<crate::core::agent::compaction::CompactionResult> {
         // In a real implementation, this would perform intelligent compaction
         // by analyzing message importance and context relevance
 

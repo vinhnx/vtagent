@@ -2,9 +2,9 @@
 
 use crate::config::constants::defaults;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::collections::HashMap;
 
 /// VTAgent configuration stored in ~/.vtagent/
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -139,8 +139,7 @@ pub struct DotManager {
 
 impl DotManager {
     pub fn new() -> Result<Self, DotError> {
-        let home_dir = dirs::home_dir()
-            .ok_or_else(|| DotError::HomeDirNotFound)?;
+        let home_dir = dirs::home_dir().ok_or_else(|| DotError::HomeDirNotFound)?;
 
         let config_dir = home_dir.join(".vtagent");
         let cache_dir = config_dir.join("cache");
@@ -156,10 +155,8 @@ impl DotManager {
     /// Initialize the dot folder structure
     pub fn initialize(&self) -> Result<(), DotError> {
         // Create directories
-        fs::create_dir_all(&self.config_dir)
-            .map_err(|e| DotError::Io(e))?;
-        fs::create_dir_all(&self.cache_dir)
-            .map_err(|e| DotError::Io(e))?;
+        fs::create_dir_all(&self.config_dir).map_err(|e| DotError::Io(e))?;
+        fs::create_dir_all(&self.cache_dir).map_err(|e| DotError::Io(e))?;
 
         // Create subdirectories
         let subdirs = [
@@ -172,8 +169,7 @@ impl DotManager {
         ];
 
         for subdir in &subdirs {
-            fs::create_dir_all(self.config_dir.join(subdir))
-                .map_err(|e| DotError::Io(e))?;
+            fs::create_dir_all(self.config_dir.join(subdir)).map_err(|e| DotError::Io(e))?;
         }
 
         // Create default config if it doesn't exist
@@ -191,20 +187,16 @@ impl DotManager {
             return Ok(DotConfig::default());
         }
 
-        let content = fs::read_to_string(&self.config_file)
-            .map_err(|e| DotError::Io(e))?;
+        let content = fs::read_to_string(&self.config_file).map_err(|e| DotError::Io(e))?;
 
-        toml::from_str(&content)
-            .map_err(|e| DotError::TomlDe(e))
+        toml::from_str(&content).map_err(|e| DotError::TomlDe(e))
     }
 
     /// Save configuration to disk
     pub fn save_config(&self, config: &DotConfig) -> Result<(), DotError> {
-        let content = toml::to_string_pretty(config)
-            .map_err(|e| DotError::Toml(e))?;
+        let content = toml::to_string_pretty(config).map_err(|e| DotError::Toml(e))?;
 
-        fs::write(&self.config_file, content)
-            .map_err(|e| DotError::Io(e))?;
+        fs::write(&self.config_file, content).map_err(|e| DotError::Io(e))?;
 
         Ok(())
     }
@@ -253,28 +245,18 @@ impl DotManager {
 
         // Clean prompt cache
         if config.cache.prompt_cache_enabled {
-            stats.prompts_cleaned = self.cleanup_directory(
-                &self.cache_dir("prompts"),
-                max_age,
-                now,
-            )?;
+            stats.prompts_cleaned =
+                self.cleanup_directory(&self.cache_dir("prompts"), max_age, now)?;
         }
 
         // Clean context cache
         if config.cache.context_cache_enabled {
-            stats.context_cleaned = self.cleanup_directory(
-                &self.cache_dir("context"),
-                max_age,
-                now,
-            )?;
+            stats.context_cleaned =
+                self.cleanup_directory(&self.cache_dir("context"), max_age, now)?;
         }
 
         // Clean model cache
-        stats.models_cleaned = self.cleanup_directory(
-            &self.cache_dir("models"),
-            max_age,
-            now,
-        )?;
+        stats.models_cleaned = self.cleanup_directory(&self.cache_dir("models"), max_age, now)?;
 
         Ok(stats)
     }
@@ -326,8 +308,11 @@ impl DotManager {
         stats.sessions_size = self.calculate_dir_size(&self.sessions_dir())?;
         stats.backups_size = self.calculate_dir_size(&self.backups_dir())?;
 
-        stats.total_size = stats.config_size + stats.cache_size +
-                          stats.logs_size + stats.sessions_size + stats.backups_size;
+        stats.total_size = stats.config_size
+            + stats.cache_size
+            + stats.logs_size
+            + stats.sessions_size
+            + stats.backups_size;
 
         Ok(stats)
     }
@@ -369,8 +354,7 @@ impl DotManager {
         let backup_path = self.backups_dir().join(backup_name);
 
         if self.config_file.exists() {
-            fs::copy(&self.config_file, &backup_path)
-                .map_err(|e| DotError::Io(e))?;
+            fs::copy(&self.config_file, &backup_path).map_err(|e| DotError::Io(e))?;
         }
 
         Ok(backup_path)
@@ -408,8 +392,7 @@ impl DotManager {
             return Err(DotError::BackupNotFound(backup_path.to_path_buf()));
         }
 
-        fs::copy(backup_path, &self.config_file)
-            .map_err(|e| DotError::Io(e))?;
+        fs::copy(backup_path, &self.config_file).map_err(|e| DotError::Io(e))?;
 
         Ok(())
     }
@@ -454,7 +437,8 @@ pub enum DotError {
 use std::sync::{LazyLock, Mutex};
 
 /// Global dot manager instance
-static DOT_MANAGER: LazyLock<Mutex<DotManager>> = LazyLock::new(|| Mutex::new(DotManager::new().unwrap()));
+static DOT_MANAGER: LazyLock<Mutex<DotManager>> =
+    LazyLock::new(|| Mutex::new(DotManager::new().unwrap()));
 
 /// Get global dot manager instance
 pub fn get_dot_manager() -> &'static Mutex<DotManager> {

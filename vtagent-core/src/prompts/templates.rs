@@ -12,10 +12,18 @@ impl PromptTemplates {
     /// Get personality-specific prompt addition
     pub fn personality_prompt(personality: &AgentPersonality) -> &'static str {
         match personality {
-            AgentPersonality::Professional => "Maintain a professional, focused approach to problem-solving.",
-            AgentPersonality::Friendly => "Be friendly and encouraging while helping with coding tasks.",
-            AgentPersonality::Technical => "Provide detailed technical explanations and focus on best practices.",
-            AgentPersonality::Creative => "Think creatively and suggest innovative solutions to problems.",
+            AgentPersonality::Professional => {
+                "Maintain a professional, focused approach to problem-solving."
+            }
+            AgentPersonality::Friendly => {
+                "Be friendly and encouraging while helping with coding tasks."
+            }
+            AgentPersonality::Technical => {
+                "Provide detailed technical explanations and focus on best practices."
+            }
+            AgentPersonality::Creative => {
+                "Think creatively and suggest innovative solutions to problems."
+            }
         }
     }
 
@@ -24,8 +32,12 @@ impl PromptTemplates {
         match style {
             ResponseStyle::Concise => "Keep responses concise and to the point.",
             ResponseStyle::Detailed => "Provide detailed explanations and comprehensive answers.",
-            ResponseStyle::Conversational => "Use a conversational tone and explain concepts clearly.",
-            ResponseStyle::Technical => "Focus on technical accuracy and include relevant implementation details.",
+            ResponseStyle::Conversational => {
+                "Use a conversational tone and explain concepts clearly."
+            }
+            ResponseStyle::Technical => {
+                "Focus on technical accuracy and include relevant implementation details."
+            }
         }
     }
 

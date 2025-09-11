@@ -1,7 +1,7 @@
-use crate::llm::provider::{LLMError, LLMProvider};
 use super::providers::{AnthropicProvider, GeminiProvider, OpenAIProvider, OpenRouterProvider};
-use std::collections::HashMap;
+use crate::llm::provider::{LLMError, LLMProvider};
 use crate::llm::providers::LMStudioProvider;
+use std::collections::HashMap;
 
 /// LLM provider factory and registry
 pub struct LLMFactory {
@@ -57,7 +57,9 @@ impl LLMFactory {
         factory.register_provider(
             "lmstudio",
             Box::new(|config: ProviderConfig| {
-                let base_url = config.base_url.unwrap_or_else(|| "http://localhost:1234/v1".to_string());
+                let base_url = config
+                    .base_url
+                    .unwrap_or_else(|| "http://localhost:1234/v1".to_string());
                 let api_key = config.api_key;
                 Box::new(LMStudioProvider::new(api_key, Some(base_url))) as Box<dyn LLMProvider>
             }),

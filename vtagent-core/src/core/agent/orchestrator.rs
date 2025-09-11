@@ -1,11 +1,11 @@
 //! Orchestrator agent implementation for multi-agent coordination
 
+use crate::config::models::ModelId;
 use crate::core::agent::multi_agent::*;
 use crate::core::agent::runner::AgentRunner;
+use crate::core::orchestrator_retry::{RetryManager, is_empty_response};
 use crate::gemini::GenerateContentRequest;
 use crate::llm::AnyClient;
-use crate::config::models::ModelId;
-use crate::core::orchestrator_retry::{RetryManager, is_empty_response};
 use anyhow::{Result, anyhow};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -339,7 +339,10 @@ impl OrchestratorAgent {
         // Create an explorer agent runner
         let mut runner = AgentRunner::new(
             AgentType::Explorer,
-            self.config.subagent_model.parse().unwrap_or(ModelId::default_subagent()),
+            self.config
+                .subagent_model
+                .parse()
+                .unwrap_or(ModelId::default_subagent()),
             self.api_key.clone(),
             self.workspace.clone(),
             self.session_id.clone(),
@@ -358,7 +361,10 @@ impl OrchestratorAgent {
         // Create a coder agent runner
         let mut runner = AgentRunner::new(
             AgentType::Coder,
-            self.config.subagent_model.parse().unwrap_or(ModelId::default_subagent()),
+            self.config
+                .subagent_model
+                .parse()
+                .unwrap_or(ModelId::default_subagent()),
             self.api_key.clone(),
             self.workspace.clone(),
             self.session_id.clone(),
@@ -397,7 +403,11 @@ impl OrchestratorAgent {
                 primary_model.as_str()
             );
 
-            match self.client.generate(&serde_json::to_string(&request)?).await {
+            match self
+                .client
+                .generate(&serde_json::to_string(&request)?)
+                .await
+            {
                 Ok(response) => {
                     let response_json = serde_json::to_value(&response)?;
 
@@ -450,7 +460,11 @@ impl OrchestratorAgent {
             fallback_model.as_str()
         );
 
-        match self.client.generate(&serde_json::to_string(&request)?).await {
+        match self
+            .client
+            .generate(&serde_json::to_string(&request)?)
+            .await
+        {
             Ok(response) => {
                 let response_json = serde_json::to_value(&response)?;
 

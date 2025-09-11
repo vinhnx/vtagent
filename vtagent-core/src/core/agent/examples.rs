@@ -3,10 +3,10 @@
 //! This module demonstrates how to use the complete multi-agent system
 //! with all optimization features enabled.
 
+use crate::config::models::ModelId;
+use crate::config::{MultiAgentDefaults, ScenarioDefaults};
 use crate::core::agent::integration::{MultiAgentSystem, OptimizedTaskResult};
 use crate::core::agent::multi_agent::{AgentType, MultiAgentConfig};
-use crate::config::{MultiAgentDefaults, ScenarioDefaults};
-use crate::config::models::ModelId;
 use anyhow::Result;
 use std::path::PathBuf;
 
@@ -222,7 +222,9 @@ fn print_status_report(status: &crate::core::agent::integration::SystemStatusRep
 }
 
 /// Demonstrate performance optimization features
-async fn demonstrate_performance_features(status: &crate::core::agent::integration::SystemStatusReport) {
+async fn demonstrate_performance_features(
+    status: &crate::core::agent::integration::SystemStatusReport,
+) {
     println!("  🎯 Active Optimizations:");
 
     if !status.recommendations.is_empty() {

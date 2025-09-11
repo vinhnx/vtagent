@@ -1,7 +1,7 @@
 //! Stats command implementation - show session statistics and performance metrics
 
-use crate::tools::build_function_declarations;
 use crate::config::types::{AgentConfig, OutputFormat, PerformanceMetrics};
+use crate::tools::build_function_declarations;
 use anyhow::Result;
 use console::style;
 

@@ -144,7 +144,9 @@ impl CompactionEngine {
     }
 
     /// Get statistics
-    pub async fn get_statistics(&self) -> Result<crate::core::agent::compaction::CompactionStatistics> {
+    pub async fn get_statistics(
+        &self,
+    ) -> Result<crate::core::agent::compaction::CompactionStatistics> {
         // In a real implementation, this would collect and return actual statistics
         // about the compaction engine's performance and the state of messages
 

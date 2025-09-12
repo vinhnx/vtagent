@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release'
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install changelogithub
+        run: npm install -g changelogithub
+
+      - name: Generate changelog and create release
+        run: |
+          # Get the tag name
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+
+          echo "Creating release for tag: $TAG"
+
+          # Generate changelog and create GitHub release
+          changelogithub --token ${{ secrets.GITHUB_TOKEN }} --tag $TAG --config .github/changelogithub.config.js
+
+      - name: Build and test (optional)
+        run: |
+          # Add any build/test steps here if needed
+          echo "Release $TAG created successfully"

@@ -1,6 +1,4 @@
 
-Remove the "update_plan" tool references from both `prompts/system.md` and `vtagent-core/src/prompts/system.rs` files. After removal, thoroughly verify that the prompt string content in `system.md` and `system.rs` is not duplicated—ensure `system.rs` only imports or reads from `system.md` without inline duplication. Update `system.rs` to dynamically load the prompt from `system.md` (e.g., via file reading or embedding) to maintain a single source of truth and prevent future inconsistencies. Commit changes with a descriptive message like "Refactor system prompts: remove update_plan tool and deduplicate content by loading from system.md".
-
 --
 
 AgentType::Orchestrator => vec![
@@ -12,7 +10,7 @@ AgentType::Orchestrator => vec![
     "task_status",
 ],
 
--> still hardcode string tools -> use enum constants from vtagent-core/src/config/constants.rs
+-> still hardcode string tools in vtagent-core/src/core/agent/multi_agent.rs -> use enum constants from vtagent-core/src/config/constants.rs
 
 --
 

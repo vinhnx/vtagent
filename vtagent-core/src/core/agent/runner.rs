@@ -840,15 +840,15 @@ impl AgentRunner {
             }
             AgentType::Explorer => {
                 // Explorer agents can use search and file listing
-                matches!(tool_name, tools::RG_SEARCH | tools::LIST_FILES)
+                matches!(tool_name, tools::GREP_SEARCH | tools::LIST_FILES)
             }
             AgentType::Orchestrator => {
                 // Orchestrator can coordinate but not directly manipulate files
-                matches!(tool_name, tools::RG_SEARCH | tools::LIST_FILES)
+                matches!(tool_name, tools::GREP_SEARCH | tools::LIST_FILES)
             }
             AgentType::Single => {
                 // Single agents have limited tool access
-                matches!(tool_name, tools::RG_SEARCH | tools::LIST_FILES)
+                matches!(tool_name, tools::GREP_SEARCH | tools::LIST_FILES)
             }
         };
 

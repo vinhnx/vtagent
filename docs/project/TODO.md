@@ -250,7 +250,8 @@ Review and refactor the source code in the `src/cli/` directory to unify the han
 Additionally, implement a '/' slash activation command in the chat agent mode. This command should trigger agent activation when entered in the chat interface, responding with a confirmation message (e.g., "Agent activated!") and enabling full agent functionality, while ignoring non-slash inputs until activation. Include safeguards to prevent accidental activation and integrate it seamlessly with the existing chat loop.
 
 ---
-
+https://github.com/pawurb/hotpath
+ A simple Rust profiler that shows exactly where your code spends time
 
 --
 
@@ -1031,3 +1032,8 @@ build claude code like tui using ratatui, port from vtagent cli
 --
 
 https://claudelog.com
+
+--
+
+https://aider.chat/docs/leaderboards/edit.html
+

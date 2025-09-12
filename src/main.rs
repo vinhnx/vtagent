@@ -284,7 +284,7 @@ async fn handle_single_agent_chat(
 
     // Initialize tool registry and function declarations
     let mut tool_registry =
-        vtagent_core::tools::ToolRegistry::new(std::env::current_dir().unwrap_or_default());
+        vtagent_core::tools::ToolRegistry::new_with_config(std::env::current_dir().unwrap_or_default(), config.pty.clone());
     tool_registry.initialize_async().await?;
     let function_declarations = vtagent_core::tools::build_function_declarations();
 

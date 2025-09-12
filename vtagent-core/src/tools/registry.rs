@@ -11,14 +11,16 @@ use super::traits::Tool;
 use super::ast_grep_tool::AstGrepTool;
 use crate::config::types::CapabilityLevel;
 use crate::config::constants::tools;
+use crate::config::PtyConfig;
 use crate::gemini::FunctionDeclaration;
 use crate::tool_policy::{ToolPolicy, ToolPolicyManager};
 use crate::tools::ast_grep::AstGrepEngine;
-use crate::tools::rg_search::RgSearchManager;
+use crate::tools::grep_search::GrepSearchManager;
 use anyhow::{Result, anyhow, Context};
 use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Main tool registry that coordinates all tools
 #[derive(Clone)]
@@ -30,20 +32,27 @@ pub struct ToolRegistry {
     file_ops_tool: FileOpsTool,
     command_tool: CommandTool,
     ck_tool: CkTool,
-    rg_search: Arc<RgSearchManager>,
+    grep_search: Arc<GrepSearchManager>,
     ast_grep_engine: Option<Arc<AstGrepEngine>>,
     tool_policy: ToolPolicyManager,
+    pty_config: PtyConfig,
+    active_pty_sessions: Arc<AtomicUsize>,
 }
 
 impl ToolRegistry {
     /// Create a new tool registry
     pub fn new(workspace_root: PathBuf) -> Self {
-        let rg_search = Arc::new(RgSearchManager::new(workspace_root.clone()));
+        Self::new_with_config(workspace_root, PtyConfig::default())
+    }
 
-        let search_tool = SearchTool::new(workspace_root.clone(), rg_search.clone());
+    /// Create a new tool registry with PTY configuration
+    pub fn new_with_config(workspace_root: PathBuf, pty_config: PtyConfig) -> Self {
+        let grep_search = Arc::new(GrepSearchManager::new(workspace_root.clone()));
+
+        let search_tool = SearchTool::new(workspace_root.clone(), grep_search.clone());
         let simple_search_tool = SimpleSearchTool::new(workspace_root.clone());
         let bash_tool = BashTool::new(workspace_root.clone());
-        let file_ops_tool = FileOpsTool::new(workspace_root.clone(), rg_search.clone());
+        let file_ops_tool = FileOpsTool::new(workspace_root.clone(), grep_search.clone());
         let command_tool = CommandTool::new(workspace_root.clone());
         let ck_tool = CkTool::new(workspace_root.clone());
 
@@ -65,7 +74,7 @@ impl ToolRegistry {
 
         // Update available tools in policy manager
         let mut available_tools = vec![
-            tools::RG_SEARCH.to_string(),
+            tools::GREP_SEARCH.to_string(),
             tools::LIST_FILES.to_string(),
             tools::RUN_TERMINAL_CMD.to_string(),
             tools::READ_FILE.to_string(),
@@ -92,9 +101,11 @@ impl ToolRegistry {
             file_ops_tool,
             command_tool,
             ck_tool,
-            rg_search,
+            grep_search,
             ast_grep_engine,
             tool_policy: policy_manager,
+            pty_config,
+            active_pty_sessions: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -123,8 +134,14 @@ impl ToolRegistry {
             return Err(anyhow!("Tool '{}' execution denied by policy", name));
         }
 
-        match name {
-            tools::RG_SEARCH => self.search_tool.execute(args).await,
+        // Check PTY session limits for PTY-based tools
+        let is_pty_tool = matches!(name, tools::RUN_TERMINAL_CMD | tools::BASH);
+        if is_pty_tool {
+            self.start_pty_session()?;
+        }
+
+        let result = match name {
+            tools::GREP_SEARCH => self.search_tool.execute(args).await,
             tools::LIST_FILES => self.file_ops_tool.execute(args).await,
             tools::RUN_TERMINAL_CMD => self.command_tool.execute(args).await,
             tools::READ_FILE => self.file_ops_tool.read_file(args).await,
@@ -135,13 +152,20 @@ impl ToolRegistry {
             tools::SIMPLE_SEARCH => self.simple_search_tool.execute(args).await,
             tools::BASH => self.bash_tool.execute(args).await,
             _ => Err(anyhow!("Unknown tool: {}", name)),
+        };
+
+        // Decrement session count if this was a PTY tool
+        if is_pty_tool {
+            self.end_pty_session();
         }
+
+        result
     }
 
     /// List available tools
     pub fn available_tools(&self) -> Vec<String> {
         let mut tools = vec![
-            tools::RG_SEARCH.to_string(),
+            tools::GREP_SEARCH.to_string(),
             tools::LIST_FILES.to_string(),
             tools::RUN_TERMINAL_CMD.to_string(),
             tools::READ_FILE.to_string(),
@@ -163,7 +187,7 @@ impl ToolRegistry {
     /// Check if a tool exists
     pub fn has_tool(&self, name: &str) -> bool {
         match name {
-            tools::RG_SEARCH | tools::LIST_FILES | tools::RUN_TERMINAL_CMD | tools::READ_FILE | tools::WRITE_FILE => true,
+            tools::GREP_SEARCH | tools::LIST_FILES | tools::RUN_TERMINAL_CMD | tools::READ_FILE | tools::WRITE_FILE => true,
             tools::AST_GREP_SEARCH => self.ast_grep_engine.is_some(),
             tools::CK_SEMANTIC_SEARCH => true,
             tools::SIMPLE_SEARCH | tools::BASH => true,
@@ -361,7 +385,7 @@ impl ToolRegistry {
     }
 
     pub async fn rp_search(&mut self, args: Value) -> Result<Value> {
-        self.execute_tool(tools::RG_SEARCH, args).await
+        self.execute_tool(tools::GREP_SEARCH, args).await
     }
 
     pub async fn list_files(&mut self, args: Value) -> Result<Value> {
@@ -499,6 +523,45 @@ impl ToolRegistry {
             Ok(resolved.to_string_lossy().to_string())
         }
     }
+
+    /// Get PTY configuration
+    pub fn pty_config(&self) -> &PtyConfig {
+        &self.pty_config
+    }
+
+    /// Check if a new PTY session can be started
+    pub fn can_start_pty_session(&self) -> bool {
+        if !self.pty_config.enabled {
+            return false;
+        }
+        self.active_pty_sessions.load(Ordering::SeqCst) < self.pty_config.max_sessions
+    }
+
+    /// Increment active PTY session count
+    pub fn start_pty_session(&self) -> Result<()> {
+        if !self.can_start_pty_session() {
+            return Err(anyhow!(
+                "Maximum PTY sessions ({}) exceeded. Current active sessions: {}",
+                self.pty_config.max_sessions,
+                self.active_pty_sessions.load(Ordering::SeqCst)
+            ));
+        }
+        self.active_pty_sessions.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+
+    /// Decrement active PTY session count
+    pub fn end_pty_session(&self) {
+        let current = self.active_pty_sessions.load(Ordering::SeqCst);
+        if current > 0 {
+            self.active_pty_sessions.fetch_sub(1, Ordering::SeqCst);
+        }
+    }
+
+    /// Get current active PTY session count
+    pub fn active_pty_sessions(&self) -> usize {
+        self.active_pty_sessions.load(Ordering::SeqCst)
+    }
 }
 
 /// Build function declarations for all available tools
@@ -506,7 +569,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
     vec![
         // Ripgrep search tool
         FunctionDeclaration {
-            name: tools::RG_SEARCH.to_string(),
+            name: tools::GREP_SEARCH.to_string(),
             description: "Enhanced unified search tool with multiple modes: exact (default), fuzzy, multi-pattern, and similarity search. Consolidates all search functionality into one powerful tool.".to_string(),
             parameters: json!({
                 "type": "object",
@@ -744,7 +807,7 @@ pub fn build_function_declarations_for_level(level: CapabilityLevel) -> Vec<Func
             .filter(|fd| {
                 fd.name == tools::LIST_FILES
                 || fd.name == tools::RUN_TERMINAL_CMD
-                || fd.name == tools::RG_SEARCH
+                || fd.name == tools::GREP_SEARCH
                 || fd.name == tools::READ_FILE
                 || fd.name == tools::WRITE_FILE
                 || fd.name == tools::EDIT_FILE

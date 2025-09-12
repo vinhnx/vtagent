@@ -235,8 +235,6 @@ impl LLMProvider for OpenRouterProvider {
     fn supported_models(&self) -> Vec<String> {
         use crate::config::constants::models;
         vec![
-            models::OPENROUTER_ANTHROPIC_CLAUDE_3_5_SONNET.to_string(),
-            models::OPENROUTER_ANTHROPIC_CLAUDE_3_HAIKU.to_string(),
             models::OPENROUTER_OPENAI_GPT_5.to_string(),
             models::OPENROUTER_OPENAI_GPT_5_MINI.to_string(),
             models::OPENROUTER_GOOGLE_GEMINI_2_5_PRO.to_string(),

@@ -108,9 +108,6 @@ pub mod models {
     pub const LMSTUDIO_QWEN_30B_A3B_2507: &str = lmstudio::LMSTUDIO_QWEN_30B_A3B_2507;
 
     // OpenRouter constants for backwards compatibility
-    pub const OPENROUTER_ANTHROPIC_CLAUDE_3_5_SONNET: &str =
-        openrouter::ANTHROPIC_CLAUDE_3_5_SONNET;
-    pub const OPENROUTER_ANTHROPIC_CLAUDE_3_HAIKU: &str = openrouter::ANTHROPIC_CLAUDE_3_HAIKU;
     pub const OPENROUTER_OPENAI_GPT_5: &str = openrouter::OPENAI_GPT_5;
     pub const OPENROUTER_OPENAI_GPT_5_MINI: &str = openrouter::OPENAI_GPT_5_MINI;
     pub const OPENROUTER_GOOGLE_GEMINI_2_5_PRO: &str = openrouter::GOOGLE_GEMINI_2_5_PRO;

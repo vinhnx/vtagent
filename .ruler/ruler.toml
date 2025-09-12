@@ -1,0 +1,43 @@
+# Ruler Configuration File
+# See https://ai.intellectronica.net/ruler for documentation.
+
+# To specify which agents are active by default when --agents is not used,
+# uncomment and populate the following line. If omitted, all agents are active.
+default_agents = [
+    "claude",
+    "copilot",
+    "cursor",
+    "codex",
+    "agentsmd",
+    "qwen",
+    "gemini",
+    "kiro",
+    "warp",
+]
+
+[mcp]
+# Enable/disable MCP propagation globally (default: true)
+enabled = true
+# Global merge strategy: 'merge' or 'overwrite' (default: 'merge')
+merge_strategy = "merge"
+
+[gitignore]
+# Enable/disable automatic .gitignore updates (default: true)
+enabled = true
+
+# Enable nested rule loading from nested .ruler directories
+# When enabled, ruler will search for and process .ruler directories throughout the project hierarchy
+nested = true
+
+[mcp_servers.context7]
+type = "stdio"
+command = "npx"
+args = ["-y", "@upstash/context7-mcp@latest"]
+gallery = true
+
+[mcp_servers.time]
+command = "uvx"
+args = ["mcp-server-time"]
+type = "stdio"
+disabled = false
+autoApprove = []

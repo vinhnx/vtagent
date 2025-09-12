@@ -838,7 +838,12 @@ async fn handle_multi_agent_chat(
     };
 
     // Create multi-agent system
-    let mut system = MultiAgentSystem::new(system_config, api_key, workspace.clone())
+    let mut system = MultiAgentSystem::new(
+        system_config,
+        api_key,
+        workspace.clone(),
+        Some(vtagent_config.agent.reasoning_effort.clone())
+    )
         .await
         .context("Failed to initialize multi-agent system")?;
 

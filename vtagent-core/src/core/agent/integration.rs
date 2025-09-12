@@ -33,6 +33,8 @@ pub struct MultiAgentSystem {
     config: MultiAgentConfig,
     /// Session management
     session: SessionManager,
+    /// Reasoning effort level for agents
+    reasoning_effort: Option<String>,
 }
 
 /// Individual subagent instance
@@ -167,6 +169,7 @@ impl MultiAgentSystem {
         config: MultiAgentSystemConfig,
         api_key: String,
         workspace: std::path::PathBuf,
+        reasoning_effort: Option<String>,
     ) -> Result<Self> {
         // Generate unique session ID
         let session_id = format!(
@@ -217,6 +220,7 @@ impl MultiAgentSystem {
             session_id.clone(),
             api_key.clone(),
             workspace.clone(),
+            reasoning_effort.clone(),
         );
 
         // Initialize verification workflow
@@ -307,6 +311,7 @@ impl MultiAgentSystem {
             performance,
             config: convert_to_multi_agent_config(&config),
             session,
+            reasoning_effort,
         })
     }
 
@@ -623,8 +628,8 @@ impl MultiAgentSystem {
             self.orchestrator.workspace.clone(),
             // Use the session ID from the multi-agent system
             self.session.session_id.clone(),
-            // TODO: Pass reasoning_effort from config
-            None,
+            // Pass reasoning_effort from config
+            self.reasoning_effort.clone(),
         )?;
 
         // Execute the task with the runner

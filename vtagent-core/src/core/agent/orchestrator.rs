@@ -29,6 +29,8 @@ pub struct OrchestratorAgent {
     pub api_key: String,
     /// Workspace path
     pub workspace: std::path::PathBuf,
+    /// Reasoning effort level
+    pub reasoning_effort: Option<String>,
 }
 
 impl OrchestratorAgent {
@@ -39,6 +41,7 @@ impl OrchestratorAgent {
         session_id: String,
         api_key: String,
         workspace: std::path::PathBuf,
+        reasoning_effort: Option<String>,
     ) -> Self {
         let context_store = Arc::new(std::sync::Mutex::new(ContextStore::new(session_id.clone())));
         let task_manager = Arc::new(std::sync::Mutex::new(TaskManager::new(session_id.clone())));
@@ -52,6 +55,7 @@ impl OrchestratorAgent {
             session_id,
             api_key,
             workspace,
+            reasoning_effort,
         }
     }
 
@@ -346,8 +350,8 @@ impl OrchestratorAgent {
             self.api_key.clone(),
             self.workspace.clone(),
             self.session_id.clone(),
-            // TODO: Pass reasoning_effort from config
-            None,
+            // Pass reasoning_effort from config
+            self.reasoning_effort.clone(),
         )?;
 
         // Execute the task
@@ -370,8 +374,8 @@ impl OrchestratorAgent {
             self.api_key.clone(),
             self.workspace.clone(),
             self.session_id.clone(),
-            // TODO: Pass reasoning_effort from config
-            None,
+            // Pass reasoning_effort from config
+            self.reasoning_effort.clone(),
         )?;
 
         // Execute the task

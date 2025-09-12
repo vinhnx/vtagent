@@ -36,40 +36,41 @@ impl LMStudioProvider {
 
         // Convert messages
         for msg in &request.messages {
-            let role = match msg.role {
-                MessageRole::System => crate::config::constants::message_roles::SYSTEM,
-                MessageRole::User => crate::config::constants::message_roles::USER,
-                MessageRole::Assistant => crate::config::constants::message_roles::ASSISTANT,
-                MessageRole::Tool => crate::config::constants::message_roles::TOOL,
-            };
+            // LMStudio typically follows OpenAI conventions
+            let role = msg.role.as_generic_str();
 
             let mut message = json!({
                 "role": role,
                 "content": msg.content
             });
 
-            // Add tool call information if present
-            if let Some(tool_calls) = &msg.tool_calls {
-                if !tool_calls.is_empty() {
-                    let tool_calls_json: Vec<Value> = tool_calls
-                        .iter()
-                        .map(|tc| {
-                            json!({
-                                "id": tc.id,
-                                "type": "function",
-                                "function": {
-                                    "name": tc.name,
-                                    "arguments": tc.arguments
-                                }
+            // Add tool call information for assistant messages
+            if msg.role == MessageRole::Assistant {
+                if let Some(tool_calls) = &msg.tool_calls {
+                    if !tool_calls.is_empty() {
+                        let tool_calls_json: Vec<Value> = tool_calls
+                            .iter()
+                            .map(|tc| {
+                                json!({
+                                    "id": tc.id,
+                                    "type": "function",
+                                    "function": {
+                                        "name": tc.name,
+                                        "arguments": tc.arguments
+                                    }
+                                })
                             })
-                        })
-                        .collect();
-                    message["tool_calls"] = Value::Array(tool_calls_json);
+                            .collect();
+                        message["tool_calls"] = Value::Array(tool_calls_json);
+                    }
                 }
             }
 
-            if let Some(tool_call_id) = &msg.tool_call_id {
-                message["tool_call_id"] = Value::String(tool_call_id.clone());
+            // Add tool_call_id for tool messages
+            if msg.role == MessageRole::Tool {
+                if let Some(tool_call_id) = &msg.tool_call_id {
+                    message["tool_call_id"] = Value::String(tool_call_id.clone());
+                }
             }
 
             messages.push(message);

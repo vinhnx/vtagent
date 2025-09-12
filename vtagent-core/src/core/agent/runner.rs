@@ -89,17 +89,19 @@ impl crate::llm::client::LLMClient for LMStudioClientWrapper {
                 gemini_tools
                     .iter()
                     .flat_map(|tool| &tool.function_declarations)
-                    .map(|decl| crate::llm::provider::ToolDefinition {
-                        name: decl.name.clone(),
-                        description: decl.description.clone(),
-                        parameters: decl.parameters.clone(),
-                    })
+                    .map(|decl| crate::llm::provider::ToolDefinition::function(
+                        decl.name.clone(),
+                        decl.description.clone(),
+                        decl.parameters.clone(),
+                    ))
                     .collect::<Vec<_>>()
             }),
             model: self.model.clone(),
             max_tokens: Some(1000),
             temperature: Some(0.7),
             stream: false,
+            tool_choice: None,
+            parallel_tool_calls: None,
         };
 
         // Get response from provider and convert it to the right type

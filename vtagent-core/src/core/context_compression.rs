@@ -244,6 +244,8 @@ impl ContextCompressor {
             max_tokens: Some(1000),
             temperature: Some(0.3),
             stream: false,
+            tool_choice: None,
+            parallel_tool_calls: None,
         };
 
         let response = self
@@ -273,7 +275,7 @@ impl ContextCompressor {
                 for tool_call in tool_calls {
                     text.push_str(&format!(
                         "Tool Call: {}({})\n",
-                        tool_call.name, tool_call.arguments
+                        tool_call.function.name, tool_call.function.arguments
                     ));
                 }
             }
@@ -291,8 +293,8 @@ impl ContextCompressor {
 
             if let Some(tool_calls) = &message.tool_calls {
                 for tool_call in tool_calls {
-                    total_chars += tool_call.name.len();
-                    total_chars += tool_call.arguments.to_string().len();
+                    total_chars += tool_call.function.name.len();
+                    total_chars += tool_call.function.arguments.len();
                 }
             }
         }

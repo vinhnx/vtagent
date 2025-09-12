@@ -373,6 +373,8 @@ async fn handle_test_provider(_cli: &Cli, provider: &str) -> Result<()> {
         max_tokens: Some(10),
         temperature: Some(0.1),
         stream: false,
+        tool_choice: None,
+        parallel_tool_calls: None,
     };
 
     match provider_instance.generate(test_request).await {

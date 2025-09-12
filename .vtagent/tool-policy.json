@@ -9,11 +9,11 @@
     "edit_file"
   ],
   "policies": {
-    "edit_file": "allow",
-    "write_file": "allow",
-    "read_file": "allow",
+    "list_files": "allow",
     "rp_search": "allow",
+    "edit_file": "allow",
     "run_terminal_cmd": "allow",
-    "list_files": "allow"
+    "write_file": "allow",
+    "read_file": "allow"
   }
 }

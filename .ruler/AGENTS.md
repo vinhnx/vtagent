@@ -261,3 +261,4 @@ if is_valid && is_allowed && is_secure {
 - Put all report documentation (md) files to ./docs folder. don't put any unrelated files in root folder. THIS IS IMPORTANT!
 - Always check ./docs/models.json use to use latest LLM model. Don't guess the model id/name. THIS IS IMPORTANT!
 - Always use vtagent-core/src/config/constants.rs for constant values. Don't hardcode any constant values, especially model id. THIS IS IMPORTANT!
+- You should always use Context7 for fetching documentation from MCP. THIS IS IMPORTANT!

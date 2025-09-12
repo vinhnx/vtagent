@@ -6,6 +6,7 @@ use vtagent_core::{
     gemini::models::SystemInstruction,
     llm::make_client,
     models::ModelId,
+    prompts::read_system_prompt_from_md,
     tools::{ToolRegistry, build_function_declarations},
     types::AgentConfig as CoreAgentConfig,
     utils::summarize_workspace_languages,
@@ -63,7 +64,10 @@ pub async fn handle_chat_command(config: &CoreAgentConfig, force_multi_agent: bo
     let mut conversation_history: Vec<Content> = vec![];
 
     // Create system instruction
-    let system_instruction = SystemInstruction::new("You are a helpful coding assistant. You can help with programming tasks, code analysis, and file operations.");
+    let system_instruction = SystemInstruction::new(
+        &read_system_prompt_from_md()
+            .unwrap_or_else(|_| "You are a helpful coding assistant. You can help with programming tasks, code analysis, and file operations.".to_string())
+    );
 
     loop {
         // Get user input

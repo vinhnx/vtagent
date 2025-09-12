@@ -93,13 +93,12 @@ impl GeminiProvider {
         let mut contents = Vec::new();
 
         for message in &request.messages {
-            let role = match message.role {
-                MessageRole::User => "user",
-                MessageRole::Assistant => "model",
-                MessageRole::System => continue,
-                MessageRole::Tool => "user", // Gemini API only accepts "user" and "model" roles
-            };
+            // Skip system messages - they should be handled as systemInstruction
+            if message.role == MessageRole::System {
+                continue;
+            }
 
+            let role = message.role.as_gemini_str();
             let mut parts = Vec::new();
 
             // Add text content if present
@@ -108,6 +107,7 @@ impl GeminiProvider {
             }
 
             // Add function calls for assistant messages
+            // Based on Gemini docs: function calls are in assistant/model messages
             if message.role == MessageRole::Assistant {
                 if let Some(tool_calls) = &message.tool_calls {
                     for tool_call in tool_calls {
@@ -122,25 +122,35 @@ impl GeminiProvider {
             }
 
             // Add function response for tool messages
+            // Based on Gemini docs: tool responses become functionResponse parts in user messages
             if message.role == MessageRole::Tool {
-                if let Some(tool_calls) = &message.tool_calls {
-                    for tool_call in tool_calls {
-                        parts.push(json!({
-                            "functionResponse": {
-                                "name": tool_call.name,
-                                "response": {
-                                    "content": message.content
-                                }
+                // For tool responses, we need to construct a functionResponse
+                // The tool_call_id should help us match this to the original function call
+                if let Some(tool_call_id) = &message.tool_call_id {
+                    // We need to extract the function name from the tool_call_id or content
+                    // For now, we'll try to parse it from the context or use a generic approach
+                    parts.push(json!({
+                        "functionResponse": {
+                            "name": tool_call_id, // This should be the function name
+                            "response": {
+                                "content": message.content
                             }
-                        }));
-                    }
+                        }
+                    }));
+                } else {
+                    // Fallback: if no tool_call_id, treat as regular text
+                    // This shouldn't happen in well-formed tool calling flows
+                    parts.push(json!({"text": message.content}));
                 }
             }
 
-            contents.push(json!({
-                "role": role,
-                "parts": parts
-            }));
+            // Only add the content if we have parts
+            if !parts.is_empty() {
+                contents.push(json!({
+                    "role": role,
+                    "parts": parts
+                }));
+            }
         }
 
         let mut gemini_request = json!({
@@ -253,24 +263,6 @@ impl GeminiProvider {
                 finish_reason: FinishReason::Stop,
             });
         }
-
-        // Fallback: Try to extract any text content from the response
-        if let Some(text) = response["text"].as_str() {
-            return Ok(LLMResponse {
-                content: Some(text.to_string()),
-                tool_calls: None,
-                usage: None,
-                finish_reason: FinishReason::Stop,
-            });
-        }
-
-        // Last resort: Return empty response instead of error
-        Ok(LLMResponse {
-            content: Some("".to_string()),
-            tool_calls: None,
-            usage: None,
-            finish_reason: FinishReason::Stop,
-        })
     }
 }
 

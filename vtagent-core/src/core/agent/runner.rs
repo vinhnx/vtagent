@@ -1,6 +1,7 @@
 //! Agent runner for executing individual agent instances
 
 use crate::config::models::ModelId;
+use crate::config::constants::tools;
 use crate::core::agent::multi_agent::*;
 use crate::gemini::{Content, GenerateContentRequest, Part, Tool, ToolConfig};
 use crate::llm::{AnyClient, create_provider_with_config, make_client};
@@ -398,7 +399,7 @@ impl AgentRunner {
                                             executed_commands.push(name.to_string());
 
                                             // Special handling for certain tools
-                                            if name == "write_file" {
+                                            if name == tools::WRITE_FILE {
                                                 if let Some(filepath) =
                                                     arguments.get("path").and_then(|p| p.as_str())
                                                 {
@@ -466,7 +467,7 @@ impl AgentRunner {
                                     executed_commands.push(name.to_string());
 
                                     // Special handling for certain tools
-                                    if name == "write_file" {
+                                    if name == tools::WRITE_FILE {
                                         if let Some(filepath) =
                                             args.get("path").and_then(|p| p.as_str())
                                         {
@@ -545,7 +546,7 @@ impl AgentRunner {
                                             executed_commands.push(func_name.to_string());
 
                                             // Special handling for certain tools
-                                            if func_name == "write_file" {
+                                            if func_name == tools::WRITE_FILE {
                                                 if let Some(filepath) =
                                                     arguments.get("path").and_then(|p| p.as_str())
                                                 {
@@ -635,7 +636,7 @@ impl AgentRunner {
                                     executed_commands.push(tool_name.to_string());
 
                                     // Special handling for certain tools
-                                    if tool_name == "write_file" {
+                                    if tool_name == tools::WRITE_FILE {
                                         if let Some(filepath) =
                                             parameters.get("path").and_then(|p| p.as_str())
                                         {
@@ -839,20 +840,20 @@ impl AgentRunner {
                 // Coder agents can use file operations and command execution
                 matches!(
                     tool_name,
-                    "read_file" | "write_file" | "list_files" | "run_terminal_cmd"
+                    tools::READ_FILE | tools::WRITE_FILE | tools::LIST_FILES | tools::RUN_TERMINAL_CMD
                 )
             }
             AgentType::Explorer => {
                 // Explorer agents can use search and file listing
-                matches!(tool_name, "rp_search" | "list_files")
+                matches!(tool_name, tools::RP_SEARCH | tools::LIST_FILES)
             }
             AgentType::Orchestrator => {
                 // Orchestrator can coordinate but not directly manipulate files
-                matches!(tool_name, "rp_search" | "list_files")
+                matches!(tool_name, tools::RP_SEARCH | tools::LIST_FILES)
             }
             AgentType::Single => {
                 // Single agents have limited tool access
-                matches!(tool_name, "rp_search" | "list_files")
+                matches!(tool_name, tools::RP_SEARCH | tools::LIST_FILES)
             }
         };
 

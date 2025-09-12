@@ -1,12 +1,4 @@
 
-1. remove this line log "[CELEBRATION] All tool calls completed successfully" chnage with differnent ansi and indicator style
-2. make sure to show loading ui/ux spinner show as "Thinking" as soon as model turns appear
-
---
-edit vtagent-core/src/config/constants.rs and add `qwen/qwen3-next-80b-a3b-thinking` model id to openrouter model list
-
---
-
 rp_search".to_string(),
 "list_files".to_string(),
 "run_terminal_cmd".to_string(),

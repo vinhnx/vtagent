@@ -1,6 +1,7 @@
 //! Create project command implementation
 
 use crate::config::types::AgentConfig;
+use crate::config::constants::tools;
 use crate::tools::ToolRegistry;
 use anyhow::{Result, anyhow};
 use console::style;
@@ -37,7 +38,7 @@ pub async fn handle_create_project_command(
     );
     let create_dir_result = registry
         .execute_tool(
-            "write_file",
+            tools::WRITE_FILE,
             json!({
                 "path": format!("{}/.gitkeep", name),
                 "content": "",
@@ -75,7 +76,7 @@ edition = "2021"
 
     let cargo_result = registry
         .execute_tool(
-            "write_file",
+            tools::WRITE_FILE,
             json!({
                 "path": format!("{}/Cargo.toml", name),
                 "content": cargo_toml_content,
@@ -126,7 +127,7 @@ fn main() {
 
     let main_rs_result = registry
         .execute_tool(
-            "write_file",
+            tools::WRITE_FILE,
             json!({
                 "path": format!("{}/src/main.rs", name),
                 "content": main_rs_content,
@@ -172,7 +173,7 @@ cargo test
 
     let readme_result = registry
         .execute_tool(
-            "write_file",
+            tools::WRITE_FILE,
             json!({
                 "path": format!("{}/README.md", name),
                 "content": readme_content,
@@ -198,7 +199,7 @@ Cargo.lock
 
     let gitignore_result = registry
         .execute_tool(
-            "write_file",
+            tools::WRITE_FILE,
             json!({
                 "path": format!("{}/.gitignore", name),
                 "content": gitignore_content,
@@ -217,7 +218,7 @@ Cargo.lock
     println!("{}", style("Step 6: Testing project build...").yellow());
     let test_build_result = registry
         .execute_tool(
-            "list_files",
+            tools::LIST_FILES,
             json!({
                 "path": format!("{}/src", name),
                 "include_hidden": false

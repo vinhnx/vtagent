@@ -3,6 +3,7 @@ use serde_json::json;
 use std::env;
 use tempfile::TempDir;
 use vtagent_core::tools::ToolRegistry;
+use vtagent_core::config::constants::tools;
 
 /// Benchmark search performance across different file sizes and patterns
 fn benchmark_search_performance(c: &mut Criterion) {
@@ -25,7 +26,7 @@ fn benchmark_search_performance(c: &mut Criterion) {
                 "pattern": "fn main",
                 "path": "."
             });
-            let _ = futures::executor::block_on(registry.execute_tool("rp_search", args));
+            let _ = futures::executor::block_on(registry.execute_tool(tools::RP_SEARCH, args));
         });
     });
 
@@ -36,7 +37,7 @@ fn benchmark_search_performance(c: &mut Criterion) {
                 "pattern": "\\bfunction\\b",
                 "path": "."
             });
-            let _ = futures::executor::block_on(registry.execute_tool("rp_search", args));
+            let _ = futures::executor::block_on(registry.execute_tool(tools::RP_SEARCH, args));
         });
     });
 
@@ -48,7 +49,7 @@ fn benchmark_search_performance(c: &mut Criterion) {
                 "path": ".",
                 "case_sensitive": false
             });
-            let _ = futures::executor::block_on(registry.execute_tool("rp_search", args));
+            let _ = futures::executor::block_on(registry.execute_tool(tools::RP_SEARCH, args));
         });
     });
 
@@ -60,7 +61,7 @@ fn benchmark_search_performance(c: &mut Criterion) {
                 "path": ".",
                 "context_lines": 3
             });
-            let _ = futures::executor::block_on(registry.execute_tool("rp_search", args));
+            let _ = futures::executor::block_on(registry.execute_tool(tools::RP_SEARCH, args));
         });
     });
 
@@ -72,7 +73,7 @@ fn benchmark_search_performance(c: &mut Criterion) {
                 "path": ".",
                 "glob_pattern": "**/*.rs"
             });
-            let _ = futures::executor::block_on(registry.execute_tool("rp_search", args));
+            let _ = futures::executor::block_on(registry.execute_tool(tools::RP_SEARCH, args));
         });
     });
 
@@ -100,7 +101,7 @@ fn benchmark_file_operations(c: &mut Criterion) {
             let args = json!({
                 "path": "large_file.txt"
             });
-            let _ = futures::executor::block_on(registry.execute_tool("read_file", args));
+            let _ = futures::executor::block_on(registry.execute_tool(tools::READ_FILE, args));
         });
     });
 
@@ -110,7 +111,7 @@ fn benchmark_file_operations(c: &mut Criterion) {
             let args = json!({
                 "path": "."
             });
-            let _ = futures::executor::block_on(registry.execute_tool("list_files", args));
+            let _ = futures::executor::block_on(registry.execute_tool(tools::LIST_FILES, args));
         });
     });
 
@@ -122,7 +123,7 @@ fn benchmark_file_operations(c: &mut Criterion) {
                 "content": "benchmark content",
                 "overwrite": true
             });
-            let _ = futures::executor::block_on(registry.execute_tool("write_file", args));
+            let _ = futures::executor::block_on(registry.execute_tool(tools::WRITE_FILE, args));
         });
     });
 

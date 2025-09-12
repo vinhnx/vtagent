@@ -2,6 +2,7 @@
 
 use crate::config::models::{ModelId, Provider};
 use crate::config::{ContextStoreDefaults, MultiAgentDefaults};
+use crate::config::constants::tools;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
@@ -63,13 +64,13 @@ impl AgentType {
     pub fn restricted_tools(&self) -> Vec<&'static str> {
         match self {
             AgentType::Orchestrator => vec![
-                "read_file",
-                "write_file",
-                "edit_file",
+                tools::READ_FILE,
+                tools::WRITE_FILE,
+                tools::EDIT_FILE,
                 "delete_file",
                 "run_command",
             ],
-            AgentType::Explorer => vec!["write_file", "edit_file", "delete_file", "create_file"],
+            AgentType::Explorer => vec![tools::WRITE_FILE, tools::EDIT_FILE, "delete_file", "create_file"],
             AgentType::Coder => vec![],  // No restrictions
             AgentType::Single => vec![], // No restrictions
         }

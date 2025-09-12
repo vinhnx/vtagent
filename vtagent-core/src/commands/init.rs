@@ -7,6 +7,7 @@
 //! that serves as a contributor guide, adapting content based on the specific project structure,
 //! commit history, and detected technologies.
 
+use crate::config::constants::tools;
 use crate::tools::ToolRegistry;
 use anyhow::Result;
 use console::style;
@@ -67,7 +68,7 @@ pub async fn handle_init_command(registry: &mut ToolRegistry, workspace: &PathBu
 
     registry
         .execute_tool(
-            "write_file",
+            tools::WRITE_FILE,
             json!({
                 "path": agents_md_path.to_string_lossy(),
                 "content": agents_md_content,
@@ -122,7 +123,7 @@ async fn analyze_project(
 
     // Analyze root directory structure
     let root_files = registry
-        .execute_tool("list_files", json!({"path": ".", "max_items": 100}))
+        .execute_tool(tools::LIST_FILES, json!({"path": ".", "max_items": 100}))
         .await?;
 
     if let Some(files) = root_files.get("files") {
@@ -175,7 +176,7 @@ async fn analyze_file(
             // Read Cargo.toml to extract dependencies
             let cargo_content = registry
                 .execute_tool(
-                    "read_file",
+                    tools::READ_FILE,
                     json!({"path": "Cargo.toml", "max_bytes": 5000}),
                 )
                 .await?;
@@ -196,7 +197,7 @@ async fn analyze_file(
             // Read package.json to extract dependencies
             let package_content = registry
                 .execute_tool(
-                    "read_file",
+                    tools::READ_FILE,
                     json!({"path": "package.json", "max_bytes": 5000}),
                 )
                 .await?;
@@ -351,7 +352,7 @@ async fn analyze_git_history(
         // Try to get recent commit messages to analyze patterns
         let git_log_result = registry
             .execute_tool(
-                "run_terminal_cmd",
+                tools::RUN_TERMINAL_CMD,
                 json!({
                     "command": "git log --oneline -20 --pretty=format:'%s'",
                     "timeout": 5000

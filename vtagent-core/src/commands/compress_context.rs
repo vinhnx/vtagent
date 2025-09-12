@@ -1,6 +1,7 @@
 //! Compress context command implementation
 
 use crate::config::models::ModelId;
+use crate::config::constants::tools;
 use crate::config::types::AgentConfig;
 use crate::gemini::{Content, FunctionResponse, GenerateContentRequest, Part};
 use crate::gemini::models::SystemInstruction;
@@ -29,7 +30,7 @@ pub async fn handle_compress_context_command(
         ),
         Content::user_parts(vec![Part::FunctionResponse {
             function_response: FunctionResponse {
-                name: "list_files".to_string(),
+                name: tools::LIST_FILES.to_string(),
                 response: json!({"path": ".", "files": ["Cargo.toml", "src/main.rs"], "directories": ["src", "tests"]}),
             },
         }]),
@@ -38,7 +39,7 @@ pub async fn handle_compress_context_command(
         ),
         Content::user_parts(vec![Part::FunctionResponse {
             function_response: FunctionResponse {
-                name: "read_file".to_string(),
+                name: tools::READ_FILE.to_string(),
                 response: json!({"path": "src/main.rs", "content": "fn main() {\n    println!(\"Hello World!\");\n}", "metadata": {"size": 45}}),
             },
         }]),
@@ -47,21 +48,21 @@ pub async fn handle_compress_context_command(
         ),
         Content::user_parts(vec![Part::FunctionResponse {
             function_response: FunctionResponse {
-                name: "edit_file".to_string(),
+                name: tools::EDIT_FILE.to_string(),
                 response: json!({"status": "modified", "path": "Cargo.toml", "action": {"replacements_made": 1}}),
             },
         }]),
         Content::system_text("Good! Now let me create the authentication module structure."),
         Content::user_parts(vec![Part::FunctionResponse {
             function_response: FunctionResponse {
-                name: "write_file".to_string(),
+                name: tools::WRITE_FILE.to_string(),
                 response: json!({"status": "created", "path": "src/auth.rs", "bytes_written": 234}),
             },
         }]),
         Content::system_text("Now I'll create the main web server with authentication endpoints."),
         Content::user_parts(vec![Part::FunctionResponse {
             function_response: FunctionResponse {
-                name: "edit_file".to_string(),
+                name: tools::EDIT_FILE.to_string(),
                 response: json!({"status": "modified", "path": "src/main.rs", "action": {"replacements_made": 3}}),
             },
         }]),

@@ -6,6 +6,7 @@
 use crate::config::constants::models;
 use crate::config::models::ModelId;
 use crate::config::multi_agent::MultiAgentSystemConfig;
+use crate::config::ContextStoreDefaults;
 use crate::core::agent::multi_agent::*;
 use crate::core::agent::optimization::{PerformanceConfig, PerformanceMonitor};
 use crate::core::agent::orchestrator::OrchestratorAgent;
@@ -556,10 +557,10 @@ fn convert_to_multi_agent_config(system_config: &MultiAgentSystemConfig) -> Mult
         delegation_strategy,
         context_store: ContextStoreConfig {
             max_contexts: system_config.context_store.max_context_size,
-            auto_cleanup_days: 7, // Default value
-            enable_persistence: false, // Default value
+            auto_cleanup_days: ContextStoreDefaults::AUTO_CLEANUP_DAYS as u64,
+            enable_persistence: ContextStoreDefaults::ENABLE_PERSISTENCE,
             compression_enabled: system_config.context_store.compression_enabled,
-            storage_dir: ".vtagent/contexts".to_string(), // Default value
+            storage_dir: ContextStoreDefaults::STORAGE_DIR.to_string(),
         },
     }
 }

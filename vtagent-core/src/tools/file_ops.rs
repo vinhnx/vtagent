@@ -2,7 +2,7 @@
 
 use super::traits::{CacheableTool, FileTool, ModeTool, Tool};
 use super::types::*;
-use crate::tools::rg_search::RgSearchManager;
+use crate::tools::grep_search::GrepSearchManager;
 use crate::utils::vtagentgitignore::should_exclude_file;
 use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
@@ -15,14 +15,14 @@ use walkdir::WalkDir;
 #[derive(Clone)]
 pub struct FileOpsTool {
     workspace_root: PathBuf,
-    rg_search: Arc<RgSearchManager>,
+    grep_search: Arc<GrepSearchManager>,
 }
 
 impl FileOpsTool {
-    pub fn new(workspace_root: PathBuf, rg_search: Arc<RgSearchManager>) -> Self {
+    pub fn new(workspace_root: PathBuf, grep_search: Arc<GrepSearchManager>) -> Self {
         Self {
             workspace_root,
-            rg_search,
+            grep_search,
         }
     }
 

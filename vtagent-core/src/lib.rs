@@ -80,7 +80,7 @@ pub use prompts::{
 pub use simple_indexer::SimpleIndexer;
 pub use tool_policy::{ToolPolicy, ToolPolicyManager};
 pub use tools::advanced_search::{AdvancedSearchTool, SearchOptions};
-pub use tools::rg_search::RgSearchManager;
+pub use tools::grep_search::GrepSearchManager;
 pub use tools::tree_sitter::TreeSitterAnalyzer;
 pub use tools::{ToolRegistry, build_function_declarations, build_function_declarations_for_level};
 pub use ui::diff_renderer::DiffRenderer;

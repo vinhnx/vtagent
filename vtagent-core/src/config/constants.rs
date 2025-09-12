@@ -184,7 +184,7 @@ pub mod urls {
 
 /// Tool name constants to avoid hardcoding strings throughout the codebase
 pub mod tools {
-    pub const RG_SEARCH: &str = "rg_search";
+    pub const GREP_SEARCH: &str = "grep_search";
     pub const LIST_FILES: &str = "list_files";
     pub const RUN_TERMINAL_CMD: &str = "run_terminal_cmd";
     pub const READ_FILE: &str = "read_file";
@@ -192,7 +192,6 @@ pub mod tools {
     pub const EDIT_FILE: &str = "edit_file";
     pub const DELETE_FILE: &str = "delete_file";
     pub const CREATE_FILE: &str = "create_file";
-    pub const GREP_SEARCH: &str = "grep_search";
     pub const AST_GREP_SEARCH: &str = "ast_grep_search";
     pub const CK_SEMANTIC_SEARCH: &str = "ck_semantic_search";
     pub const SIMPLE_SEARCH: &str = "simple_search";

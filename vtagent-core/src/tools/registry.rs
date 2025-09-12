@@ -6,6 +6,7 @@ use super::file_ops::FileOpsTool;
 use super::search::SearchTool;
 use super::traits::Tool;
 use crate::config::types::CapabilityLevel;
+use crate::config::constants::tools;
 use crate::gemini::FunctionDeclaration;
 use crate::tool_policy::{ToolPolicy, ToolPolicyManager};
 use crate::tools::ast_grep::AstGrepEngine;
@@ -45,12 +46,12 @@ impl ToolRegistry {
 
         // Update available tools in policy manager
         let available_tools = vec![
-            "rp_search".to_string(),
-            "list_files".to_string(),
-            "run_terminal_cmd".to_string(),
-            "read_file".to_string(),
-            "write_file".to_string(),
-            "edit_file".to_string(),
+            tools::RP_SEARCH.to_string(),
+            tools::LIST_FILES.to_string(),
+            tools::RUN_TERMINAL_CMD.to_string(),
+            tools::READ_FILE.to_string(),
+            tools::WRITE_FILE.to_string(),
+            tools::EDIT_FILE.to_string(),
         ];
 
         if let Err(e) = policy_manager.update_available_tools(available_tools) {
@@ -94,12 +95,12 @@ impl ToolRegistry {
         }
 
         match name {
-            "rp_search" => self.search_tool.execute(args).await,
-            "list_files" => self.file_ops_tool.execute(args).await,
-            "run_terminal_cmd" => self.command_tool.execute(args).await,
-            "read_file" => self.file_ops_tool.read_file(args).await,
-            "write_file" => self.file_ops_tool.write_file(args).await,
-            "edit_file" => self.edit_file(args).await,
+            tools::RP_SEARCH => self.search_tool.execute(args).await,
+            tools::LIST_FILES => self.file_ops_tool.execute(args).await,
+            tools::RUN_TERMINAL_CMD => self.command_tool.execute(args).await,
+            tools::READ_FILE => self.file_ops_tool.read_file(args).await,
+            tools::WRITE_FILE => self.file_ops_tool.write_file(args).await,
+            tools::EDIT_FILE => self.edit_file(args).await,
             _ => Err(anyhow!("Unknown tool: {}", name)),
         }
     }
@@ -120,7 +121,7 @@ impl ToolRegistry {
     pub fn has_tool(&self, name: &str) -> bool {
         matches!(
             name,
-            "rp_search" | "list_files" | "run_terminal_cmd" | "read_file" | "write_file"
+            tools::RP_SEARCH | tools::LIST_FILES | tools::RUN_TERMINAL_CMD | tools::READ_FILE | tools::WRITE_FILE
         )
     }
 
@@ -185,11 +186,11 @@ impl ToolRegistry {
 
     // Legacy methods for backward compatibility
     pub async fn read_file(&mut self, args: Value) -> Result<Value> {
-        self.execute_tool("read_file", args).await
+        self.execute_tool(tools::READ_FILE, args).await
     }
 
     pub async fn write_file(&mut self, args: Value) -> Result<Value> {
-        self.execute_tool("write_file", args).await
+        self.execute_tool(tools::WRITE_FILE, args).await
     }
 
     pub async fn edit_file(&mut self, args: Value) -> Result<Value> {
@@ -314,24 +315,24 @@ impl ToolRegistry {
     }
 
     pub async fn rp_search(&mut self, args: Value) -> Result<Value> {
-        self.execute_tool("rp_search", args).await
+        self.execute_tool(tools::RP_SEARCH, args).await
     }
 
     pub async fn list_files(&mut self, args: Value) -> Result<Value> {
-        self.execute_tool("list_files", args).await
+        self.execute_tool(tools::LIST_FILES, args).await
     }
 
     pub async fn run_terminal_cmd(&mut self, args: Value) -> Result<Value> {
-        self.execute_tool("run_terminal_cmd", args).await
+        self.execute_tool(tools::RUN_TERMINAL_CMD, args).await
     }
 }
 
 /// Build function declarations for all available tools
 pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
     vec![
-        // Consolidated search tool
+        // Ripgrep search tool
         FunctionDeclaration {
-            name: "rp_search".to_string(),
+            name: tools::RP_SEARCH.to_string(),
             description: "Enhanced unified search tool with multiple modes: exact (default), fuzzy, multi-pattern, and similarity search. Consolidates all search functionality into one powerful tool.".to_string(),
             parameters: json!({
                 "type": "object",
@@ -377,7 +378,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
 
         // File reading tool
         FunctionDeclaration {
-            name: "read_file".to_string(),
+            name: tools::READ_FILE.to_string(),
             description: "Read the contents of a file. Use this before editing to understand file structure.".to_string(),
             parameters: json!({
                 "type": "object",
@@ -390,7 +391,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
 
         // File writing tool
         FunctionDeclaration {
-            name: "write_file".to_string(),
+            name: tools::WRITE_FILE.to_string(),
             description: "Write content to a file. Can create new files or overwrite existing ones. Use read_file first to understand current content before editing.".to_string(),
             parameters: json!({
                 "type": "object",
@@ -405,7 +406,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
 
         // File editing tool
         FunctionDeclaration {
-            name: "edit_file".to_string(),
+            name: tools::EDIT_FILE.to_string(),
             description: "Edit a file by replacing specific text. Use read_file first to understand the file structure and find exact text to replace.".to_string(),
             parameters: json!({
                 "type": "object",
@@ -420,7 +421,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
 
         // Consolidated command execution tool
         FunctionDeclaration {
-            name: "run_terminal_cmd".to_string(),
+            name: tools::RUN_TERMINAL_CMD.to_string(),
             description: "Enhanced command execution tool with multiple modes: terminal (default), pty, streaming. Use this for shell commands, not for file editing - use read_file/write_file/edit_file for file operations.".to_string(),
             parameters: json!({
                 "type": "object",
@@ -448,31 +449,31 @@ pub fn build_function_declarations_for_level(level: CapabilityLevel) -> Vec<Func
             .collect(),
         CapabilityLevel::FileListing => all_declarations
             .into_iter()
-            .filter(|fd| fd.name == "list_files" || fd.name == "read_file")
+            .filter(|fd| fd.name == tools::LIST_FILES || fd.name == tools::READ_FILE)
             .collect(),
         CapabilityLevel::Bash => all_declarations
             .into_iter()
-            .filter(|fd| fd.name == "list_files" || fd.name == "run_terminal_cmd" || fd.name == "read_file")
+            .filter(|fd| fd.name == tools::LIST_FILES || fd.name == tools::RUN_TERMINAL_CMD || fd.name == tools::READ_FILE)
             .collect(),
         CapabilityLevel::Editing => all_declarations
             .into_iter()
             .filter(|fd| {
-                fd.name == "list_files"
-                || fd.name == "read_file"
-                || fd.name == "write_file"
-                || fd.name == "edit_file"
-                || fd.name == "run_terminal_cmd"
+                fd.name == tools::LIST_FILES
+                || fd.name == tools::READ_FILE
+                || fd.name == tools::WRITE_FILE
+                || fd.name == tools::EDIT_FILE
+                || fd.name == tools::RUN_TERMINAL_CMD
             })
             .collect(),
         CapabilityLevel::CodeSearch => all_declarations
             .into_iter()
             .filter(|fd| {
-                fd.name == "list_files"
-                || fd.name == "run_terminal_cmd"
-                || fd.name == "rp_search"
-                || fd.name == "read_file"
-                || fd.name == "write_file"
-                || fd.name == "edit_file"
+                fd.name == tools::LIST_FILES
+                || fd.name == tools::RUN_TERMINAL_CMD
+                || fd.name == tools::RP_SEARCH
+                || fd.name == tools::READ_FILE
+                || fd.name == tools::WRITE_FILE
+                || fd.name == tools::EDIT_FILE
             })
             .collect(),
     }

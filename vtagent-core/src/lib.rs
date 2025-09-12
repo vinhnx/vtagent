@@ -112,6 +112,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_tool_registry_integration() {
+        use crate::config::constants::tools;
+
         let temp_dir = TempDir::new().unwrap();
         std::env::set_current_dir(&temp_dir).unwrap();
 
@@ -122,7 +124,7 @@ mod tests {
             "path": "."
         });
 
-        let result = registry.execute_tool("list_files", list_args).await;
+        let result = registry.execute_tool(tools::LIST_FILES, list_args).await;
         assert!(result.is_ok());
 
         let response: serde_json::Value = result.unwrap();

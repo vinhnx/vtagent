@@ -2,6 +2,7 @@
 
 use super::traits::{CacheableTool, ModeTool, Tool};
 use crate::tools::rp_search::{RpSearchInput, RpSearchManager};
+use crate::config::constants::tools;
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use serde_json::{Value, json};
@@ -314,7 +315,7 @@ impl Tool for SearchTool {
     }
 
     fn name(&self) -> &'static str {
-        "rp_search"
+        tools::RP_SEARCH
     }
 
     fn description(&self) -> &'static str {

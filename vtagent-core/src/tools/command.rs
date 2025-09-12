@@ -2,6 +2,7 @@
 
 use super::traits::{ModeTool, Tool};
 use super::types::*;
+use crate::config::constants::tools;
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 // PtySession import removed as it's not directly used
@@ -157,7 +158,7 @@ impl Tool for CommandTool {
     }
 
     fn name(&self) -> &'static str {
-        "run_terminal_cmd"
+        tools::RUN_TERMINAL_CMD
     }
 
     fn description(&self) -> &'static str {

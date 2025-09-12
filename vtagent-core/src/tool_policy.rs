@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use crate::config::constants::tools;
 
 /// Tool execution policy
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -435,13 +436,13 @@ mod tests {
     #[test]
     fn test_tool_policy_config_serialization() {
         let mut config = ToolPolicyConfig::default();
-        config.available_tools = vec!["read_file".to_string(), "write_file".to_string()];
+        config.available_tools = vec![tools::READ_FILE.to_string(), tools::WRITE_FILE.to_string()];
         config
             .policies
-            .insert("read_file".to_string(), ToolPolicy::Allow);
+            .insert(tools::READ_FILE.to_string(), ToolPolicy::Allow);
         config
             .policies
-            .insert("write_file".to_string(), ToolPolicy::Prompt);
+            .insert(tools::WRITE_FILE.to_string(), ToolPolicy::Prompt);
 
         let json = serde_json::to_string_pretty(&config).unwrap();
         let deserialized: ToolPolicyConfig = serde_json::from_str(&json).unwrap();

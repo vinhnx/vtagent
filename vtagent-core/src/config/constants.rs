@@ -173,3 +173,13 @@ pub mod message_roles {
     pub const ASSISTANT: &str = "assistant";
     pub const TOOL: &str = "tool";
 }
+
+/// Tool name constants to avoid hardcoding strings throughout the codebase
+pub mod tools {
+    pub const RP_SEARCH: &str = "rp_search";
+    pub const LIST_FILES: &str = "list_files";
+    pub const RUN_TERMINAL_CMD: &str = "run_terminal_cmd";
+    pub const READ_FILE: &str = "read_file";
+    pub const WRITE_FILE: &str = "write_file";
+    pub const EDIT_FILE: &str = "edit_file";
+}

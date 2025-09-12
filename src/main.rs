@@ -8,7 +8,7 @@ use console::style;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use vtagent_core::cli::args::{Cli, Commands};
-use vtagent_core::config::constants::{models, prompts};
+use vtagent_core::config::constants::{models, prompts, tools};
 use vtagent_core::config::models::{ModelId, Provider};
 use vtagent_core::config::{ConfigManager, VTAgentConfig};
 use vtagent_core::core::agent::integration::MultiAgentSystem;
@@ -352,7 +352,7 @@ async fn handle_single_agent_chat(
 
             // Try to read README.md
             match tool_registry
-                .execute_tool("read_file", serde_json::json!({"path": "README.md"}))
+                .execute_tool(tools::READ_FILE, serde_json::json!({"path": "README.md"}))
                 .await
             {
                 Ok(result) => {
@@ -366,7 +366,7 @@ async fn handle_single_agent_chat(
 
             // Try to list files in root directory
             match tool_registry
-                .execute_tool("list_files", serde_json::json!({"path": "."}))
+                .execute_tool(tools::LIST_FILES, serde_json::json!({"path": "."}))
                 .await
             {
                 Ok(result) => {

@@ -1,6 +1,7 @@
 //! Validate command implementation - environment and configuration validation
 
 use crate::config::types::AgentConfig;
+use crate::config::constants::tools;
 use crate::tools::ToolRegistry;
 use anyhow::Result;
 use console::style;
@@ -104,13 +105,13 @@ async fn check_filesystem_permissions(config: &AgentConfig) -> Result<()> {
 
     // Try to list files in the workspace
     registry
-        .execute_tool("list_files", json!({"path": ".", "max_items": 5}))
+        .execute_tool(tools::LIST_FILES, json!({"path": ".", "max_items": 5}))
         .await?;
 
     // Try to create a test file
     registry
         .execute_tool(
-            "write_file",
+            tools::WRITE_FILE,
             json!({
                 "path": ".vtagent_test",
                 "content": "test",

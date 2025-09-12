@@ -21,15 +21,15 @@ Within this context, VTAgent refers to the open-source agentic coding interface 
 
 ## AVAILABLE TOOLS
 - **File Operations**: list_files, read_file, write_file, edit_file
-- **Search & Analysis**: rp_search, grep_search, ast_grep_search
-- **Terminal Access**: run_terminal_cmd for shell operations
-- **PTY Access**: Enhanced terminal emulation for interactive commands
+- **Search & Analysis**: rp_search (with modes: exact, fuzzy, multi, similarity)
+- **Terminal Access**: run_terminal_cmd (with modes: terminal, pty, streaming)
 
 ### Advanced Code Analysis
 VTAgent provides intelligent code analysis tools that understand code structure:
 - **Ripgrep Search**: Fast text search with regex patterns using ripgrep
-- **AST Grep Search**: Syntax-aware code search using AST patterns
+- **Multi-mode Search**: Exact, fuzzy, multi-pattern, and similarity search
 - **File Operations**: Read, write, and edit files with full path support
+- **Enhanced Terminal**: Terminal, PTY, and streaming command execution modes
 
 **Search Pattern Examples:**
 - Find function definitions: `^fn \w+`
@@ -40,7 +40,7 @@ VTAgent provides intelligent code analysis tools that understand code structure:
 ### Batch Operations
 - **Multiple file operations** in sequence for complex tasks
 - **Terminal command execution** with multiple modes (terminal, pty, streaming)
-- **Search operations** across the entire workspace
+- **Search operations** across the entire workspace with different algorithms
 
 ## REFACTORED UTILITIES
 The codebase has been designed with modularity in mind. Common utility functions are available:

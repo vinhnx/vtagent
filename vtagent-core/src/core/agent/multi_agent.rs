@@ -2,7 +2,7 @@
 
 use crate::config::models::{ModelId, Provider};
 use crate::config::{ContextStoreDefaults, MultiAgentDefaults};
-use crate::config::constants::tools;
+use crate::config::constants::{tools, prompts};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
@@ -24,10 +24,10 @@ impl AgentType {
     /// Get the system prompt file path for this agent type
     pub fn system_prompt_path(&self) -> &'static str {
         match self {
-            AgentType::Orchestrator => "prompts/orchestrator_system.md",
-            AgentType::Explorer => "prompts/explorer_system.md",
-            AgentType::Coder => "prompts/coder_system.md",
-            AgentType::Single => "prompts/default_system.md",
+            AgentType::Orchestrator => prompts::ORCHESTRATOR_SYSTEM_PROMPT_PATH,
+            AgentType::Explorer => prompts::EXPLORER_SYSTEM_PROMPT_PATH,
+            AgentType::Coder => prompts::CODER_SYSTEM_PROMPT_PATH,
+            AgentType::Single => prompts::DEFAULT_SYSTEM_PROMPT_PATH,
         }
     }
 
@@ -35,27 +35,27 @@ impl AgentType {
     pub fn allowed_tools(&self) -> Vec<&'static str> {
         match self {
             AgentType::Orchestrator => vec![
-                "task_create",
-                "launch_subagent",
-                "add_context",
-                "finish",
-                "context_search",
-                "task_status",
+                tools::TASK_CREATE,
+                tools::LAUNCH_SUBAGENT,
+                tools::ADD_CONTEXT,
+                tools::FINISH,
+                tools::CONTEXT_SEARCH,
+                tools::TASK_STATUS,
             ],
             AgentType::Explorer => vec![
                 tools::READ_FILE,
                 tools::GREP_SEARCH,
                 tools::RUN_TERMINAL_CMD,
-                "file_metadata",
-                "project_overview",
-                "tree_sitter_analyze",
+                tools::FILE_METADATA,
+                tools::PROJECT_OVERVIEW,
+                tools::TREE_SITTER_ANALYZE,
                 tools::AST_GREP_SEARCH,
             ],
             AgentType::Coder => vec![
-                "*", // Full access to all tools
+                tools::WILDCARD_ALL, // Full access to all tools
             ],
             AgentType::Single => vec![
-                "*", // Full access for backward compatibility
+                tools::WILDCARD_ALL, // Full access for backward compatibility
             ],
         }
     }
@@ -70,7 +70,12 @@ impl AgentType {
                 tools::DELETE_FILE,
                 tools::RUN_TERMINAL_CMD,
             ],
-            AgentType::Explorer => vec![tools::WRITE_FILE, tools::EDIT_FILE, tools::DELETE_FILE, tools::CREATE_FILE],
+            AgentType::Explorer => vec![
+                tools::WRITE_FILE,
+                tools::EDIT_FILE,
+                tools::DELETE_FILE,
+                tools::CREATE_FILE
+            ],
             AgentType::Coder => vec![],  // No restrictions
             AgentType::Single => vec![], // No restrictions
         }

@@ -108,12 +108,12 @@ impl ToolRegistry {
     /// List available tools
     pub fn available_tools(&self) -> Vec<String> {
         vec![
-            "rp_search".to_string(),
-            "list_files".to_string(),
-            "run_terminal_cmd".to_string(),
-            "read_file".to_string(),
-            "write_file".to_string(),
-            "edit_file".to_string(),
+            tools::RP_SEARCH.to_string(),
+            tools::LIST_FILES.to_string(),
+            tools::RUN_TERMINAL_CMD.to_string(),
+            tools::READ_FILE.to_string(),
+            tools::WRITE_FILE.to_string(),
+            tools::EDIT_FILE.to_string(),
         ]
     }
 

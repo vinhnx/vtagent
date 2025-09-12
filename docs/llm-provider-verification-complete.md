@@ -8,7 +8,7 @@
 
 **Root Cause**: Anthropic's API requires tool results to be sent as user messages with `tool_result` content blocks, not as simple text messages.
 
-### 🔧 **Fix Implemented**
+### **Fix Implemented**
 
 #### **Before (Incorrect)**
 ```rust
@@ -93,8 +93,8 @@ fn convert_from_anthropic_format(&self, response: Value) -> Result<LLMResponse, 
 ```rust
 // All providers work through unified interface
 let gemini = UnifiedLLMClient::new("gemini-2.5-flash".to_string(), api_key)?;
-let openai = UnifiedLLMClient::new("gpt-4o".to_string(), api_key)?;
-let claude = UnifiedLLMClient::new("claude-3-5-sonnet".to_string(), api_key)?;
+let openai = UnifiedLLMClient::new("gpt-5".to_string(), api_key)?;
+let claude = UnifiedLLMClient::new("claude-4-sonnet".to_string(), api_key)?;
 
 // Same interface for all
 let response = client.generate(messages, system_prompt).await?;
@@ -107,7 +107,7 @@ let response = client.generate(messages, system_prompt).await?;
 | **OpenAI** | Bearer token | Chat completions | Native functions | ✅ Working |
 | **Anthropic** | x-api-key header | Messages API | tool_result blocks | ✅ Fixed |
 
-### 🔧 **Technical Verification Results**
+### **Technical Verification Results**
 ```
 
 #### **✅ Message Creation System**

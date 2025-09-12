@@ -1,35 +1,19 @@
 {
   "version": 1,
-  "default": {
-    "allow": true,
-    "rate_limit_per_run": 20,
-    "max_concurrent": 2,
-    "fs_write": true,
-    "network": false
-  },
-  "tools": {
-    "run_terminal_cmd": {
-      "allow": true,
-      "fs_write": true,
-      "network": false,
-      "args_policy": {
-        "deny_substrings": [
-          "rm -rf",
-          "git reset --hard",
-          ":(){ :|:& };:"
-        ]
-      }
-    },
-    "code_search": { "allow": true },
-    "codebase_search": { "allow": true },
-    "rp_search": { "allow": true },
-    "list_files": { "allow": true },
-    "read_file": { "allow": true },
-    "write_file": { "allow": true },
-    "edit_file": { "allow": true },
-    "ast_grep_search": { "allow": true },
-    "ast_grep_transform": { "allow": true },
-    "ast_grep_lint": { "allow": true },
-    "ast_grep_refactor": { "allow": true }
+  "available_tools": [
+    "rp_search",
+    "list_files",
+    "run_terminal_cmd",
+    "read_file",
+    "write_file",
+    "edit_file"
+  ],
+  "policies": {
+    "rp_search": "allow",
+    "edit_file": "allow",
+    "write_file": "allow",
+    "list_files": "allow",
+    "read_file": "allow",
+    "run_terminal_cmd": "allow"
   }
 }

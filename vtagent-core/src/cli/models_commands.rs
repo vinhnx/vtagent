@@ -36,7 +36,7 @@ pub async fn handle_models_command(cli: &Cli, command: &ModelCommands) -> Result
 async fn handle_list_models(_cli: &Cli) -> Result<()> {
     println!(
         "{}",
-        "🔧 Available LLM Providers & Models".bold().underline()
+        "Available LLM Providers & Models".bold().underline()
     );
     println!();
 

@@ -79,7 +79,7 @@ Task: Interactive coding session
 • Most cost-effective
 • Good for simple tasks
 
-🔧 Single Coder Agent:
+Single Coder Agent:
 • Direct and efficient
 • Lower API costs
 • Faster task completion

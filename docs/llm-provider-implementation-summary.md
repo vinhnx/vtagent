@@ -53,8 +53,8 @@ pub struct LLMResponse {
 #### **4. Provider Factory & Auto-Detection** ✅
 ```rust
 // Auto-detects provider from model name
-let client = UnifiedLLMClient::new("gpt-4o".to_string(), api_key)?;  // → OpenAI
-let client = UnifiedLLMClient::new("claude-3-5-sonnet".to_string(), api_key)?;  // → Anthropic
+let client = UnifiedLLMClient::new("gpt-5".to_string(), api_key)?;  // → OpenAI
+let client = UnifiedLLMClient::new("claude-4-sonnet".to_string(), api_key)?;  // → Anthropic
 let client = UnifiedLLMClient::new("gemini-2.5-flash".to_string(), api_key)?;  // → Gemini
 ```
 
@@ -105,7 +105,7 @@ let client = make_client(api_key, model); // Still works!
 | **Anthropic** | x-api-key header | Messages API | Custom format | Claude 3.5, Claude 3 | ✅ Ready |
 | **Gemini** | URL query param | GenerateContent | Function declarations | Gemini 2.5, Gemini 1.5 | ✅ Ready |
 
-## 🔧 **Technical Implementation Patterns**
+## **Technical Implementation Patterns**
 
 ### **1. Provider Abstraction Pattern**
 Each provider implements the universal `LLMProvider` trait and handles format conversion:
@@ -141,8 +141,8 @@ pub fn provider_from_model(&self, model: &str) -> Option<String> {
 ```rust
 // Works with any provider automatically
 let gemini_client = UnifiedLLMClient::new("gemini-2.5-flash".to_string(), gemini_key)?;
-let openai_client = UnifiedLLMClient::new("gpt-4o".to_string(), openai_key)?;
-let claude_client = UnifiedLLMClient::new("claude-3-5-sonnet".to_string(), anthropic_key)?;
+let openai_client = UnifiedLLMClient::new("gpt-5".to_string(), openai_key)?;
+let claude_client = UnifiedLLMClient::new("claude-4-sonnet".to_string(), anthropic_key)?;
 
 // Same interface for all
 let messages = vec![Message::user("Explain quantum computing".to_string())];

@@ -67,8 +67,6 @@ pub mod models {
     // OpenRouter models (provider-prefixed - keeping existing for backwards compatibility)
     pub mod openrouter {
         pub const SONOMA_SKY_ALPHA: &str = "openrouter/sonoma-sky-alpha";
-        pub const ANTHROPIC_CLAUDE_3_5_SONNET: &str = "anthropic/claude-3.5-sonnet";
-        pub const ANTHROPIC_CLAUDE_3_HAIKU: &str = "anthropic/claude-3-haiku";
         pub const OPENAI_GPT_5: &str = "openai/gpt-5";
         pub const OPENAI_GPT_5_MINI: &str = "openai/gpt-5-mini";
         pub const QWEN_QWEN3_CODER: &str = "qwen/qwen3-coder";
@@ -83,14 +81,13 @@ pub mod models {
         pub const QWEN_QWEN3_NEXT_80B_A3B_INSTRUCT: &str = "qwen/qwen3-next-80b-a3b-instruct";
         pub const KIMI_K2_0905: &str = "moonshotai/kimi-k2-0905";
         pub const SUPPORTED_MODELS: &[&str] = &[
-            "anthropic/claude-3.5-sonnet",
-            "anthropic/claude-3-haiku",
             "openai/gpt-5",
             "openai/gpt-5-mini",
             "google/gemini-2.5-pro",
             "google/gemini-2.5-flash",
             "google/gemini-2.5-flash-lite",
             "qwen/qwen3-next-80b-a3b-thinking",
+            "qwen/qwen3-next-80b-a3b-instruct",
             "qwen/qwen3-30b-a3b-2507",
             "x-ai/grok-code-fast-1",
             "deepseek/deepseek-chat-v3.1",

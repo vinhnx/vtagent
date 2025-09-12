@@ -31,7 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Demo 2: Provider Creation
-    println!("\n🔧 Provider Creation Demo:");
+    println!("\nProvider Creation Demo:");
 
     let gemini = create_provider_for_model("gemini-2.5-flash", "test_key".to_string());
     println!("Gemini provider created: {}", gemini.is_ok());

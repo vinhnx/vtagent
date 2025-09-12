@@ -1,6 +1,9 @@
 /// Prompt path constants to avoid hardcoding throughout the codebase
 pub mod prompts {
     pub const DEFAULT_SYSTEM_PROMPT_PATH: &str = "prompts/system.md";
+    pub const ORCHESTRATOR_SYSTEM_PROMPT_PATH: &str = "prompts/orchestrator_system.md";
+    pub const EXPLORER_SYSTEM_PROMPT_PATH: &str = "prompts/explorer_system.md";
+    pub const CODER_SYSTEM_PROMPT_PATH: &str = "prompts/coder_system.md";
 }
 
 /// Model ID constants to sync with docs/models.json
@@ -186,4 +189,20 @@ pub mod tools {
     pub const CREATE_FILE: &str = "create_file";
     pub const GREP_SEARCH: &str = "grep_search";
     pub const AST_GREP_SEARCH: &str = "ast_grep_search";
+
+    // Multi-agent specific tools
+    pub const TASK_CREATE: &str = "task_create";
+    pub const LAUNCH_SUBAGENT: &str = "launch_subagent";
+    pub const ADD_CONTEXT: &str = "add_context";
+    pub const FINISH: &str = "finish";
+    pub const CONTEXT_SEARCH: &str = "context_search";
+    pub const TASK_STATUS: &str = "task_status";
+
+    // Explorer-specific tools
+    pub const FILE_METADATA: &str = "file_metadata";
+    pub const PROJECT_OVERVIEW: &str = "project_overview";
+    pub const TREE_SITTER_ANALYZE: &str = "tree_sitter_analyze";
+
+    // Special wildcard for full access
+    pub const WILDCARD_ALL: &str = "*";
 }

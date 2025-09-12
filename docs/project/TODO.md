@@ -1,19 +1,5 @@
-check
-
-vtagent-core/src/core/agent/integration.rs
-vtagent-core/src/llm/providers/openai.rs
-vtagent-core/src/llm/providers/lmstudio.rs
-vtagent-core/src/llm/providers/gemini.rs
-vtagent-core/src/llm/providers/anthropic.rs
-
-still have hardcode string
-if request.model.contains("gpt-5") || request.model.contains("o1") {
---
-
-auto_cleanup_days: 7, // Default value
-enable_persistence: false, // Default value
-
-vtagent-core/src/core/agent/integration.rs -> move to config?
+refactor vtagent-core/src/core/agent/integration.rs
+make a plan
 
 ---
 
@@ -31,44 +17,22 @@ scan for dead code and review. and fix
 
 --
 
-reasoning_effort = "medium"
-use_single_model = true
--> thse config is not used in logic
-
-fix it.
-also, make sure all config in vtagent.toml applied correctly in core agent logic.
-
---
-
 https://docs.rs/console/latest/console/
-
----
 
 https://docs.rs/dialoguer/latest/dialoguer/
 
---
---
-
-https://x.com/AlexGDimakis/status/1965947230696910935
-
-
-
-
---
-add configure comments for all possible values for vtagent.toml (example: providers. models. values)
 
 --
 
+add configurable comments for all possible values for vtagent.toml (example: possbible value/ providers. models. value for config suggestion)
+
 --
+
 the agent loop was working on main branch. we did have a major refactor now. make sure agent loop still work.
 
 ---
 
-also config the run the agent on lmstudio on dev mode by default. use single qwen/qwen3-4b-2507
-as all agents task in orchestrator and executor and planner  agent.
-
----
-
+apply for agent
 https://github.com/krypticmouse/DSRs/tree/main
 https://github.com/krypticmouse/DSRs/tree/main/crates/dspy-rs/examples
 

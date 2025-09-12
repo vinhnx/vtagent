@@ -1,229 +1,222 @@
-# **vtagent Documentation Hub**
+# VTAgent Documentation Hub
 
-Welcome to the comprehensive documentation for **vtagent**, an Research-preview AI-powered coding assistant that implements state-of-the-art agent architecture patterns inspired by Anthropic's breakthrough engineering approaches.
+Welcome to the comprehensive documentation for **VTAgent**, a Rust-based terminal coding agent with modular architecture supporting multiple LLM providers and advanced code analysis capabilities.
 
-## **What Makes vtagent Special**
+## What Makes VTAgent Special
 
-vtagent represents a significant advancement in AI-powered software development tools, featuring:
+VTAgent represents a modern approach to AI-powered software development, featuring:
 
-- **Anthropic-Inspired Architecture** - Built following the same principles that achieved 49% on SWE-bench Verified
-- **Multi-Language Intelligence** - Research-preview code understanding across 6+ programming languages
-- **Enterprise-Grade Reliability** - Production-ready with comprehensive error recovery and context management
-- **Complete Transparency** - Full audit trails and decision tracking for all agent actions
-- **Comprehensive Testing** - Production-grade test suite with performance benchmarking
-- **Research-preview Tool Ecosystem** - Error-proofed tools designed for maximum reliability
+- **Multi-Agent Architecture** - Orchestrator, Explorer, and Coder agents for specialized tasks
+- **Multi-Provider LLM Support** - Gemini, OpenAI, Anthropic, and LMStudio integration
+- **Advanced Code Intelligence** - Tree-sitter parsers for 6+ programming languages
+- **Enterprise-Grade Safety** - Comprehensive security controls and path validation
+- **Flexible Configuration** - TOML-based configuration with granular policies
+- **Research-Preview Features** - Cutting-edge agent coordination and context engineering
 
-## **Documentation Overview**
+## Documentation Overview
 
 This documentation is organized to support different user personas and use cases:
 
-### **For Users**
+### For Users
 
-New to vtagent? Start with installation and basic usage:
+New to VTAgent? Start with installation and basic usage:
 
 - **[Getting Started](./user-guide/getting-started.md)** - Installation, configuration, and first steps
-- **[Tree-sitter Integration](./user-guide/tree-sitter-integration.md)** - Research-preview code analysis capabilities
-- **[Command Reference](./user-guide/commands.md)** - Complete command reference and examples
-
-### **For Developers**
-
-Contributing to vtagent? Understand the architecture and development processes:
-
-- **[Development Guide](./development/README.md)** - Development environment setup and workflows
-- **[Architecture Guide](./development/architecture.md)** - System design and core patterns
-- **[API Reference](./api/README.md)** - Technical API documentation and specifications
-- **[Code Standards](./development/code-style.md)** - Coding guidelines and best practices
-
-### **For Testers & QA**
-
-Ensuring vtagent's reliability? Master the comprehensive testing framework:
-
-- **[Testing Guide](./development/testing.md)** - Complete testing documentation and best practices
-- **[Performance Benchmarking](./development/benchmarking.md)** - Performance testing and optimization
-- **[Quality Assurance](./development/qa.md)** - Quality assurance processes and validation
-
-## **Core Capabilities**
-
-### **AI Agent Architecture**
-
-- **Gemini Function Calling** - Powered by Google's most Research-preview AI models
-- **Context Engineering** - Intelligent conversation management and compression
-- **Decision Tracking** - Complete audit trail of all agent decisions
-- **Error Recovery** - Multi-strategy error handling with context preservation
-- **Pattern Recognition** - Learning from interaction patterns for optimization
-
-### **Research-preview Code Intelligence**
-
-- **Tree-sitter Integration** - Syntax-aware parsing for 6+ languages (Rust, Python, JavaScript, TypeScript, Go, Java)
-- **Symbol Analysis** - Intelligent extraction of functions, classes, variables, and imports
-- **Dependency Mapping** - Import relationship analysis and module dependencies
-- **Code Quality Assessment** - Maintainability scoring and complexity analysis
-- **Refactoring Intelligence** - Safe code transformation suggestions
-
-### **Comprehensive Tool Suite**
-
-- **File Operations** - Safe, validated file system operations with error-proofing
-- **Ultra-Fast Search** - ripgrep-powered text search with Research-preview filtering
-- **Code Analysis** - Deep syntactic analysis with AST parsing
-- **Symbol Navigation** - Intelligent code navigation and symbol lookup
-- **Dependency Analysis** - Import relationship mapping and module analysis
-
-### **Transparency & Analytics**
-
-- **Real-time Monitoring** - Live tracking of agent decisions and performance
-- **Session Analytics** - Comprehensive performance and usage statistics
-- **Error Pattern Detection** - Automatic identification of recurring issues
-- **Confidence Scoring** - Quality assessment for all agent actions
-- **Resource Usage Tracking** - Memory, API usage, and performance monitoring
-
-### **Testing & Quality Assurance**
-
-- **Unit Testing** - Comprehensive component-level testing
-- **Integration Testing** - End-to-end workflow validation
-- **Performance Benchmarking** - Automated performance testing
-- **Mock Frameworks** - Realistic testing without external dependencies
-- **Continuous Integration** - Automated testing and validation
-
-## **Quick Start Guide**
-
-### For New Users
-
-1. **[Installation](./user-guide/getting-started.md)** - Get vtagent running in minutes
-2. **[First Analysis](./user-guide/tree-sitter-integration.md)** - Try Research-preview code analysis
-3. **[Basic Commands](./user-guide/commands.md)** - Learn essential commands
+- **[Multi-Agent Guide](./MULTI_AGENT_GUIDE.md)** - Understanding agent coordination
+- **[Configuration Guide](./CONFIGURATION.md)** - Comprehensive configuration options
 
 ### For Developers
 
-1. **[Development Setup](./development/README.md)** - Configure your development environment
-2. **[Architecture](./development/architecture.md)** - Understand the system design
-3. **[Testing](./development/testing.md)** - Master the testing framework
+Contributing to VTAgent? Understand the architecture and development processes:
+
+- **[Architecture Overview](./ARCHITECTURE.md)** - System design and core components
+- **[Development Guide](./development/README.md)** - Development environment setup
+- **[API Documentation](./api/README.md)** - Technical API references
+- **[Code Standards](./development/code-style.md)** - Coding guidelines and best practices
 
 ### For Organizations
 
-1. **[Enterprise Features](./user-guide/enterprise.md)** - Security and compliance features
-2. **[Analytics](./user-guide/analytics.md)** - Research-preview monitoring and reporting
-3. **[Integration](./development/integration.md)** - CI/CD and automation integration
+Deploying VTAgent in production? Focus on enterprise features:
 
-## **Research-preview Usage Patterns**
+- **[Security Implementation](./SAFETY_IMPLEMENTATION.md)** - Security controls and compliance
+- **[Performance Analysis](./PERFORMANCE_ANALYSIS.md)** - Optimization and benchmarking
+- **[Provider Guides](./PROVIDER_GUIDES.md)** - LLM provider integration guides
 
-### Intelligent Codebase Analysis
+## Core Capabilities
+
+### Multi-Agent Architecture
+
+- **Orchestrator Agent** - Strategic task coordination and delegation
+- **Explorer Agent** - Read-only investigation and verification
+- **Coder Agent** - Implementation specialist with full write access
+- **Context Store** - Persistent knowledge management across agents
+- **Task Verification** - Automated quality assurance workflows
+
+### Advanced Code Intelligence
+
+- **Tree-Sitter Integration** - Syntax-aware parsing for Rust, Python, JavaScript, TypeScript, Go, Java
+- **Intelligent Search** - Ripgrep and AST-grep powered code analysis
+- **Symbol Analysis** - Function, class, and variable extraction
+- **Dependency Mapping** - Import relationship analysis
+- **Code Quality Assessment** - Complexity and maintainability scoring
+
+### Comprehensive Tool Suite
+
+- **File Operations** - Safe, validated file system operations
+- **Terminal Integration** - Enhanced PTY support for interactive commands
+- **Search & Analysis** - Fast text and syntax-aware code search
+- **Batch Processing** - Efficient multi-file operations
+- **Configuration Management** - Dynamic TOML-based settings
+
+### Safety & Security
+
+- **Path Validation** - Prevents access outside workspace boundaries
+- **Command Policies** - Allow/deny lists with pattern matching
+- **Human-in-the-Loop** - Confirmation for dangerous operations
+- **File Size Limits** - Configurable resource constraints
+- **API Key Security** - Secure credential management
+
+## Quick Start Guide
+
+### For New Users
+
+1. **[Installation](../README.md#installation)** - Get VTAgent running in minutes
+2. **[Basic Configuration](./CONFIGURATION.md)** - Set up your environment
+3. **[First Chat Session](../README.md#basic-usage)** - Try interactive coding assistance
+
+### For Developers
+
+1. **[Architecture Overview](./ARCHITECTURE.md)** - Understand the system design
+2. **[Development Setup](./development/README.md)** - Configure development environment
+3. **[Multi-Agent Patterns](./MULTI_AGENT_GUIDE.md)** - Learn agent coordination
+
+### For Organizations
+
+1. **[Security Implementation](./SAFETY_IMPLEMENTATION.md)** - Enterprise security features
+2. **[Provider Integration](./PROVIDER_GUIDES.md)** - LLM provider setup
+3. **[Performance Tuning](./PERFORMANCE_ANALYSIS.md)** - Optimization strategies
+
+## Usage Patterns
+
+### Multi-Agent Workflows
 
 ```bash
-# Deep analysis with comprehensive metrics
-cargo run -- analyze --depth deep --format json
+# Complex task orchestration
+./run.sh orchestrate "Implement user authentication system"
 
-# Symbol intelligence and navigation
-cargo run -- chat "Find all functions named 'process_' in the codebase"
+# Codebase exploration
+./run.sh explore "Analyze current architecture"
+
+# Implementation tasks
+./run.sh code "Add new API endpoint"
+```
+
+### Intelligent Code Analysis
+
+```bash
+# Comprehensive project analysis
+./run.sh analyze
+
+# Symbol search and navigation
+./run.sh search "function process_"
 
 # Dependency analysis
-cargo run -- chat "Show me the dependency graph for the authentication module"
+./run.sh deps --graph
 ```
 
-### Complete Project Generation
+### Configuration Management
 
 ```bash
-# Full-stack web application
-cargo run -- create-project secure-api axum,serde,tokio,sqlx,jsonwebtoken,bcrypt
+# Initialize project configuration
+./run.sh init
 
-# Data science toolkit
-cargo run -- create-project data-analyzer polars,serde,tokio,plotly,jupyter
+# Edit configuration interactively
+./run.sh config --edit
 
-# Microservices architecture
-cargo run -- create-project user-service tonic,prost,tokio,sqlx,redis
+# Validate configuration
+./run.sh config --validate
 ```
 
-### Transparency & Decision Tracking
+## Testing & Quality Assurance
 
-```bash
-# Experience full transparency
-cargo run -- chat-verbose "Refactor the user authentication system"
-
-# Get detailed session analytics
-cargo run -- stats --detailed --format json
-```
-
-## **Comprehensive Testing**
-
-vtagent includes a production-grade testing infrastructure:
+VTAgent includes comprehensive testing infrastructure:
 
 ### Test Categories
 
-```bash
-# Unit testing
-cargo test --lib -- --nocapture
+- **Unit Tests** - Component-level testing with `cargo test`
+- **Integration Tests** - End-to-end workflow validation
+- **Performance Tests** - Benchmarking with `cargo bench`
+- **Configuration Tests** - TOML validation and policy testing
 
-# Integration testing
-cargo test --test integration_tests -- --nocapture
+### Quality Assurance
+
+```bash
+# Run full test suite
+cargo test
+
+# Run with coverage
+cargo tarpaulin
 
 # Performance benchmarking
 cargo bench
 
-# Mock data testing
-cargo test mock_gemini_responses -- --nocapture
+# Linting and formatting
+cargo clippy && cargo fmt
 ```
 
-### Quality Assurance
-
-- **Automated Testing Pipeline** - CI/CD integration ready
-- **Performance Regression Detection** - Automatic benchmark comparisons
-- **Coverage Analysis** - Code coverage tracking
-- **Cross-Platform Validation** - Multi-environment testing
-- **Security Scanning** - Vulnerability detection
-
-## **Project Information**
+## Project Information
 
 ### Current Status & Roadmap
 
-- **[Roadmap](./project/roadmap.md)** - Future development plans and milestones
-- **[Changelog](./project/CHANGELOG.md)** - Version history and release notes
-- **[TODO](./project/TODO.md)** - Current tasks and development backlog
+- **[Roadmap](../ROADMAP.md)** - Future development plans and milestones
+- **[Changelog](../CHANGELOG.md)** - Version history and release notes
+- **[TODO](./project/TODO.md)** - Current development tasks
 
 ### Development Resources
 
-- **[Contributing Guide](./development/contributing.md)** - How to contribute to the project
-- **[Code Standards](./development/code-style.md)** - Coding guidelines and best practices
-- **[Architecture Decisions](./development/architecture.md)** - Design rationale and trade-offs
+- **[Contributing Guide](../CONTRIBUTING.md)** - How to contribute
+- **[Code Standards](./development/code-style.md)** - Coding guidelines
+- **[Architecture Decisions](./ARCHITECTURE.md)** - Design rationale
 
-## **Support & Community**
+## Support & Community
 
 ### Getting Help
 
-- **Email Support**: For questions, issues, or contributions
-- **GitHub Issues**: Report bugs and request features
-- **Discussions**: Join community discussions
-- **Documentation**: Comprehensive guides and tutorials
+- **GitHub Issues** - Report bugs and request features
+- **GitHub Discussions** - Community discussions and support
+- **Documentation** - Comprehensive guides and tutorials
 
 ### Community Resources
 
 - **[Main README](../README.md)** - Project overview and quick reference
-- **[GitHub Repository](https://github.com/username/vtagent)** - Source code and issue tracking
-- **[Discussions](https://github.com/username/vtagent/discussions)** - Community discussions and support
-- **[Wiki](https://github.com/username/vtagent/wiki)** - Community-contributed documentation
+- **[GitHub Repository](https://github.com/vinhnx/vtagent)** - Source code and collaboration
+- **[Discussions](https://github.com/vinhnx/vtagent/discussions)** - Community support
 
 ### Enterprise Support
 
-- **Security**: Enterprise-grade security and compliance features
-- **Analytics**: Research-preview monitoring and reporting capabilities
-- **Integration**: CI/CD and automation integration guides
-- **Consulting**: Professional services and custom development
+- **Security Features** - Enterprise-grade security controls
+- **Multi-Agent Coordination** - Advanced workflow orchestration
+- **Provider Integration** - Multiple LLM provider support
+- **Performance Optimization** - Enterprise-scale performance tuning
 
-## **License & Attribution**
+## License & Attribution
 
-This documentation is part of the vtagent project and is licensed under the same terms. See the main [README](../README.md) for license information.
+This documentation is part of the VTAgent project. See the main [README](../README.md) for license information.
 
 ### Attribution
 
-vtagent builds upon breakthrough work in agent development:
+VTAgent builds upon key developments in AI agent technology:
 
-- **Anthropic's SWE-bench Achievement** - 49% on SWE-bench Verified
-- **Cognition's Context Engineering** - Long-running agent reliability principles
-- **OpenAI's Swarm Concepts** - Multi-agent coordination patterns
-- **Community Best Practices** - Open-source agent implementations
+- **Anthropic's Agent Patterns** - Tool design and safety principles
+- **Cognition's Context Engineering** - Long-running agent reliability
+- **OpenAI's Multi-Agent Concepts** - Agent coordination patterns
+- **Tree-Sitter Ecosystem** - Advanced code parsing capabilities
+- **Rust Community** - High-performance systems programming
 
 ---
 
-**Documentation Version:** 1.0.0
-**Last Updated:** December 2024
-**vtagent Version:** 0.1.0
+**Documentation Version:** 2.0.0
+**Last Updated:** September 2025
+**VTAgent Version:** 0.2.0
 
-**Ready to get started?** **[Installation Guide](./user-guide/getting-started.md)**
+**Ready to get started?** **[Installation Guide](../README.md#quick-start)**

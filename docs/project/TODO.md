@@ -929,115 +929,151 @@ https://github.com/rust-cli/anstyle
 --
 ---
 
+integrate ck as a new tool for semantic code search and analysis.
 https://github.com/BeaconBay/ck
+I'll analyze both repositories to compare ck and ast-grep for your coding agent project. Let me examine the ck repository first to understand its capabilities.Based on the information gathered, **ck** and **ast-grep** serve different but complementary purposes for a coding agent in Rust. Here's a detailed comparison:
+
+## Core Purpose & Philosophy
+
+**ast-grep**:
+- **Structural code search** using Abstract Syntax Trees (AST)
+- Focuses on code structure, syntax patterns, and transformations
+- Language-aware parsing that understands code semantics
+- Excellent for refactoring, linting, and precise code transformations
+
+**ck**:
+- **Semantic search** using embeddings and natural language understanding
+- Finds code by meaning/concept rather than exact structure
+- Combines traditional grep functionality with AI-powered semantic understanding
+- Excellent for code discovery, exploration, and finding conceptually related code
+
+## Key Differences
+
+### Search Approach
+- **ast-grep**: Pattern-based matching using AST structure (`console.log($MSG)` finds all console.log calls)
+- **ck**: Meaning-based search (`"error handling"` finds try/catch, error returns, exception handling, etc.)
+
+### Use Cases
+**ast-grep excels at**:
+- Precise refactoring (replace all `var` with `let`)
+- Code linting and rule enforcement
+- Structural code analysis
+- Finding exact syntax patterns
+- Code transformations with guaranteed correctness
+
+**ck excels at**:
+- Code exploration in unfamiliar codebases
+- Finding conceptually similar code across different implementations
+- Natural language queries ("find authentication logic")
+- Discovering related functionality without knowing exact syntax
+- AI agent code analysis and understanding
+
+## Integration Benefits (Not Redundant!)
+
+For a coding agent, having **both** tools provides significant advantages:
+
+### 1. **Complementary Strengths**
+```bash
+# ast-grep: Find all function definitions with specific structure
+ast-grep -p 'function $NAME($ARGS) { $BODY }'
+
+# ck: Find all authentication-related functions regardless of structure
+ck --sem "user authentication functions"
+```
+
+### 2. **Workflow Integration**
+- **Discovery phase**: Use `ck` to find relevant code areas by concept
+- **Analysis phase**: Use `ast-grep` to precisely analyze structure and patterns
+- **Transformation phase**: Use `ast-grep` for safe, structure-aware modifications
+
+### 3. **Different Query Types**
+```bash
+# Natural language exploration (ck)
+ck --sem "database connection pooling"
+ck --sem "retry logic with backoff"
+
+# Precise structural queries (ast-grep)
+ast-grep -p 'impl $TRAIT for $TYPE { $BODY }'
+ast-grep -p 'async fn $NAME($ARGS) -> Result<$T, $E> { $BODY }'
+```
+
+## Practical Recommendations
+
+**Use ast-grep when**:
+- You need precise, structure-aware code modifications
+- Implementing linting rules or code quality checks
+- Performing safe refactoring operations
+- You know the exact syntax pattern you're looking for
+
+**Use ck when**:
+- Exploring unfamiliar codebases
+- Finding code by concept/functionality
+- Your coding agent needs to understand "what this code does"
+- Searching across multiple languages with different syntax but similar concepts
+
+**Use both together when**:
+- Building comprehensive code analysis pipelines
+- Creating intelligent code suggestion systems
+- Implementing context-aware code generation
+- Developing advanced coding assistance features
+
+## Conclusion
+
+**ck and ast-grep are highly complementary, not redundant**. For a Rust coding agent:
+
+- **ast-grep** provides precise, syntax-aware code manipulation capabilities
+- **ck** provides intelligent, meaning-based code discovery and understanding
+- Together, they enable both **understanding** (ck) and **manipulation** (ast-grep) of codebases
+- The combination allows for more sophisticated coding agent capabilities than either tool alone
+
+I'd recommend keeping both in your coding agent stack, as they solve different fundamental problems in code analysis and manipulation.
 
 --
 
-reference this as roadmap for future improvements
+For OpenAI and GPT-5 model agents only.
 
-https://x.com/iannuttall/status/1964976282237649041
-k Claude Code could do to win back people switching to Codex CLI:
+To maximize performance and achieve superior results with GPT-5, always use an AI agent to refine and rewrite your human-written prompts before submitting them to the model. This iterative enhancement ensures clarity, specificity, and alignment with GPT-5's advanced capabilities.
 
-- open source Claude Code
-- reduce sycophancy/make it less verbose (or add option for that)
-- more transparency about how/why the model degrades
-- fix tui flashing bug! PLEASE
-- improve model hallucinations like GPT-5 has
-- better thinking for removing files/lines of code to prevent accidental deletions
-- less boilerplate or pseudo implementations (break it into working chunks if needed)
-- ability to change/remove/reduce the system reminder prompts
-- file based session auto-compact with much more detail on the conversation for future reference
-
-what would you want to see improve to make CC work better for you?
---
-GPT 5 only
-If you want better results with GPT-5, use AI to rewrite your human-written prompt before providing it to GPT-5. Provide your prompt-writing agent with a link to https://cookbook.openai.com/examples/gpt-5/gpt-5_prompting_guide for even better results.
-
---
-
-double check prompts/codex_tool_recommendations.md
+For even better outcomes, provide your prompt-writing AI with this official resource as a reference: https://cookbook.openai.com/examples/gpt-5/gpt-5_prompting_guide. Instruct it to incorporate best practices from the guide, such as chain-of-thought reasoning, role-playing, and structured formatting, while adapting to your specific task.
 
 
 ---
 
-context compression for long context window task
+You are an expert AI assistant tasked with implementing a context compression and compaction command for managing conversation history in large language models. This feature detects when the context window is approaching or exceeding its limit (e.g., due to token overflow) and automatically summarizes or prunes the history to maintain efficiency while preserving key information.
 
-eg: "The context window has overflowed, summarizing the history..."
+### Requirements:
+- **Trigger Condition**: Monitor the total token count in the conversation history. If it exceeds 80% of the model's context window limit (e.g., 128k tokens for GPT-4), activate compaction. Use a reliable tokenizer like tiktoken for accurate counting.
+- **Compaction Strategy**:
+  - Identify and summarize redundant, repetitive, or low-relevance sections (e.g., greetings, off-topic asides).
+  - Retain critical elements: user queries, key responses, unresolved tasks, and factual summaries.
+  - Generate a concise summary message, such as: "The context window has overflowed. Summarizing the history: [brief overview of main topics, decisions, and open items]. Continuing from here..."
+  - Optionally, allow user override or manual triggers via commands like `/compact` or `/summarize`.
+- **Implementation Details**:
+  - Build this as a modular command in a Rust-based system (inspired by OpenAI's Codex architecture).
+  - Integrate with the core prompt loop: Before generating a response, check history length and insert the compacted version if needed.
+  - Ensure the summary is neutral, accurate, and under 20% of the original length.
+  - Handle edge cases: Very short histories (no action), multi-turn debates (preserve arguments), code sessions (keep snippets intact).
+- **Output Format**: After compaction, append the summary to the history and proceed with the next response. Log the before/after token counts for debugging.
+- **Reference**: Base your implementation on the prompt structure in https://github.com/openai/codex/blob/main/codex-rs/core/src/prompt_for_compact_command.md, adapting it for dynamic history management.
 
-https://github.com/openai/codex/blob/main/codex-rs/core/src/prompt_for_compact_command.md
+Provide a complete, working code snippet in Rust (or the target language) demonstrating this command, including tests for overflow scenarios. Explain any deviations from the reference in comments.
 
 ---
 
---
+
 <https://github.com/laude-institute/terminal-bench?tab=readme-ov-file#submit-to-our-leaderboard>
-
-run some lt-bench agent benchmark to test agent capability. then update the the report in readme. checking for existing benchs
-
----
 
 <https://app.primeintellect.ai/dashboard/environments>
 
 
-
 ---
 
--   [ ] Update documentation and README.md to reflect all recent changes, including new features, configuration options, and usage instructions.
--   [ ] Add a comprehensive usage guide to the README.md, covering setup, available commands, configuration via AGENTS.md, and example workflows.
--   [ ] Ensure all documented commands and options match the current implementation.
--   [ ] Review and update any outdated instructions or references in both documentation and README.md.
+https://agentclientprotocol.com/overview/introduction
 
--
-
-implement prompt caching to save token cost with context engineering. use mcp for agent provider agnostic (gemini, anthropic, openai)
-prompt caching guide and apply to our system
-
---
-
-streaming
-
----
-
-Ensure that the event handling system in the agent loop properly captures, processes, and responds to all relevant events (such as user inputs, system triggers, or external signals) without conflicts or delays, while implementing a robust turn-based management structure that enforces sequential execution of agent actions, maintains state consistency across turns, handles interruptions gracefully, and includes error recovery mechanisms for seamless operation in multi-agent or interactive environments.
-
---
-
-
-research claude code and apply
-https://claudelog.com/
-
---
-
-markdown render
-
----
-
-long term plan: https://agentclientprotocol.com/overview/introduction for IDE integration
-
----
-
-implement and update case-insensitive search tools for file and content
-
----
-
-study prompt
-
-IMPORTANT: apply to vtagent https://github.com/openai/codex/blob/main/codex-rs/core/prompt.md
 
 ---
 
 https://ai.google.dev/gemma/docs/embeddinggemma/inference-embeddinggemma-with-sentence-transformers
-
-
---
-
-implement dot folder config/cache like in user home
-/Users/vinh.nguyenxuan/.claude/projects
-
-check existing config and cache and move there
-
----
-
-also implement model switch config on tui and cli at vtagent-core/src/models.rs
 
 ---
 
@@ -1091,4 +1127,4 @@ https://ratatui.rs/
 
 --
 
-https://claudelog.com/mechanics/ultrathink-plus-plus/
+https://claudelog.com

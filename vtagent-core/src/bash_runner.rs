@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 /// Simple bash-like command runner
+#[derive(Clone)]
 pub struct BashRunner {
     /// Working directory
     working_dir: PathBuf,

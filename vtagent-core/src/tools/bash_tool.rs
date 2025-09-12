@@ -5,12 +5,14 @@
 
 use super::traits::Tool;
 use crate::bash_runner::BashRunner;
+use crate::config::constants::tools;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use serde_json::{Value, json};
 use std::path::PathBuf;
 
 /// Bash-like tool for direct command execution
+#[derive(Clone)]
 pub struct BashTool {
     runner: BashRunner,
 }
@@ -271,7 +273,7 @@ impl Tool for BashTool {
     }
 
     fn name(&self) -> &'static str {
-        "bash"
+        tools::BASH
     }
 
     fn description(&self) -> &'static str {

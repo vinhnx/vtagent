@@ -194,6 +194,8 @@ pub mod tools {
     pub const CREATE_FILE: &str = "create_file";
     pub const GREP_SEARCH: &str = "grep_search";
     pub const AST_GREP_SEARCH: &str = "ast_grep_search";
+    pub const SIMPLE_SEARCH: &str = "simple_search";
+    pub const BASH: &str = "bash";
 
     // Multi-agent specific tools
     pub const TASK_CREATE: &str = "task_create";

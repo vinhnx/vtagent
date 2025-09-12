@@ -24,7 +24,7 @@ async fn load_project_context(
     project_name: &str,
 ) -> Result<Vec<String>> {
     let mut context_items = Vec::new();
-    
+
     // Load project metadata
     if let Some(metadata) = project_manager.load_project_metadata(project_name)? {
         context_items.push(format!("Project: {}", metadata.name));
@@ -33,7 +33,7 @@ async fn load_project_context(
         }
         context_items.push(format!("Created: {}", metadata.created_at));
     }
-    
+
     // Load README.md if it exists
     let readme_paths = ["README.md", "README.txt", "README"];
     for readme_path in &readme_paths {
@@ -51,7 +51,7 @@ async fn load_project_context(
             }
         }
     }
-    
+
     // Load key project files for context
     let key_files = ["Cargo.toml", "package.json", "requirements.txt", "Gemfile"];
     for key_file in &key_files {
@@ -68,7 +68,7 @@ async fn load_project_context(
             }
         }
     }
-    
+
     Ok(context_items)
 }
 
@@ -202,44 +202,28 @@ async fn handle_chat_command(args: &Cli) -> Result<()> {
     let vtagent_config = config_manager.config();
 
     // Initialize project-specific systems if available
-    if let (Some(project_manager), Some(project_name)) = 
+    if let (Some(project_manager), Some(project_name)) =
         (config_manager.project_manager(), config_manager.project_name()) {
-        
+
         println!("Project: {}", project_name);
-        
+
         // Initialize cache
         let cache_dir = project_manager.cache_dir(project_name);
         let cache = vtagent_core::project::FileCache::new(cache_dir)
             .context("Failed to initialize project cache")?;
-        
+
         // Clean expired cache entries
         if let Ok(cleaned) = cache.clean_expired() {
             if cleaned > 0 {
                 println!("Cleaned {} expired cache entries", cleaned);
             }
         }
-        
-        // Initialize embeddings
-        let embeddings_dir = project_manager.embeddings_dir(project_name);
-        let retrieval_dir = project_manager.retrieval_dir(project_name);
-        let mut embedding_manager = vtagent_core::embeddings::EmbeddingManager::new(embeddings_dir, retrieval_dir)
-            .context("Failed to initialize embedding manager")?;
-        
-        // Check if we need to re-index project files
-        let (total_embeddings, _) = embedding_manager.stats()
-            .context("Failed to get embedding statistics")?;
-        
-        if total_embeddings == 0 {
-            println!("Indexing project files for semantic search...");
-            // In a full implementation, we would index relevant project files here
-            // For now, we'll just show the message
-        }
-        
+
         // Load project-specific context for better agent performance
         let project_context = load_project_context(project_manager, project_name)
             .await
             .unwrap_or_default();
-        
+
         if !project_context.is_empty() {
             println!("Loaded project context ({} items)", project_context.len());
         }
@@ -1007,5 +991,3 @@ async fn handle_multi_agent_chat(
 
     Ok(())
 }
-
-/// Load project-specific context for better agent performance\nasync fn load_project_context(\n    project_manager: &vtagent_core::project::ProjectManager,\n    project_name: &str,\n) -> Result<Vec<String>> {\n    let mut context_items = Vec::new();\n    \n    // Load project metadata\n    if let Some(metadata) = project_manager.load_project_metadata(project_name)? {\n        context_items.push(format!(\"Project: {}\", metadata.name));\n        if let Some(description) = metadata.description {\n            context_items.push(format!(\"Description: {}\", description));\n        }\n        context_items.push(format!(\"Created: {}\", metadata.created_at));\n    }\n    \n    // Check for common project files that provide context\n    let common_files = [\n        \"README.md\",\n        \"README.txt\",\n        \"README\",\n        \"docs/README.md\",\n        \"docs/README.txt\",\n        \"docs/README\",\n        \"Cargo.toml\",  // Rust projects\n        \"package.json\",  // Node.js projects\n        \"requirements.txt\",  // Python projects\n        \"pom.xml\",  // Java projects\n        \"build.gradle\",  // Gradle projects\n        \"Makefile\",\n        \"CMakeLists.txt\",\n        \"Dockerfile\",\n    ];\n    \n    let project_root = std::path::Path::new(&project_manager.load_project_metadata(project_name)?\n        .map(|m| m.root_path)\n        .unwrap_or_else(|| \".\".to_string()));\n    \n    for file_name in &common_files {\n        let file_path = project_root.join(file_name);\n        if file_path.exists() {\n            // For README files, we might want to include a snippet\n            if file_name.contains(\"README\") {\n                if let Ok(content) = std::fs::read_to_string(&file_path) {\n                    let lines: Vec<&str> = content.lines().take(10).collect();  // First 10 lines\n                    context_items.push(format!(\"{} (first 10 lines):\\n{}\", file_name, lines.join(\"\\n\")));\n                }\n            } else {\n                // For other files, just note their presence\n                context_items.push(format!(\"Found project file: {}\", file_name));\n            }\n        }\n    }\n    \n    Ok(context_items)\n}

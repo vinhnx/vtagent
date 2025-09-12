@@ -68,8 +68,8 @@ impl ToolRegistry {
             tools::READ_FILE.to_string(),
             tools::WRITE_FILE.to_string(),
             tools::EDIT_FILE.to_string(),
-            "simple_search".to_string(),
-            "bash".to_string(),
+            tools::SIMPLE_SEARCH.to_string(),
+            tools::BASH.to_string(),
         ];
 
         // Add AST-grep tool if available
@@ -127,8 +127,8 @@ impl ToolRegistry {
             tools::WRITE_FILE => self.file_ops_tool.write_file(args).await,
             tools::EDIT_FILE => self.edit_file(args).await,
             tools::AST_GREP_SEARCH => self.execute_ast_grep(args).await,
-            "simple_search" => self.simple_search_tool.execute(args).await,
-            "bash" => self.bash_tool.execute(args).await,
+            tools::SIMPLE_SEARCH => self.simple_search_tool.execute(args).await,
+            tools::BASH => self.bash_tool.execute(args).await,
             _ => Err(anyhow!("Unknown tool: {}", name)),
         }
     }
@@ -159,7 +159,7 @@ impl ToolRegistry {
         match name {
             tools::RP_SEARCH | tools::LIST_FILES | tools::RUN_TERMINAL_CMD | tools::READ_FILE | tools::WRITE_FILE => true,
             tools::AST_GREP_SEARCH => self.ast_grep_engine.is_some(),
-            "simple_search" | "bash" => true,
+            tools::SIMPLE_SEARCH | tools::BASH => true,
             _ => false,
         }
     }
@@ -628,7 +628,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
 
         // Simple bash-like search tool
         FunctionDeclaration {
-            name: "simple_search".to_string(),
+            name: tools::SIMPLE_SEARCH.to_string(),
             description: "Simple bash-like search and file operations: grep, find, ls, cat, head, tail, index. Direct file operations without complex abstractions.".to_string(),
             parameters: json!({
                 "type": "object",
@@ -650,7 +650,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
 
         // Bash-like command tool
         FunctionDeclaration {
-            name: "bash".to_string(),
+            name: tools::BASH.to_string(),
             description: "Direct bash-like command execution: ls, pwd, grep, find, cat, head, tail, mkdir, rm, cp, mv, stat, run. Acts like a human using bash commands.".to_string(),
             parameters: json!({
                 "type": "object",
@@ -716,8 +716,8 @@ pub fn build_function_declarations_for_level(level: CapabilityLevel) -> Vec<Func
                 || fd.name == tools::WRITE_FILE
                 || fd.name == tools::EDIT_FILE
                 || fd.name == tools::AST_GREP_SEARCH
-                || fd.name == "simple_search"
-                || fd.name == "bash"
+                || fd.name == tools::SIMPLE_SEARCH
+                || fd.name == tools::BASH
             })
             .collect(),
     }

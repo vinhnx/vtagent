@@ -43,13 +43,13 @@ impl AgentType {
                 "task_status",
             ],
             AgentType::Explorer => vec![
-                "read_file",
-                "grep_search",
-                "run_command",
+                tools::READ_FILE,
+                tools::GREP_SEARCH,
+                tools::RUN_TERMINAL_CMD,
                 "file_metadata",
                 "project_overview",
                 "tree_sitter_analyze",
-                "ast_grep_search",
+                tools::AST_GREP_SEARCH,
             ],
             AgentType::Coder => vec![
                 "*", // Full access to all tools
@@ -67,10 +67,10 @@ impl AgentType {
                 tools::READ_FILE,
                 tools::WRITE_FILE,
                 tools::EDIT_FILE,
-                "delete_file",
-                "run_command",
+                tools::DELETE_FILE,
+                tools::RUN_TERMINAL_CMD,
             ],
-            AgentType::Explorer => vec![tools::WRITE_FILE, tools::EDIT_FILE, "delete_file", "create_file"],
+            AgentType::Explorer => vec![tools::WRITE_FILE, tools::EDIT_FILE, tools::DELETE_FILE, tools::CREATE_FILE],
             AgentType::Coder => vec![],  // No restrictions
             AgentType::Single => vec![], // No restrictions
         }

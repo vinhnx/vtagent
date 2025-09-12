@@ -178,7 +178,14 @@ cp vtagent.toml.example vtagent.toml
 ### Basic Chat Session
 
 ```bash
+# Start interactive chat with tools
 ./run.sh chat
+
+# Single question mode (no tools)
+./run.sh ask "Explain Rust ownership"
+
+# Verbose chat with detailed logging
+./run.sh chat-verbose
 ```
 
 ### Project Analysis
@@ -187,159 +194,97 @@ cp vtagent.toml.example vtagent.toml
 # Analyze current project structure
 ./run.sh analyze
 
-# Get detailed file information
-./run.sh info
+# Display performance metrics
+./run.sh performance
 ```
 
-### Code Generation
+### Project Creation
 
 ```bash
-# Generate new Rust module
-./run.sh generate --type module --name utils
+# Create new Rust project with features
+./run.sh create-project my-api serde,axum,tokio
 
-# Create project template
-./run.sh template --type web-api --features serde,axum
+# Available features: web frameworks, databases, async runtimes, etc.
+```
+
+### Context Management
+
+```bash
+# Compress conversation context for long sessions
+./run.sh compress-context
+
+# Demo async file operations
+./run.sh demo-async
+```
+
+### Snapshot Management
+
+```bash
+# List all available snapshots
+./run.sh snapshots
+
+# Revert to previous turn
+./run.sh revert --turn 5
+
+# Clean up old snapshots (keep last 20)
+./run.sh cleanup-snapshots --max 20
 ```
 
 ### Configuration Management
 
 ```bash
-# Edit configuration interactively
-./run.sh config --edit
+# Initialize project with configuration
+./run.sh init
 
-# Show current configuration
-./run.sh config --show
+# Manage tool policies
+./run.sh tool-policy status
+./run.sh tool-policy allow read_file
+./run.sh tool-policy deny run_terminal_cmd
+
+# Manage models and providers
+./run.sh models list
+./run.sh models set-provider openai
+./run.sh models set-model gpt-4o
+./run.sh models test gemini
 ```
 
-## Advanced Features
+## Command Reference
 
-### Multi-Agent Workflows
+### Core Commands
 
-VTAgent supports sophisticated multi-agent coordination:
+- **`chat`** - Interactive AI coding assistant with full tool access
+- **`ask <prompt>`** - Single question mode without tool usage
+- **`chat-verbose`** - Interactive chat with enhanced logging and transparency
+- **`analyze`** - Comprehensive workspace analysis and project overview
+- **`performance`** - Display system performance metrics and statistics
 
-```bash
-# Start orchestrator for complex tasks
-./run.sh orchestrate "Implement user authentication system"
+### Project Management
 
-# Explorer agent for investigation
-./run.sh explore "Analyze current codebase structure"
+- **`init`** - Initialize project with VTAgent configuration and AGENTS.md
+- **`create-project <name> <features>`** - Generate complete Rust project with specified features
 
-# Coder agent for implementation
-./run.sh code "Add new API endpoint"
-```
+### Advanced Features
 
-### Context Engineering
+- **`compress-context`** - Compress conversation context for long-running sessions
+- **`demo-async`** - Demonstrate async file operations and diff rendering
 
-Advanced context management for long conversations:
+### Snapshot System
 
-- **Automatic compression** of conversation history
-- **Intelligent summarization** of completed tasks
-- **Context preservation** during errors
-- **Memory optimization** for large codebases
+- **`snapshots`** - List all available conversation snapshots
+- **`revert --turn <n> [--partial <scope>]`** - Revert to previous conversation state
+- **`cleanup-snapshots [--max <n>]`** - Clean up old snapshots (default: keep 50)
 
-### Safety Features
+### Configuration
 
-Comprehensive safety and security controls:
+- **`tool-policy <command>`** - Manage tool execution policies
+  - `status` - Show current policies
+  - `allow <tool>` - Allow specific tool
+  - `deny <tool>` - Deny specific tool
+  - `reset` - Reset to defaults
 
-- **Path validation** preventing access outside workspace
-- **Command allow/deny lists** with pattern matching
-- **Human-in-the-loop** confirmation for dangerous operations
-- **File size limits** and type restrictions
-- **API key masking** in logs and snapshots
-
-## Development
-
-### Build Commands
-
-```bash
-# Quick compilation check
-cargo check
-
-# Full build with optimizations
-cargo build --release
-
-# Run tests
-cargo test
-
-# Run linter
-cargo clippy
-
-# Format code
-cargo fmt
-```
-
-### Project Structure
-
-```
-vtagent/
-├── vtagent-core/          # Core library crate
-│   ├── src/
-│   │   ├── config/        # Configuration management
-│   │   ├── llm/          # LLM provider abstractions
-│   │   ├── tools/        # Tool implementations
-│   │   └── prompts/      # System prompt management
-├── src/                   # Binary crate
-├── prompts/              # Agent system prompts
-├── docs/                 # Documentation
-├── examples/             # Usage examples
-└── scripts/              # Build and run scripts
-```
-
-### Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Run the test suite
-6. Submit a pull request
-
-### Testing
-
-```bash
-# Run all tests
-cargo test
-
-# Run specific test
-cargo test test_name
-
-# Run with verbose output
-cargo test -- --nocapture
-
-# Run integration tests
-cargo test --test integration
-```
-
-## Documentation
-
-Comprehensive documentation is available in the `docs/` directory:
-
-- [Architecture Overview](docs/ARCHITECTURE.md)
-- [Configuration Guide](docs/CONFIGURATION.md)
-- [API Reference](docs/API.md)
-- [Troubleshooting](docs/TROUBLESHOOTING.md)
-- [Contributing Guide](docs/CONTRIBUTING.md)
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-VTAgent builds upon several key works in the agent development space:
-
-- **Anthropic's agent patterns** - Tool design and workflow principles
-- **Cognition's context engineering** - Long-running agent reliability
-- **OpenAI's Swarm concepts** - Multi-agent coordination
-- **Tree-sitter** - Advanced code parsing capabilities
-- **Rust ecosystem** - High-performance systems programming
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/vinhnx/vtagent/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/vinhnx/vtagent/discussions)
-- **Documentation**: [VTAgent Docs](https://vinhnx.github.io/vtagent/)
-
----
-
-*VTAgent is an open-source project created by [vinhnx](https://github.com/vinhnx). Contributions and feedback are welcome!*
+- **`models <command>`** - Manage LLM providers and models
+  - `list` - Show available providers and models
+  - `set-provider <provider>` - Switch LLM provider
+  - `set-model <model>` - Set specific model
+  - `test <provider>` - Test provider connectivity
+````

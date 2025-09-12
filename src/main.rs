@@ -495,8 +495,9 @@ async fn handle_single_agent_chat(
                                 // If this is the last tool call, show completion message
                                 if tool_call_index == tool_calls.len() - 1 {
                                     println!(
-                                        "\n{} All tool calls completed successfully",
-                                        style("[CELEBRATION]").green().bold()
+                                        "\n{} {} All operations completed successfully!",
+                                        style("SUCCESS").yellow().bold(),
+                                        style("[COMPLETED]").green().bold().on_bright_black()
                                     );
                                 }
                             }
@@ -544,7 +545,6 @@ async fn handle_single_agent_chat(
                                     println!(
                                         "{}: Calling tool: {} with args: {}",
                                         style("[TOOL_CALL]").cyan().bold().on_black(),
-                                        tool_call.name,
                                         tool_call.arguments
                                     );
 
@@ -622,7 +622,7 @@ async fn handle_single_agent_chat(
                                     Err(e) => {
                                         eprintln!(
                                             "{}: Error in ultimate follow-up request: {:?}",
-                                            style("[ERROR]").red().bold().on_black(),
+                                            style("[ERROR]").red().bold().on_bright_black(),
                                             e
                                         );
                                     }
@@ -642,7 +642,7 @@ async fn handle_single_agent_chat(
                         Err(e) => {
                             eprintln!(
                                 "{}: Error in follow-up request: {:?}",
-                                style("[ERROR]").red().bold().on_black(),
+                                style("[ERROR]").red().bold().on_bright_black(),
                                 e
                             );
                         }
@@ -656,7 +656,7 @@ async fn handle_single_agent_chat(
                 }
             }
             Err(e) => {
-                eprintln!("{}: {:?}", style("[ERROR]").red().bold().on_black(), e);
+                eprintln!("{}: {:?}", style("[ERROR]").red().bold().on_bright_black(), e);
             }
         }
     }

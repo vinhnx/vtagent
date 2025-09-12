@@ -55,6 +55,50 @@ Runs comprehensive code quality checks (same as CI pipeline).
 - Test execution
 - Documentation generation
 
+### `release.sh` - Release Management
+
+Creates releases for VTAgent using changelogithub integration.
+
+```bash
+# Create a specific version release
+./scripts/release.sh 1.0.0
+
+# Create patch release (increment patch version)
+./scripts/release.sh --patch
+
+# Create minor release (increment minor version)
+./scripts/release.sh --minor
+
+# Create major release (increment major version)
+./scripts/release.sh --major
+
+# Dry run to see what would happen
+./scripts/release.sh --patch --dry-run
+
+# Show help
+./scripts/release.sh --help
+```
+
+**What it does:**
+
+- Updates version in `Cargo.toml`
+- Creates git tag with proper versioning
+- Pushes tag to GitHub (triggers release workflow)
+- GitHub Actions automatically generates changelog and creates release
+
+**Prerequisites:**
+
+- Must be on `main` branch
+- Working tree must be clean
+- Requires GitHub repository access
+
+**Release Process:**
+
+1. **Pre-flight checks**: Verifies branch and working tree state
+2. **Version update**: Updates `Cargo.toml` with new version
+3. **Git operations**: Commits version change, creates tag, pushes to GitHub
+4. **Automated release**: GitHub Actions creates release with changelog
+
 ## Quick Start
 
 For new developers:

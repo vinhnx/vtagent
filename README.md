@@ -1,4 +1,4 @@
-# VTAgent - Terminal Coding Agent
+# VTAgent - minimal coding agent written in Rust
 
 VTAgent is a Rust-based terminal coding agent with modular architecture supporting multiple LLM providers (Gemini, OpenAI, Anthropic) and tree-sitter parsers for 6+ languages. It provides a reliable, context-aware coding experience through intelligent tool integration and sophisticated prompt engineering.
 

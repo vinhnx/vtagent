@@ -6,23 +6,36 @@ use std::io::Write;
 use vtagent_core::config::{ConfigManager, VTAgentConfig};
 
 /// Handle the config command
-pub async fn handle_config_command(output: Option<&Path>) -> Result<()> {
+pub async fn handle_config_command(output: Option<&Path>, use_home_dir: bool) -> Result<()> {
     println!("{}", style("Generate configuration").blue().bold());
 
-    // Configuration generation implementation
-    let config_content = generate_default_config();
-
-    if let Some(output_path) = output {
+    if use_home_dir {
+        // Create config in user's home directory
+        let created_files = VTAgentConfig::bootstrap_project_with_options(
+            std::env::current_dir()?,
+            true, // force overwrite
+            true  // use home directory
+        )?;
+        
+        if !created_files.is_empty() {
+            println!("Configuration files created in user home directory:");
+            for file in created_files {
+                println!("  - {}", file);
+            }
+        } else {
+            println!("Configuration files already exist in user home directory");
+        }
+    } else if let Some(output_path) = output {
         println!("Output path: {}", output_path.display());
 
         // Write to specified file
         let mut file = fs::File::create(output_path)?;
-        file.write_all(config_content.as_bytes())?;
+        file.write_all(generate_default_config().as_bytes())?;
         println!("Configuration written to {}", output_path.display());
     } else {
         // Print to stdout
         println!("\nGenerated configuration:\n");
-        println!("{}", config_content);
+        println!("{}", generate_default_config());
     }
 
     Ok(())

@@ -30,6 +30,7 @@ The agent follows proven patterns for reliable, long-running coding assistance:
 //! including tool implementations, LLM integration, and utility functions.
 
 // Public modules
+pub mod bash_runner;
 pub mod cli;
 pub mod code;
 pub mod commands;
@@ -38,9 +39,12 @@ pub mod constants;
 pub mod core;
 pub mod gemini;
 pub mod llm;
+pub mod markdown_storage;
 pub mod models;
+pub mod project;
 pub mod prompts;
 pub mod safety;
+pub mod simple_indexer;
 pub mod tool_policy;
 pub mod tools;
 pub mod types;
@@ -49,6 +53,7 @@ pub mod user_confirmation;
 pub mod utils;
 
 // Re-exports for convenience
+pub use bash_runner::BashRunner;
 pub use cli::args::{Cli, Commands};
 pub use code::code_completion::{CompletionEngine, CompletionSuggestion};
 pub use commands::stats::handle_stats_command;
@@ -67,9 +72,12 @@ pub use core::prompt_caching::{CacheStats, PromptCache, PromptCacheConfig, Promp
 pub use core::timeout_detector::TimeoutDetector;
 pub use gemini::{Content, FunctionDeclaration, Part};
 pub use llm::{AnyClient, make_client};
+pub use markdown_storage::{MarkdownStorage, SimpleKVStorage, ProjectStorage, ProjectData};
+pub use project::{SimpleProjectManager, SimpleCache};
 pub use prompts::{
     generate_lightweight_instruction, generate_specialized_instruction, generate_system_instruction,
 };
+pub use simple_indexer::SimpleIndexer;
 pub use tool_policy::{ToolPolicy, ToolPolicyManager};
 pub use tools::advanced_search::{AdvancedSearchTool, SearchOptions};
 pub use tools::rp_search::RpSearchManager;

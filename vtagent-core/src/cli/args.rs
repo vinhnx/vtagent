@@ -130,10 +130,58 @@ pub enum Commands {
         max: usize,
     },
 
-    /// **Initialize project with AGENTS.md** - analyzes current project and generates AGENTS.md file\n\n**Features:**\n• Auto-detect project languages and frameworks\n• Analyze dependencies and build systems\n• Generate comprehensive agent guidelines\n• Create project-specific conventions\n\n**Usage:** vtagent init
+    /// **Usage:** vtagent init
     Init,
 
-    /// **Manage tool execution policies** - control which tools the agent can use\n\n**Features:**\n• Allow/deny specific tools\n• Persistent policy storage\n• User confirmation workflow\n• Policy status overview\n\n**Examples:**\n  vtagent tool-policy status\n  vtagent tool-policy allow read_file\n  vtagent tool-policy deny run_terminal_cmd
+    /// **Initialize project with dot-folder structure** - sets up ~/.vtagent/projects/<project-name> structure
+
+    /// **Features:**
+    /// • Creates project directory structure in ~/.vtagent/projects/
+    /// • Sets up config, cache, embeddings, and retrieval directories
+    /// • Creates .project metadata file
+    /// • Migrates existing config/cache files with user confirmation
+
+    /// **Examples:**
+    ///   vtagent init-project
+    ///   vtagent init-project --name my-project
+    ///   vtagent init-project --force
+    #[command(name = "init-project")]
+    InitProject {
+        /// **Project name** - defaults to current directory name
+        #[arg(long)]
+        name: Option<String>,
+        
+        /// **Force initialization** - overwrite existing project structure
+        #[arg(long)]
+        force: bool,
+        
+        /// **Migrate existing files** - move existing config/cache files to new structure
+        #[arg(long)]
+        migrate: bool,
+    },
+
+    /// **Generate configuration file** - creates a vtagent.toml configuration file
+
+    /// **Features:**
+    /// • Generate default configuration
+    /// • Support for global (home directory) and local configuration
+    /// • TOML format with comprehensive settings
+
+    /// **Examples:**
+    ///   vtagent config
+    ///   vtagent config --output ./custom-config.toml
+    ///   vtagent config --global
+    Config {
+        /// **Output file path** - where to save the configuration file
+        #[arg(long)]
+        output: Option<std::path::PathBuf>,
+        
+        /// **Create in user home directory** - creates ~/.vtagent/vtagent.toml
+        #[arg(long)]
+        global: bool,
+    },
+
+    /// **Manage tool execution policies** - control which tools the agent can use
     #[command(name = "tool-policy")]
     ToolPolicy {
         #[command(subcommand)]

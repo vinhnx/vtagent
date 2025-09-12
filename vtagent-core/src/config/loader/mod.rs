@@ -2,6 +2,7 @@ use crate::config::PtyConfig;
 use crate::config::core::{AgentConfig, CommandsConfig, SecurityConfig, ToolsConfig};
 use crate::config::multi_agent::MultiAgentSystemConfig;
 use crate::config::LMStudioConfig;
+use crate::project::{ProjectManager, ProjectMetadata};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -56,11 +57,44 @@ impl Default for VTAgentConfig {
 impl VTAgentConfig {
     /// Bootstrap project with config + gitignore
     pub fn bootstrap_project<P: AsRef<Path>>(workspace: P, force: bool) -> Result<Vec<String>> {
+        Self::bootstrap_project_with_options(workspace, force, false)
+    }
+
+    /// Bootstrap project with config + gitignore, with option to create in home directory
+    pub fn bootstrap_project_with_options<P: AsRef<Path>>(
+        workspace: P, 
+        force: bool, 
+        use_home_dir: bool
+    ) -> Result<Vec<String>> {
         let workspace = workspace.as_ref();
         let mut created_files = Vec::new();
 
+        // Determine where to create the config file
+        let (config_path, gitignore_path) = if use_home_dir {
+            // Create in user's home directory
+            if let Some(home_dir) = ConfigManager::get_home_dir() {
+                let vtagent_dir = home_dir.join(".vtagent");
+                // Create .vtagent directory if it doesn't exist
+                if !vtagent_dir.exists() {
+                    fs::create_dir_all(&vtagent_dir).with_context(|| {
+                        format!("Failed to create directory: {}", vtagent_dir.display())
+                    })?;
+                }
+                (vtagent_dir.join("vtagent.toml"), vtagent_dir.join(".vtagentgitignore"))
+            } else {
+                // Fallback to workspace if home directory cannot be determined
+                let config_path = workspace.join("vtagent.toml");
+                let gitignore_path = workspace.join(".vtagentgitignore");
+                (config_path, gitignore_path)
+            }
+        } else {
+            // Create in workspace
+            let config_path = workspace.join("vtagent.toml");
+            let gitignore_path = workspace.join(".vtagentgitignore");
+            (config_path, gitignore_path)
+        };
+
         // Create vtagent.toml
-        let config_path = workspace.join("vtagent.toml");
         if !config_path.exists() || force {
             let default_config = VTAgentConfig::default();
             let config_content = toml::to_string_pretty(&default_config)
@@ -74,7 +108,6 @@ impl VTAgentConfig {
         }
 
         // Create .vtagentgitignore
-        let gitignore_path = workspace.join(".vtagentgitignore");
         if !gitignore_path.exists() || force {
             let gitignore_content = Self::default_vtagent_gitignore();
             fs::write(&gitignore_path, gitignore_content).with_context(|| {
@@ -125,9 +158,12 @@ target/, build/, dist/, node_modules/, vendor/
 }
 
 /// Configuration manager for loading and validating configurations
+#[derive(Clone)]
 pub struct ConfigManager {
     config: VTAgentConfig,
     config_path: Option<PathBuf>,
+    project_manager: Option<ProjectManager>,
+    project_name: Option<String>,
 }
 
 impl ConfigManager {
@@ -136,26 +172,89 @@ impl ConfigManager {
         Self::load_from_workspace(std::env::current_dir()?)
     }
 
+    /// Get the user's home directory path
+    fn get_home_dir() -> Option<PathBuf> {
+        // Try standard environment variables
+        if let Ok(home) = std::env::var("HOME") {
+            return Some(PathBuf::from(home));
+        }
+        
+        // Try USERPROFILE on Windows
+        if let Ok(userprofile) = std::env::var("USERPROFILE") {
+            return Some(PathBuf::from(userprofile));
+        }
+        
+        // Fallback to dirs crate approach
+        dirs::home_dir()
+    }
+
     /// Load configuration from a specific workspace
     pub fn load_from_workspace(workspace: impl AsRef<Path>) -> Result<Self> {
         let workspace = workspace.as_ref();
+        
+        // Initialize project manager
+        let project_manager = ProjectManager::new().ok();
+        let project_name = project_manager.as_ref()
+            .and_then(|pm| pm.identify_project(workspace).ok());
 
         // Try vtagent.toml in workspace root first
         let config_path = workspace.join("vtagent.toml");
         if config_path.exists() {
-            return Self::load_from_file(&config_path);
+            let config = Self::load_from_file(&config_path)?;
+            return Ok(Self {
+                config: config.config,
+                config_path: config.config_path,
+                project_manager,
+                project_name,
+            });
         }
 
-        // Try .vtagent/vtagent.toml as fallback
+        // Try .vtagent/vtagent.toml in workspace
         let fallback_path = workspace.join(".vtagent").join("vtagent.toml");
         if fallback_path.exists() {
-            return Self::load_from_file(&fallback_path);
+            let config = Self::load_from_file(&fallback_path)?;
+            return Ok(Self {
+                config: config.config,
+                config_path: config.config_path,
+                project_manager,
+                project_name,
+            });
+        }
+
+        // Try ~/.vtagent/vtagent.toml in user home directory
+        if let Some(home_dir) = Self::get_home_dir() {
+            let home_config_path = home_dir.join(".vtagent").join("vtagent.toml");
+            if home_config_path.exists() {
+                let config = Self::load_from_file(&home_config_path)?;
+                return Ok(Self {
+                    config: config.config,
+                    config_path: config.config_path,
+                    project_manager,
+                    project_name,
+                });
+            }
+        }
+
+        // Try project-specific configuration
+        if let (Some(ref pm), Some(ref pname)) = (&project_manager, &project_name) {
+            let project_config_path = pm.config_dir(pname).join("vtagent.toml");
+            if project_config_path.exists() {
+                let config = Self::load_from_file(&project_config_path)?;
+                return Ok(Self {
+                    config: config.config,
+                    config_path: config.config_path,
+                    project_manager: Some(pm.clone()),
+                    project_name: Some(pname.clone()),
+                });
+            }
         }
 
         // Use default configuration if no file found
         Ok(Self {
             config: VTAgentConfig::default(),
             config_path: None,
+            project_manager,
+            project_name,
         })
     }
 
@@ -168,9 +267,14 @@ impl ConfigManager {
         let config: VTAgentConfig = toml::from_str(&content)
             .with_context(|| format!("Failed to parse config file: {}", path.display()))?;
 
+        // Initialize project manager but don't set project name since we're loading from file
+        let project_manager = ProjectManager::new().ok();
+
         Ok(Self {
             config,
             config_path: Some(path.to_path_buf()),
+            project_manager,
+            project_name: None,
         })
     }
 
@@ -187,5 +291,15 @@ impl ConfigManager {
     /// Get session duration from agent config
     pub fn session_duration(&self) -> std::time::Duration {
         std::time::Duration::from_secs(self.config.agent.max_session_duration_minutes * 60)
+    }
+    
+    /// Get the project manager (if available)
+    pub fn project_manager(&self) -> Option<&ProjectManager> {
+        self.project_manager.as_ref()
+    }
+    
+    /// Get the project name (if identified)
+    pub fn project_name(&self) -> Option<&str> {
+        self.project_name.as_deref()
     }
 }

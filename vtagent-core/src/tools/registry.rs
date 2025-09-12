@@ -4,7 +4,10 @@ use super::cache::FILE_CACHE;
 use super::command::CommandTool;
 use super::file_ops::FileOpsTool;
 use super::search::SearchTool;
+use super::simple_search::SimpleSearchTool;
+use super::bash_tool::BashTool;
 use super::traits::Tool;
+use super::ast_grep_tool::AstGrepTool;
 use crate::config::types::CapabilityLevel;
 use crate::config::constants::tools;
 use crate::gemini::FunctionDeclaration;
@@ -21,11 +24,13 @@ use std::sync::Arc;
 pub struct ToolRegistry {
     workspace_root: PathBuf,
     search_tool: SearchTool,
+    simple_search_tool: SimpleSearchTool,
+    bash_tool: BashTool,
     file_ops_tool: FileOpsTool,
     command_tool: CommandTool,
     rp_search: Arc<RpSearchManager>,
     ast_grep_engine: Option<Arc<AstGrepEngine>>,
-    policy_manager: ToolPolicyManager,
+    tool_policy: ToolPolicyManager,
 }
 
 impl ToolRegistry {
@@ -34,8 +39,19 @@ impl ToolRegistry {
         let rp_search = Arc::new(RpSearchManager::new(workspace_root.clone()));
 
         let search_tool = SearchTool::new(workspace_root.clone(), rp_search.clone());
+        let simple_search_tool = SimpleSearchTool::new(workspace_root.clone());
+        let bash_tool = BashTool::new(workspace_root.clone());
         let file_ops_tool = FileOpsTool::new(workspace_root.clone(), rp_search.clone());
         let command_tool = CommandTool::new(workspace_root.clone());
+
+        // Initialize AST-grep engine
+        let ast_grep_engine = match AstGrepEngine::new() {
+            Ok(engine) => Some(Arc::new(engine)),
+            Err(e) => {
+                eprintln!("Warning: Failed to initialize AST-grep engine: {}", e);
+                None
+            }
+        };
 
         // Initialize policy manager and update available tools
         let mut policy_manager = ToolPolicyManager::new_with_workspace(&workspace_root).unwrap_or_else(|e| {
@@ -45,14 +61,21 @@ impl ToolRegistry {
         });
 
         // Update available tools in policy manager
-        let available_tools = vec![
+        let mut available_tools = vec![
             tools::RP_SEARCH.to_string(),
             tools::LIST_FILES.to_string(),
             tools::RUN_TERMINAL_CMD.to_string(),
             tools::READ_FILE.to_string(),
             tools::WRITE_FILE.to_string(),
             tools::EDIT_FILE.to_string(),
+            "simple_search".to_string(),
+            "bash".to_string(),
         ];
+
+        // Add AST-grep tool if available
+        if ast_grep_engine.is_some() {
+            available_tools.push(tools::AST_GREP_SEARCH.to_string());
+        }
 
         if let Err(e) = policy_manager.update_available_tools(available_tools) {
             eprintln!("Warning: Failed to update tool policies: {}", e);
@@ -61,11 +84,13 @@ impl ToolRegistry {
         Self {
             workspace_root,
             search_tool,
+            simple_search_tool,
+            bash_tool,
             file_ops_tool,
             command_tool,
             rp_search,
-            ast_grep_engine: None,
-            policy_manager,
+            ast_grep_engine,
+            tool_policy: policy_manager,
         }
     }
 
@@ -90,7 +115,7 @@ impl ToolRegistry {
     /// Execute a tool by name with policy checking
     pub async fn execute_tool(&mut self, name: &str, args: Value) -> Result<Value> {
         // Check tool policy before execution
-        if !self.policy_manager.should_execute_tool(name)? {
+        if !self.policy_manager().should_execute_tool(name)? {
             return Err(anyhow!("Tool '{}' execution denied by policy", name));
         }
 
@@ -101,68 +126,82 @@ impl ToolRegistry {
             tools::READ_FILE => self.file_ops_tool.read_file(args).await,
             tools::WRITE_FILE => self.file_ops_tool.write_file(args).await,
             tools::EDIT_FILE => self.edit_file(args).await,
+            tools::AST_GREP_SEARCH => self.execute_ast_grep(args).await,
+            "simple_search" => self.simple_search_tool.execute(args).await,
+            "bash" => self.bash_tool.execute(args).await,
             _ => Err(anyhow!("Unknown tool: {}", name)),
         }
     }
 
     /// List available tools
     pub fn available_tools(&self) -> Vec<String> {
-        vec![
+        let mut tools = vec![
             tools::RP_SEARCH.to_string(),
             tools::LIST_FILES.to_string(),
             tools::RUN_TERMINAL_CMD.to_string(),
             tools::READ_FILE.to_string(),
             tools::WRITE_FILE.to_string(),
             tools::EDIT_FILE.to_string(),
-        ]
+            "simple_search".to_string(),
+            "bash".to_string(),
+        ];
+
+        // Add AST-grep tool if available
+        if self.ast_grep_engine.is_some() {
+            tools.push(tools::AST_GREP_SEARCH.to_string());
+        }
+
+        tools
     }
 
     /// Check if a tool exists
     pub fn has_tool(&self, name: &str) -> bool {
-        matches!(
-            name,
-            tools::RP_SEARCH | tools::LIST_FILES | tools::RUN_TERMINAL_CMD | tools::READ_FILE | tools::WRITE_FILE
-        )
+        match name {
+            tools::RP_SEARCH | tools::LIST_FILES | tools::RUN_TERMINAL_CMD | tools::READ_FILE | tools::WRITE_FILE => true,
+            tools::AST_GREP_SEARCH => self.ast_grep_engine.is_some(),
+            "simple_search" | "bash" => true,
+            _ => false,
+        }
     }
 
     /// Get tool policy manager (mutable reference)
     pub fn policy_manager_mut(&mut self) -> &mut ToolPolicyManager {
-        &mut self.policy_manager
+        &mut self.tool_policy
     }
 
     /// Get tool policy manager (immutable reference)
     pub fn policy_manager(&self) -> &ToolPolicyManager {
-        &self.policy_manager
+        &self.tool_policy
     }
 
     /// Set policy for a specific tool
     pub fn set_tool_policy(&mut self, tool_name: &str, policy: ToolPolicy) -> Result<()> {
-        self.policy_manager.set_policy(tool_name, policy)
+        self.tool_policy.set_policy(tool_name, policy)
     }
 
     /// Get policy for a specific tool
     pub fn get_tool_policy(&self, tool_name: &str) -> ToolPolicy {
-        self.policy_manager.get_policy(tool_name)
+        self.tool_policy.get_policy(tool_name)
     }
 
     /// Reset all tool policies to prompt
     pub fn reset_tool_policies(&mut self) -> Result<()> {
-        self.policy_manager.reset_all_to_prompt()
+        self.tool_policy.reset_all_to_prompt()
     }
 
     /// Allow all tools
     pub fn allow_all_tools(&mut self) -> Result<()> {
-        self.policy_manager.allow_all_tools()
+        self.tool_policy.allow_all_tools()
     }
 
     /// Deny all tools
     pub fn deny_all_tools(&mut self) -> Result<()> {
-        self.policy_manager.deny_all_tools()
+        self.tool_policy.deny_all_tools()
     }
 
     /// Print tool policy status
     pub fn print_tool_policy_status(&self) {
-        self.policy_manager.print_status();
+        self.tool_policy.print_status();
     }
 
     /// Get cache statistics
@@ -325,6 +364,134 @@ impl ToolRegistry {
     pub async fn run_terminal_cmd(&mut self, args: Value) -> Result<Value> {
         self.execute_tool(tools::RUN_TERMINAL_CMD, args).await
     }
+
+    /// Execute AST-grep tool
+    async fn execute_ast_grep(&self, args: Value) -> Result<Value> {
+        let engine = self.ast_grep_engine.as_ref()
+            .ok_or_else(|| anyhow!("AST-grep engine not available"))?;
+
+        let operation = args.get("operation")
+            .and_then(|v| v.as_str())
+            .unwrap_or("search");
+
+        match operation {
+            "search" => {
+                let pattern = args.get("pattern")
+                    .and_then(|v| v.as_str())
+                    .context("'pattern' is required")?;
+
+                let path = args.get("path")
+                    .and_then(|v| v.as_str())
+                    .context("'path' is required")?;
+
+                let path = self.normalize_path(path)?;
+
+                let language = args.get("language").and_then(|v| v.as_str());
+                let context_lines = args.get("context_lines").and_then(|v| v.as_u64()).map(|v| v as usize);
+                let max_results = args.get("max_results").and_then(|v| v.as_u64()).map(|v| v as usize);
+
+                engine.search(pattern, &path, language, context_lines, max_results).await
+            }
+            "transform" => {
+                let pattern = args.get("pattern")
+                    .and_then(|v| v.as_str())
+                    .context("'pattern' is required")?;
+
+                let replacement = args.get("replacement")
+                    .and_then(|v| v.as_str())
+                    .context("'replacement' is required")?;
+
+                let path = args.get("path")
+                    .and_then(|v| v.as_str())
+                    .context("'path' is required")?;
+
+                let path = self.normalize_path(path)?;
+
+                let language = args.get("language").and_then(|v| v.as_str());
+                let preview_only = args.get("preview_only").and_then(|v| v.as_bool()).unwrap_or(true);
+                let update_all = args.get("update_all").and_then(|v| v.as_bool()).unwrap_or(false);
+
+                engine.transform(pattern, replacement, &path, language, preview_only, update_all).await
+            }
+            "lint" => {
+                let path = args.get("path")
+                    .and_then(|v| v.as_str())
+                    .context("'path' is required")?;
+
+                let path = self.normalize_path(path)?;
+
+                let language = args.get("language").and_then(|v| v.as_str());
+                let severity_filter = args.get("severity_filter").and_then(|v| v.as_str());
+
+                engine.lint(&path, language, severity_filter, None).await
+            }
+            "refactor" => {
+                let path = args.get("path")
+                    .and_then(|v| v.as_str())
+                    .context("'path' is required")?;
+
+                let path = self.normalize_path(path)?;
+
+                let language = args.get("language").and_then(|v| v.as_str());
+                let refactor_type = args.get("refactor_type")
+                    .and_then(|v| v.as_str())
+                    .context("'refactor_type' is required")?;
+
+                engine.refactor(&path, language, refactor_type).await
+            }
+            "custom" => {
+                let pattern = args.get("pattern")
+                    .and_then(|v| v.as_str())
+                    .context("'pattern' is required")?;
+
+                let path = args.get("path")
+                    .and_then(|v| v.as_str())
+                    .context("'path' is required")?;
+
+                let path = self.normalize_path(path)?;
+
+                let language = args.get("language").and_then(|v| v.as_str());
+                let rewrite = args.get("rewrite").and_then(|v| v.as_str());
+                let context_lines = args.get("context_lines").and_then(|v| v.as_u64()).map(|v| v as usize);
+                let max_results = args.get("max_results").and_then(|v| v.as_u64()).map(|v| v as usize);
+                let interactive = args.get("interactive").and_then(|v| v.as_bool()).unwrap_or(false);
+                let update_all = args.get("update_all").and_then(|v| v.as_bool()).unwrap_or(false);
+
+                engine.run_custom(
+                    pattern,
+                    &path,
+                    language,
+                    rewrite,
+                    context_lines,
+                    max_results,
+                    interactive,
+                    update_all,
+                ).await
+            }
+            _ => Err(anyhow!("Unknown AST-grep operation: {}", operation)),
+        }
+    }
+
+    /// Normalize a path relative to workspace
+    fn normalize_path(&self, path: &str) -> Result<String> {
+        let path_buf = PathBuf::from(path);
+
+        // If path is absolute, check if it's within workspace
+        if path_buf.is_absolute() {
+            if !path_buf.starts_with(&self.workspace_root) {
+                return Err(anyhow!(
+                    "Path {} is outside workspace root {}",
+                    path,
+                    self.workspace_root.display()
+                ));
+            }
+            Ok(path.to_string())
+        } else {
+            // Relative path - resolve relative to workspace
+            let resolved = self.workspace_root.join(path);
+            Ok(resolved.to_string_lossy().to_string())
+        }
+    }
 }
 
 /// Build function declarations for all available tools
@@ -434,6 +601,80 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
                 "required": ["command"]
             }),
         },
+
+        // AST-grep search and transformation tool
+        FunctionDeclaration {
+            name: tools::AST_GREP_SEARCH.to_string(),
+            description: "Advanced syntax-aware code search, transformation, and analysis using AST-grep patterns. Supports multiple operations: search (default), transform, lint, refactor, custom.".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "operation": {"type": "string", "description": "Operation type: 'search', 'transform', 'lint', 'refactor', 'custom'", "default": "search"},
+                    "pattern": {"type": "string", "description": "AST-grep pattern to search for"},
+                    "path": {"type": "string", "description": "File or directory path to search in", "default": "."},
+                    "language": {"type": "string", "description": "Programming language (auto-detected if not specified)"},
+                    "replacement": {"type": "string", "description": "Replacement pattern for transform operations"},
+                    "refactor_type": {"type": "string", "description": "Type of refactoring: 'extract_function', 'remove_console_logs', 'simplify_conditions', 'extract_constants', 'modernize_syntax'"},
+                    "context_lines": {"type": "integer", "description": "Number of context lines to show", "default": 0},
+                    "max_results": {"type": "integer", "description": "Maximum number of results", "default": 100},
+                    "preview_only": {"type": "boolean", "description": "Preview changes without applying (transform only)", "default": true},
+                    "update_all": {"type": "boolean", "description": "Update all matches (transform only)", "default": false},
+                    "interactive": {"type": "boolean", "description": "Interactive mode (custom only)", "default": false},
+                    "severity_filter": {"type": "string", "description": "Filter lint results by severity"}
+                },
+                "required": ["pattern", "path"]
+            }),
+        },
+
+        // Simple bash-like search tool
+        FunctionDeclaration {
+            name: "simple_search".to_string(),
+            description: "Simple bash-like search and file operations: grep, find, ls, cat, head, tail, index. Direct file operations without complex abstractions.".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string", "description": "Command to execute: 'grep', 'find', 'ls', 'cat', 'head', 'tail', 'index'", "default": "grep"},
+                    "pattern": {"type": "string", "description": "Search pattern for grep/find commands"},
+                    "file_pattern": {"type": "string", "description": "File pattern filter for grep"},
+                    "file_path": {"type": "string", "description": "File path for cat/head/tail commands"},
+                    "path": {"type": "string", "description": "Directory path for ls/find/index commands", "default": "."},
+                    "start_line": {"type": "integer", "description": "Start line number for cat command"},
+                    "end_line": {"type": "integer", "description": "End line number for cat command"},
+                    "lines": {"type": "integer", "description": "Number of lines for head/tail commands", "default": 10},
+                    "max_results": {"type": "integer", "description": "Maximum results to return", "default": 50},
+                    "show_hidden": {"type": "boolean", "description": "Show hidden files for ls command", "default": false}
+                },
+                "required": []
+            }),
+        },
+
+        // Bash-like command tool
+        FunctionDeclaration {
+            name: "bash".to_string(),
+            description: "Direct bash-like command execution: ls, pwd, grep, find, cat, head, tail, mkdir, rm, cp, mv, stat, run. Acts like a human using bash commands.".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "bash_command": {"type": "string", "description": "Bash command to execute: 'ls', 'pwd', 'grep', 'find', 'cat', 'head', 'tail', 'mkdir', 'rm', 'cp', 'mv', 'stat', 'run'", "default": "ls"},
+                    "path": {"type": "string", "description": "Path for file/directory operations"},
+                    "source": {"type": "string", "description": "Source path for cp/mv operations"},
+                    "dest": {"type": "string", "description": "Destination path for cp/mv operations"},
+                    "pattern": {"type": "string", "description": "Search pattern for grep/find"},
+                    "recursive": {"type": "boolean", "description": "Recursive operation", "default": false},
+                    "show_hidden": {"type": "boolean", "description": "Show hidden files", "default": false},
+                    "parents": {"type": "boolean", "description": "Create parent directories", "default": false},
+                    "force": {"type": "boolean", "description": "Force operation", "default": false},
+                    "lines": {"type": "integer", "description": "Number of lines for head/tail", "default": 10},
+                    "start_line": {"type": "integer", "description": "Start line for cat"},
+                    "end_line": {"type": "integer", "description": "End line for cat"},
+                    "name_pattern": {"type": "string", "description": "Name pattern for find"},
+                    "type_filter": {"type": "string", "description": "Type filter for find (f=file, d=directory)"},
+                    "command": {"type": "string", "description": "Command to run for arbitrary execution"},
+                    "args": {"type": "array", "items": {"type": "string"}, "description": "Arguments for command execution"}
+                },
+                "required": []
+            }),
+        },
     ]
 }
 
@@ -474,6 +715,9 @@ pub fn build_function_declarations_for_level(level: CapabilityLevel) -> Vec<Func
                 || fd.name == tools::READ_FILE
                 || fd.name == tools::WRITE_FILE
                 || fd.name == tools::EDIT_FILE
+                || fd.name == tools::AST_GREP_SEARCH
+                || fd.name == "simple_search"
+                || fd.name == "bash"
             })
             .collect(),
     }

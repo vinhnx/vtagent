@@ -5,12 +5,14 @@
 
 use super::traits::Tool;
 use crate::simple_indexer::{SimpleIndexer, SearchResult};
+use crate::config::constants::tools;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use serde_json::{Value, json};
 use std::path::PathBuf;
 
 /// Simple bash-like search tool
+#[derive(Clone)]
 pub struct SimpleSearchTool {
     indexer: SimpleIndexer,
 }
@@ -186,7 +188,7 @@ impl Tool for SimpleSearchTool {
     }
 
     fn name(&self) -> &'static str {
-        "simple_search"
+        tools::SIMPLE_SEARCH
     }
 
     fn description(&self) -> &'static str {

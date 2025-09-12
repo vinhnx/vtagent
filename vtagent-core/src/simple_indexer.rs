@@ -39,6 +39,7 @@ pub struct SearchResult {
 }
 
 /// Simple file indexer
+#[derive(Clone)]
 pub struct SimpleIndexer {
     /// Index storage directory
     index_dir: PathBuf,

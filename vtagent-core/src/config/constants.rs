@@ -177,6 +177,11 @@ pub mod message_roles {
     pub const TOOL: &str = "tool";
 }
 
+/// URL constants for API endpoints
+pub mod urls {
+    pub const LMSTUDIO_DEFAULT_BASE_URL: &str = "http://localhost:1234/v1";
+}
+
 /// Tool name constants to avoid hardcoding strings throughout the codebase
 pub mod tools {
     pub const RP_SEARCH: &str = "rp_search";

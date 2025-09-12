@@ -136,9 +136,11 @@ async fn handle_chat_command(args: &Cli) -> Result<()> {
     let mut model_str = vtagent_config.agent.default_model.clone();
     let provider = &vtagent_config.agent.provider;
 
-    // For LMStudio, use the correct model name
-    if provider.eq_ignore_ascii_case("lmstudio") && model_str == models::LMSTUDIO_LOCAL {
-        model_str = models::LMSTUDIO_QWEN_30B_A3B_2507.to_string();
+    // For LMStudio, use the configured single agent model
+    if provider.eq_ignore_ascii_case("lmstudio") {
+        if model_str == models::LMSTUDIO_LOCAL || model_str.is_empty() {
+            model_str = vtagent_config.lmstudio.single_agent_model.clone();
+        }
     }
 
     // Validate configuration
@@ -246,7 +248,7 @@ async fn handle_single_agent_chat(
         let client_result = create_provider_with_config(
             "lmstudio",
             Some(api_key),
-            Some("http://localhost:1234/v1".to_string()),
+            Some(config.lmstudio.base_url.clone()),
             Some(actual_model),
         )
         .context("Failed to create LMStudio provider")?;
@@ -425,6 +427,9 @@ async fn handle_single_agent_chat(
             max_tokens: Some(1000),
             temperature: Some(0.7),
             stream: false,
+            tool_choice: None,
+            parallel_tool_calls: None,
+            reasoning_effort: Some(vtagent_config.agent.reasoning_effort.clone()),
         };
 
         // Get response from AI
@@ -530,6 +535,9 @@ async fn handle_single_agent_chat(
                         max_tokens: Some(1000),
                         temperature: Some(0.7),
                         stream: false,
+                        tool_choice: None,
+                        parallel_tool_calls: None,
+                        reasoning_effort: Some(vtagent_config.agent.reasoning_effort.clone()),
                     };
 
                     match client.generate(follow_up_request).await {
@@ -606,6 +614,9 @@ async fn handle_single_agent_chat(
                                     max_tokens: Some(1000),
                                     temperature: Some(0.7),
                                     stream: false,
+                                    tool_choice: None,
+                                    parallel_tool_calls: None,
+                                    reasoning_effort: Some(vtagent_config.agent.reasoning_effort.clone()),
                                 };
 
                                 match client.generate(final_follow_up_request).await {
@@ -753,48 +764,55 @@ async fn handle_multi_agent_chat(
     config: &VTAgentConfig,
 ) -> Result<()> {
     // Determine if we need to use fallback models for multi-agent
-    let (orchestrator_model, subagent_model) =
-        if config.agent.provider.eq_ignore_ascii_case("lmstudio") {
+    let (orchestrator_model, executor_model) =
+        if config.multi_agent.use_single_model {
+            // Use single model for all agents when configured
+            let single_model = if config.multi_agent.executor_model.is_empty() {
+                model_str.to_string()
+            } else {
+                config.multi_agent.executor_model.clone()
+            };
+            (single_model.clone(), single_model)
+        } else if config.agent.provider.eq_ignore_ascii_case("lmstudio") {
             // LMStudio now supports multi-agent mode with local models
             eprintln!("Info: Using LMStudio local models for multi-agent system.");
-            // Use the actual model name that works with LMStudio
+            // Use configured models from LMStudio config
             (
-                models::LMSTUDIO_QWEN_30B_A3B_2507.to_string(),
-                models::LMSTUDIO_QWEN_30B_A3B_2507.to_string(),
+                config.lmstudio.orchestrator_model.clone(),
+                config.lmstudio.subagent_model.clone(),
             )
         } else {
-            (model_str.to_string(), model_str.to_string())
+            // Use configured models from multi_agent config
+            (
+                config.multi_agent.orchestrator_model.clone(),
+                config.multi_agent.executor_model.clone(),
+            )
         };
 
     // Create multi-agent configuration
-    let multi_config = if config.agent.provider.eq_ignore_ascii_case("lmstudio") {
+    let system_config = if config.agent.provider.eq_ignore_ascii_case("lmstudio") {
         // Use LMStudio provider for multi-agent mode
-        MultiAgentConfig {
-            enable_multi_agent: true,
-            enable_task_management: true,
-            enable_context_sharing: true,
-            enable_performance_monitoring: true,
+        MultiAgentSystemConfig {
+            enabled: true,
+            use_single_model: config.multi_agent.use_single_model,
             provider: Provider::LMStudio,
             orchestrator_model: orchestrator_model.clone(),
-            subagent_model: subagent_model.clone(),
-            max_concurrent_subagents: 3,
-            task_timeout: std::time::Duration::from_secs(60),
-            context_window_size: 4096,
-            max_context_items: 50,
+            subagent_model: executor_model.clone(),
+            max_concurrent_subagents: config.multi_agent.max_concurrent_subagents,
+            context_store_enabled: config.multi_agent.context_sharing_enabled,
+            execution_mode: crate::core::agent::ExecutionMode::Auto,
             ..Default::default()
         }
     } else {
-        MultiAgentConfig {
-            enable_multi_agent: true,
-            enable_task_management: true,
-            enable_context_sharing: true,
-            enable_performance_monitoring: true,
+        // Use configured models from multi_agent config
+        MultiAgentSystemConfig {
+            enabled: true,
+            use_single_model: config.multi_agent.use_single_model,
             orchestrator_model,
-            subagent_model,
-            max_concurrent_subagents: 3,
-            task_timeout: std::time::Duration::from_secs(60),
-            context_window_size: 4096,
-            max_context_items: 50,
+            subagent_model: executor_model,
+            max_concurrent_subagents: config.multi_agent.max_concurrent_subagents,
+            context_store_enabled: config.multi_agent.context_sharing_enabled,
+            execution_mode: crate::core::agent::ExecutionMode::Auto,
             ..Default::default()
         }
     };
@@ -820,7 +838,7 @@ async fn handle_multi_agent_chat(
     };
 
     // Create multi-agent system
-    let mut system = MultiAgentSystem::new(multi_config, api_key, workspace.clone())
+    let mut system = MultiAgentSystem::new(system_config, api_key, workspace.clone())
         .await
         .context("Failed to initialize multi-agent system")?;
 

@@ -130,12 +130,20 @@ Deploying VTAgent in production? Focus on enterprise features:
 # Initialize project configuration
 ./run.sh init
 
+# Generate complete configuration (preserves existing settings)
+./run.sh config
+
+# Generate configuration to custom file
+./run.sh config --output my-config.toml
+
 # Edit configuration interactively
 ./run.sh config --edit
 
 # Validate configuration
 ./run.sh config --validate
 ```
+
+**Smart Configuration Generation**: The `config` command implements two-way synchronization that reads your existing `vtagent.toml` and generates a complete template while preserving all your customizations.
 
 ## Testing & Quality Assurance
 

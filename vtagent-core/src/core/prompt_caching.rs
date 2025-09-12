@@ -376,6 +376,7 @@ impl PromptOptimizer {
             stream: false,
             tool_choice: None,
             parallel_tool_calls: None,
+            reasoning_effort: None,
         };
 
         let response = self

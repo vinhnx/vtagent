@@ -189,6 +189,9 @@ fn test_anthropic_tool_handling() {
         max_tokens: None,
         temperature: None,
         stream: false,
+        tool_choice: None,
+        parallel_tool_calls: None,
+        reasoning_effort: None,
     };
 
     // This should convert tool messages to user messages for Anthropic

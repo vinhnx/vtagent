@@ -1,6 +1,7 @@
 use crate::config::PtyConfig;
 use crate::config::core::{AgentConfig, CommandsConfig, SecurityConfig, ToolsConfig};
 use crate::config::multi_agent::MultiAgentSystemConfig;
+use crate::config::LMStudioConfig;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -32,6 +33,10 @@ pub struct VTAgentConfig {
     /// Multi-agent system configuration
     #[serde(default)]
     pub multi_agent: MultiAgentSystemConfig,
+
+    /// LMStudio-specific configuration
+    #[serde(default)]
+    pub lmstudio: LMStudioConfig,
 }
 
 impl Default for VTAgentConfig {
@@ -43,6 +48,7 @@ impl Default for VTAgentConfig {
             security: SecurityConfig::default(),
             pty: PtyConfig::default(),
             multi_agent: MultiAgentSystemConfig::default(),
+            lmstudio: LMStudioConfig::default(),
         }
     }
 }

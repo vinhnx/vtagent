@@ -346,6 +346,8 @@ impl OrchestratorAgent {
             self.api_key.clone(),
             self.workspace.clone(),
             self.session_id.clone(),
+            // TODO: Pass reasoning_effort from config
+            None,
         )?;
 
         // Execute the task
@@ -368,6 +370,8 @@ impl OrchestratorAgent {
             self.api_key.clone(),
             self.workspace.clone(),
             self.session_id.clone(),
+            // TODO: Pass reasoning_effort from config
+            None,
         )?;
 
         // Execute the task

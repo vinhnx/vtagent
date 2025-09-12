@@ -3,7 +3,9 @@
 //! This module provides the main integration point for the multi-agent system,
 //! orchestrating all components including verification workflows and performance optimization.
 
+use crate::config::constants::models;
 use crate::config::models::ModelId;
+use crate::config::multi_agent::MultiAgentSystemConfig;
 use crate::core::agent::multi_agent::*;
 use crate::core::agent::optimization::{PerformanceConfig, PerformanceMonitor};
 use crate::core::agent::orchestrator::OrchestratorAgent;
@@ -161,7 +163,7 @@ impl Default for SessionStatistics {
 impl MultiAgentSystem {
     /// Create a new multi-agent system
     pub async fn new(
-        config: MultiAgentConfig,
+        config: MultiAgentSystemConfig,
         api_key: String,
         workspace: std::path::PathBuf,
     ) -> Result<Self> {
@@ -180,15 +182,36 @@ impl MultiAgentSystem {
         );
 
         // Create orchestrator client
-        let orchestrator_model_id = config
-            .orchestrator_model
+        let (orchestrator_model, subagent_model) = if config.use_single_model {
+            // Use single model for all agents
+            let single_model = if config.orchestrator_model.is_empty() {
+                models::google::GEMINI_2_5_FLASH_LITE.to_string() // Default single model
+            } else {
+                config.orchestrator_model.clone()
+            };
+            (single_model.clone(), single_model)
+        } else {
+            let orchestrator_model = if config.orchestrator_model.is_empty() {
+                models::google::GEMINI_2_5_PRO.to_string() // Default orchestrator model
+            } else {
+                config.orchestrator_model.clone()
+            };
+            let subagent_model = if config.subagent_model.is_empty() {
+                models::google::GEMINI_2_5_FLASH_LITE.to_string() // Default subagent model
+            } else {
+                config.subagent_model.clone()
+            };
+            (orchestrator_model, subagent_model)
+        };
+
+        let orchestrator_model_id = orchestrator_model
             .parse::<ModelId>()
-            .map_err(|_| anyhow!("Invalid orchestrator model: {}", config.orchestrator_model))?;
+            .map_err(|_| anyhow!("Invalid orchestrator model: {}", orchestrator_model))?;
         let orchestrator_client = make_client(api_key.clone(), orchestrator_model_id);
 
         // Create orchestrator agent
         let orchestrator = OrchestratorAgent::new(
-            config.clone(),
+            convert_to_multi_agent_config(&config),
             orchestrator_client,
             session_id.clone(),
             api_key.clone(),
@@ -208,10 +231,9 @@ impl MultiAgentSystem {
         let mut coder_agents = vec![];
         for i in 0..config.max_concurrent_subagents {
             let agent_id = format!("coder_{}", i);
-            let subagent_model_id = config
-                .subagent_model
+            let subagent_model_id = subagent_model
                 .parse::<ModelId>()
-                .map_err(|_| anyhow!("Invalid subagent model: {}", config.subagent_model))?;
+                .map_err(|_| anyhow!("Invalid subagent model: {}", subagent_model))?;
             let client = make_client(api_key.clone(), subagent_model_id);
 
             coder_agents.push(SubAgent {
@@ -235,10 +257,9 @@ impl MultiAgentSystem {
         for i in 0..2 {
             // Fewer explorer agents as they're typically read-only
             let agent_id = format!("explorer_{}", i);
-            let subagent_model_id = config
-                .subagent_model
+            let subagent_model_id = subagent_model
                 .parse::<ModelId>()
-                .map_err(|_| anyhow!("Invalid subagent model: {}", config.subagent_model))?;
+                .map_err(|_| anyhow!("Invalid subagent model: {}", subagent_model))?;
             let client = make_client(api_key.clone(), subagent_model_id);
 
             explorer_agents.push(SubAgent {
@@ -267,8 +288,8 @@ impl MultiAgentSystem {
         };
 
         eprintln!("Multi-agent system initialized successfully");
-        eprintln!("- Orchestrator: {} model", config.orchestrator_model);
-        eprintln!("- Subagents: {} model", config.subagent_model);
+        eprintln!("- Orchestrator: {} model", orchestrator_model);
+        eprintln!("- Subagents: {} model", subagent_model);
         eprintln!(
             "- Coder agents: {}",
             subagents.get(&AgentType::Coder).map_or(0, |v| v.len())
@@ -283,7 +304,7 @@ impl MultiAgentSystem {
             subagents,
             verification,
             performance,
-            config,
+            config: convert_to_multi_agent_config(&config),
             session,
         })
     }
@@ -492,7 +513,58 @@ impl MultiAgentSystem {
             }
         }
     }
+}
 
+/// Convert MultiAgentSystemConfig to MultiAgentConfig
+fn convert_to_multi_agent_config(system_config: &MultiAgentSystemConfig) -> MultiAgentConfig {
+    use crate::core::agent::multi_agent::{ExecutionMode, VerificationStrategy, DelegationStrategy};
+
+    let execution_mode = match system_config.execution_mode {
+        crate::config::multi_agent::ExecutionMode::Single => ExecutionMode::Single,
+        crate::config::multi_agent::ExecutionMode::Multi => ExecutionMode::Multi,
+        crate::config::multi_agent::ExecutionMode::Auto => ExecutionMode::Auto,
+    };
+
+    let verification_strategy = match system_config.verification_strategy {
+        crate::config::multi_agent::VerificationStrategy::Always => VerificationStrategy::Always,
+        crate::config::multi_agent::VerificationStrategy::OnLowConfidence => VerificationStrategy::ComplexOnly,
+        crate::config::multi_agent::VerificationStrategy::Never => VerificationStrategy::Never,
+    };
+
+    let delegation_strategy = match system_config.delegation_strategy {
+        crate::config::multi_agent::DelegationStrategy::ByCapability => DelegationStrategy::Adaptive,
+        crate::config::multi_agent::DelegationStrategy::RoundRobin => DelegationStrategy::Conservative,
+        crate::config::multi_agent::DelegationStrategy::BySpecialization => DelegationStrategy::Aggressive,
+    };
+
+    MultiAgentConfig {
+        enable_multi_agent: system_config.enabled,
+        execution_mode,
+        provider: system_config.provider.clone(),
+        orchestrator_model: system_config.orchestrator_model.clone(),
+        subagent_model: system_config.subagent_model.clone(),
+        max_concurrent_subagents: system_config.max_concurrent_subagents,
+        context_store_enabled: system_config.context_store_enabled,
+        enable_task_management: system_config.enable_task_management,
+        enable_context_sharing: system_config.enable_context_sharing,
+        enable_performance_monitoring: system_config.enable_performance_monitoring,
+        debug_mode: system_config.debug_mode,
+        task_timeout: system_config.task_timeout,
+        context_window_size: system_config.context_window_size,
+        max_context_items: system_config.max_context_items,
+        verification_strategy,
+        delegation_strategy,
+        context_store: ContextStoreConfig {
+            max_contexts: system_config.context_store.max_context_size,
+            auto_cleanup_days: 7, // Default value
+            enable_persistence: false, // Default value
+            compression_enabled: system_config.context_store.compression_enabled,
+            storage_dir: ".vtagent/contexts".to_string(), // Default value
+        },
+    }
+}
+
+impl MultiAgentSystem {
     /// Find an available agent of the specified type and return its ID
     async fn find_available_agent_id(&self, agent_type: AgentType) -> Result<String> {
         let agents = self
@@ -550,6 +622,8 @@ impl MultiAgentSystem {
             self.orchestrator.workspace.clone(),
             // Use the session ID from the multi-agent system
             self.session.session_id.clone(),
+            // TODO: Pass reasoning_effort from config
+            None,
         )?;
 
         // Execute the task with the runner

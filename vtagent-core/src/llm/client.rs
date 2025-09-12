@@ -23,7 +23,7 @@ pub fn make_client(api_key: String, model: ModelId) -> AnyClient {
         Provider::Anthropic => Box::new(AnthropicProvider::new(api_key)),
         Provider::LMStudio => Box::new(LMStudioProvider::new(
             None,
-            Some("http://localhost:1234/v1".to_string()),
+            Some(crate::config::constants::urls::LMSTUDIO_DEFAULT_BASE_URL.to_string()),
         )),
     }
 }

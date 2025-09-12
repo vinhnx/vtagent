@@ -46,6 +46,10 @@ pub struct MultiAgentSystemConfig {
     #[serde(default)]
     pub enabled: bool,
 
+    /// Use single model for all agents when multi-agent is enabled (default: true)
+    #[serde(default = "default_true")]
+    pub use_single_model: bool,
+
     /// Maximum number of agents
     #[serde(default = "default_max_agents")]
     pub max_agents: usize,
@@ -69,6 +73,10 @@ pub struct MultiAgentSystemConfig {
     /// Model to use for orchestrator agent
     #[serde(default)]
     pub orchestrator_model: String,
+
+    /// Model to use for executor agent (used for single-agent mode and as subagents in multi-agent mode)
+    #[serde(default)]
+    pub executor_model: String,
 
     /// Model to use for subagents
     #[serde(default)]
@@ -123,12 +131,14 @@ impl Default for MultiAgentSystemConfig {
     fn default() -> Self {
         Self {
             enabled: false,
+            use_single_model: default_true(),
             max_agents: default_max_agents(),
             context_store: ContextStoreConfiguration::default(),
             agents: AgentSpecificConfigs::default(),
             execution_mode: ExecutionMode::Single,
             provider: Provider::Gemini,
             orchestrator_model: String::new(),
+            executor_model: String::new(),
             subagent_model: String::new(),
             max_concurrent_subagents: default_max_concurrent_subagents(),
             context_store_enabled: default_true(),

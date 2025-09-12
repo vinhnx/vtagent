@@ -2,15 +2,31 @@
 
 [agent]
 # default_model = "local-model"
-default_model = "gemini-2.5-flash-lite"
-provider = "gemini"
-max_turns = 150
+default_model = "qwen/qwen3-4b-2507"
+provider = "lmstudio"
+max_conversation_turns = 150
+# Reasoning effort level for models that support it (low, medium, high)
+# Applies to: Claude, GPT-5, Gemini, Qwen3, DeepSeek with reasoning capability
+reasoning_effort = "medium"
 
 [security]
 human_in_the_loop = true
 
 [multi_agent]
+# Enable multi-agent mode (default: false)
 enabled = false
+# Use single model for all agents when multi-agent is enabled (default: true)
+use_single_model = true
+# Main orchestrator agent model (used when multi-agent is enabled)
+orchestrator_model = "qwen/qwen3-4b-2507"
+# Executor agent model (used for single-agent mode and as subagents in multi-agent mode)
+executor_model = "qwen/qwen3-4b-2507"
+# Maximum number of concurrent subagents
+max_concurrent_subagents = 3
+# Enable context sharing between agents
+context_sharing_enabled = true
+# Task execution timeout in seconds
+task_timeout_seconds = 300
 
 [lmstudio]
 # LMStudio-specific configuration
@@ -30,7 +46,7 @@ connection_timeout_seconds = 30
 default_policy = "prompt"
 
 [commands]
-safe_commands = ["ls", "pwd", "cat", "grep", "git status", "git diff"]
+allow_list = ["ls", "pwd", "cat", "grep", "git status", "git diff"]
 
 [pty]
 enabled = true

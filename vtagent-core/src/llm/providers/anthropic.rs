@@ -275,23 +275,28 @@ impl LLMClient for AnthropicProvider {
         }
 
         let request = LLMRequest {
-            messages: vec![crate::llm::provider::Message {
-                role: crate::llm::provider::MessageRole::User,
-                content: prompt.to_string(),
-                tool_calls: None,
-                tool_call_id: None,
-            }],
+            model: model.clone(),
+            messages: vec![json!({
+                "role": "user",
+                "content": prompt
+            })],
+            max_tokens: None,
+            temperature: None,
+            top_p: None,
+            frequency_penalty: None,
+            presence_penalty: None,
+            stream: None,
+            logprobs: None,
+            stop: None,
+            user: None,
             system_prompt: None,
             tools: None,
-            model: model.clone(),
-            max_tokens: Some(4096),
-            temperature: None,
-            stream: false,
             tool_choice: None,
-            parallel_tool_calls: None,
+            n: None,
+            prompt: None,
         };
 
-        let response = LLMProvider::generate(self, request).await?;
+        let response = LLMProvider::generate(self, request.clone()).await?;
 
         Ok(llm_types::LLMResponse {
             content: response.content.unwrap_or("".to_string()),

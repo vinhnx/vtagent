@@ -51,7 +51,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 /// Universal LLM request structure
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LLMRequest {
     pub messages: Vec<Message>,
     pub system_prompt: Option<String>,
@@ -67,6 +67,10 @@ pub struct LLMRequest {
 
     /// Whether to enable parallel tool calls (OpenAI specific)
     pub parallel_tool_calls: Option<bool>,
+
+    /// Reasoning effort level for models that support it (low, medium, high)
+    /// Applies to: Claude, GPT-5, Gemini, Qwen3, DeepSeek with reasoning capability
+    pub reasoning_effort: Option<String>,
 }
 
 /// Tool choice configuration that works across different providers

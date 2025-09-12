@@ -93,7 +93,7 @@ api_key_env = "GROQ_API_KEY"
 ```toml
 [agent]
 provider = "openrouter"
-default_model = "anthropic/claude-3.5-sonnet"
+default_model = "qwen/qwen3-next-80b-a3b-instruct"
 api_key_env = "OPENROUTER_API_KEY"
 ```
 

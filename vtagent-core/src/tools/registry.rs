@@ -37,7 +37,7 @@ impl ToolRegistry {
         let command_tool = CommandTool::new(workspace_root.clone());
 
         // Initialize policy manager and update available tools
-        let mut policy_manager = ToolPolicyManager::new().unwrap_or_else(|e| {
+        let mut policy_manager = ToolPolicyManager::new_with_workspace(&workspace_root).unwrap_or_else(|e| {
             eprintln!("Warning: Failed to initialize tool policy manager: {}", e);
             // Create a fallback that allows all tools
             ToolPolicyManager::new().unwrap()

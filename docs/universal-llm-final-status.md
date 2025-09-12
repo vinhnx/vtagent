@@ -42,8 +42,8 @@ vtagent-core/src/llm/
 ```rust
 // Auto-detects provider from model name
 let gemini = UnifiedLLMClient::new("gemini-2.5-flash".to_string(), api_key)?;
-let openai = UnifiedLLMClient::new("gpt-4o".to_string(), api_key)?;
-let claude = UnifiedLLMClient::new("claude-3-5-sonnet".to_string(), api_key)?;
+let openai = UnifiedLLMClient::new("gpt-5".to_string(), api_key)?;
+let claude = UnifiedLLMClient::new("claude-4-sonnet".to_string(), api_key)?;
 
 // Same interface for all providers
 let response = client.generate(messages, system_prompt).await?;
@@ -53,7 +53,7 @@ let response = client.generate(messages, system_prompt).await?;
 ```rust
 // Intelligent model → provider mapping
 "gpt-4o" → "openai"
-"claude-3-5-sonnet" → "anthropic"  
+"claude-3-5-sonnet" → "anthropic"
 "gemini-2.5-flash" → "gemini"
 ```
 
@@ -89,7 +89,7 @@ let response = client.generate_content(&request).await?;
 3. **Future-Proofing**: Easy to add new providers as they emerge
 4. **Competitive Advantage**: Leverage best models from all providers
 
-## 🔧 **Technical Achievements**
+## **Technical Achievements**
 
 ### **Provider Compatibility Matrix**
 
@@ -120,9 +120,6 @@ let response = client.generate_content(&gemini_request).await?;
 // Works with any provider automatically
 let client = UnifiedLLMClient::new(model, api_key)?;
 let response = client.generate(messages, system_prompt).await?;
-
-// Provider auto-detected from model name:
-// "gpt-4o" → OpenAI, "claude-3-5-sonnet" → Anthropic, "gemini-2.5-flash" → Gemini
 ```
 
 ## 📊 **Implementation Metrics**

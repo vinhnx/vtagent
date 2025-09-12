@@ -71,29 +71,3 @@ args = ["mcp-server-time"]
 type = "stdio"
 disabled = false
 autoApprove = []
-
-[mcp_servers.serena]
-command = "uvx"
-args = [
-    "--from",
-    "git+https://github.com/oraios/serena",
-    "serena",
-    "start-mcp-server",
-    "--context",
-    "ide-assistant",
-    "--project",
-    "./",
-]
-type = "stdio"
-disabled = false
-autoApprove = [
-    "find_symbol",
-    "get_symbols_overview",
-    "search_for_pattern",
-    "find_referencing_symbols",
-]
-
-
-[mcp_servers.sequential-thinking]
-command = "npx"
-args = ["-y", "@modelcontextprotocol/server-sequential-thinking"]

@@ -18,7 +18,7 @@ I have thoroughly verified and fixed the tool call implementations for all three
       "tool_calls": [
         {
           "id": "call_123",
-          "type": "function", 
+          "type": "function",
           "function": {
             "name": "get_weather",
             "arguments": "{\"location\": \"New York\"}"
@@ -149,7 +149,7 @@ I have thoroughly verified and fixed the tool call implementations for all three
 - ✅ Tools defined with `functionDeclarations` array
 - ✅ Function arguments as JSON object
 
-### 🔧 **Fixes Implemented**
+### **Fixes Implemented**
 
 #### **1. OpenAI Provider Enhanced**
 ```rust
@@ -166,12 +166,12 @@ if message.role == MessageRole::Tool {
 // Fixed assistant messages with structured content
 MessageRole::Assistant => {
     let mut content = Vec::new();
-    
+
     // Add text content if present
     if !message.content.is_empty() {
         content.push(json!({"type": "text", "text": message.content}));
     }
-    
+
     // Add tool_use blocks if present
     if let Some(tool_calls) = &message.tool_calls {
         for tool_call in tool_calls {
@@ -225,7 +225,7 @@ if message.role == MessageRole::Assistant {
 
 #### **✅ API Format Compliance Verified**
 
-**OpenAI**: 
+**OpenAI**:
 - ✅ Correct `tool_calls` array format
 - ✅ Proper `tool_call_id` references
 - ✅ Function arguments as JSON strings
@@ -262,7 +262,7 @@ if message.role == MessageRole::Assistant {
 
 #### **✅ API Compliance: 100% Verified**
 - **OpenAI**: Fully compliant with Chat Completions API
-- **Anthropic**: Fully compliant with Messages API  
+- **Anthropic**: Fully compliant with Messages API
 - **Gemini**: Fully compliant with GenerateContent API
 
 #### **✅ Tool Call Features: Complete**

@@ -833,7 +833,8 @@ impl AgentRunner {
 
     /// Check if a tool is allowed for this agent type
     fn is_tool_allowed(&self, tool_name: &str) -> bool {
-        match self.agent_type {
+        // First check agent type restrictions
+        let agent_type_allowed = match self.agent_type {
             AgentType::Coder => {
                 // Coder agents can use file operations and command execution
                 matches!(
@@ -853,6 +854,18 @@ impl AgentRunner {
                 // Single agents have limited tool access
                 matches!(tool_name, "rp_search" | "list_files")
             }
+        };
+
+        // If agent type doesn't allow it, deny access
+        if !agent_type_allowed {
+            return false;
+        }
+
+        // Check tool policy (allow if Allow or Prompt, deny if Deny)
+        let policy = self.tool_registry.policy_manager().get_policy(tool_name);
+        match policy {
+            crate::tool_policy::ToolPolicy::Allow | crate::tool_policy::ToolPolicy::Prompt => true,
+            crate::tool_policy::ToolPolicy::Deny => false,
         }
     }
 

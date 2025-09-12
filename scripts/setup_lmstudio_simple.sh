@@ -57,7 +57,7 @@ if command -v curl >/dev/null 2>&1; then
         echo "   Please make sure LMStudio is running and the server is started."
         echo "   The server should be accessible at http://localhost:1234"
         echo ""
-        echo "🔧 Troubleshooting:"
+        echo "Troubleshooting:"
         echo "   1. Launch LMStudio"
         echo "   2. Go to 'Local Inference' tab"
         echo "   3. Load a model if you haven't already"

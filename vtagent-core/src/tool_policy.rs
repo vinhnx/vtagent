@@ -51,6 +51,55 @@ impl Default for ToolPolicyConfig {
     }
 }
 
+/// Alternative tool policy configuration format (user's format)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AlternativeToolPolicyConfig {
+    /// Configuration version for future compatibility
+    pub version: u32,
+    /// Default policy settings
+    pub default: AlternativeDefaultPolicy,
+    /// Tool-specific policies
+    pub tools: HashMap<String, AlternativeToolPolicy>,
+}
+
+/// Default policy in alternative format
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AlternativeDefaultPolicy {
+    /// Whether to allow by default
+    pub allow: bool,
+    /// Rate limit per run
+    pub rate_limit_per_run: u32,
+    /// Max concurrent executions
+    pub max_concurrent: u32,
+    /// Allow filesystem writes
+    pub fs_write: bool,
+    /// Allow network access
+    pub network: bool,
+}
+
+/// Tool policy in alternative format
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AlternativeToolPolicy {
+    /// Whether to allow this tool
+    pub allow: bool,
+    /// Allow filesystem writes (optional)
+    #[serde(default)]
+    pub fs_write: bool,
+    /// Allow network access (optional)
+    #[serde(default)]
+    pub network: bool,
+    /// Arguments policy (optional)
+    #[serde(default)]
+    pub args_policy: Option<AlternativeArgsPolicy>,
+}
+
+/// Arguments policy in alternative format
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AlternativeArgsPolicy {
+    /// Substrings to deny
+    pub deny_substrings: Vec<String>,
+}
+
 /// Tool policy manager
 #[derive(Clone)]
 pub struct ToolPolicyManager {
@@ -62,6 +111,17 @@ impl ToolPolicyManager {
     /// Create a new tool policy manager
     pub fn new() -> Result<Self> {
         let config_path = Self::get_config_path()?;
+        let config = Self::load_or_create_config(&config_path)?;
+
+        Ok(Self {
+            config_path,
+            config,
+        })
+    }
+
+    /// Create a new tool policy manager with workspace-specific config
+    pub fn new_with_workspace(workspace_root: &PathBuf) -> Result<Self> {
+        let config_path = Self::get_workspace_config_path(workspace_root)?;
         let config = Self::load_or_create_config(&config_path)?;
 
         Ok(Self {
@@ -82,17 +142,59 @@ impl ToolPolicyManager {
         Ok(vtagent_dir.join("tool-policy.json"))
     }
 
+    /// Get the path to the workspace-specific tool policy configuration file
+    fn get_workspace_config_path(workspace_root: &PathBuf) -> Result<PathBuf> {
+        let workspace_vtagent_dir = workspace_root.join(".vtagent");
+
+        // Check if workspace has a .vtagent/tool-policy.json file
+        let workspace_policy_path = workspace_vtagent_dir.join("tool-policy.json");
+        if workspace_policy_path.exists() {
+            return Ok(workspace_policy_path);
+        }
+
+        // Fall back to home directory
+        Self::get_config_path()
+    }
+
     /// Load existing config or create new one with all tools as "prompt"
     fn load_or_create_config(config_path: &PathBuf) -> Result<ToolPolicyConfig> {
         if config_path.exists() {
             let content =
                 fs::read_to_string(config_path).context("Failed to read tool policy config")?;
 
+            // Try to parse as alternative format first
+            if let Ok(alt_config) = serde_json::from_str::<AlternativeToolPolicyConfig>(&content) {
+                // Convert alternative format to standard format
+                return Ok(Self::convert_from_alternative(alt_config));
+            }
+
+            // Fall back to standard format
             serde_json::from_str(&content).context("Failed to parse tool policy config")
         } else {
             // Create new config with empty tools list
             let config = ToolPolicyConfig::default();
             Ok(config)
+        }
+    }
+
+    /// Convert alternative format to standard format
+    fn convert_from_alternative(alt_config: AlternativeToolPolicyConfig) -> ToolPolicyConfig {
+        let mut policies = HashMap::new();
+
+        // Convert tool policies
+        for (tool_name, alt_policy) in alt_config.tools {
+            let policy = if alt_policy.allow {
+                ToolPolicy::Allow
+            } else {
+                ToolPolicy::Deny
+            };
+            policies.insert(tool_name, policy);
+        }
+
+        ToolPolicyConfig {
+            version: alt_config.version,
+            available_tools: policies.keys().cloned().collect(),
+            policies,
         }
     }
 

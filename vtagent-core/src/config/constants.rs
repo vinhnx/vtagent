@@ -182,4 +182,8 @@ pub mod tools {
     pub const READ_FILE: &str = "read_file";
     pub const WRITE_FILE: &str = "write_file";
     pub const EDIT_FILE: &str = "edit_file";
+    pub const DELETE_FILE: &str = "delete_file";
+    pub const CREATE_FILE: &str = "create_file";
+    pub const GREP_SEARCH: &str = "grep_search";
+    pub const AST_GREP_SEARCH: &str = "ast_grep_search";
 }

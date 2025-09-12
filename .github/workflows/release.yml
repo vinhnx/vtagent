@@ -43,7 +43,7 @@ jobs:
           fi
 
       - name: Generate changelog and create release
-        uses: changelogithub/action@v1
+        uses: HiDeoo/changelogithub-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref_name }}

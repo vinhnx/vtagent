@@ -63,6 +63,16 @@ All notable changes to vtagent will be documented in this file.
 - **Decision Quality Metrics**: Confidence scores and decision success rates
 - **Context Usage Monitoring**: Automatic warnings for approaching limits
 
+### **Configuration System Improvements**
+
+#### Two-Way Configuration Synchronization
+
+- **Smart Config Generation**: `vtagent config` now reads existing `vtagent.toml` and preserves customizations
+- **Complete Template Generation**: Ensures all configuration sections are present, even missing ones
+- **Bidirectional Sync**: Generated configs always match your actual configuration state
+- **Fallback Safety**: Uses system defaults when no configuration file exists
+- **TOML Serialization**: Replaced hardcoded templates with proper TOML generation
+
 ## [Previous Versions]
 
 ### v0.1.0 - Initial Release

@@ -2,6 +2,7 @@ use crate::config::constants::models;
 use crate::llm::client::LLMClient;
 use crate::llm::provider::{
     FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
+    ToolDefinition, Usage, FunctionCall,
 };
 use crate::llm::types as llm_types;
 use async_trait::async_trait;
@@ -113,8 +114,8 @@ impl GeminiProvider {
                     for tool_call in tool_calls {
                         parts.push(json!({
                             "functionCall": {
-                                "name": tool_call.name,
-                                "args": tool_call.arguments
+                                "name": tool_call.function.name,
+                                "args": tool_call.function.arguments
                             }
                         }));
                     }
@@ -167,15 +168,11 @@ impl GeminiProvider {
         if let Some(tools) = &request.tools {
             let gemini_tools: Vec<Value> = tools
                 .iter()
-                .map(|tool| {
-                    json!({
-                        "functionDeclarations": [{
-                            "name": tool.name,
-                            "description": tool.description,
-                            "parameters": tool.parameters
-                        }]
-                    })
-                })
+                .map(|tool| json!({
+                                "name": tool.function.name,
+                                "description": tool.function.description,
+                                "parameters": tool.function.parameters
+                            }))
                 .collect();
             gemini_request["tools"] = json!(gemini_tools);
         }
@@ -216,8 +213,11 @@ impl GeminiProvider {
                         let args = function_call["args"].clone();
                         tool_calls.push(ToolCall {
                             id: format!("call_{}", tool_calls.len()), // Gemini doesn't provide IDs
-                            name,
-                            arguments: args,
+                            call_type: "function".to_string(),
+                            function: FunctionCall {
+                                name,
+                                arguments: serde_json::to_string(&args).unwrap_or_default(),
+                            },
                         });
                     }
                 }
@@ -270,9 +270,28 @@ impl GeminiProvider {
 impl LLMClient for GeminiProvider {
     async fn generate(&mut self, prompt: &str) -> Result<llm_types::LLMResponse, LLMError> {
         // Check if the prompt is a serialized GenerateContentRequest
-        let request = if prompt.trim().starts_with("{") {
+        let request = if prompt.len() == 1 && prompt[0].role == MessageRole::User {
+            // Regular prompt
+            LLMRequest {
+                messages: vec![Message {
+                    role: MessageRole::User,
+                    content: prompt[0].content.clone(),
+                    tool_calls: None,
+                    tool_call_id: None,
+                }],
+                system_prompt: None,
+                tools: None,
+                model: self.model.clone(),
+                max_tokens: None,
+                temperature: None,
+                stream: false,
+                tool_choice: None,
+                parallel_tool_calls: None,
+                reasoning_effort: None,
+            }
+        } else {
             // Try to parse as JSON GenerateContentRequest
-            match serde_json::from_str::<crate::gemini::GenerateContentRequest>(prompt) {
+            match serde_json::from_value::<crate::gemini::GenerateContentRequest>(serde_json::to_value(prompt.clone()).unwrap()) {
                 Ok(gemini_request) => {
                     // Convert GenerateContentRequest to LLMRequest
                     let mut messages = Vec::new();
@@ -318,9 +337,12 @@ impl LLMClient for GeminiProvider {
                             .iter()
                             .flat_map(|tool| &tool.function_declarations)
                             .map(|decl| crate::llm::provider::ToolDefinition {
-                                name: decl.name.clone(),
-                                description: decl.description.clone(),
-                                parameters: decl.parameters.clone(),
+                                tool_type: "function".to_string(),
+                                function: crate::llm::provider::FunctionDefinition {
+                                    name: decl.name.clone(),
+                                    description: decl.description.clone(),
+                                    parameters: decl.parameters.clone(),
+                                },
                             })
                             .collect::<Vec<_>>()
                     });
@@ -343,6 +365,9 @@ impl LLMClient for GeminiProvider {
                             .and_then(|v| v.as_f64())
                             .map(|v| v as f32),
                         stream: false,
+                        tool_choice: None,
+                        parallel_tool_calls: None,
+                        reasoning_effort: None,
                     };
 
                     // Use the standard LLMProvider generate method
@@ -356,8 +381,8 @@ impl LLMClient for GeminiProvider {
                                 "tool_calls": tool_calls.iter().map(|tc| {
                                     json!({
                                         "function": {
-                                            "name": tc.name,
-                                            "arguments": tc.arguments
+                                            "name": tc.function.name,
+                                            "arguments": tc.function.arguments
                                         }
                                     })
                                 }).collect::<Vec<_>>()
@@ -385,7 +410,7 @@ impl LLMClient for GeminiProvider {
                     LLMRequest {
                         messages: vec![Message {
                             role: MessageRole::User,
-                            content: prompt.to_string(),
+                            content: prompt[0].content.clone(),
                             tool_calls: None,
                             tool_call_id: None,
                         }],
@@ -395,24 +420,11 @@ impl LLMClient for GeminiProvider {
                         max_tokens: None,
                         temperature: None,
                         stream: false,
+                        tool_choice: None,
+                        parallel_tool_calls: None,
+                        reasoning_effort: None,
                     }
                 }
-            }
-        } else {
-            // Regular prompt
-            LLMRequest {
-                messages: vec![Message {
-                    role: MessageRole::User,
-                    content: prompt.to_string(),
-                    tool_calls: None,
-                    tool_call_id: None,
-                }],
-                system_prompt: None,
-                tools: None,
-                model: self.model.clone(),
-                max_tokens: None,
-                temperature: None,
-                stream: false,
             }
         };
 

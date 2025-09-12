@@ -144,12 +144,24 @@ command_timeout_seconds = 300
 # Initialize with default configuration
 ./run.sh init
 
+# Generate complete configuration (preserves existing settings)
+./run.sh config
+
+# Generate configuration and save to specific file
+./run.sh config --output my-config.toml
+
 # Copy example configuration
 cp vtagent.toml.example vtagent.toml
 
 # Validate configuration
 ./run.sh config --validate
 ```
+
+**Configuration Generation**: The `config` command implements two-way synchronization:
+- **Reads existing `vtagent.toml`** if present, preserving your customizations
+- **Generates complete TOML** with all sections, even missing ones
+- **Falls back to defaults** if no configuration exists
+- **Ensures consistency** between your config file and generated templates
 
 ## Tool Suite
 
@@ -287,4 +299,3 @@ cp vtagent.toml.example vtagent.toml
   - `set-provider <provider>` - Switch LLM provider
   - `set-model <model>` - Set specific model
   - `test <provider>` - Test provider connectivity
-````

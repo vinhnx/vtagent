@@ -51,6 +51,15 @@ vtagent config --output my-config.toml
 vtagent config --force
 ```
 
+**Two-Way Synchronization**: The `config` command implements intelligent configuration generation:
+
+- **Preserves Existing Settings**: If `vtagent.toml` exists, it loads your current configuration and uses it as the template
+- **Ensures Completeness**: Generates all configuration sections, even if they're missing from your current file
+- **Maintains Customizations**: Your model choices, security settings, and policies are preserved
+- **Falls Back to Defaults**: Uses system defaults only when no configuration file exists
+
+This ensures your generated configuration always reflects your actual setup while guaranteeing all available options are documented.
+
 ## Configuration Sections
 
 ### [agent] - Agent Behavior

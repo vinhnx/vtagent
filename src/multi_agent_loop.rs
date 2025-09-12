@@ -38,20 +38,33 @@ fn convert_multi_agent_config(system_config: &MultiAgentSystemConfig) -> MultiAg
         .unwrap_or(Provider::Gemini); // Default to Gemini if parsing fails
 
     // Use provider-specific models if not explicitly configured
-    let orchestrator_model = if system_config.orchestrator_model.is_empty() {
-        ModelId::default_orchestrator_for_provider(provider.clone())
-            .as_str()
-            .to_string()
+    let (orchestrator_model, subagent_model) = if system_config.use_single_model {
+        // Use single model for all agents when configured
+        let single_model = if system_config.orchestrator_model.is_empty() {
+            ModelId::default_orchestrator_for_provider(provider.clone())
+                .as_str()
+                .to_string()
+        } else {
+            system_config.orchestrator_model.clone()
+        };
+        (single_model.clone(), single_model)
     } else {
-        system_config.orchestrator_model.clone()
-    };
+        let orchestrator_model = if system_config.orchestrator_model.is_empty() {
+            ModelId::default_orchestrator_for_provider(provider.clone())
+                .as_str()
+                .to_string()
+        } else {
+            system_config.orchestrator_model.clone()
+        };
 
-    let subagent_model = if system_config.subagent_model.is_empty() {
-        ModelId::default_subagent_for_provider(provider.clone())
-            .as_str()
-            .to_string()
-    } else {
-        system_config.subagent_model.clone()
+        let subagent_model = if system_config.subagent_model.is_empty() {
+            ModelId::default_subagent_for_provider(provider.clone())
+                .as_str()
+                .to_string()
+        } else {
+            system_config.subagent_model.clone()
+        };
+        (orchestrator_model, subagent_model)
     };
 
     MultiAgentConfig {

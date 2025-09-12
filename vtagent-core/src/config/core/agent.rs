@@ -55,6 +55,11 @@ pub struct AgentConfig {
     /// Default system instruction fallback
     #[serde(default = "default_system_instruction")]
     pub default_system_instruction: String,
+
+    /// Reasoning effort level for models that support it (low, medium, high)
+    /// Applies to: Claude, GPT-5, Gemini, Qwen3, DeepSeek with reasoning capability
+    #[serde(default = "default_reasoning_effort")]
+    pub reasoning_effort: String,
 }
 
 impl Default for AgentConfig {
@@ -73,6 +78,7 @@ impl Default for AgentConfig {
             anthropic_api_key: None,
             openai_api_key: None,
             default_system_instruction: default_system_instruction(),
+            reasoning_effort: default_reasoning_effort(),
         }
     }
 }
@@ -103,4 +109,7 @@ fn default_api_key_env() -> String {
 }
 fn default_system_instruction() -> String {
     "You are a helpful AI assistant.".to_string()
+}
+fn default_reasoning_effort() -> String {
+    "medium".to_string()
 }

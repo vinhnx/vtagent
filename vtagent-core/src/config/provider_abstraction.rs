@@ -5,6 +5,7 @@
 
 use crate::config::provider_definitions::Provider;
 use crate::config::model_definitions::ModelId;
+use crate::config::constants::urls;
 use std::collections::HashMap;
 
 /// Provider configuration details
@@ -31,7 +32,7 @@ impl ProviderRegistry {
         let mut registry = ProviderRegistry {
             providers: HashMap::new(),
         };
-        
+
         // Register all supported providers
         registry.register_provider(ProviderConfig {
             name: "gemini".to_string(),
@@ -39,69 +40,69 @@ impl ProviderRegistry {
             base_url: "https://generativelanguage.googleapis.com/v1beta".to_string(),
             is_local: false,
         });
-        
+
         registry.register_provider(ProviderConfig {
             name: "openai".to_string(),
             api_key_env: "OPENAI_API_KEY".to_string(),
             base_url: "https://api.openai.com/v1".to_string(),
             is_local: false,
         });
-        
+
         registry.register_provider(ProviderConfig {
             name: "anthropic".to_string(),
             api_key_env: "ANTHROPIC_API_KEY".to_string(),
             base_url: "https://api.anthropic.com/v1".to_string(),
             is_local: false,
         });
-        
+
         registry.register_provider(ProviderConfig {
             name: "lmstudio".to_string(),
             api_key_env: "LMSTUDIO_API_KEY".to_string(),
-            base_url: "http://localhost:1234/v1".to_string(),
+            base_url: urls::LMSTUDIO_DEFAULT_BASE_URL.to_string(),
             is_local: true,
         });
-        
+
         registry.register_provider(ProviderConfig {
             name: "ollama".to_string(),
             api_key_env: "OLLAMA_API_KEY".to_string(),
             base_url: "http://localhost:11434/api".to_string(),
             is_local: true,
         });
-        
+
         registry.register_provider(ProviderConfig {
             name: "openrouter".to_string(),
             api_key_env: "OPENROUTER_API_KEY".to_string(),
             base_url: "https://openrouter.ai/api/v1".to_string(),
             is_local: false,
         });
-        
+
         registry.register_provider(ProviderConfig {
             name: "groq".to_string(),
             api_key_env: "GROQ_API_KEY".to_string(),
             base_url: "https://api.groq.com/openai/v1".to_string(),
             is_local: false,
         });
-        
+
         registry.register_provider(ProviderConfig {
             name: "deepseek".to_string(),
             api_key_env: "DEEPSEEK_API_KEY".to_string(),
             base_url: "https://api.deepseek.com/v1".to_string(),
             is_local: false,
         });
-        
+
         registry
     }
-    
+
     /// Register a provider configuration
     pub fn register_provider(&mut self, config: ProviderConfig) {
         self.providers.insert(config.name.clone(), config);
     }
-    
+
     /// Get provider configuration by name
     pub fn get_provider(&self, name: &str) -> Option<&ProviderConfig> {
         self.providers.get(name)
     }
-    
+
     /// Get API key environment variable for a provider
     pub fn get_api_key_env(&self, provider: &Provider) -> String {
         match self.providers.get(&provider.to_string()) {
@@ -109,7 +110,7 @@ impl ProviderRegistry {
             None => provider.default_api_key_env().to_string(),
         }
     }
-    
+
     /// Get base URL for a provider
     pub fn get_base_url(&self, provider: &Provider) -> String {
         match self.providers.get(&provider.to_string()) {
@@ -120,7 +121,7 @@ impl ProviderRegistry {
                     Provider::Gemini => "https://generativelanguage.googleapis.com/v1beta".to_string(),
                     Provider::OpenAI => "https://api.openai.com/v1".to_string(),
                     Provider::Anthropic => "https://api.anthropic.com/v1".to_string(),
-                    Provider::LMStudio => "http://localhost:1234/v1".to_string(),
+                    Provider::LMStudio => urls::LMSTUDIO_DEFAULT_BASE_URL.to_string(),
                     Provider::Ollama => "http://localhost:11434/api".to_string(),
                     Provider::OpenRouter => "https://openrouter.ai/api/v1".to_string(),
                     Provider::Groq => "https://api.groq.com/openai/v1".to_string(),
@@ -129,7 +130,7 @@ impl ProviderRegistry {
             }
         }
     }
-    
+
     /// Check if a provider is local (doesn't require API key)
     pub fn is_local_provider(&self, provider: &Provider) -> bool {
         match self.providers.get(&provider.to_string()) {
@@ -226,45 +227,45 @@ pub fn get_provider_registry() -> &'static ProviderRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_provider_registry() {
         let registry = ProviderRegistry::new();
-        
+
         // Test known providers
         let gemini_config = registry.get_provider("gemini");
         assert!(gemini_config.is_some());
         assert_eq!(gemini_config.unwrap().api_key_env, "GEMINI_API_KEY");
-        
+
         let lmstudio_config = registry.get_provider("lmstudio");
         assert!(lmstudio_config.is_some());
         assert!(lmstudio_config.unwrap().is_local);
     }
-    
+
     #[test]
     fn test_standard_models() {
         let registry = ProviderRegistry::new();
-        
+
         // Test fast model mapping
         let gemini_fast = StandardModel::Fast.get_model_for_provider(&Provider::Gemini);
         assert_eq!(gemini_fast, ModelId::Gemini25FlashLitePreview0617);
-        
+
         let openai_fast = StandardModel::Fast.get_model_for_provider(&Provider::OpenAI);
         assert_eq!(openai_fast, ModelId::GPT5Mini);
     }
-    
+
     #[test]
     fn test_api_key_env() {
         let registry = ProviderRegistry::new();
-        
+
         assert_eq!(registry.get_api_key_env(&Provider::Gemini), "GEMINI_API_KEY");
         assert_eq!(registry.get_api_key_env(&Provider::OpenAI), "OPENAI_API_KEY");
     }
-    
+
     #[test]
     fn test_base_url() {
         let registry = ProviderRegistry::new();
-        
+
         assert!(registry.get_base_url(&Provider::Gemini).contains("generativelanguage"));
         assert!(registry.get_base_url(&Provider::OpenAI).contains("openai.com"));
         assert!(registry.get_base_url(&Provider::LMStudio).contains("localhost:1234"));

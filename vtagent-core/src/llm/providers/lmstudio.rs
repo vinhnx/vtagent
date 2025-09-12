@@ -1,4 +1,4 @@
-use crate::config::constants::{model_helpers, models};
+use crate::config::constants::{model_helpers, models, urls};
 use crate::llm::client::LLMClient;
 use crate::llm::provider::{
     FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
@@ -19,7 +19,7 @@ impl LMStudioProvider {
         Self {
             api_key,
             http_client: HttpClient::new(),
-            base_url: base_url.unwrap_or_else(|| "http://localhost:1234/v1".to_string()),
+            base_url: base_url.unwrap_or_else(|| urls::LMSTUDIO_DEFAULT_BASE_URL.to_string()),
         }
     }
 
@@ -55,8 +55,8 @@ impl LMStudioProvider {
                                     "id": tc.id,
                                     "type": "function",
                                     "function": {
-                                        "name": tc.name,
-                                        "arguments": tc.arguments
+                                        "name": tc.function.name,
+                                        "arguments": tc.function.arguments
                                     }
                                 })
                             })
@@ -103,9 +103,9 @@ impl LMStudioProvider {
                         json!({
                             "type": "function",
                             "function": {
-                                "name": tool.name,
-                                "description": tool.description,
-                                "parameters": tool.parameters
+                                "name": tool.function.name,
+                                "description": tool.function.description,
+                                "parameters": tool.function.parameters
                             }
                         })
                     })
@@ -149,12 +149,15 @@ impl LMStudioProvider {
                     .filter_map(|call| {
                         Some(ToolCall {
                             id: call.get("id")?.as_str()?.to_string(),
-                            name: call.get("function")?.get("name")?.as_str()?.to_string(),
-                            arguments: call
-                                .get("function")
-                                .and_then(|f| f.get("arguments"))
-                                .cloned()
-                                .unwrap_or(Value::Null),
+                            call_type: "function".to_string(),
+                            function: FunctionCall {
+                                name: call.get("function")?.get("name")?.as_str()?.to_string(),
+                                arguments: call
+                                    .get("function")
+                                    .and_then(|f| f.get("arguments"))
+                                    .map(|args| serde_json::to_string(args).unwrap_or_default())
+                                    .unwrap_or_default(),
+                            },
                         })
                     })
                     .collect()
@@ -343,9 +346,12 @@ impl LLMClient for LMStudioProvider {
                             .iter()
                             .flat_map(|tool| &tool.function_declarations)
                             .map(|decl| crate::llm::provider::ToolDefinition {
-                                name: decl.name.clone(),
-                                description: decl.description.clone(),
-                                parameters: decl.parameters.clone(),
+                                tool_type: "function".to_string(),
+                                function: crate::llm::provider::FunctionDefinition {
+                                    name: decl.name.clone(),
+                                    description: decl.description.clone(),
+                                    parameters: decl.parameters.clone(),
+                                },
                             })
                             .collect::<Vec<_>>()
                     });
@@ -358,6 +364,9 @@ impl LLMClient for LMStudioProvider {
                         max_tokens: Some(1000),
                         temperature: Some(0.7),
                         stream: false,
+                        tool_choice: None,
+                        parallel_tool_calls: None,
+                        reasoning_effort: None,
                     }
                 }
                 Err(_) => {
@@ -375,6 +384,9 @@ impl LLMClient for LMStudioProvider {
                         max_tokens: None,
                         temperature: None,
                         stream: false,
+                        tool_choice: None,
+                        parallel_tool_calls: None,
+                        reasoning_effort: None,
                     }
                 }
             }
@@ -393,6 +405,9 @@ impl LLMClient for LMStudioProvider {
                 max_tokens: None,
                 temperature: None,
                 stream: false,
+                tool_choice: None,
+                parallel_tool_calls: None,
+                reasoning_effort: None,
             }
         };
 

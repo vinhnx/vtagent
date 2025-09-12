@@ -55,6 +55,9 @@ fn test_openai_tool_call_format() {
         max_tokens: Some(1000),
         temperature: Some(0.7),
         stream: false,
+        tool_choice: None,
+        parallel_tool_calls: None,
+        reasoning_effort: None,
     };
 
     let result = provider.convert_to_openai_format(&request);
@@ -144,6 +147,9 @@ fn test_anthropic_tool_call_format() {
         max_tokens: Some(1000),
         temperature: Some(0.7),
         stream: false,
+        tool_choice: None,
+        parallel_tool_calls: None,
+        reasoning_effort: None,
     };
 
     let result = provider.convert_to_anthropic_format(&request);
@@ -235,6 +241,9 @@ fn test_gemini_tool_call_format() {
         max_tokens: Some(1000),
         temperature: Some(0.7),
         stream: false,
+        tool_choice: None,
+        parallel_tool_calls: None,
+        reasoning_effort: None,
     };
 
     let result = provider.convert_to_gemini_format(&request);
@@ -299,9 +308,12 @@ fn test_all_providers_tool_validation() {
         system_prompt: None,
         tools: Some(vec![tool.clone()]),
         model: "gemini-2.5-flash".to_string(),
-        max_tokens: None,
-        temperature: None,
+        max_tokens: Some(1000),
+        temperature: Some(0.7),
         stream: false,
+        tool_choice: None,
+        parallel_tool_calls: None,
+        reasoning_effort: None,
     };
 
     let openai_request = LLMRequest {
@@ -312,6 +324,9 @@ fn test_all_providers_tool_validation() {
         max_tokens: None,
         temperature: None,
         stream: false,
+        tool_choice: None,
+        parallel_tool_calls: None,
+        reasoning_effort: None,
     };
 
     let anthropic_request = LLMRequest {

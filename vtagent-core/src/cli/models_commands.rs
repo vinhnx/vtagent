@@ -375,6 +375,7 @@ async fn handle_test_provider(_cli: &Cli, provider: &str) -> Result<()> {
         stream: false,
         tool_choice: None,
         parallel_tool_calls: None,
+        reasoning_effort: None,
     };
 
     match provider_instance.generate(test_request).await {

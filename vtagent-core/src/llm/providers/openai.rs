@@ -189,6 +189,14 @@ impl OpenAIProvider {
             openai_request["parallel_tool_calls"] = Value::Bool(parallel);
         }
 
+        // Add reasoning_effort for models that support it (GPT-5 etc.)
+        if let Some(reasoning_effort) = &request.reasoning_effort {
+            if request.model.contains(models::openai::GPT_5) ||
+               request.model.contains(models::openai::GPT_5_MINI) {
+                openai_request["reasoning_effort"] = json!(reasoning_effort);
+            }
+        }
+
         Ok(openai_request)
     }
 
@@ -292,23 +300,16 @@ impl LLMClient for OpenAIProvider {
         }
 
         let request = LLMRequest {
+            model: model.clone(),
             messages: vec![Message {
                 role: MessageRole::User,
                 content: prompt.to_string(),
-                tool_calls: None,
-                tool_call_id: None,
+                ..Default::default()
             }],
-            system_prompt: None,
-            tools: None,
-            model: model.clone(),
-            max_tokens: None,
-            temperature: None,
-            stream: false,
-            tool_choice: None,
-            parallel_tool_calls: None,
+            ..Default::default()
         };
 
-        let response = LLMProvider::generate(self, request).await?;
+        let response = LLMProvider::generate(self, request.clone()).await?;
 
         Ok(llm_types::LLMResponse {
             content: response.content.unwrap_or("".to_string()),

@@ -173,6 +173,9 @@ fn test_request_validation() {
         max_tokens: None,
         temperature: None,
         stream: false,
+        tool_choice: None,
+        parallel_tool_calls: None,
+        reasoning_effort: None,
     };
     assert!(gemini.validate_request(&valid_gemini_request).is_ok());
 

@@ -1,97 +1,63 @@
+check
+
+vtagent-core/src/core/agent/integration.rs
+vtagent-core/src/llm/providers/openai.rs
+vtagent-core/src/llm/providers/lmstudio.rs
+vtagent-core/src/llm/providers/gemini.rs
+vtagent-core/src/llm/providers/anthropic.rs
+
+still have hardcode string
+if request.model.contains("gpt-5") || request.model.contains("o1") {
+--
+
+auto_cleanup_days: 7, // Default value
+enable_persistence: false, // Default value
+
+vtagent-core/src/core/agent/integration.rs -> move to config?
+
+---
+
+implement "// TODO: Pass reasoning_effort from config". use context7
+
+--
+❌ pty.max_sessions - Defined but not used in core logic
+
+---
+
+check src/multi_agent_loop.rs and make sure multi-agent loop still work.
+--
+
+scan for dead code and review. and fix
+
+--
+
+reasoning_effort = "medium"
+use_single_model = true
+-> thse config is not used in logic
+
+fix it.
+also, make sure all config in vtagent.toml applied correctly in core agent logic.
+
 --
 
 https://docs.rs/console/latest/console/
 
---
+---
 
 https://docs.rs/dialoguer/latest/dialoguer/
 
 --
-
-IMPORTANT: don't use emoji in agent runner message. this is extremely important.
-
 --
 
 https://x.com/AlexGDimakis/status/1965947230696910935
 
 
---
-src/main.rs, double check use hardcode model id and old model in async_trait, use enum constants model from vtagent-core/src/config/constants.rs and model.json. make sure all places that use hardcode model id and old model in async_trait are updated.
 
---
-
-let mut conversation_history = vec![
-    Message {
-        role: MessageRole::System,
-        content: "You are a helpful coding assistant. You can help with programming tasks, code analysis, and file operations.".to_string(),
-        content: "You are a helpful coding assistant for the VTAgent Rust project with access to file operations.\n\nMANDATORY TOOL USAGE:\n- When user asks 'what is this project about' or similar: IMMEDIATELY call list_files to see project structure, then call read_file on README.md\n- When user asks about code or files: Use read_file to read the relevant files\n- When user asks about project structure: Use list_files first\n\nTOOL CALL FORMAT: Always respond with a function call when you need to use tools. Do not give text responses for project questions without using tools first.\n\nAvailable tools:\n- list_files: List files and directories\n- read_file: Read file contents\n- rp_search: Search for patterns in code\n- run_terminal_cmd: Execute terminal commands".to_string(),
-        tool_calls: None,
-        tool_call_id: None,
-    }
-];
-
-
-make sure this prompts is linked with /prompts/*.md files for full prompts context.
-
----
-vtagent-core/src/llm/providers/openai.rs still use hardcode model id and old model in async_trait, use enum constants model from vtagent-core/src/config/constants.rs and model.json
-
---
-
-check
-vtagent-core/src/llm/providers/lmstudio.rs still use hardcode model id and old model in async_trait, use enum constants model from vtagent-core/src/config/constants.rs and model.json
-
---
-
-check
-vtagent-core/src/llm/providers/anthropic.rs still use hardcode model id and old model in async_trait, use enum constants model from vtagent-core/src/config/constants.rs and model.json
-
-_
-
-allow config reasoning effort level for agent model that support it. like claude, gpt-5, gemini, qwen3.
-
---
-
-in vtagent.toml. add option to use 1 model for all agents, if multi-agent enabled, default true.
-
-
----
-
-don't hardcode port "http://localhost:1234/v1" use enum constant from vtagent-core/src/config/constants.rs. update all places that use this hardcode value.
-
----
-
-let system_prompt = match agent_type {
-            AgentType::Coder => {
-                include_str!("../../../../prompts/coder_system.md").to_string()
-            }
-            AgentType::Explorer => {
-                include_str!("../../../../prompts/explorer_system.md").to_string()
-            }
-            AgentType::Orchestrator => {
-                include_str!("../../../../prompts/orchestrator_system.md").to_string()
-            }
-            AgentType::Single => {
-                include_str!("../../../../prompts/system.md").to_string()
-            }
-        };
-
-is this path correct?
-
---
-
-double check and cleanup vtagent-core/src/config/provider_abstraction.rs.
-
---
-
-add kimi k2, glm-4.5 for openrouter models
 
 --
 add configure comments for all possible values for vtagent.toml (example: providers. models. values)
 
 --
-
-use context7 to update llm provider implement make sure tools call work and applicable generically regardless of provider/model
 
 --
 the agent loop was working on main branch. we did have a major refactor now. make sure agent loop still work.
@@ -101,14 +67,6 @@ the agent loop was working on main branch. we did have a major refactor now. mak
 also config the run the agent on lmstudio on dev mode by default. use single qwen/qwen3-4b-2507
 as all agents task in orchestrator and executor and planner  agent.
 
---
-
-1. remove meta-llama, mistral models
-2. update anthropic models: claude-opus-4-1-20250805,  claude-sonnet-4-20250514. remove others
-3. update openai models: gpt-5,  gpt-5-mini. remove others
-4. update gemini models: gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
-5. remove ollama provider completely
-6. update all tests and document and config completely for the models sync
 ---
 
 https://github.com/krypticmouse/DSRs/tree/main
@@ -121,34 +79,13 @@ https://github.com/tokio-rs/tracing
 https://x.com/krypticmouse/status/1965807238347645137
 --
 
-can we remove?
-
-[text](../../vtagent_minimal.toml) [text](../../vtagent_simple.toml)
---
 https://github.com/gyscos/cursive
 
 --
 https://github.com/openai/completions-responses-migration-pack
 
 --
-https://github.com/github/spec-kit
 
---
- refence the docs/ folder to understand the complete            │
-│   picture to make sure agent loop and system prompt and          │
-│   multi agent work                                               │
-╰───────────────────────
-
----
-
-why this is still mock. please   │
-│    implement it. now for vtagent.toml       │
-│    config. let user choose to use           │
-│    multi-agent enable. if enable let user   │
-│    set main ochstrator agent and and        │
-│    executor agent. by default for single    │
-│    agent mode, use execurator agent only
---
 "Regex over embeddings. Markdown over databases. Direct file operations over complex abstractions. Acts like a human using bash."
 --
 If you follow me you know that I love Claude Code and I probably changed my life

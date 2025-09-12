@@ -1,10 +1,11 @@
 //! Agent runner for executing individual agent instances
 
 use crate::config::models::ModelId;
-use crate::config::constants::tools;
+use crate::config::constants::{tools, urls};
 use crate::core::agent::multi_agent::*;
 use crate::gemini::{Content, GenerateContentRequest, Part, Tool, ToolConfig};
 use crate::llm::{AnyClient, create_provider_with_config, make_client};
+use crate::llm::provider::{LLMRequest, Message, MessageRole, ToolDefinition, FunctionDefinition};
 use crate::tools::{ToolRegistry, build_function_declarations};
 use anyhow::{Result, anyhow};
 use console::style;
@@ -25,92 +26,38 @@ impl crate::llm::client::LLMClient for LMStudioClientWrapper {
         &mut self,
         prompt: &str,
     ) -> Result<crate::llm::types::LLMResponse, crate::llm::provider::LLMError> {
-        // Parse the prompt as a GenerateContentRequest if it's a serialized request
-        let request: crate::gemini::GenerateContentRequest = match serde_json::from_str(prompt) {
+        // Try to parse as LLMRequest JSON, otherwise treat as plain text
+        let request: crate::llm::provider::LLMRequest = match serde_json::from_str(prompt) {
             Ok(req) => req,
             Err(_) => {
-                // If parsing fails, treat it as a simple text prompt
-                crate::gemini::GenerateContentRequest {
-                    contents: vec![crate::gemini::Content::user_text(prompt.to_string())],
+                // Fallback to simple text prompt
+                crate::llm::provider::LLMRequest {
+                    messages: vec![crate::llm::provider::Message {
+                        role: crate::llm::provider::MessageRole::User,
+                        content: prompt.to_string(),
+                        tool_calls: None,
+                        tool_call_id: None,
+                    }],
+                    system_prompt: None,
                     tools: None,
-                    tool_config: None,
-                    system_instruction: None,
-                    generation_config: None,
+                    model: self.model.clone(),
+                    max_tokens: Some(1000),
+                    temperature: Some(0.7),
+                    stream: false,
+                    tool_choice: None,
+                    parallel_tool_calls: None,
+                    reasoning_effort: None,
                 }
             }
         };
 
-        // Convert Gemini format to LLM provider format
-        let messages: Vec<crate::llm::provider::Message> = request
-            .contents
-            .into_iter()
-            .map(|content| {
-                let role = match content.role.as_str() {
-                    crate::config::constants::message_roles::USER => crate::llm::provider::MessageRole::User,
-                    "model" => crate::llm::provider::MessageRole::Assistant,
-                    crate::config::constants::message_roles::SYSTEM => crate::llm::provider::MessageRole::System,
-                    _ => crate::llm::provider::MessageRole::User,
-                };
-
-                // Extract text content from parts
-                let content_text = content
-                    .parts
-                    .into_iter()
-                    .filter_map(|part| match part {
-                        crate::gemini::Part::Text { text } => Some(text),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n");
-
-                crate::llm::provider::Message {
-                    role,
-                    content: content_text,
-                    tool_calls: None,
-                    tool_call_id: None,
-                }
-            })
-            .collect();
-
-        // Create LLM request
-        let llm_request = crate::llm::provider::LLMRequest {
-            messages,
-            system_prompt: request.system_instruction.as_ref().map(|si| {
-                si.parts
-                    .iter()
-                    .filter_map(|part| match part {
-                        crate::gemini::Part::Text { text } => Some(text.clone()),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            }),
-            tools: request.tools.as_ref().map(|gemini_tools| {
-                gemini_tools
-                    .iter()
-                    .flat_map(|tool| &tool.function_declarations)
-                    .map(|decl| crate::llm::provider::ToolDefinition::function(
-                        decl.name.clone(),
-                        decl.description.clone(),
-                        decl.parameters.clone(),
-                    ))
-                    .collect::<Vec<_>>()
-            }),
-            model: self.model.clone(),
-            max_tokens: Some(1000),
-            temperature: Some(0.7),
-            stream: false,
-            tool_choice: None,
-            parallel_tool_calls: None,
-        };
-
-        // Get response from provider and convert it to the right type
-        let provider_response = self.provider.generate(llm_request).await?;
+        // Convert LLMRequest to the format expected by the provider
+        let response = self.provider.generate(request).await?;
 
         Ok(crate::llm::types::LLMResponse {
-            content: provider_response.content.unwrap_or_default(),
+            content: response.content.unwrap_or_default(),
             model: self.model.clone(),
-            usage: provider_response.usage.map(|u| crate::llm::types::Usage {
+            usage: response.usage.map(|u| crate::llm::types::Usage {
                 prompt_tokens: u.prompt_tokens as usize,
                 completion_tokens: u.completion_tokens as usize,
                 total_tokens: u.total_tokens as usize,
@@ -141,6 +88,10 @@ pub struct AgentRunner {
     session_id: String,
     /// Workspace path
     workspace: PathBuf,
+    /// Model identifier
+    model: String,
+    /// Reasoning effort level for models that support it
+    reasoning_effort: Option<String>,
 }
 
 impl AgentRunner {
@@ -203,6 +154,7 @@ impl AgentRunner {
         api_key: String,
         workspace: PathBuf,
         session_id: String,
+        reasoning_effort: Option<String>,
     ) -> Result<Self> {
         // Create client based on model - if it's an LMStudio model, create the provider directly
         let client: AnyClient =
@@ -211,7 +163,7 @@ impl AgentRunner {
                 let provider = create_provider_with_config(
                     "lmstudio",
                     Some(api_key.clone()),
-                    Some("http://localhost:1234/v1".to_string()),
+                    Some(urls::LMSTUDIO_DEFAULT_BASE_URL.to_string()),
                     Some(model.as_str().to_string()),
                 )
                 .map_err(|e| anyhow::anyhow!("Failed to create LMStudio provider: {}", e))?;
@@ -244,6 +196,8 @@ impl AgentRunner {
             system_prompt,
             session_id,
             workspace,
+            model: model.as_str().to_string(),
+            reasoning_effort,
         })
     }
 
@@ -297,7 +251,21 @@ impl AgentRunner {
         }
 
         // Build available tools for this agent
-        let tools = self.build_agent_tools()?;
+        let gemini_tools = self.build_agent_tools()?;
+
+        // Convert Gemini tools to universal ToolDefinition format
+        let tools: Vec<ToolDefinition> = gemini_tools
+            .into_iter()
+            .flat_map(|tool| tool.function_declarations)
+            .map(|decl| ToolDefinition {
+                tool_type: "function".to_string(),
+                function: FunctionDefinition {
+                    name: decl.name,
+                    description: decl.description,
+                    parameters: decl.parameters,
+                },
+            })
+            .collect();
 
         // Track execution results
         let created_contexts = Vec::new();
@@ -319,12 +287,37 @@ impl AgentRunner {
                 turn + 1
             ));
 
-            let request = GenerateContentRequest {
-                contents: conversation.clone(),
-                tools: Some(tools.clone()),
-                tool_config: Some(ToolConfig::auto()),
-                system_instruction: None,
-                generation_config: None,
+            let request = LLMRequest {
+                messages: conversation.iter().map(|content| {
+                    // Convert Gemini Content to LLM Message
+                    let role = match content.role.as_str() {
+                        "user" => MessageRole::User,
+                        "model" => MessageRole::Assistant,
+                        _ => MessageRole::User,
+                    };
+                    let content_text = content.parts.iter()
+                        .filter_map(|part| match part {
+                            crate::gemini::Part::Text { text } => Some(text.clone()),
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    Message {
+                        role,
+                        content: content_text,
+                        tool_calls: None,
+                        tool_call_id: None,
+                    }
+                }).collect(),
+                system_prompt: None,
+                tools: Some(tools),
+                model: self.model.clone(),
+                max_tokens: Some(2000),
+                temperature: Some(0.7),
+                stream: false,
+                tool_choice: None,
+                parallel_tool_calls: None,
+                reasoning_effort: self.reasoning_effort.clone(),
             };
 
             let response = self

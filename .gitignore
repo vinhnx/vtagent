@@ -758,7 +758,6 @@ TODO2.md
 /.github/copilot-instructions.md.bak
 /.kiro/steering/ruler_kiro_instructions.md
 /.kiro/steering/ruler_kiro_instructions.md.bak
-/.serena/project.yml
 /AGENTS.md
 /AGENTS.md.bak
 /CLAUDE.md
@@ -766,3 +765,13 @@ TODO2.md
 /WARP.md
 /WARP.md.bak
 # END Ruler Generated Files
+
+*.pkl
+.ck/
+.cursor/
+.codex/
+.kiro/
+.serena/
+.copilot/
+.gemini/
+.qwen/

@@ -2,6 +2,7 @@ use crate::config::constants::{model_helpers, models, urls};
 use crate::llm::client::LLMClient;
 use crate::llm::provider::{
     FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
+    FunctionCall,
 };
 use crate::llm::types as llm_types;
 use async_trait::async_trait;

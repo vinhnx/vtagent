@@ -1,7 +1,7 @@
 //! Advanced search tools with enhanced case-insensitive capabilities
 
 use super::traits::Tool;
-use crate::tools::rp_search::RpSearchManager;
+use crate::tools::rg_search::RgSearchManager;
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use regex::Regex;
@@ -13,7 +13,7 @@ use std::sync::Arc;
 /// Enhanced search tool with advanced case-insensitive features
 pub struct AdvancedSearchTool {
     workspace_root: PathBuf,
-    rp_search: Arc<RpSearchManager>,
+    rg_search: Arc<RgSearchManager>,
 }
 
 #[derive(Debug, Clone)]
@@ -44,10 +44,10 @@ impl Default for SearchOptions {
 }
 
 impl AdvancedSearchTool {
-    pub fn new(workspace_root: PathBuf, rp_search: Arc<RpSearchManager>) -> Self {
+    pub fn new(workspace_root: PathBuf, rg_search: Arc<RgSearchManager>) -> Self {
         Self {
             workspace_root,
-            rp_search,
+            rg_search,
         }
     }
 
@@ -530,7 +530,7 @@ mod tests {
             .await
             .unwrap();
 
-        let rp_search = Arc::new(RpSearchManager::new(workspace_root.clone()));
+        let rp_search = Arc::new(RgSearchManager::new(workspace_root.clone()));
         let search_tool = AdvancedSearchTool::new(workspace_root, rp_search);
 
         let options = SearchOptions {
@@ -555,7 +555,7 @@ mod tests {
             .await
             .unwrap();
 
-        let rp_search = Arc::new(RpSearchManager::new(workspace_root.clone()));
+        let rp_search = Arc::new(RgSearchManager::new(workspace_root.clone()));
         let search_tool = AdvancedSearchTool::new(workspace_root, rp_search);
 
         let options = SearchOptions {

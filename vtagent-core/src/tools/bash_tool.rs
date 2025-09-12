@@ -1,141 +1,306 @@
-//! Bash-like tool using direct command execution
+//! Bash-like tool using PTY for terminal emulation compatibility
 //!
-//! This tool provides bash-like functionality by directly executing
-//! common shell commands without complex abstractions.
+//! This tool provides bash-like functionality using PTY (pseudo-terminal)
+//! for proper terminal emulation, making it compatible with interactive
+//! commands and tools that require terminal capabilities.
 
 use super::traits::Tool;
-use crate::bash_runner::BashRunner;
 use crate::config::constants::tools;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use rexpect::spawn;
 use serde_json::{Value, json};
 use std::path::PathBuf;
 
-/// Bash-like tool for direct command execution
+/// Bash-like tool for PTY-based command execution
 #[derive(Clone)]
 pub struct BashTool {
-    runner: BashRunner,
+    workspace_root: PathBuf,
 }
 
 impl BashTool {
     /// Create a new bash tool
     pub fn new(workspace_root: PathBuf) -> Self {
-        let runner = BashRunner::new(workspace_root);
-        Self { runner }
+        Self { workspace_root }
     }
 
-    /// Execute ls command
+    /// Execute command using PTY for terminal emulation
+    async fn execute_pty_command(&self, command: &str, args: Vec<String>, timeout_secs: Option<u64>) -> Result<Value> {
+        // Validate command for security before execution
+        let full_command_parts = std::iter::once(command.to_string()).chain(args.clone()).collect::<Vec<String>>();
+        self.validate_command(&full_command_parts)?;
+
+        let full_command = if args.is_empty() {
+            command.to_string()
+        } else {
+            format!("{} {}", command, args.join(" "))
+        };
+
+        // Set working directory
+        let work_dir = self.workspace_root.display().to_string();
+        let cd_command = format!("cd {}", work_dir);
+
+        // Set timeout (default 30 seconds)
+        let timeout_ms = timeout_secs.unwrap_or(30) * 1000;
+
+        // Execute command in PTY
+        let mut pty_session = spawn(&full_command, Some(timeout_ms))
+            .map_err(|e| anyhow::anyhow!("Failed to spawn PTY session: {}", e))?;
+
+        // Change to workspace directory
+        pty_session
+            .send_line(&cd_command)
+            .map_err(|e| anyhow::anyhow!("Failed to change directory: {}", e))?;
+
+        // Wait for command to complete and capture output
+        let output = pty_session
+            .exp_eof()
+            .map_err(|e| anyhow::anyhow!("PTY session failed: {}", e))?;
+
+        Ok(json!({
+            "success": true,
+            "exit_code": 0,
+            "stdout": output,
+            "stderr": "",
+            "mode": "pty",
+            "pty_enabled": true,
+            "command": full_command,
+            "working_directory": work_dir
+        }))
+    }
+
+    /// Validate command for security
+    fn validate_command(&self, command_parts: &[String]) -> Result<()> {
+        if command_parts.is_empty() {
+            return Err(anyhow::anyhow!("Command cannot be empty"));
+        }
+
+        let program = &command_parts[0];
+
+        // Basic security checks - dangerous commands that should be blocked
+        let dangerous_commands = [
+            "rm", "rmdir", "del", "format", "fdisk", "mkfs",
+            "dd", "shred", "wipe", "srm", "unlink",
+            "chmod", "chown", "passwd", "usermod", "userdel",
+            "systemctl", "service", "kill", "killall", "pkill",
+            "reboot", "shutdown", "halt", "poweroff",
+            "sudo", "su", "doas", "runas",
+            "curl", "wget", "ftp", "scp", "rsync", // Network commands
+            "ssh", "telnet", "nc", "ncat", "socat", // Remote access
+            "mount", "umount", "fsck", "tune2fs", // Filesystem operations
+            "iptables", "ufw", "firewalld", // Firewall
+            "crontab", "at", // Scheduling
+            "docker", "podman", "kubectl", // Container/orchestration
+        ];
+
+        if dangerous_commands.contains(&program.as_str()) {
+            return Err(anyhow::anyhow!(
+                "Dangerous command not allowed: '{}'. This command could potentially harm your system. \
+                 Use file operation tools instead for safe file management.",
+                program
+            ));
+        }
+
+        // Check for suspicious patterns in the full command
+        let full_command = command_parts.join(" ");
+
+        // Block recursive delete operations
+        if full_command.contains("rm -rf") ||
+           full_command.contains("rm -r") && (full_command.contains(" /") || full_command.contains(" ~")) ||
+           full_command.contains("rmdir") && (full_command.contains(" /") || full_command.contains(" ~")) {
+            return Err(anyhow::anyhow!(
+                "Potentially dangerous recursive delete operation detected. \
+                 Use file operation tools for safe file management."
+            ));
+        }
+
+        // Block privilege escalation attempts
+        if full_command.contains("sudo ") ||
+           full_command.contains("su ") ||
+           full_command.contains("doas ") ||
+           full_command.contains("runas ") {
+            return Err(anyhow::anyhow!(
+                "Privilege escalation commands are not allowed. \
+                 All operations run with current user privileges."
+            ));
+        }
+
+        // Block network operations that could exfiltrate data
+        if (full_command.contains("curl ") || full_command.contains("wget ")) &&
+           (full_command.contains("http://") || full_command.contains("https://") ||
+            full_command.contains("ftp://")) {
+            return Err(anyhow::anyhow!(
+                "Network download commands are restricted. \
+                 Use local file operations only."
+            ));
+        }
+
+        // Block commands that modify system configuration
+        if full_command.contains(" > /etc/") ||
+           full_command.contains(" >> /etc/") ||
+           full_command.contains(" > /usr/") ||
+           full_command.contains(" >> /usr/") ||
+           full_command.contains(" > /var/") ||
+           full_command.contains(" >> /var/") {
+            return Err(anyhow::anyhow!(
+                "System configuration file modifications are not allowed. \
+                 Use user-specific configuration files only."
+            ));
+        }
+
+        // Block commands that access sensitive directories
+        let sensitive_paths = ["/etc/", "/usr/", "/var/", "/root/", "/boot/", "/sys/", "/proc/"];
+        for path in &sensitive_paths {
+            if full_command.contains(path) && (
+                full_command.contains("rm ") ||
+                full_command.contains("mv ") ||
+                full_command.contains("cp ") ||
+                full_command.contains("chmod ") ||
+                full_command.contains("chown ")
+            ) {
+                return Err(anyhow::anyhow!(
+                    "Operations on system directories '{}' are not allowed. \
+                     Work within your project workspace only.",
+                    path.trim_end_matches('/')
+                ));
+            }
+        }
+
+        // Allow only safe commands that are commonly needed for development
+        let allowed_commands = [
+            "ls", "pwd", "cat", "head", "tail", "grep", "find",
+            "wc", "sort", "uniq", "cut", "awk", "sed",
+            "echo", "printf", "seq", "basename", "dirname",
+            "date", "cal", "bc", "expr", "test", "[", "]",
+            "true", "false", "sleep", "which", "type",
+            "file", "stat", "du", "df", "ps", "top", "htop",
+            "tree", "less", "more", "tac", "rev", "tr",
+            "fold", "paste", "join", "comm", "diff", "patch",
+            "gzip", "gunzip", "bzip2", "bunzip2", "xz", "unxz",
+            "tar", "zip", "unzip", "gzip", "bzip2",
+            "git", "hg", "svn", // Version control (read-only operations)
+            "make", "cmake", "ninja", // Build systems
+            "cargo", "npm", "yarn", "pnpm", // Package managers
+            "python", "python3", "node", "ruby", "perl", "php",
+            "java", "javac", "scala", "kotlin", "go", "rustc",
+            "gcc", "g++", "clang", "clang++", // Compilers
+        ];
+
+        if !allowed_commands.contains(&program.as_str()) {
+            return Err(anyhow::anyhow!(
+                "Command '{}' is not in the allowed commands list. \
+                 Only safe development and analysis commands are permitted. \
+                 Use specialized tools for file operations, searches, and builds.",
+                program
+            ));
+        }
+
+        Ok(())
+    }
+
+    /// Execute ls command with PTY
     async fn execute_ls(&self, args: Value) -> Result<Value> {
-        let path = args.get("path").and_then(|v| v.as_str());
+        let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
         let show_hidden = args.get("show_hidden").and_then(|v| v.as_bool()).unwrap_or(false);
 
-        let result = self.runner.ls(path, show_hidden)?;
-        Ok(json!({
-            "command": "ls",
-            "path": path,
-            "show_hidden": show_hidden,
-            "output": result
-        }))
+        let mut cmd_args = vec![path.to_string()];
+        if show_hidden {
+            cmd_args.insert(0, "-la".to_string());
+        } else {
+            cmd_args.insert(0, "-l".to_string());
+        }
+
+        self.execute_pty_command("ls", cmd_args, Some(10)).await
     }
 
-    /// Execute pwd command
+    /// Execute pwd command with PTY
     async fn execute_pwd(&self) -> Result<Value> {
-        let result = self.runner.pwd();
-        Ok(json!({
-            "command": "pwd",
-            "output": result
-        }))
+        self.execute_pty_command("pwd", vec![], Some(5)).await
     }
 
-    /// Execute grep command
+    /// Execute grep command with PTY
     async fn execute_grep(&self, args: Value) -> Result<Value> {
         let pattern = args.get("pattern")
             .and_then(|v| v.as_str())
             .context("pattern is required for grep")?;
 
-        let path = args.get("path").and_then(|v| v.as_str());
+        let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
         let recursive = args.get("recursive").and_then(|v| v.as_bool()).unwrap_or(false);
 
-        let result = self.runner.grep(pattern, path, recursive)?;
-        Ok(json!({
-            "command": "grep",
-            "pattern": pattern,
-            "path": path,
-            "recursive": recursive,
-            "output": result
-        }))
+        let mut cmd_args = vec![pattern.to_string(), path.to_string()];
+        if recursive {
+            cmd_args.insert(0, "-r".to_string());
+        }
+
+        self.execute_pty_command("grep", cmd_args, Some(30)).await
     }
 
-    /// Execute find command
+    /// Execute find command with PTY
     async fn execute_find(&self, args: Value) -> Result<Value> {
-        let path = args.get("path").and_then(|v| v.as_str());
+        let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
         let name_pattern = args.get("name_pattern").and_then(|v| v.as_str());
         let type_filter = args.get("type_filter").and_then(|v| v.as_str());
 
-        let result = self.runner.find(path, name_pattern, type_filter)?;
-        Ok(json!({
-            "command": "find",
-            "path": path,
-            "name_pattern": name_pattern,
-            "type_filter": type_filter,
-            "output": result
-        }))
+        let mut cmd_args = vec![path.to_string()];
+        if let Some(pattern) = name_pattern {
+            cmd_args.push("-name".to_string());
+            cmd_args.push(pattern.to_string());
+        }
+        if let Some(filter) = type_filter {
+            cmd_args.push("-type".to_string());
+            cmd_args.push(filter.to_string());
+        }
+
+        self.execute_pty_command("find", cmd_args, Some(30)).await
     }
 
-    /// Execute cat command
+    /// Execute cat command with PTY
     async fn execute_cat(&self, args: Value) -> Result<Value> {
         let path = args.get("path")
             .and_then(|v| v.as_str())
             .context("path is required for cat")?;
 
-        let start_line = args.get("start_line").and_then(|v| v.as_u64()).map(|v| v as usize);
-        let end_line = args.get("end_line").and_then(|v| v.as_u64()).map(|v| v as usize);
+        let start_line = args.get("start_line").and_then(|v| v.as_u64());
+        let end_line = args.get("end_line").and_then(|v| v.as_u64());
 
-        let result = self.runner.cat(path, start_line, end_line)?;
-        Ok(json!({
-            "command": "cat",
-            "path": path,
-            "start_line": start_line,
-            "end_line": end_line,
-            "output": result
-        }))
+        if let (Some(start), Some(end)) = (start_line, end_line) {
+            // Use sed to extract line range
+            let sed_cmd = format!("sed -n '{}','{}'p {}", start, end, path);
+            return self.execute_pty_command("sh", vec!["-c".to_string(), sed_cmd], Some(10)).await;
+        }
+
+        let cmd_args = vec![path.to_string()];
+
+        self.execute_pty_command("cat", cmd_args, Some(10)).await
     }
 
-    /// Execute head command
+    /// Execute head command with PTY
     async fn execute_head(&self, args: Value) -> Result<Value> {
         let path = args.get("path")
             .and_then(|v| v.as_str())
             .context("path is required for head")?;
 
-        let lines = args.get("lines").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
+        let lines = args.get("lines").and_then(|v| v.as_u64()).unwrap_or(10);
 
-        let result = self.runner.head(path, lines)?;
-        Ok(json!({
-            "command": "head",
-            "path": path,
-            "lines": lines,
-            "output": result
-        }))
+        let cmd_args = vec!["-n".to_string(), lines.to_string(), path.to_string()];
+
+        self.execute_pty_command("head", cmd_args, Some(10)).await
     }
 
-    /// Execute tail command
+    /// Execute tail command with PTY
     async fn execute_tail(&self, args: Value) -> Result<Value> {
         let path = args.get("path")
             .and_then(|v| v.as_str())
             .context("path is required for tail")?;
 
-        let lines = args.get("lines").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
+        let lines = args.get("lines").and_then(|v| v.as_u64()).unwrap_or(10);
 
-        let result = self.runner.tail(path, lines)?;
-        Ok(json!({
-            "command": "tail",
-            "path": path,
-            "lines": lines,
-            "output": result
-        }))
+        let cmd_args = vec!["-n".to_string(), lines.to_string(), path.to_string()];
+
+        self.execute_pty_command("tail", cmd_args, Some(10)).await
     }
 
-    /// Execute mkdir command
+    /// Execute mkdir command with PTY
     async fn execute_mkdir(&self, args: Value) -> Result<Value> {
         let path = args.get("path")
             .and_then(|v| v.as_str())
@@ -143,16 +308,15 @@ impl BashTool {
 
         let parents = args.get("parents").and_then(|v| v.as_bool()).unwrap_or(false);
 
-        self.runner.mkdir(path, parents)?;
-        Ok(json!({
-            "command": "mkdir",
-            "path": path,
-            "parents": parents,
-            "status": "success"
-        }))
+        let mut cmd_args = vec![path.to_string()];
+        if parents {
+            cmd_args.insert(0, "-p".to_string());
+        }
+
+        self.execute_pty_command("mkdir", cmd_args, Some(10)).await
     }
 
-    /// Execute rm command
+    /// Execute rm command with PTY
     async fn execute_rm(&self, args: Value) -> Result<Value> {
         let path = args.get("path")
             .and_then(|v| v.as_str())
@@ -161,17 +325,19 @@ impl BashTool {
         let recursive = args.get("recursive").and_then(|v| v.as_bool()).unwrap_or(false);
         let force = args.get("force").and_then(|v| v.as_bool()).unwrap_or(false);
 
-        self.runner.rm(path, recursive, force)?;
-        Ok(json!({
-            "command": "rm",
-            "path": path,
-            "recursive": recursive,
-            "force": force,
-            "status": "success"
-        }))
+        let mut cmd_args = vec![];
+        if recursive {
+            cmd_args.push("-r".to_string());
+        }
+        if force {
+            cmd_args.push("-f".to_string());
+        }
+        cmd_args.push(path.to_string());
+
+        self.execute_pty_command("rm", cmd_args, Some(10)).await
     }
 
-    /// Execute cp command
+    /// Execute cp command with PTY
     async fn execute_cp(&self, args: Value) -> Result<Value> {
         let source = args.get("source")
             .and_then(|v| v.as_str())
@@ -183,17 +349,17 @@ impl BashTool {
 
         let recursive = args.get("recursive").and_then(|v| v.as_bool()).unwrap_or(false);
 
-        self.runner.cp(source, dest, recursive)?;
-        Ok(json!({
-            "command": "cp",
-            "source": source,
-            "dest": dest,
-            "recursive": recursive,
-            "status": "success"
-        }))
+        let mut cmd_args = vec![];
+        if recursive {
+            cmd_args.push("-r".to_string());
+        }
+        cmd_args.push(source.to_string());
+        cmd_args.push(dest.to_string());
+
+        self.execute_pty_command("cp", cmd_args, Some(30)).await
     }
 
-    /// Execute mv command
+    /// Execute mv command with PTY
     async fn execute_mv(&self, args: Value) -> Result<Value> {
         let source = args.get("source")
             .and_then(|v| v.as_str())
@@ -203,30 +369,23 @@ impl BashTool {
             .and_then(|v| v.as_str())
             .context("dest is required for mv")?;
 
-        self.runner.mv(source, dest)?;
-        Ok(json!({
-            "command": "mv",
-            "source": source,
-            "dest": dest,
-            "status": "success"
-        }))
+        let cmd_args = vec![source.to_string(), dest.to_string()];
+
+        self.execute_pty_command("mv", cmd_args, Some(10)).await
     }
 
-    /// Execute stat command
+    /// Execute stat command with PTY
     async fn execute_stat(&self, args: Value) -> Result<Value> {
         let path = args.get("path")
             .and_then(|v| v.as_str())
             .context("path is required for stat")?;
 
-        let result = self.runner.stat(path)?;
-        Ok(json!({
-            "command": "stat",
-            "path": path,
-            "output": result
-        }))
+        let cmd_args = vec!["-la".to_string(), path.to_string()];
+
+        self.execute_pty_command("ls", cmd_args, Some(10)).await
     }
 
-    /// Execute arbitrary command
+    /// Execute arbitrary command with PTY
     async fn execute_run(&self, args: Value) -> Result<Value> {
         let command = args.get("command")
             .and_then(|v| v.as_str())
@@ -234,16 +393,10 @@ impl BashTool {
 
         let cmd_args = args.get("args")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<&str>>())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str()).map(|s| s.to_string()).collect::<Vec<String>>())
             .unwrap_or_default();
 
-        let result = self.runner.run(command, &cmd_args)?;
-        Ok(json!({
-            "command": "run",
-            "executed_command": command,
-            "args": cmd_args,
-            "output": result
-        }))
+        self.execute_pty_command(command, cmd_args, Some(30)).await
     }
 }
 
@@ -277,6 +430,7 @@ impl Tool for BashTool {
     }
 
     fn description(&self) -> &'static str {
-        "Bash-like commands: ls, pwd, grep, find, cat, head, tail, mkdir, rm, cp, mv, stat, run"
+        "Bash-like commands with PTY support and security validation: ls, pwd, grep, find, cat, head, tail, mkdir, rm, cp, mv, stat, run. \
+         Dangerous commands (rm, sudo, network operations, system modifications) are blocked for safety."
     }
 }

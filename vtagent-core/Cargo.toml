@@ -61,7 +61,8 @@ rexpect = "0.6.2"
 dotenvy = "0.15"
 # Home directory detection
 dirs = "5.0"
-
+# YAML support
+serde_yaml = "0.9"
 
 [features]
 default = []
@@ -70,3 +71,5 @@ swift = ["tree-sitter-swift"]
 [dependencies.tree-sitter-swift]
 version = "=0.7.1"
 optional = true
+
+[profile.release]

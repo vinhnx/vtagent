@@ -27,6 +27,8 @@ Within this context, VTAgent refers to the open-source agentic coding interface 
 ### Advanced Code Analysis
 VTAgent provides intelligent code analysis tools that understand code structure:
 - **Ripgrep Search**: Fast text search with regex patterns using ripgrep
+- **AST-grep**: Structural code search using Abstract Syntax Trees (AST)
+- **CK Semantic Search**: AI-powered semantic code search by meaning and concepts
 - **Multi-mode Search**: Exact, fuzzy, multi-pattern, and similarity search
 - **File Operations**: Read, write, and edit files with full path support
 - **Enhanced Terminal**: Terminal, PTY, and streaming command execution modes
@@ -36,6 +38,54 @@ VTAgent provides intelligent code analysis tools that understand code structure:
 - Find imports: `^use \w+`
 - Find TODO comments: `TODO|FIXME`
 - Find error handling: `anyhow::|Result<|Err\(`
+
+### CK Semantic Search Tool
+VTAgent includes the powerful **ck semantic search tool** for AI-powered code discovery:
+
+**Key Features:**
+- **Semantic Search**: Find code by meaning, not just keywords
+- **Natural Language Queries**: Search with phrases like "error handling", "authentication logic"
+- **Hybrid Search**: Combine semantic understanding with keyword precision
+- **Complete Code Sections**: Extract entire functions/classes containing matches
+- **JSONL Output**: Structured output perfect for AI agent processing
+
+**Usage Examples:**
+```json
+// Semantic search for authentication code
+{"operation": "semantic_search", "query": "user authentication", "path": "src/"}
+
+// Hybrid search combining semantic + keyword
+{"operation": "hybrid_search", "query": "database connection", "path": "."}
+
+// Get complete functions with error handling
+{"operation": "semantic_search", "query": "error handling", "full_section": true}
+```
+
+**Workflow Integration:**
+1. **Discovery Phase**: Use ck semantic search to find relevant code areas by concept
+2. **Analysis Phase**: Use AST-grep to precisely analyze structure and patterns
+3. **Transformation Phase**: Use AST-grep for safe, structure-aware modifications
+4. **Integrated Analysis**: Use `analyze_and_search` operation to combine both tools seamlessly
+
+**When to Use CK:**
+- Exploring unfamiliar codebases
+- Finding conceptually similar code across different implementations
+- Natural language queries ("find authentication logic")
+- Discovering related functionality without knowing exact syntax
+- AI agent code analysis and understanding
+
+**When to Use AST-grep:**
+- Precise, structure-aware code modifications
+- Implementing linting rules or code quality checks
+- Performing safe refactoring operations
+- You know the exact syntax pattern you're looking for
+
+**When to Use Both Together:**
+- Building comprehensive code analysis pipelines
+- Creating intelligent code suggestion systems
+- Implementing context-aware code generation
+- Developing advanced coding assistance features
+- Using `analyze_and_search` for combined semantic + structural analysis
 
 ### Batch Operations
 - **Multiple file operations** in sequence for complex tasks

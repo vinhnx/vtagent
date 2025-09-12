@@ -370,7 +370,7 @@ impl LLMClient for LMStudioProvider {
                         }],
                         system_prompt: None,
                         tools: None,
-                        model: models::lmstudio::DEFAULT_MODEL to_string(),
+                        model: models::lmstudio::DEFAULT_MODEL.to_string(),
                         max_tokens: None,
                         temperature: None,
                         stream: false,
@@ -388,7 +388,7 @@ impl LLMClient for LMStudioProvider {
                 }],
                 system_prompt: None,
                 tools: None,
-                model: models::lmstudio::DEFAULT_MODEL to_string(),
+                model: models::lmstudio::DEFAULT_MODEL.to_string(),
                 max_tokens: None,
                 temperature: None,
                 stream: false,
@@ -397,7 +397,7 @@ impl LLMClient for LMStudioProvider {
 
         let response = LLMProvider::generate(self, request).await?;
 
-        let model = models::lmstudio::DEFAULT_MODEL to_string();
+        let model = models::lmstudio::DEFAULT_MODEL.to_string();
 
         // Validate the model
         if !model_helpers::is_valid("lmstudio", &model) {

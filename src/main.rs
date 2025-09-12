@@ -5,6 +5,7 @@
 use anyhow::{Context, Result, bail};
 use clap::Parser;
 use console::style;
+use owo_colors::OwoColorize;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use vtagent_core::cli::args::{Cli, Commands};
@@ -545,6 +546,7 @@ async fn handle_single_agent_chat(
                                     println!(
                                         "{}: Calling tool: {} with args: {}",
                                         style("[TOOL_CALL]").cyan().bold().on_black(),
+                                        tool_call.name,
                                         tool_call.arguments
                                     );
 

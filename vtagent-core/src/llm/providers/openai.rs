@@ -99,40 +99,46 @@ impl OpenAIProvider {
 
         // Convert messages
         for msg in &request.messages {
-            let role = match msg.role {
-                MessageRole::System => crate::config::constants::message_roles::SYSTEM,
-                MessageRole::User => crate::config::constants::message_roles::USER,
-                MessageRole::Assistant => crate::config::constants::message_roles::ASSISTANT,
-                MessageRole::Tool => crate::config::constants::message_roles::TOOL,
-            };
+            // Use the proper role mapping for OpenAI
+            let role = msg.role.as_openai_str();
 
             let mut message = json!({
                 "role": role,
                 "content": msg.content
             });
 
-            // Add tool call information if present
-            if let Some(tool_calls) = &msg.tool_calls {
-                if !tool_calls.is_empty() {
-                    let tool_calls_json: Vec<Value> = tool_calls
-                        .iter()
-                        .map(|tc| {
-                            json!({
-                                "id": tc.id,
-                                "type": "function",
-                                "function": {
-                                    "name": tc.name,
-                                    "arguments": tc.arguments
-                                }
+            // Add tool call information for assistant messages
+            // Based on OpenAI docs: only assistant messages can have tool_calls
+            if msg.role == MessageRole::Assistant {
+                if let Some(tool_calls) = &msg.tool_calls {
+                    if !tool_calls.is_empty() {
+                        let tool_calls_json: Vec<Value> = tool_calls
+                            .iter()
+                            .map(|tc| {
+                                json!({
+                                    "id": tc.id,
+                                    "type": "function",
+                                    "function": {
+                                        "name": tc.function.name,
+                                        "arguments": tc.function.arguments
+                                    }
+                                })
                             })
-                        })
-                        .collect();
-                    message["tool_calls"] = Value::Array(tool_calls_json);
+                            .collect();
+                        message["tool_calls"] = Value::Array(tool_calls_json);
+                    }
                 }
             }
 
-            if let Some(tool_call_id) = &msg.tool_call_id {
-                message["tool_call_id"] = Value::String(tool_call_id.clone());
+            // Add tool_call_id for tool messages
+            // Based on OpenAI docs: tool messages must have tool_call_id
+            if msg.role == MessageRole::Tool {
+                if let Some(tool_call_id) = &msg.tool_call_id {
+                    message["tool_call_id"] = Value::String(tool_call_id.clone());
+                } else {
+                    // This should not happen in well-formed requests
+                    eprintln!("Warning: Tool message without tool_call_id in OpenAI request");
+                }
             }
 
             messages.push(message);
@@ -162,15 +168,25 @@ impl OpenAIProvider {
                         json!({
                             "type": "function",
                             "function": {
-                                "name": tool.name,
-                                "description": tool.description,
-                                "parameters": tool.parameters
+                                "name": tool.function.name,
+                                "description": tool.function.description,
+                                "parameters": tool.function.parameters
                             }
                         })
                     })
                     .collect();
                 openai_request["tools"] = Value::Array(tools_json);
             }
+        }
+
+        // Add tool_choice if specified
+        if let Some(tool_choice) = &request.tool_choice {
+            openai_request["tool_choice"] = tool_choice.to_provider_format("openai");
+        }
+
+        // Add parallel_tool_calls if specified
+        if let Some(parallel) = request.parallel_tool_calls {
+            openai_request["parallel_tool_calls"] = Value::Bool(parallel);
         }
 
         Ok(openai_request)
@@ -208,12 +224,15 @@ impl OpenAIProvider {
                     .filter_map(|call| {
                         Some(ToolCall {
                             id: call.get("id")?.as_str()?.to_string(),
-                            name: call.get("function")?.get("name")?.as_str()?.to_string(),
-                            arguments: call
-                                .get("function")
-                                .and_then(|f| f.get("arguments"))
-                                .cloned()
-                                .unwrap_or(Value::Null),
+                            call_type: "function".to_string(),
+                            function: crate::llm::provider::FunctionCall {
+                                name: call.get("function")?.get("name")?.as_str()?.to_string(),
+                                arguments: call
+                                    .get("function")
+                                    .and_then(|f| f.get("arguments"))
+                                    .and_then(|args| args.as_str())
+                                    .unwrap_or("{}").to_string(),
+                            },
                         })
                     })
                     .collect()
@@ -285,6 +304,8 @@ impl LLMClient for OpenAIProvider {
             max_tokens: None,
             temperature: None,
             stream: false,
+            tool_choice: None,
+            parallel_tool_calls: None,
         };
 
         let response = LLMProvider::generate(self, request).await?;

@@ -3,6 +3,7 @@
 use crate::config::types::AgentConfig;
 use crate::config::constants::tools;
 use crate::tools::ToolRegistry;
+use crate::prompts::read_system_prompt_from_md;
 use anyhow::Result;
 use console::style;
 use serde_json::json;
@@ -78,10 +79,16 @@ async fn check_api_connectivity(config: &AgentConfig) -> Result<()> {
         if let Some(text) = part.as_text() {
             SystemInstruction::new(text)
         } else {
-            SystemInstruction::new("You are a helpful coding assistant.")
+            SystemInstruction::new(
+                &read_system_prompt_from_md()
+                    .unwrap_or_else(|_| "You are a helpful coding assistant.".to_string())
+            )
         }
     } else {
-        SystemInstruction::new("You are a helpful coding assistant.")
+        SystemInstruction::new(
+            &read_system_prompt_from_md()
+                .unwrap_or_else(|_| "You are a helpful coding assistant.".to_string())
+        )
     };
 
     let request = GenerateContentRequest {

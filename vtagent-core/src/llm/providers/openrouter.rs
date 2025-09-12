@@ -34,12 +34,7 @@ impl OpenRouterProvider {
 
         // Convert messages
         for msg in &request.messages {
-            let role = match msg.role {
-                MessageRole::System => crate::config::constants::message_roles::SYSTEM,
-                MessageRole::User => crate::config::constants::message_roles::USER,
-                MessageRole::Assistant => crate::config::constants::message_roles::ASSISTANT,
-                MessageRole::Tool => crate::config::constants::message_roles::TOOL,
-            };
+            let role = msg.role.as_generic_str();
 
             let mut message = json!({
                 "role": role,
@@ -56,8 +51,8 @@ impl OpenRouterProvider {
                                 "id": tc.id,
                                 "type": "function",
                                 "function": {
-                                    "name": tc.name,
-                                    "arguments": tc.arguments
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments
                                 }
                             })
                         })
@@ -97,15 +92,25 @@ impl OpenRouterProvider {
                         json!({
                             "type": "function",
                             "function": {
-                                "name": tool.name,
-                                "description": tool.description,
-                                "parameters": tool.parameters
+                                "name": tool.function.name,
+                                "description": tool.function.description,
+                                "parameters": tool.function.parameters
                             }
                         })
                     })
                     .collect();
                 openai_request["tools"] = Value::Array(tools_json);
             }
+        }
+
+        // Add tool_choice if specified - OpenRouter follows OpenAI format
+        if let Some(tool_choice) = &request.tool_choice {
+            openai_request["tool_choice"] = tool_choice.to_provider_format("openai");
+        }
+
+        // Add parallel_tool_calls if specified - OpenRouter supports this feature
+        if let Some(parallel) = request.parallel_tool_calls {
+            openai_request["parallel_tool_calls"] = Value::Bool(parallel);
         }
 
         Ok(openai_request)
@@ -143,12 +148,15 @@ impl OpenRouterProvider {
                     .filter_map(|call| {
                         Some(ToolCall {
                             id: call.get("id")?.as_str()?.to_string(),
-                            name: call.get("function")?.get("name")?.as_str()?.to_string(),
-                            arguments: call
-                                .get("function")
-                                .and_then(|f| f.get("arguments"))
-                                .cloned()
-                                .unwrap_or(Value::Null),
+                            call_type: "function".to_string(),
+                            function: crate::llm::provider::FunctionCall {
+                                name: call.get("function")?.get("name")?.as_str()?.to_string(),
+                                arguments: call
+                                    .get("function")
+                                    .and_then(|f| f.get("arguments"))
+                                    .and_then(|args| args.as_str())
+                                    .unwrap_or("{}").to_string(),
+                            },
                         })
                     })
                     .collect()

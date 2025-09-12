@@ -374,6 +374,8 @@ impl PromptOptimizer {
             max_tokens: Some(2000),
             temperature: Some(0.3),
             stream: false,
+            tool_choice: None,
+            parallel_tool_calls: None,
         };
 
         let response = self

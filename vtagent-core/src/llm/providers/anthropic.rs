@@ -98,17 +98,27 @@ impl AnthropicProvider {
                 continue;
             }
 
+            // Anthropic handles tool responses as user messages
+            // Based on official docs: tool responses are treated as user messages
             let role = match msg.role {
-                MessageRole::User => crate::config::constants::message_roles::USER,
-                MessageRole::Assistant => crate::config::constants::message_roles::ASSISTANT,
-                MessageRole::Tool => crate::config::constants::message_roles::USER, // Anthropic treats tool responses as user messages
-                MessageRole::System => continue, // Skip system messages
+                MessageRole::Tool => "user", // Anthropic treats tool responses as user messages
+                _ => msg.role.as_anthropic_str(),
             };
 
             let message = json!({
                 "role": role,
                 "content": msg.content
             });
+
+            // Add tool_call_id for tool responses if present
+            // This helps maintain context for tool call chains
+            if msg.role == MessageRole::Tool {
+                if let Some(_tool_call_id) = &msg.tool_call_id {
+                    // Note: Anthropic doesn't use tool_call_id in the same way as OpenAI
+                    // but we can include it as metadata in the content or ignore it
+                    // For now, we'll include the tool response content as-is
+                }
+            }
 
             messages.push(message);
         }
@@ -143,15 +153,23 @@ impl AnthropicProvider {
                     .iter()
                     .map(|tool| {
                         json!({
-                            "name": tool.name,
-                            "description": tool.description,
-                            "input_schema": tool.parameters
+                            "name": tool.function.name,
+                            "description": tool.function.description,
+                            "input_schema": tool.function.parameters
                         })
                     })
                     .collect();
                 anthropic_request["tools"] = Value::Array(tools_json);
             }
         }
+
+        // Add tool_choice if specified - Anthropic format
+        if let Some(tool_choice) = &request.tool_choice {
+            anthropic_request["tool_choice"] = tool_choice.to_provider_format("anthropic");
+        }
+
+        // Note: Anthropic doesn't support parallel_tool_calls parameter
+        // Tool calls are handled sequentially by default
 
         Ok(anthropic_request)
     }
@@ -168,22 +186,32 @@ impl AnthropicProvider {
             .collect::<Vec<_>>()
             .join("");
 
-        // Parse tool calls
+        // Parse tool calls from Anthropic content blocks
+        // Anthropic uses content blocks with tool_use type instead of top-level tool_calls
         let tool_calls = response_json
-            .get("tool_calls")
-            .and_then(|tc| tc.as_array())
-            .map(|calls| {
-                calls
+            .get("content")
+            .and_then(|content| content.as_array())
+            .map(|content_blocks| {
+                content_blocks
                     .iter()
-                    .filter_map(|call| {
+                    .filter(|block| block.get("type").and_then(|t| t.as_str()) == Some("tool_use"))
+                    .filter_map(|block| {
+                        let id = block.get("id")?.as_str()?.to_string();
+                        let name = block.get("name")?.as_str()?.to_string();
+                        let input = block.get("input").cloned().unwrap_or(json!({}));
+
                         Some(ToolCall {
-                            id: call.get("id")?.as_str()?.to_string(),
-                            name: call.get("name")?.as_str()?.to_string(),
-                            arguments: call.get("input").cloned().unwrap_or(Value::Null),
+                            id,
+                            call_type: "function".to_string(),
+                            function: crate::llm::provider::FunctionCall {
+                                name,
+                                arguments: serde_json::to_string(&input).unwrap_or("{}".to_string()),
+                            },
                         })
                     })
-                    .collect()
-            });
+                    .collect::<Vec<_>>()
+            })
+            .filter(|calls| !calls.is_empty());
 
         // Parse finish reason
         let stop_reason = response_json
@@ -259,6 +287,8 @@ impl LLMClient for AnthropicProvider {
             max_tokens: Some(4096),
             temperature: None,
             stream: false,
+            tool_choice: None,
+            parallel_tool_calls: None,
         };
 
         let response = LLMProvider::generate(self, request).await?;

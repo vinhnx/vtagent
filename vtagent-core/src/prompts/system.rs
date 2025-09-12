@@ -1,6 +1,5 @@
 //! System instructions and prompt management
 
-use crate::config::types::CapabilityLevel;
 use crate::gemini::Content;
 use std::fs;
 use std::path::Path;
@@ -38,15 +37,25 @@ pub fn read_system_prompt_from_md() -> Result<String, std::io::Error> {
 
     for path in &prompt_paths {
         if let Ok(content) = fs::read_to_string(path) {
-            // Extract the main system prompt from the markdown
-            if let Some(start) = content.find("```rust\nr#\"") {
-                if let Some(end) = content[start..].find("\"#\n```") {
-                    let prompt_start = start + 9; // Skip ```rust\nr#"
-                    let prompt_end = start + end;
-                    return Ok(content[prompt_start..prompt_end].to_string());
+            // Extract the main system prompt content (skip the markdown header)
+            if let Some(start) = content.find("## Core System Prompt") {
+                // Find the end of the prompt (look for the next major section)
+                let after_start = &content[start..];
+                if let Some(end) = after_start.find("## Specialized System Prompts") {
+                    let prompt_content = &after_start[..end].trim();
+                    // Remove the header and return the content
+                    if let Some(content_start) = prompt_content.find("```rust\nr#\"") {
+                        if let Some(content_end) = prompt_content[content_start..].find("\"#\n```") {
+                            let prompt_start = content_start + 9; // Skip ```rust\nr#"
+                            let prompt_end = content_start + content_end;
+                            return Ok(prompt_content[prompt_start..prompt_end].to_string());
+                        }
+                    }
+                    // If no code block found, return the section content
+                    return Ok(prompt_content.to_string());
                 }
             }
-            // If no code block found, return the entire content
+            // If no specific section found, return the entire content
             return Ok(content);
         }
     }
@@ -69,7 +78,7 @@ Within this context, VTAgent refers to the open-source agentic coding interface 
 }
 
 /// Generate system instruction by loading from system.md
-pub fn generate_system_instruction(config: &SystemPromptConfig) -> Content {
+pub fn generate_system_instruction(_config: &SystemPromptConfig) -> Content {
     match read_system_prompt_from_md() {
         Ok(prompt_content) => Content::system_text(prompt_content),
         Err(_) => Content::system_text(r#"You are a coding agent running in VTAgent, a terminal-based coding assistant created by vinhnx. You are expected to be precise, safe, helpful, and smart.
@@ -101,7 +110,7 @@ pub fn read_agent_guidelines(project_root: &Path) -> Option<String> {
 
 /// Generate system instruction with configuration and AGENTS.md guidelines incorporated
 pub fn generate_system_instruction_with_config(
-    config: &SystemPromptConfig,
+    _config: &SystemPromptConfig,
     project_root: &Path,
     vtagent_config: Option<&crate::config::VTAgentConfig>,
 ) -> Content {
@@ -185,7 +194,7 @@ Within this context, VTAgent refers to the open-source agentic coding interface 
 
 /// Generate system instruction with AGENTS.md guidelines incorporated
 pub fn generate_system_instruction_with_guidelines(
-    config: &SystemPromptConfig,
+    _config: &SystemPromptConfig,
     project_root: &Path,
 ) -> Content {
     let mut instruction = match read_system_prompt_from_md() {
@@ -215,6 +224,44 @@ Within this context, VTAgent refers to the open-source agentic coding interface 
     }
 
     Content::system_text(instruction)
+}
+
+/// Generate a lightweight system instruction for simple operations
+pub fn generate_lightweight_instruction() -> Content {
+    Content::system_text(r#"You are a coding agent running in VTAgent, a terminal-based coding assistant created by vinhnx. You are expected to be precise, safe, helpful, and smart.
+
+## AVAILABLE TOOLS
+- **File Operations**: list_files, read_file, write_file, edit_file
+- **Search & Analysis**: rp_search, grep_search, ast_grep_search
+- **Terminal Access**: run_terminal_cmd for shell operations
+
+Your capabilities:
+- Receive user prompts and other context provided by the harness, such as files in the workspace.
+- Communicate with the user by streaming thinking & responses, and by making & updating plans.
+- Emit function calls to run terminal commands and apply patches.
+
+Within this context, VTAgent refers to the open-source agentic coding interface created by vinhnx, not any other coding tools or models."#.to_string())
+}
+
+/// Generate a specialized system instruction for advanced operations
+pub fn generate_specialized_instruction() -> Content {
+    Content::system_text(r#"You are a specialized coding agent running in VTAgent, a terminal-based coding assistant created by vinhnx. You are expected to be precise, safe, helpful, and smart with advanced capabilities.
+
+## AVAILABLE TOOLS
+- **File Operations**: list_files, read_file, write_file, edit_file
+- **Search & Analysis**: rp_search, grep_search, ast_grep_search
+- **Terminal Access**: run_terminal_cmd for shell operations
+- **PTY Access**: Enhanced terminal emulation for interactive commands
+- **Advanced Analysis**: Tree-sitter parsing, performance profiling, prompt caching
+
+Your capabilities:
+- Receive user prompts and other context provided by the harness, such as files in the workspace.
+- Communicate with the user by streaming thinking & responses, and by making & updating plans.
+- Emit function calls to run terminal commands and apply patches.
+- Perform advanced code analysis and optimization
+- Handle complex multi-step operations with proper error handling
+
+Within this context, VTAgent refers to the open-source agentic coding interface created by vinhnx, not any other coding tools or models."#.to_string())
 }
 
 /// Read multi-agent prompt from markdown file

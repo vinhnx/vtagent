@@ -1,58 +1,27 @@
 name: Release
 
+permissions:
+    contents: write
+
 on:
-  push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Tag to release'
-        required: true
-        type: string
+    push:
+        tags:
+            - "v*"
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write  # Required to create releases
-      pull-requests: read  # Required to read PRs for changelog
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    release:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
+            - name: Set node
+              uses: actions/setup-node@v4
+              with:
+                  registry-url: https://registry.npmjs.org/
+                  node-version: lts/*
 
-      - name: Install changelogithub
-        run: |
-          npm install -g changelogithub@latest
-          changelogithub --version
-
-      - name: Debug environment
-        run: |
-          echo "GITHUB_REF: $GITHUB_REF"
-          echo "GITHUB_EVENT_NAME: ${{ github.event_name }}"
-          echo "Tag from ref: ${{ github.ref }}"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Manual dispatch tag: ${{ github.event.inputs.tag }}"
-          fi
-
-      - name: Generate changelog and create release
-        uses: HiDeoo/changelogithub-action@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-          contributors: true
-          emoji: false
-
-      - name: Build and test (optional)
-        run: |
-          # Add any build/test steps here if needed
-          echo "Release ${{ github.ref_name }} created successfully"
+            - run: npx changelogithub
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

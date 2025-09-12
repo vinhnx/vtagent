@@ -161,7 +161,7 @@ impl ToolPolicyManager {
     }
 
     /// Prompt user for tool execution permission
-    fn prompt_user_for_tool(&self, tool_name: &str) -> Result<bool> {
+    fn prompt_user_for_tool(&mut self, tool_name: &str) -> Result<bool> {
         println!(
             "{}",
             style(format!("Tool Permission Request: {}", tool_name))

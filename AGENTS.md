@@ -248,7 +248,7 @@ if is_valid && is_allowed && is_secure {
 - Consider the separation between library and binary code
 - Place configuration files at the project root
 
-## When Making Changes
+## IMPORTANT NOTEs for coding agents
 
 - Ensure all tests pass
 - Run `cargo clippy` and fix warnings
@@ -256,7 +256,7 @@ if is_valid && is_allowed && is_secure {
 - Update documentation if needed
 - Consider performance implications
 - Test with various input files and edge cases
-- Prefered ripgrep for searching code
+- Prefered ripgrep over grep for search
 - DO NOT USE EMOJI THIS IS IMPORTANT
 - Put all agent's configuration option to vtagent.toml. This is important, every logic should be read from this toml config instead of hardcode.
 - Use MCP tools for enhanced context awareness if needed.
@@ -267,3 +267,4 @@ if is_valid && is_allowed && is_secure {
 - Always check ./docs/models.json use to use latest LLM model. Don't guess the model id/name. THIS IS IMPORTANT!
 - Always use vtagent-core/src/config/constants.rs for constant values. Don't hardcode any constant values, especially model id. THIS IS IMPORTANT!
 - You should always use Context7 for fetching documentation from MCP. THIS IS IMPORTANT!
+- For testing echo, make sure not to use "!" this will cause shell escaping issue. for example Use "echo test" instead of "echo test!" THIS IS IMPORTANT!

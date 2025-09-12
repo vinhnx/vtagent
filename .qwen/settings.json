@@ -1,15 +1,20 @@
 {
-    "contextFileName": "AGENTS.md",
-    "mcpServers": {
-        "context7": {
-            "command": "npx",
-            "args": ["-y", "@upstash/context7-mcp@latest"],
-            "type": "stdio"
-        },
-        "time": {
-            "command": "uvx",
-            "args": ["mcp-server-time"],
-            "type": "stdio"
-        }
+  "contextFileName": "AGENTS.md",
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ],
+      "type": "stdio"
+    },
+    "time": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-time"
+      ],
+      "type": "stdio"
     }
+  }
 }

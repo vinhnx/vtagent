@@ -2,7 +2,7 @@ use crate::config::PtyConfig;
 use crate::config::core::{AgentConfig, CommandsConfig, SecurityConfig, ToolsConfig};
 use crate::config::multi_agent::MultiAgentSystemConfig;
 use crate::config::LMStudioConfig;
-use crate::project::{ProjectManager, ProjectMetadata};
+use crate::SimpleProjectManager;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -62,8 +62,8 @@ impl VTAgentConfig {
 
     /// Bootstrap project with config + gitignore, with option to create in home directory
     pub fn bootstrap_project_with_options<P: AsRef<Path>>(
-        workspace: P, 
-        force: bool, 
+        workspace: P,
+        force: bool,
         use_home_dir: bool
     ) -> Result<Vec<String>> {
         let workspace = workspace.as_ref();
@@ -162,7 +162,7 @@ target/, build/, dist/, node_modules/, vendor/
 pub struct ConfigManager {
     config: VTAgentConfig,
     config_path: Option<PathBuf>,
-    project_manager: Option<ProjectManager>,
+    project_manager: Option<SimpleProjectManager>,
     project_name: Option<String>,
 }
 
@@ -178,12 +178,12 @@ impl ConfigManager {
         if let Ok(home) = std::env::var("HOME") {
             return Some(PathBuf::from(home));
         }
-        
+
         // Try USERPROFILE on Windows
         if let Ok(userprofile) = std::env::var("USERPROFILE") {
             return Some(PathBuf::from(userprofile));
         }
-        
+
         // Fallback to dirs crate approach
         dirs::home_dir()
     }
@@ -191,9 +191,9 @@ impl ConfigManager {
     /// Load configuration from a specific workspace
     pub fn load_from_workspace(workspace: impl AsRef<Path>) -> Result<Self> {
         let workspace = workspace.as_ref();
-        
+
         // Initialize project manager
-        let project_manager = ProjectManager::new().ok();
+        let project_manager = SimpleProjectManager::new(workspace.to_path_buf()).ok();
         let project_name = project_manager.as_ref()
             .and_then(|pm| pm.identify_project(workspace).ok());
 
@@ -268,7 +268,10 @@ impl ConfigManager {
             .with_context(|| format!("Failed to parse config file: {}", path.display()))?;
 
         // Initialize project manager but don't set project name since we're loading from file
-        let project_manager = ProjectManager::new().ok();
+        // Use current directory as workspace root for file-based loading
+        let project_manager = std::env::current_dir()
+            .ok()
+            .and_then(|cwd| SimpleProjectManager::new(cwd).ok());
 
         Ok(Self {
             config,
@@ -292,12 +295,12 @@ impl ConfigManager {
     pub fn session_duration(&self) -> std::time::Duration {
         std::time::Duration::from_secs(self.config.agent.max_session_duration_minutes * 60)
     }
-    
+
     /// Get the project manager (if available)
-    pub fn project_manager(&self) -> Option<&ProjectManager> {
+    pub fn project_manager(&self) -> Option<&SimpleProjectManager> {
         self.project_manager.as_ref()
     }
-    
+
     /// Get the project name (if identified)
     pub fn project_name(&self) -> Option<&str> {
         self.project_name.as_deref()

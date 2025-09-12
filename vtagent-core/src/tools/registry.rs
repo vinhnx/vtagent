@@ -6,6 +6,7 @@ use super::file_ops::FileOpsTool;
 use super::search::SearchTool;
 use super::simple_search::SimpleSearchTool;
 use super::bash_tool::BashTool;
+use super::ck_tool::CkTool;
 use super::traits::Tool;
 use super::ast_grep_tool::AstGrepTool;
 use crate::config::types::CapabilityLevel;
@@ -13,7 +14,7 @@ use crate::config::constants::tools;
 use crate::gemini::FunctionDeclaration;
 use crate::tool_policy::{ToolPolicy, ToolPolicyManager};
 use crate::tools::ast_grep::AstGrepEngine;
-use crate::tools::rp_search::RpSearchManager;
+use crate::tools::rg_search::RgSearchManager;
 use anyhow::{Result, anyhow, Context};
 use serde_json::{Value, json};
 use std::path::PathBuf;
@@ -28,7 +29,8 @@ pub struct ToolRegistry {
     bash_tool: BashTool,
     file_ops_tool: FileOpsTool,
     command_tool: CommandTool,
-    rp_search: Arc<RpSearchManager>,
+    ck_tool: CkTool,
+    rg_search: Arc<RgSearchManager>,
     ast_grep_engine: Option<Arc<AstGrepEngine>>,
     tool_policy: ToolPolicyManager,
 }
@@ -36,13 +38,14 @@ pub struct ToolRegistry {
 impl ToolRegistry {
     /// Create a new tool registry
     pub fn new(workspace_root: PathBuf) -> Self {
-        let rp_search = Arc::new(RpSearchManager::new(workspace_root.clone()));
+        let rg_search = Arc::new(RgSearchManager::new(workspace_root.clone()));
 
-        let search_tool = SearchTool::new(workspace_root.clone(), rp_search.clone());
+        let search_tool = SearchTool::new(workspace_root.clone(), rg_search.clone());
         let simple_search_tool = SimpleSearchTool::new(workspace_root.clone());
         let bash_tool = BashTool::new(workspace_root.clone());
-        let file_ops_tool = FileOpsTool::new(workspace_root.clone(), rp_search.clone());
+        let file_ops_tool = FileOpsTool::new(workspace_root.clone(), rg_search.clone());
         let command_tool = CommandTool::new(workspace_root.clone());
+        let ck_tool = CkTool::new(workspace_root.clone());
 
         // Initialize AST-grep engine
         let ast_grep_engine = match AstGrepEngine::new() {
@@ -62,13 +65,13 @@ impl ToolRegistry {
 
         // Update available tools in policy manager
         let mut available_tools = vec![
-            tools::RP_SEARCH.to_string(),
+            tools::RG_SEARCH.to_string(),
             tools::LIST_FILES.to_string(),
             tools::RUN_TERMINAL_CMD.to_string(),
             tools::READ_FILE.to_string(),
             tools::WRITE_FILE.to_string(),
             tools::EDIT_FILE.to_string(),
-            tools::SIMPLE_SEARCH.to_string(),
+            tools::CK_SEMANTIC_SEARCH.to_string(),
             tools::BASH.to_string(),
         ];
 
@@ -88,7 +91,8 @@ impl ToolRegistry {
             bash_tool,
             file_ops_tool,
             command_tool,
-            rp_search,
+            ck_tool,
+            rg_search,
             ast_grep_engine,
             tool_policy: policy_manager,
         }
@@ -120,13 +124,14 @@ impl ToolRegistry {
         }
 
         match name {
-            tools::RP_SEARCH => self.search_tool.execute(args).await,
+            tools::RG_SEARCH => self.search_tool.execute(args).await,
             tools::LIST_FILES => self.file_ops_tool.execute(args).await,
             tools::RUN_TERMINAL_CMD => self.command_tool.execute(args).await,
             tools::READ_FILE => self.file_ops_tool.read_file(args).await,
             tools::WRITE_FILE => self.file_ops_tool.write_file(args).await,
             tools::EDIT_FILE => self.edit_file(args).await,
             tools::AST_GREP_SEARCH => self.execute_ast_grep(args).await,
+            tools::CK_SEMANTIC_SEARCH => self.ck_tool.execute(args).await,
             tools::SIMPLE_SEARCH => self.simple_search_tool.execute(args).await,
             tools::BASH => self.bash_tool.execute(args).await,
             _ => Err(anyhow!("Unknown tool: {}", name)),
@@ -136,12 +141,13 @@ impl ToolRegistry {
     /// List available tools
     pub fn available_tools(&self) -> Vec<String> {
         let mut tools = vec![
-            tools::RP_SEARCH.to_string(),
+            tools::RG_SEARCH.to_string(),
             tools::LIST_FILES.to_string(),
             tools::RUN_TERMINAL_CMD.to_string(),
             tools::READ_FILE.to_string(),
             tools::WRITE_FILE.to_string(),
             tools::EDIT_FILE.to_string(),
+            tools::CK_SEMANTIC_SEARCH.to_string(),
             "simple_search".to_string(),
             "bash".to_string(),
         ];
@@ -157,8 +163,9 @@ impl ToolRegistry {
     /// Check if a tool exists
     pub fn has_tool(&self, name: &str) -> bool {
         match name {
-            tools::RP_SEARCH | tools::LIST_FILES | tools::RUN_TERMINAL_CMD | tools::READ_FILE | tools::WRITE_FILE => true,
+            tools::RG_SEARCH | tools::LIST_FILES | tools::RUN_TERMINAL_CMD | tools::READ_FILE | tools::WRITE_FILE => true,
             tools::AST_GREP_SEARCH => self.ast_grep_engine.is_some(),
+            tools::CK_SEMANTIC_SEARCH => true,
             tools::SIMPLE_SEARCH | tools::BASH => true,
             _ => false,
         }
@@ -354,7 +361,7 @@ impl ToolRegistry {
     }
 
     pub async fn rp_search(&mut self, args: Value) -> Result<Value> {
-        self.execute_tool(tools::RP_SEARCH, args).await
+        self.execute_tool(tools::RG_SEARCH, args).await
     }
 
     pub async fn list_files(&mut self, args: Value) -> Result<Value> {
@@ -499,7 +506,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
     vec![
         // Ripgrep search tool
         FunctionDeclaration {
-            name: tools::RP_SEARCH.to_string(),
+            name: tools::RG_SEARCH.to_string(),
             description: "Enhanced unified search tool with multiple modes: exact (default), fuzzy, multi-pattern, and similarity search. Consolidates all search functionality into one powerful tool.".to_string(),
             parameters: json!({
                 "type": "object",
@@ -626,6 +633,32 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
             }),
         },
 
+        // Ck semantic search tool
+        FunctionDeclaration {
+            name: tools::CK_SEMANTIC_SEARCH.to_string(),
+            description: "Semantic code search using ck tool - find code by meaning, not just keywords. Supports semantic search, hybrid search, regex search, indexing, index status, and integrated analysis with AST-grep.".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "operation": {"type": "string", "description": "Operation type: 'semantic_search' (default), 'hybrid_search', 'regex_search', 'index_workspace', 'index_status', 'analyze_and_search'", "default": "semantic_search"},
+                    "query": {"type": "string", "description": "Natural language query for semantic/hybrid search (e.g., 'error handling', 'authentication logic')"},
+                    "pattern": {"type": "string", "description": "Regex pattern for regex_search operation"},
+                    "path": {"type": "string", "description": "File or directory path to search in", "default": "."},
+                    "threshold": {"type": "number", "description": "Relevance threshold for semantic results (0.0-1.0)", "default": 0.0},
+                    "top_k": {"type": "integer", "description": "Maximum number of results to return"},
+                    "full_section": {"type": "boolean", "description": "Return complete code sections instead of snippets", "default": false},
+                    "scores": {"type": "boolean", "description": "Include relevance scores in results", "default": false},
+                    "case_insensitive": {"type": "boolean", "description": "Case insensitive regex search", "default": false},
+                    "line_numbers": {"type": "boolean", "description": "Show line numbers in regex results", "default": true},
+                    "context_lines": {"type": "integer", "description": "Number of context lines for regex results"},
+                    "exclude_patterns": {"type": "array", "items": {"type": "string"}, "description": "Patterns to exclude during indexing"},
+                    "ast_grep_pattern": {"type": "string", "description": "AST-grep pattern for integrated analysis in analyze_and_search operation"},
+                    "max_results": {"type": "integer", "description": "Maximum number of results for integrated analysis", "default": 10}
+                },
+                "required": []
+            }),
+        },
+
         // Simple bash-like search tool
         FunctionDeclaration {
             name: tools::SIMPLE_SEARCH.to_string(),
@@ -711,7 +744,7 @@ pub fn build_function_declarations_for_level(level: CapabilityLevel) -> Vec<Func
             .filter(|fd| {
                 fd.name == tools::LIST_FILES
                 || fd.name == tools::RUN_TERMINAL_CMD
-                || fd.name == tools::RP_SEARCH
+                || fd.name == tools::RG_SEARCH
                 || fd.name == tools::READ_FILE
                 || fd.name == tools::WRITE_FILE
                 || fd.name == tools::EDIT_FILE

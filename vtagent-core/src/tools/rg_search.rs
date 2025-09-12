@@ -37,7 +37,7 @@ const ACTIVE_SEARCH_COMPLETE_POLL_INTERVAL: Duration = Duration::from_millis(20)
 
 /// Input parameters for ripgrep search
 #[derive(Debug, Clone)]
-pub struct RpSearchInput {
+pub struct RgSearchInput {
     pub pattern: String,
     pub path: String,
     pub case_sensitive: Option<bool>,
@@ -50,13 +50,13 @@ pub struct RpSearchInput {
 
 /// Result of a ripgrep search
 #[derive(Debug, Clone)]
-pub struct RpSearchResult {
+pub struct RgSearchResult {
     pub query: String,
     pub matches: Vec<serde_json::Value>,
 }
 
-/// State machine for rp_search orchestration.
-pub struct RpSearchManager {
+/// State machine for rg_search orchestration.
+pub struct RgSearchManager {
     /// Unified state guarded by one mutex.
     state: Arc<Mutex<SearchState>>,
 
@@ -79,7 +79,7 @@ struct ActiveSearch {
     cancellation_token: Arc<AtomicBool>,
 }
 
-impl RpSearchManager {
+impl RgSearchManager {
     pub fn new(search_dir: PathBuf) -> Self {
         Self {
             state: Arc::new(Mutex::new(SearchState {
@@ -157,7 +157,7 @@ impl RpSearchManager {
                 query
             };
 
-            RpSearchManager::spawn_rp_search(query, search_dir, cancellation_token, state);
+            RgSearchManager::spawn_rp_search(query, search_dir, cancellation_token, state);
         });
     }
 
@@ -237,7 +237,7 @@ impl RpSearchManager {
     }
 
     /// Perform an actual ripgrep search with the given input parameters
-    pub async fn perform_search(&self, input: RpSearchInput) -> Result<RpSearchResult> {
+    pub async fn perform_search(&self, input: RgSearchInput) -> Result<RgSearchResult> {
         // std::path::Path import removed as it's not directly used
         use std::process::Command;
 
@@ -312,7 +312,7 @@ impl RpSearchManager {
             }
         }
 
-        Ok(RpSearchResult {
+        Ok(RgSearchResult {
             query: input.pattern,
             matches,
         })

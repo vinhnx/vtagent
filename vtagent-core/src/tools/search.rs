@@ -1,7 +1,7 @@
 //! Search tool implementation with multiple modes
 
 use super::traits::{CacheableTool, ModeTool, Tool};
-use crate::tools::rp_search::{RpSearchInput, RpSearchManager};
+use crate::tools::rg_search::{RgSearchInput, RgSearchManager};
 use crate::config::constants::tools;
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
@@ -13,14 +13,14 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct SearchTool {
     workspace_root: PathBuf,
-    rp_search: Arc<RpSearchManager>,
+    rg_search: Arc<RgSearchManager>,
 }
 
 impl SearchTool {
-    pub fn new(workspace_root: PathBuf, rp_search: Arc<RpSearchManager>) -> Self {
+    pub fn new(workspace_root: PathBuf, rg_search: Arc<RgSearchManager>) -> Self {
         Self {
             workspace_root,
-            rp_search,
+            rg_search,
         }
     }
 
@@ -31,7 +31,7 @@ impl SearchTool {
             .and_then(|p| p.as_str())
             .ok_or_else(|| anyhow!("Missing pattern for search"))?;
 
-        let input = RpSearchInput {
+        let input = RgSearchInput {
             pattern: pattern.to_string(),
             path: args
                 .get("path")
@@ -54,7 +54,7 @@ impl SearchTool {
             include_hidden: Some(false),
         };
 
-        let result = self.rp_search.perform_search(input).await?;
+        let result = self.rg_search.perform_search(input).await?;
         Ok(json!({
             "success": true,
             "matches": result.matches,
@@ -315,7 +315,7 @@ impl Tool for SearchTool {
     }
 
     fn name(&self) -> &'static str {
-        tools::RP_SEARCH
+        tools::RG_SEARCH
     }
 
     fn description(&self) -> &'static str {

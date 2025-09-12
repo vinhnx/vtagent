@@ -84,6 +84,9 @@ install_dev_tools() {
         "cargo-license:Check dependency licenses"
         "cargo-tarpaulin:Code coverage"
         "cargo-bench:Performance benchmarking"
+        "ripgrep:Fast text search tool"
+        "ast-grep:Structural code search and transformation"
+        "ck-search:Semantic code search tool"
     )
 
     for tool_info in "${tools[@]}"; do

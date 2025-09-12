@@ -21,6 +21,10 @@ enabled = true
 # Global merge strategy: 'merge' or 'overwrite' (default: 'merge')
 merge_strategy = "merge"
 
+[agents.copilot]
+enabled = true
+output_path = "AGENTS.md"
+
 [gitignore]
 # Enable/disable automatic .gitignore updates (default: true)
 enabled = true

@@ -1,110 +1,156 @@
 # AGENTS.md
 
-# Repository Guidelines
+# VTAgent
 
-This document serves as a contributor guide for the vtagent repository, a Rust-based AI agent tool for context-aware code assistance.
+## Project Overview
+VTAgent is a Rust-based terminal coding agent with modular architecture supporting multiple LLM providers (Gemini, OpenAI, Anthropic) and tree-sitter parsers for 6+ languages.
 
-## Project Structure & Module Organization
+## Architecture & Key Components
+- **Workspace Structure**: `vtagent-core/` (library) + `src/` (binary) with modular tools system
+- **Core Modules**: `llm/` (provider abstraction), `tools/` (modular tool system), `config/` (TOML-based settings)
+- **Integration Points**: Gemini API, tree-sitter parsers, PTY command execution, MCP tools
 
-The project follows a modular Rust workspace structure:
+## Critical Developer Workflows
 
-- `vtagent-core/src/` - Core library containing modules for LLM integration, UI components, and commands
-- `src/` - Main binary entry point
-- `tests/` - Integration tests and test utilities
-- `docs/` - Project documentation and guides
-- `scripts/` - Build and development scripts
-- `examples/` - Usage examples and demonstrations
-
-Key modules include `gemini.rs` for AI integration, `ui/` for terminal interfaces, and `commands/` for CLI functionality.
-
-For a detailed overview of the VTAgent architecture, see [VTAgent Architecture Documentation](docs/vtagent-architecture.md).
-
-## Build, Test, and Development Commands
-
-- `cargo build` - Build the project in debug mode
-- `cargo build --release` - Build optimized release version
-- `cargo test` - Run all tests
-- `cargo check` - Quick compilation check without building
-- `./run.sh` - Run the application in production mode
-- `./run-debug.sh` - Run with debug logging enabled
-- `cargo clippy` - Run linter for code quality checks
-
-## Coding Style & Naming Conventions
-
-- Use 4-space indentation (spaces, not tabs)
-- Follow Rust standard naming: `snake_case` for functions/variables, `PascalCase` for types
-- Line length limit: 100 characters
-- Use `rustfmt` for automatic formatting
-- Prefer explicit error handling over panics
-- Document public APIs with rustdoc comments
-
-## Testing Guidelines
-
-- Use `cargo test` to run the test suite
-- Integration tests go in `tests/` directory
-- Unit tests are co-located with source code using `#[cfg(test)]`
-- Test functions should be descriptive: `test_function_name_scenario_expected_result`
-- Aim for meaningful test coverage of core functionality
-- Mock external dependencies for reliable testing
-
-## Commit & Pull Request Guidelines
-
-- Use conventional commit format: `type(scope): description`
-- Common types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
-- Keep commits atomic and focused on single changes
-- Include issue references in commit messages when applicable
-- Pull requests should include clear descriptions and test coverage
-- Update documentation for user-facing changes
-
-## Agent-Specific Instructions
-
-- AI responses should maintain context awareness across conversations
-- Tool integrations must handle timeouts and error recovery gracefully
-- UI components should provide non-blocking status feedback
-- Configuration changes require documentation updates
-- New commands should follow the existing pattern in `commands/` module
-- Use MCP tools for enhanced context awareness and external service integration
-- All agent config should be in `vtagent.toml` (no hardcoding)
-- Environment variables for sensitive data (API keys)
-
-## Code Quality & Maintainability Principles
-
-You are an engineer who writes code for **human brains, not machines**. You favour code that is simple to undertand and maintain. Remember at all times that the code you will be processed by human brain. The brain has a very limited capacity. People can only hold ~4 chunks in their working memory at once. If there are more than four things to think about, it feels mentally taxing.
-
-Here's an example that's hard for people to understand:
+### Build & Run Commands
+```bash
+./run.sh              # Production build + run (release mode)
+./run-debug.sh        # Development build + run (debug mode)
+cargo check           # Quick compilation check (preferred over cargo build)
+cargo clippy          # Linting with project-specific rules
 ```
-if val > someConstant // (one fact in human memory)
-    && (condition2 || condition3) // (three facts in human memory), prev cond should be true, one of c2 or c3 has be true
-    && (condition4 && !condition5) { // (human memory overload), we are messed up by this point
-    ...
+
+### Configuration Management
+- **Primary Config**: `vtagent.toml` (never hardcode settings)
+- **Model Constants**: Always reference `vtagent-core/src/config/constants.rs`
+- **Latest Models**: Check `docs/models.json` for current model IDs
+
+## Project-Specific Patterns
+
+### Configuration Pattern
+```rust
+// ❌ Don't hardcode
+let model = "gemini-2.5-flash-lite";
+
+// ✅ Use constants module
+use vtagent_core::config::constants::models::google::GEMINI_2_5_FLASH_LITE;
+let model = GEMINI_2_5_FLASH_LITE;
+```
+
+### Error Handling Pattern
+```rust
+// ✅ Project standard: anyhow + descriptive context
+use anyhow::{Context, Result};
+
+fn process_file(path: &Path) -> Result<String> {
+    std::fs::read_to_string(path)
+        .with_context(|| format!("Failed to read file: {}", path.display()))
 }
 ```
 
-A good example, introducing intermediate variables with meaningful names:
+### Documentation Pattern
+```rust
+// ✅ All .md files belong in ./docs/ folder
+// ❌ Don't put documentation in root or other folders
 ```
-isValid = val > someConstant
-isAllowed = condition2 || condition3
-isSecure = condition4 && !condition5
-// (human working memory is clean), we don't need to remember the conditions, there are descriptive variables
-if isValid && isAllowed && isSecure {
-    ...
+
+### Tool Integration Pattern
+```rust
+// ✅ Use trait-based composition for tools
+#[async_trait]
+impl Tool for MyTool {
+    async fn execute(&self, args: Value) -> Result<Value> {
+        // Implementation
+    }
 }
 ```
 
-- No useless "WHAT" comments, don't write a comment if it duplicates the code. Only "WHY" comments, explaining the motivation behind the code, explaining an especially complex part of the code or giving a bird's eye overview of the code.
-- Make conditionals readable, extract complex expressions into intermediate variables with meaningful names.
-- Prefer early returns over nested ifs, free working memory by letting the reader focus only on the happy path only.
-- Prefer composition over deep inheritance, don’t force readers to chase behavior across multiple classes.
-- Don't write shallow modules (complex interface, simple functionality). An example of shallow module: `MetricsProviderFactoryFactory`. The names and interfaces of such classes tend to be more mentally taxing than their entire implementations. Having too many shallow modules can make it difficult to understand the project. Not only do we have to keep in mind each module responsibilities, but also all their interactions.
-- Prefer deep modules (simple interface, complex functionality) over many shallow ones.
-- Don’t overuse language featuress, stick to the minimal subset. Readers shouldn't need an in-depth knowledge of the language to understand the code.
-- Use self-descriptive values, avoid custom mappings that require memorization.
-- Don’t abuse DRY, a little duplication is better than unnecessary dependencies.
-- Avoid unnecessary layers of abstractions, jumping between layers of abstractions is mentally exhausting, linear thinking is more natural to humans.
+## Code Quality Principles
 
-## Project Context
+### Human-Centered Design
+- **4-space indentation** (spaces, not tabs)
+- **Early returns** over nested conditionals
+- **Descriptive variables** over complex expressions
+- **Composition** over deep inheritance
+- **Deep modules** (simple interface, complex functionality)
 
-This is a Rust project called "vtagent" that appears to be a code analysis tool with tree-sitter support for multiple programming languages (Rust, Python, JavaScript, TypeScript, Go, Java).
+### Memory-Efficient Conditionals
+```rust
+// ❌ Hard to track mentally
+if val > threshold && (cond1 || cond2) && (cond3 && !cond4) {
+    // ...
+}
+
+// ✅ Clear intermediate variables
+let is_valid = val > threshold;
+let is_allowed = cond1 || cond2;
+let is_secure = cond3 && !cond4;
+
+if is_valid && is_allowed && is_secure {
+    // ...
+}
+```
+
+## Integration Points
+
+### LLM Providers
+- **Gemini**: Primary provider via `gemini.rs`
+- **Multi-Provider**: Abstracted through `llm/` module
+- **Configuration**: Model selection via `vtagent.toml`
+
+### Tree-Sitter Integration
+- **Supported Languages**: Rust, Python, JavaScript, TypeScript, Go, Java
+- **Performance**: Efficient parsing with size limits
+- **Error Handling**: Graceful degradation on parse failures
+
+### PTY Command Execution
+- **Unified Backend**: All commands use enhanced PTY system
+- **Modes**: `terminal`, `pty`, `streaming`
+- **Safety**: Configurable command allow/deny lists
+
+## Development Conventions
+
+### Commit Messages
+- **Format**: `type(scope): description`
+- **Types**: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
+- **Atomic**: Single logical change per commit
+
+### Testing Strategy
+- **Unit Tests**: Co-located with source code in `#[cfg(test)]`
+- **Integration Tests**: In `tests/` directory
+- **Mocking**: External dependencies for reliable tests
+
+### File Organization
+- **Library Code**: `vtagent-core/src/`
+- **Binary Entry**: `src/main.rs`
+- **Documentation**: `./docs/` folder only
+- **Examples**: `examples/` directory
+- **Benchmarks**: `benches/` directory
+
+## Security & Safety
+
+### API Key Management
+- **Environment Variables**: `GEMINI_API_KEY`, `GOOGLE_API_KEY`
+- **Never Hardcode**: Keys must come from environment
+- **Validation**: Input sanitization for all external data
+
+### File System Safety
+- **Path Validation**: All file operations check workspace boundaries
+- **Size Limits**: Configurable maximum file sizes
+- **Exclusion Patterns**: `.vtagentgitignore` support
+
+## Performance Considerations
+
+### Async Operations
+- **Tokio Runtime**: Full async support with multi-threading
+- **Streaming**: Real-time output for long-running commands
+- **Caching**: Strategic caching for file operations
+
+### Memory Management
+- **Chunked Reading**: Large file handling without memory exhaustion
+- **Context Compression**: Automatic conversation summarization
+- **Resource Limits**: Configurable timeouts and size limits
+
 
 ## Code Style and Standards
 

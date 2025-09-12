@@ -50,6 +50,7 @@ jobs:
           draft: false
           prerelease: false
           contributors: true
+          emoji: false
 
       - name: Build and test (optional)
         run: |

@@ -1,5 +1,7 @@
 
+edit vtagent-core/src/config/constants.rs and add `qwen/qwen3-next-80b-a3b-thinking` model id to openrouter model list
 
+--
 
 rp_search".to_string(),
 "list_files".to_string(),

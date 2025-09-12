@@ -72,6 +72,7 @@ pub mod models {
         pub const OPENAI_GPT_5: &str = "openai/gpt-5";
         pub const OPENAI_GPT_5_MINI: &str = "openai/gpt-5-mini";
         pub const QWEN_QWEN3_CODER: &str = "qwen/qwen3-coder";
+        pub const QWEN_QWEN3_NEXT_80B_A3B_THINKING: &str = "qwen/qwen3-next-80b-a3b-thinking";
         pub const GOOGLE_GEMINI_2_5_PRO: &str = "google/gemini-2.5-pro";
         pub const GOOGLE_GEMINI_2_5_FLASH: &str = "google/gemini-2.5-flash";
         pub const GOOGLE_GEMINI_2_5_FLASH_LITE: &str = "google/gemini-2.5-flash-lite";
@@ -79,6 +80,7 @@ pub mod models {
         pub const X_AI_GROK_CODE_FAST_1: &str = "x-ai/grok-code-fast-1";
         pub const DEEPSEEK_DEEPSEEK_CHAT_V3_1: &str = "deepseek/deepseek-chat-v3.1";
         pub const GLM_4_5: &str = "z-ai/glm-4.5";
+        pub const QWEN_QWEN3_NEXT_80B_A3B_INSTRUCT: &str = "qwen/qwen3-next-80b-a3b-instruct";
         pub const KIMI_K2_0905: &str = "moonshotai/kimi-k2-0905";
         pub const SUPPORTED_MODELS: &[&str] = &[
             "anthropic/claude-3.5-sonnet",
@@ -88,7 +90,7 @@ pub mod models {
             "google/gemini-2.5-pro",
             "google/gemini-2.5-flash",
             "google/gemini-2.5-flash-lite",
-            "qwen/qwen3-coder",
+            "qwen/qwen3-next-80b-a3b-thinking",
             "qwen/qwen3-30b-a3b-2507",
             "x-ai/grok-code-fast-1",
             "deepseek/deepseek-chat-v3.1",

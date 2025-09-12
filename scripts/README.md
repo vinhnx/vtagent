@@ -97,7 +97,13 @@ Creates releases for VTAgent using changelogithub integration.
 1. **Pre-flight checks**: Verifies branch and working tree state
 2. **Version update**: Updates `Cargo.toml` with new version
 3. **Git operations**: Commits version change, creates tag, pushes to GitHub
-4. **Automated release**: GitHub Actions creates release with changelog
+4. **Automated release**: GitHub Actions creates release with changelog using the official changelogithub action
+
+**Recent Updates:**
+
+- Fixed changelogithub CLI compatibility issues by switching to the official GitHub Action
+- Added proper workflow permissions for release creation
+- Improved error handling and debugging information
 
 ## Quick Start
 

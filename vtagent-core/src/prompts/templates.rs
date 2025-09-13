@@ -43,7 +43,7 @@ impl PromptTemplates {
 
     /// Get tool usage prompt
     pub fn tool_usage_prompt() -> &'static str {
-        "You have access to various tools for file operations, code analysis, and system commands. Use them appropriately to assist with tasks."
+        "You have tools for files, search, and shell. Plan before calling tools; choose the most specific tool. Prefer small, targeted calls. Default to response_format='concise' and paginate long results with page/per_page. If a tool truncates output or returns guidance, follow it. Use unambiguous args (e.g., path, max_results)."
     }
 
     /// Get workspace context prompt
@@ -53,6 +53,6 @@ impl PromptTemplates {
 
     /// Get safety guidelines prompt
     pub fn safety_guidelines_prompt() -> &'static str {
-        "Always prioritize safety and security. Ask for confirmation before making destructive changes or running potentially dangerous commands."
+        "Prioritize safety. Follow scoped permissions and caps applied by policy. Ask confirmation for destructive operations. If a tool errors, read the message and retry with corrected arguments."
     }
 }

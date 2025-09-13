@@ -464,15 +464,19 @@ async fn handle_single_agent_chat(
         tool_call_id: None,
     }];
 
+    // Welcome message with guidance
+    println!("{}", style("Welcome to VTAgent! Type your questions or commands below.").cyan());
+    println!("{}", style("Tip: Try asking 'read the main.rs and show me what it about'").dim());
+    println!();
+
     loop {
         if debug_enabled {
             println!("DEBUG: Starting input loop iteration");
             println!("DEBUG: About to show prompt");
         }
 
-        // Enhanced REPL prompt with better formatting - no period at the end
-        print!("{}", style("[AGENT] vtagent").cyan().bold());
-        print!("{}", style(" ❯ ").white().bold());
+        // Simplified REPL prompt
+        print!("{}", style("❯ ").white().bold());
         let flush_result = io::stdout().flush();
 
         if debug_enabled {
@@ -744,7 +748,7 @@ async fn handle_single_agent_chat(
                         }
                     }
 
-                    progress.finish_with_message("All tools executed");
+                    progress.finish_and_clear();
 
                     // After executing tools, send another request to get the final response
                     let follow_up_request = LLMRequest {

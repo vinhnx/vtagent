@@ -29,7 +29,7 @@ pub struct ToolRegistry {
     bash_tool: BashTool,
     file_ops_tool: FileOpsTool,
     command_tool: CommandTool,
-    grep_search: Arc<GrepSearchManager>,
+    // Removed stored grep_search (no longer needed as a field)
     ast_grep_engine: Option<Arc<AstGrepEngine>>,
     tool_policy: ToolPolicyManager,
     pty_config: PtyConfig,
@@ -96,7 +96,6 @@ impl ToolRegistry {
             bash_tool,
             file_ops_tool,
             command_tool,
-            grep_search,
             ast_grep_engine,
             tool_policy: policy_manager,
             pty_config,
@@ -129,6 +128,9 @@ impl ToolRegistry {
             return Err(anyhow!("Tool '{}' execution denied by policy", name));
         }
 
+        // Apply optional scoped constraints from policy
+        let args = self.apply_policy_constraints(name, args)?;
+
         // Check PTY session limits for PTY-based tools
         let is_pty_tool = matches!(name, tools::RUN_TERMINAL_CMD | tools::BASH);
         if is_pty_tool {
@@ -154,6 +156,85 @@ impl ToolRegistry {
         }
 
         result
+    }
+
+    /// Apply optional scoped constraints from tool policy to arguments to improve safety
+    fn apply_policy_constraints(&self, name: &str, mut args: Value) -> Result<Value> {
+        if let Some(constraints) = self.tool_policy.get_constraints(name).cloned() {
+            let obj = args
+                .as_object_mut()
+                .ok_or_else(|| anyhow!("Error: tool arguments must be an object"))?;
+
+            // Default response_format
+            if let Some(fmt) = constraints.default_response_format {
+                obj.entry("response_format").or_insert(json!(fmt));
+            }
+
+            // Allowed modes
+            if let Some(allowed) = constraints.allowed_modes {
+                if let Some(mode) = obj.get("mode").and_then(|v| v.as_str()) {
+                    if !allowed.iter().any(|m| m == mode) {
+                        return Err(anyhow!(format!(
+                            "Mode '{}' not allowed by policy for '{}'. Allowed: {}",
+                            mode,
+                            name,
+                            allowed.join(", ")
+                        )));
+                    }
+                }
+            }
+
+            // Tool-specific caps
+            match name {
+                n if n == tools::LIST_FILES => {
+                    if let Some(cap) = constraints.max_items_per_call {
+                        let requested = obj
+                            .get("max_items")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(cap as u64) as usize;
+                        if requested > cap {
+                            obj.insert("max_items".to_string(), json!(cap));
+                            obj.insert(
+                                "_policy_note".to_string(),
+                                json!(format!("Capped max_items to {} by policy", cap)),
+                            );
+                        }
+                    }
+                }
+                n if n == tools::GREP_SEARCH => {
+                    if let Some(cap) = constraints.max_results_per_call {
+                        let requested = obj
+                            .get("max_results")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(cap as u64) as usize;
+                        if requested > cap {
+                            obj.insert("max_results".to_string(), json!(cap));
+                            obj.insert(
+                                "_policy_note".to_string(),
+                                json!(format!("Capped max_results to {} by policy", cap)),
+                            );
+                        }
+                    }
+                }
+                n if n == tools::READ_FILE => {
+                    if let Some(cap) = constraints.max_bytes_per_read {
+                        let requested = obj
+                            .get("max_bytes")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(cap as u64) as usize;
+                        if requested > cap {
+                            obj.insert("max_bytes".to_string(), json!(cap));
+                            obj.insert(
+                                "_policy_note".to_string(),
+                                json!(format!("Capped max_bytes to {} by policy", cap)),
+                            );
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(args)
     }
 
     /// List available tools
@@ -405,7 +486,7 @@ impl ToolRegistry {
             .and_then(|v| v.as_str())
             .unwrap_or("search");
 
-        match operation {
+        let mut out = match operation {
             "search" => {
                 let pattern = args
                     .get("pattern")
@@ -547,7 +628,40 @@ impl ToolRegistry {
                     .await
             }
             _ => Err(anyhow!("Unknown AST-grep operation: {}", operation)),
+        }?;
+
+        // Optional concise transform
+        let fmt = args
+            .get("response_format")
+            .and_then(|v| v.as_str())
+            .unwrap_or("concise");
+        if fmt.eq_ignore_ascii_case("concise") {
+            if let Some(matches) = out.get_mut("matches") {
+                let concise = Self::astgrep_to_concise(matches.take());
+                out["matches"] = concise;
+                out["response_format"] = json!("concise");
+            } else if let Some(results) = out.get_mut("results") {
+                let concise = Self::astgrep_to_concise(results.take());
+                out["results"] = concise;
+                out["response_format"] = json!("concise");
+            } else if let Some(issues) = out.get_mut("issues") {
+                let concise = Self::astgrep_issues_to_concise(issues.take());
+                out["issues"] = concise;
+                out["response_format"] = json!("concise");
+            } else if let Some(suggestions) = out.get_mut("suggestions") {
+                let concise = Self::astgrep_changes_to_concise(suggestions.take());
+                out["suggestions"] = concise;
+                out["response_format"] = json!("concise");
+            } else if let Some(changes) = out.get_mut("changes") {
+                let concise = Self::astgrep_changes_to_concise(changes.take());
+                out["changes"] = concise;
+                out["response_format"] = json!("concise");
+            }
+        } else {
+            out["response_format"] = json!("detailed");
         }
+
+        Ok(out)
     }
 
     /// Normalize a path relative to workspace
@@ -611,29 +725,160 @@ impl ToolRegistry {
     }
 }
 
+impl ToolRegistry {
+    // Best-effort concise mapping for ast-grep outputs from various operations
+    fn astgrep_to_concise(v: Value) -> Value {
+        let mut out = Vec::new();
+        match v {
+            Value::Array(arr) => {
+                for item in arr.into_iter() {
+                    let mut path = None;
+                    let mut line = None;
+                    let mut text = None;
+
+                    // Common shapes
+                    if let Some(p) = item.get("path").and_then(|p| p.as_str()) {
+                        path = Some(p.to_string());
+                    }
+                    if line.is_none() {
+                        line = item
+                            .get("range").and_then(|r| r.get("start")).and_then(|s| s.get("line")).and_then(|l| l.as_u64())
+                            .or(item.get("start").and_then(|s| s.get("line")).and_then(|l| l.as_u64()));
+                    }
+                    if text.is_none() {
+                        text = item.get("text").and_then(|t| t.as_str()).map(|s| s.to_string())
+                            .or(item.get("lines").and_then(|l| l.get("text")).and_then(|t| t.as_str()).map(|s| s.to_string()))
+                            .or(item.get("matched").and_then(|t| t.as_str()).map(|s| s.to_string()));
+                    }
+
+                    out.push(json!({
+                        "path": path.unwrap_or_default(),
+                        "line_number": line.unwrap_or(0),
+                        "text": text.unwrap_or_default(),
+                    }));
+                }
+                Value::Array(out)
+            }
+            other => other,
+        }
+    }
+
+    // Map ast-grep lint issues into concise entries
+    fn astgrep_issues_to_concise(v: Value) -> Value {
+        let mut out = Vec::new();
+        match v {
+            Value::Array(arr) => {
+                for item in arr.into_iter() {
+                    let path = item
+                        .get("path")
+                        .or_else(|| item.get("file"))
+                        .and_then(|p| p.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let line = item
+                        .get("range").and_then(|r| r.get("start")).and_then(|s| s.get("line")).and_then(|l| l.as_u64())
+                        .or(item.get("start").and_then(|s| s.get("line")).and_then(|l| l.as_u64()))
+                        .or(item.get("line").and_then(|l| l.as_u64()))
+                        .unwrap_or(0);
+                    let message = item
+                        .get("message").and_then(|m| m.as_str())
+                        .or(item.get("text").and_then(|t| t.as_str()))
+                        .unwrap_or("")
+                        .to_string();
+                    let severity = item.get("severity").and_then(|s| s.as_str()).unwrap_or("");
+                    let rule = item.get("rule").or_else(|| item.get("rule_id")).and_then(|r| r.as_str()).unwrap_or("");
+                    out.push(json!({
+                        "path": path,
+                        "line_number": line,
+                        "message": message,
+                        "severity": severity,
+                        "rule": rule,
+                    }));
+                }
+                Value::Array(out)
+            }
+            other => other,
+        }
+    }
+
+    // Map ast-grep refactor/transform suggestions/changes into concise entries
+    fn astgrep_changes_to_concise(v: Value) -> Value {
+        let mut out = Vec::new();
+        match v {
+            Value::Array(arr) => {
+                for item in arr.into_iter() {
+                    let path = item
+                        .get("path")
+                        .or_else(|| item.get("file"))
+                        .and_then(|p| p.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let line = item
+                        .get("range").and_then(|r| r.get("start")).and_then(|s| s.get("line")).and_then(|l| l.as_u64())
+                        .or(item.get("start").and_then(|s| s.get("line")).and_then(|l| l.as_u64()))
+                        .or(item.get("line").and_then(|l| l.as_u64()))
+                        .unwrap_or(0);
+                    // Try different fields to summarize change
+                    let before = item.get("text").and_then(|t| t.as_str())
+                        .or(item.get("matched").and_then(|t| t.as_str()))
+                        .or(item.get("before").and_then(|t| t.as_str()))
+                        .unwrap_or("");
+                    let after = item.get("replacement").and_then(|t| t.as_str())
+                        .or(item.get("after").and_then(|t| t.as_str()))
+                        .unwrap_or("");
+                    let note = if !after.is_empty() {
+                        format!("{} -> {}", truncate(before, 80), truncate(after, 80))
+                    } else {
+                        truncate(before, 120)
+                    };
+                    out.push(json!({
+                        "path": path,
+                        "line_number": line,
+                        "note": note,
+                    }));
+                }
+                Value::Array(out)
+            }
+            other => other,
+        }
+    }
+}
+
+fn truncate(s: &str, max: usize) -> String {
+    if s.chars().count() <= max { return s.to_string(); }
+    let mut out = String::new();
+    for (i, ch) in s.chars().enumerate() {
+        if i >= max { break; }
+        out.push(ch);
+    }
+    out.push_str("…");
+    out
+}
+
 /// Build function declarations for all available tools
 pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
     vec![
         // Ripgrep search tool
         FunctionDeclaration {
             name: tools::GREP_SEARCH.to_string(),
-            description: "Enhanced unified search tool with multiple modes: exact (default), fuzzy, multi-pattern, and similarity search. Consolidates all search functionality into one powerful tool.".to_string(),
+            description: "code_search: Unified grep-based search. Modes: 'exact' (default), 'fuzzy', 'multi', 'similarity'. Returns concise results by default; set response_format='detailed' for raw ripgrep JSON. Example: grep_search({pattern:'TODO|FIXME', path:'src', max_results:100, response_format:'concise'}).".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
-                    "pattern": {"type": "string", "description": "Search pattern (required for exact/fuzzy modes)"},
-                    "path": {"type": "string", "description": "Directory path to search in", "default": "."},
-                    "mode": {"type": "string", "description": "Search mode: 'exact' (default), 'fuzzy', 'multi', 'similarity'", "default": "exact"},
-                    "max_results": {"type": "integer", "description": "Maximum number of results", "default": 100},
-                    "case_sensitive": {"type": "boolean", "description": "Case sensitive search", "default": true},
+                    "pattern": {"type": "string", "description": "Search pattern. Example: 'fn \\w+' or 'TODO|FIXME'"},
+                    "path": {"type": "string", "description": "Directory path to search in (relative). Default: '.'", "default": "."},
+                    "mode": {"type": "string", "description": "Search mode: 'exact' | 'fuzzy' | 'multi' | 'similarity'", "default": "exact"},
+                    "max_results": {"type": "integer", "description": "Max results (token efficiency). Default: 100", "default": 100},
+                    "case_sensitive": {"type": "boolean", "description": "Case sensitive search. Default: true", "default": true},
                     // Multi-pattern search parameters
-                    "patterns": {"type": "array", "items": {"type": "string"}, "description": "Multiple patterns for multi mode"},
-                    "logic": {"type": "string", "description": "Logic for multi mode: 'AND' or 'OR'", "default": "AND"},
+                    "patterns": {"type": "array", "items": {"type": "string"}, "description": "For mode='multi'. Example: ['fn \\w+','use \\w+']"},
+                    "logic": {"type": "string", "description": "For mode='multi': 'AND' or 'OR'", "default": "AND"},
                     // Fuzzy search parameters
                     "fuzzy_threshold": {"type": "number", "description": "Fuzzy matching threshold (0.0-1.0)", "default": 0.7},
                     // Similarity search parameters
-                    "reference_file": {"type": "string", "description": "Reference file for similarity mode"},
-                    "content_type": {"type": "string", "description": "Content type for similarity: 'structure', 'imports', 'functions', 'all'", "default": "all"}
+                    "reference_file": {"type": "string", "description": "For mode='similarity': reference file path"},
+                    "content_type": {"type": "string", "description": "For mode='similarity': 'structure'|'imports'|'functions'|'all'", "default": "all"},
+                    "response_format": {"type": "string", "description": "'concise' (default) or 'detailed' (raw rg JSON)", "default": "concise"}
                 },
                 "required": ["pattern"]
             }),
@@ -642,16 +887,19 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // Consolidated file operations tool
         FunctionDeclaration {
             name: "list_files".to_string(),
-            description: "Enhanced file discovery tool with multiple modes: list (default), recursive, find_name, find_content. Consolidates all file discovery functionality.".to_string(),
+            description: "fs_list: File discovery. Modes: 'list' (default), 'recursive', 'find_name', 'find_content'. Supports pagination and response_format for token efficiency. Example: list_files({path:'src', page:1, per_page:50, response_format:'concise'}).".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Path to search from"},
-                    "max_items": {"type": "integer", "description": "Maximum number of items to return", "default": 1000},
+                    "path": {"type": "string", "description": "Path to search from (relative). Example: 'src'"},
+                    "mode": {"type": "string", "description": "'list' | 'recursive' | 'find_name' | 'find_content'", "default": "list"},
+                    "max_items": {"type": "integer", "description": "Cap total items scanned (token safety). Default: 1000", "default": 1000},
+                    "page": {"type": "integer", "description": "Page number (1-based). Default: 1", "default": 1},
+                    "per_page": {"type": "integer", "description": "Items per page. Default: 100", "default": 100},
+                    "response_format": {"type": "string", "description": "'concise' (default) omits low-signal fields; 'detailed' includes them", "default": "concise"},
                     "include_hidden": {"type": "boolean", "description": "Include hidden files", "default": false},
-                    "mode": {"type": "string", "description": "Discovery mode: 'list' (default), 'recursive', 'find_name', 'find_content'", "default": "list"},
-                    "name_pattern": {"type": "string", "description": "Pattern for recursive and find_name modes"},
-                    "content_pattern": {"type": "string", "description": "Content pattern for find_content mode"},
+                    "name_pattern": {"type": "string", "description": "For 'recursive'/'find_name' modes. Example: '*.rs'"},
+                    "content_pattern": {"type": "string", "description": "For 'find_content' mode. Example: 'fn main'"},
                     "file_extensions": {"type": "array", "items": {"type": "string"}, "description": "Filter by file extensions"},
                     "case_sensitive": {"type": "boolean", "description": "Case sensitive pattern matching", "default": true},
                     "ast_grep_pattern": {"type": "string", "description": "Optional AST pattern to filter files"}
@@ -663,7 +911,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // File reading tool
         FunctionDeclaration {
             name: tools::READ_FILE.to_string(),
-            description: "Read the contents of a file. Use this before editing to understand file structure.".to_string(),
+            description: "fs_read: Read file contents. Use max_bytes to limit tokens. Example: read_file({path:'src/main.rs', max_bytes:20000}).".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
@@ -676,7 +924,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // File writing tool
         FunctionDeclaration {
             name: tools::WRITE_FILE.to_string(),
-            description: "Write content to a file. Can create new files or overwrite existing ones. Use read_file first to understand current content before editing.".to_string(),
+            description: "fs_write: Write content to a file. Modes: 'overwrite' (default) | 'append' | 'skip_if_exists'. Example: write_file({path:'README.md', content:'Hello', mode:'overwrite'}).".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
@@ -691,7 +939,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // File editing tool
         FunctionDeclaration {
             name: tools::EDIT_FILE.to_string(),
-            description: "Edit a file by replacing specific text. Use read_file first to understand the file structure and find exact text to replace.".to_string(),
+            description: "fs_edit: Replace specific text in a file. Read the file first to identify exact spans. Example: edit_file({path:'src/lib.rs', old_str:'foo', new_str:'bar'}).".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
@@ -706,14 +954,15 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // Consolidated command execution tool
         FunctionDeclaration {
             name: tools::RUN_TERMINAL_CMD.to_string(),
-            description: "Enhanced command execution tool with multiple modes: terminal (default), pty, streaming. Use this for shell commands, not for file editing - use read_file/write_file/edit_file for file operations.".to_string(),
+            description: "shell_run: Execute a program with args. Modes: 'terminal' (default), 'pty', 'streaming'. Prefer file tools for edits. Example: run_terminal_cmd({command:['bash','-lc','echo test'], timeout_secs:10, mode:'terminal'}).".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
                     "command": {"type": "array", "items": {"type": "string"}, "description": "Program + args as array"},
                     "working_dir": {"type": "string", "description": "Working directory relative to workspace"},
                     "timeout_secs": {"type": "integer", "description": "Command timeout in seconds (default: 30)", "default": 30},
-                    "mode": {"type": "string", "description": "Execution mode: 'terminal' (default), 'pty', 'streaming'", "default": "terminal"}
+                    "mode": {"type": "string", "description": "Execution mode: 'terminal' | 'pty' | 'streaming'", "default": "terminal"},
+                    "response_format": {"type": "string", "description": "'concise' (default) or 'detailed'", "default": "concise"}
                 },
                 "required": ["command"]
             }),
@@ -722,7 +971,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // AST-grep search and transformation tool
         FunctionDeclaration {
             name: tools::AST_GREP_SEARCH.to_string(),
-            description: "Advanced syntax-aware code search, transformation, and analysis using AST-grep patterns. Supports multiple operations: search (default), transform, lint, refactor, custom.".to_string(),
+            description: "code_astgrep: Syntax-aware code search and rewrite using AST-grep. Operations include 'search', 'transform', 'lint', 'refactor', and 'custom'. Provide patterns and optional context_lines/max_results to control output size.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
@@ -768,7 +1017,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // Bash-like command tool
         FunctionDeclaration {
             name: tools::BASH.to_string(),
-            description: "Direct bash-like command execution: ls, pwd, grep, find, cat, head, tail, mkdir, rm, cp, mv, stat, run. Acts like a human using bash commands.".to_string(),
+            description: "shell_bash: Bash-like commands via PTY (ls, pwd, grep, find, cat, head, tail, mkdir, rm, cp, mv, stat, run). Restricted for safety; prefer 'run_terminal_cmd' and file/search tools when possible.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {

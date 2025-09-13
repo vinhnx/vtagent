@@ -29,7 +29,7 @@ impl SearchTool {
         let pattern = args
             .get("pattern")
             .and_then(|p| p.as_str())
-            .ok_or_else(|| anyhow!("Missing pattern for search"))?;
+            .ok_or_else(|| anyhow!("Error: Missing 'pattern'. Example: grep_search({{\"pattern\": \"TODO|FIXME\", \"path\": \"src\"}})"))?;
 
         let input = GrepSearchInput {
             pattern: pattern.to_string(),
@@ -54,12 +54,44 @@ impl SearchTool {
             include_hidden: Some(false),
         };
 
-        let result = self.grep_search.perform_search(input).await?;
-        Ok(json!({
-            "success": true,
-            "matches": result.matches,
-            "mode": "exact"
-        }))
+        let result = self.grep_search.perform_search(input.clone()).await?;
+
+        // Response formatting
+        let concise = args
+            .get("response_format")
+            .and_then(|v| v.as_str())
+            .map(|s| s.eq_ignore_ascii_case("concise"))
+            .unwrap_or(true);
+
+        let mut body = if concise {
+            let concise_matches = transform_matches_to_concise(&result.matches);
+            json!({
+                "success": true,
+                "matches": concise_matches,
+                "mode": "exact",
+                "response_format": "concise"
+            })
+        } else {
+            json!({
+                "success": true,
+                "matches": result.matches,
+                "mode": "exact",
+                "response_format": "detailed"
+            })
+        };
+
+        if let Some(max) = input.max_results {
+            // Heuristic: if we hit the cap, hint pagination/filtering
+            if let Some(arr) = body.get("matches").and_then(|m| m.as_array()) {
+                if arr.len() >= max {
+                    body["message"] = json!(format!(
+                        "Showing {} results (limit). Narrow your query or use more specific patterns to reduce tokens.",
+                        max
+                    ));
+                }
+            }
+        }
+        Ok(body)
     }
 
     /// Execute fuzzy search mode
@@ -77,7 +109,7 @@ impl SearchTool {
     async fn execute_multi(&self, args: Value) -> Result<Value> {
         let args_obj = args
             .as_object()
-            .ok_or_else(|| anyhow!("Invalid arguments"))?;
+            .ok_or_else(|| anyhow!("Error: Invalid 'multi' arguments. Required: {{ patterns: string[] }}. Optional: {{ logic: 'AND'|'OR' }}. Example: grep_search({{\"mode\": \"multi\", \"patterns\": [\"fn \\w+\", \"use \\w+\"], \"logic\": \"AND\"}})"))?;
 
         let patterns = args_obj
             .get("patterns")
@@ -130,12 +162,12 @@ impl SearchTool {
     async fn execute_similarity(&self, args: Value) -> Result<Value> {
         let args_obj = args
             .as_object()
-            .ok_or_else(|| anyhow!("Invalid arguments"))?;
+            .ok_or_else(|| anyhow!("Error: Invalid 'similarity' arguments. Required: {{ reference_file: string }}. Optional: {{ content_type: 'structure'|'imports'|'functions'|'all' }}. Example: grep_search({{\"mode\": \"similarity\", \"reference_file\": \"src/lib.rs\", \"content_type\": \"functions\"}})"))?;
 
         let reference_file = args_obj
             .get("reference_file")
             .and_then(|f| f.as_str())
-            .ok_or_else(|| anyhow!("Missing reference_file for similarity mode"))?;
+            .ok_or_else(|| anyhow!("Error: Missing 'reference_file'. Example: grep_search({{\"mode\": \"similarity\", \"reference_file\": \"src/main.rs\"}})"))?;
 
         let content_type = args_obj
             .get("content_type")
@@ -146,7 +178,7 @@ impl SearchTool {
         let ref_path = self.workspace_root.join(reference_file);
         let ref_content = tokio::fs::read_to_string(&ref_path)
             .await
-            .map_err(|e| anyhow!("Failed to read reference file: {}", e))?;
+            .map_err(|e| anyhow!("Error: Failed to read reference file '{}': {}", reference_file, e))?;
 
         // Extract patterns based on content type
         let patterns = self.extract_similarity_patterns(&ref_content, content_type)?;
@@ -262,7 +294,7 @@ impl SearchTool {
         }
 
         if patterns.is_empty() {
-            return Err(anyhow!("No patterns extracted from reference file"));
+            return Err(anyhow!("No patterns extracted from reference file. Try content_type='all' or provide a different reference_file."));
         }
 
         Ok(patterns)
@@ -354,5 +386,62 @@ impl CacheableTool for SearchTool {
         // Cache exact and fuzzy searches, but not multi/similarity (too dynamic)
         let mode = args.get("mode").and_then(|m| m.as_str()).unwrap_or("exact");
         matches!(mode, "exact" | "fuzzy")
+    }
+}
+
+/// Transform ripgrep JSON event stream into a concise, agent-friendly structure
+/// keeping only meaningful context for downstream actions.
+pub(crate) fn transform_matches_to_concise(events: &[Value]) -> Vec<Value> {
+    let mut out = Vec::new();
+    for ev in events {
+        if ev.get("type").and_then(|t| t.as_str()) != Some("match") {
+            continue;
+        }
+        if let Some(data) = ev.get("data") {
+            let path = data
+                .get("path")
+                .and_then(|p| p.get("text"))
+                .and_then(|t| t.as_str())
+                .unwrap_or("");
+            let line = data.get("line_number").and_then(|n| n.as_u64()).unwrap_or(0);
+            let preview = data
+                .get("lines")
+                .and_then(|l| l.get("text"))
+                .and_then(|t| t.as_str())
+                .unwrap_or("")
+                .trim_end_matches(['\r', '\n']);
+
+            out.push(json!({
+                "path": path,
+                "line_number": line,
+                "text": preview,
+            }));
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_transform_matches_to_concise() {
+        let raw = vec![
+            json!({
+                "type": "match",
+                "data": {
+                    "path": {"text": "src/main.rs"},
+                    "line_number": 10,
+                    "lines": {"text": "fn main() {}\n"}
+                }
+            }),
+            json!({"type": "begin"}),
+        ];
+        let concise = transform_matches_to_concise(&raw);
+        assert_eq!(concise.len(), 1);
+        assert_eq!(concise[0]["path"], "src/main.rs");
+        assert_eq!(concise[0]["line_number"], 10);
+        assert_eq!(concise[0]["text"], "fn main() {}");
     }
 }

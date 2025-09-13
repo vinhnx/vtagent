@@ -39,6 +39,9 @@ pub struct ToolPolicyConfig {
     pub available_tools: Vec<String>,
     /// Policy for each tool
     pub policies: HashMap<String, ToolPolicy>,
+    /// Optional per-tool constraints to scope permissions and enforce safety
+    #[serde(default)]
+    pub constraints: HashMap<String, ToolConstraints>,
 }
 
 impl Default for ToolPolicyConfig {
@@ -47,6 +50,7 @@ impl Default for ToolPolicyConfig {
             version: 1,
             available_tools: Vec::new(),
             policies: HashMap::new(),
+            constraints: HashMap::new(),
         }
     }
 }
@@ -60,6 +64,9 @@ pub struct AlternativeToolPolicyConfig {
     pub default: AlternativeDefaultPolicy,
     /// Tool-specific policies
     pub tools: HashMap<String, AlternativeToolPolicy>,
+    /// Optional per-tool constraints (ignored if absent)
+    #[serde(default)]
+    pub constraints: HashMap<String, ToolConstraints>,
 }
 
 /// Default policy in alternative format
@@ -195,6 +202,7 @@ impl ToolPolicyManager {
             version: alt_config.version,
             available_tools: policies.keys().cloned().collect(),
             policies,
+            constraints: alt_config.constraints,
         }
     }
 
@@ -239,6 +247,11 @@ impl ToolPolicyManager {
             .get(tool_name)
             .cloned()
             .unwrap_or(ToolPolicy::Prompt)
+    }
+
+    /// Get optional constraints for a specific tool
+    pub fn get_constraints(&self, tool_name: &str) -> Option<&ToolConstraints> {
+        self.config.constraints.get(tool_name)
     }
 
     /// Check if tool should be executed based on policy
@@ -423,9 +436,30 @@ impl ToolPolicyManager {
     }
 }
 
+/// Scoped, optional constraints for a tool to align with safe defaults
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ToolConstraints {
+    /// Whitelisted modes for tools that support modes (e.g., 'terminal')
+    #[serde(default)]
+    pub allowed_modes: Option<Vec<String>>,
+    /// Cap on results for list/search-like tools
+    #[serde(default)]
+    pub max_results_per_call: Option<usize>,
+    /// Cap on items scanned for file listing
+    #[serde(default)]
+    pub max_items_per_call: Option<usize>,
+    /// Default response format if unspecified by caller
+    #[serde(default)]
+    pub default_response_format: Option<String>,
+    /// Cap maximum bytes when reading files
+    #[serde(default)]
+    pub max_bytes_per_read: Option<usize>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::constants::tools;
     use tempfile::tempdir;
 
     #[test]

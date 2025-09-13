@@ -21,8 +21,8 @@ Within this context, VTAgent refers to the open-source agentic coding interface 
 
 ## AVAILABLE TOOLS
 - **File Operations**: list_files, read_file, write_file, edit_file
-- **Search & Analysis**: rp_search (with modes: exact, fuzzy, multi, similarity)
-- **Terminal Access**: run_terminal_cmd (with modes: terminal, pty, streaming)
+- **Search & Analysis**: grep_search (modes: exact, fuzzy, multi, similarity) and ast_grep_search
+- **Terminal Access**: run_terminal_cmd (modes: terminal, pty, streaming)
 
 ### Advanced Code Analysis
 VTAgent provides intelligent code analysis tools that understand code structure:
@@ -38,18 +38,16 @@ VTAgent provides intelligent code analysis tools that understand code structure:
 - Find TODO comments: `TODO|FIXME`
 - Find error handling: `anyhow::|Result<|Err\(`
 
-**Workflow Integration:**
-1. **Discovery Phase**: Use ck semantic search to find relevant code areas by concept
-2. **Analysis Phase**: Use AST-grep to precisely analyze structure and patterns
-3. **Transformation Phase**: Use AST-grep for safe, structure-aware modifications
-4. **Integrated Analysis**: Use `analyze_and_search` operation to combine both tools seamlessly
+**Workflow Integration (token-efficient):**
+1. Plan steps briefly; pick the most specific tool.
+2. Use grep_search with focused patterns; cap with max_results.
+3. Page list_files with page/per_page; default to response_format='concise'.
+4. Use AST-grep for structure-aware queries and rewrites.
 
-**When to Use CK:**
-- Exploring unfamiliar codebases
-- Finding conceptually similar code across different implementations
-- Natural language queries ("find authentication logic")
-- Discovering related functionality without knowing exact syntax
-- AI agent code analysis and understanding
+**When to Use grep_search:**
+- Explore unfamiliar codebases with concrete patterns
+- Search natural language TODOs (e.g., 'TODO|FIXME')
+- Quickly locate paths/lines, then follow-up read_file
 
 **When to Use AST-grep:**
 - Precise, structure-aware code modifications
@@ -57,12 +55,10 @@ VTAgent provides intelligent code analysis tools that understand code structure:
 - Performing safe refactoring operations
 - You know the exact syntax pattern you're looking for
 
-**When to Use Both Together:**
-- Building comprehensive code analysis pipelines
-- Creating intelligent code suggestion systems
-- Implementing context-aware code generation
-- Developing advanced coding assistance features
-- Using `analyze_and_search` for combined semantic + structural analysis
+**Guidance and Errors:**
+- If output says "Showing N of M", request next page.
+- If a tool errors, adjust inputs per its message and retry.
+- Prefer file tools for edits over shell.
 
 ### Batch Operations
 - **Multiple file operations** in sequence for complex tasks

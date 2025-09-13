@@ -11,12 +11,12 @@ if ! curl -s http://localhost:1234/v1/models >/dev/null; then
     exit 1
 fi
 
-echo "✅ LMStudio is running"
+echo "LMStudio is running"
 
 # Check if the model from config is available
 MODEL_FROM_CONFIG="qwen3-4b-2507"
 if curl -s http://localhost:1234/v1/models | jq -r '.data[].id' | grep -q "$MODEL_FROM_CONFIG"; then
-    echo "✅ Model '$MODEL_FROM_CONFIG' is available in LMStudio"
+    echo "Model '$MODEL_FROM_CONFIG' is available in LMStudio"
 else
     echo "❌ Model '$MODEL_FROM_CONFIG' not found in LMStudio"
     echo "Available models:"
@@ -35,7 +35,7 @@ if [ ! -f "vtagent.toml" ]; then
     exit 1
 fi
 
-echo "✅ vtagent.toml exists"
+echo "vtagent.toml exists"
 
 # Check configuration values
 CONFIG_MODEL=$(grep "default_model" vtagent.toml | cut -d'"' -f2)
@@ -46,7 +46,7 @@ echo "  - Model: $CONFIG_MODEL"
 echo "  - Provider: $CONFIG_PROVIDER"
 
 if [ "$CONFIG_MODEL" = "$MODEL_FROM_CONFIG" ]; then
-    echo "✅ Model configuration matches"
+    echo "Model configuration matches"
 else
     echo "❌ Model configuration mismatch"
     echo "  Expected: $MODEL_FROM_CONFIG"
@@ -54,7 +54,7 @@ else
 fi
 
 if [ "$CONFIG_PROVIDER" = "lmstudio" ]; then
-    echo "✅ Provider configuration is correct"
+    echo "Provider configuration is correct"
 else
     echo "❌ Provider configuration mismatch"
     echo "  Expected: lmstudio"
@@ -72,11 +72,11 @@ if [ ! -f "target/release/vtagent" ]; then
     exit 1
 fi
 
-echo "✅ VT Agent binary exists"
+echo "VT Agent binary exists"
 
 # Test help command
 if ./target/release/vtagent --help >/dev/null 2>&1; then
-    echo "✅ VT Agent binary is executable"
+    echo "VT Agent binary is executable"
 else
     echo "❌ VT Agent binary is not executable"
     exit 1

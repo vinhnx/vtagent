@@ -24,10 +24,10 @@ echo "📡 Testing connection to LMStudio at http://localhost:1234..."
 echo
 
 # Test 1: Check if LMStudio is running
-echo "📋 Test 1: Checking if LMStudio server is accessible..."
+echo "Test 1: Checking if LMStudio server is accessible..."
 if curl -s -m 5 "http://localhost:1234/v1/models" > /tmp/lmstudio_test.json 2>/dev/null; then
-    echo "✅ Success: LMStudio server is running"
-    
+    echo "Success: LMStudio server is running"
+
     # Show available models
     echo
     echo "📂 Available Models:"
@@ -37,7 +37,7 @@ if curl -s -m 5 "http://localhost:1234/v1/models" > /tmp/lmstudio_test.json 2>/d
         # Fallback without jq
         grep -o '"id":"[^"]*"' /tmp/lmstudio_test.json | cut -d'"' -f4 | sed 's/^/   - /' || echo "   (Could not parse model list)"
     fi
-    
+
     MODEL_COUNT=$(grep -o '"id"' /tmp/lmstudio_test.json | wc -l | tr -d ' ')
     echo "📊 Total models available: $MODEL_COUNT"
 else
@@ -64,11 +64,11 @@ fi
 
 if [ -n "$FIRST_MODEL" ] && [ "$FIRST_MODEL" != "null" ]; then
     echo "   Testing with model: $FIRST_MODEL"
-    
+
     # Test completion with a simple prompt
     TEST_PROMPT="Say hello world in one word"
     echo "   Prompt: $TEST_PROMPT"
-    
+
     # Create test request
     cat > /tmp/lmstudio_request.json <<EOF
 {
@@ -83,25 +83,25 @@ if [ -n "$FIRST_MODEL" ] && [ "$FIRST_MODEL" != "null" ]; then
     "max_tokens": 100
 }
 EOF
-    
+
     # Send completion request
     if curl -s -m 10 \
         -X POST "http://localhost:1234/v1/chat/completions" \
         -H "Content-Type: application/json" \
         -d @/tmp/lmstudio_request.json \
         > /tmp/lmstudio_completion.json 2>/dev/null; then
-        
+
         if $HAS_JQ; then
             # Check if response is valid JSON
             if cat /tmp/lmstudio_completion.json | jq . >/dev/null 2>&1; then
-                echo "✅ Success: Model completion API is working"
-                
+                echo "Success: Model completion API is working"
+
                 # Extract response content
                 RESPONSE_CONTENT=$(cat /tmp/lmstudio_completion.json | jq -r '.choices[0].message.content' 2>/dev/null)
                 if [ "$RESPONSE_CONTENT" != "null" ] && [ -n "$RESPONSE_CONTENT" ]; then
                     echo "   Response: $RESPONSE_CONTENT"
                 else
-                    echo "   ⚠️  Got response but no content (model might still be loading)"
+                    echo "    Got response but no content (model might still be loading)"
                 fi
             else
                 echo "❌ Response is not valid JSON:"
@@ -110,7 +110,7 @@ EOF
         else
             # Check without jq
             if grep -q '"choices"' /tmp/lmstudio_completion.json; then
-                echo "✅ Success: Model completion API is working"
+                echo "Success: Model completion API is working"
                 echo "   (Install jq for better response formatting)"
             else
                 echo "❌ Unexpected response format"
@@ -118,11 +118,11 @@ EOF
             fi
         fi
     else
-        echo "⚠️  Failed to get completion response (this is OK if model is still loading)"
+        echo " Failed to get completion response (this is OK if model is still loading)"
         echo "💡 Model might still be initializing in LMStudio"
     fi
 else
-    echo "⚠️  Could not determine model name for testing"
+    echo " Could not determine model name for testing"
 fi
 
 # Clean up

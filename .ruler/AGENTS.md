@@ -32,14 +32,14 @@ cargo clippy          # Linting with project-specific rules
 // ❌ Don't hardcode
 let model = "gemini-2.5-flash-lite";
 
-// ✅ Use constants module
+// Use constants module
 use vtagent_core::config::constants::models::google::GEMINI_2_5_FLASH_LITE;
 let model = GEMINI_2_5_FLASH_LITE;
 ```
 
 ### Error Handling Pattern
 ```rust
-// ✅ Project standard: anyhow + descriptive context
+// Project standard: anyhow + descriptive context
 use anyhow::{Context, Result};
 
 fn process_file(path: &Path) -> Result<String> {
@@ -50,13 +50,13 @@ fn process_file(path: &Path) -> Result<String> {
 
 ### Documentation Pattern
 ```rust
-// ✅ All .md files belong in ./docs/ folder
+// All .md files belong in ./docs/ folder
 // ❌ Don't put documentation in root or other folders
 ```
 
 ### Tool Integration Pattern
 ```rust
-// ✅ Use trait-based composition for tools
+// Use trait-based composition for tools
 #[async_trait]
 impl Tool for MyTool {
     async fn execute(&self, args: Value) -> Result<Value> {
@@ -81,7 +81,7 @@ if val > threshold && (cond1 || cond2) && (cond3 && !cond4) {
     // ...
 }
 
-// ✅ Clear intermediate variables
+// Clear intermediate variables
 let is_valid = val > threshold;
 let is_allowed = cond1 || cond2;
 let is_secure = cond3 && !cond4;
@@ -263,3 +263,4 @@ if is_valid && is_allowed && is_secure {
 - Always use vtagent-core/src/config/constants.rs for constant values. Don't hardcode any constant values, especially model id. THIS IS IMPORTANT!
 - You should always use Context7 for fetching documentation from MCP. THIS IS IMPORTANT!
 - For testing echo, make sure not to use "!" this will cause shell escaping issue. for example Use "echo test" instead of "echo test!" THIS IS IMPORTANT!
+- Reference ANSI color code when you want to print colored text in terminal. THIS IS IMPORTANT! https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit

@@ -26,7 +26,7 @@ run_test() {
     TESTS_RUN=$((TESTS_RUN + 1))
 
     if eval "$command" 2>/dev/null | grep -q "$expected_contains"; then
-        echo -e "${GREEN}✅ PASSED${NC}"
+        echo -e "${GREEN}PASSED${NC}"
         TESTS_PASSED=$((TESTS_PASSED + 1))
     else
         echo -e "${RED}❌ FAILED${NC}"
@@ -35,7 +35,7 @@ run_test() {
     fi
 }
 
-echo -e "\n🔧 Testing Code Security Implementation"
+echo -e "\nTesting Code Security Implementation"
 echo "======================================="
 
 # Test 1: Check that security validation functions exist
@@ -53,7 +53,7 @@ run_test "BashTool allows safe commands" "grep 'allowed_commands' vtagent-core/s
 # Test 5: Check that SimpleSearchTool restricts to read-only commands
 run_test "SimpleSearchTool read-only restriction" "grep 'read-only commands' vtagent-core/src/tools/simple_search.rs" "read-only commands"
 
-echo -e "\n📋 Testing Policy System Integration"
+echo -e "\nTesting Policy System Integration"
 echo "===================================="
 
 # Test 6: Check that tools integrate with policy system
@@ -85,12 +85,12 @@ echo "Success Rate: $((TESTS_PASSED * 100 / TESTS_RUN))%"
 
 if [ $TESTS_PASSED -eq $TESTS_RUN ]; then
     echo -e "\n${GREEN}🎉 All security implementation tests passed!${NC}"
-    echo "✅ Security validation functions are implemented"
-    echo "✅ Dangerous commands are properly blocked"
-    echo "✅ Policy system integration is working"
-    echo "✅ PTY tools are secure"
+    echo "Security validation functions are implemented"
+    echo "Dangerous commands are properly blocked"
+    echo "Policy system integration is working"
+    echo "PTY tools are secure"
     exit 0
 else
-    echo -e "\n${RED}⚠️  Some security tests failed. Check the output above.${NC}"
+    echo -e "\n${RED} Some security tests failed. Check the output above.${NC}"
     exit 1
 fi

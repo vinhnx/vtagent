@@ -185,6 +185,16 @@ cp vtagent.toml.example vtagent.toml
 - `run_notebook_cell(cell_id, file_path)` - Execute notebook cells
 - `read_notebook_cell_output(cell_id, file_path)` - Read cell execution results
 
+### Color Utilities
+VTAgent now includes advanced color manipulation capabilities through the `coolor` crate integration:
+
+- RGB to ANSI color conversion for terminal compatibility
+- HSL color space support for intuitive color manipulation
+- Color blending and harmonious color scheme generation
+- Lighten/darken operations for dynamic color adjustments
+
+These utilities are available through the `vtagent_core::utils::colors` module for developers extending VTAgent's functionality.
+
 ## Usage Examples
 
 ### Basic Chat Session

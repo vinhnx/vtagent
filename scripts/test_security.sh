@@ -29,7 +29,7 @@ test_blocked_command() {
     # This would normally test the actual tool, but since we can't run the full agent,
     # we'll test the validation logic conceptually
     if [[ "$command" == *"rm"* ]] || [[ "$command" == *"sudo"* ]] || [[ "$command" == *"curl"* ]]; then
-        echo -e "${GREEN}✅ BLOCKED${NC} (would be blocked by security validation)"
+        echo -e "${GREEN}BLOCKED${NC} (would be blocked by security validation)"
         TESTS_PASSED=$((TESTS_PASSED + 1))
     else
         echo -e "${RED}❌ ALLOWED${NC} (should be blocked)"
@@ -47,7 +47,7 @@ test_allowed_command() {
 
     # Test allowed commands
     if [[ "$command" == "ls" ]] || [[ "$command" == "grep" ]] || [[ "$command" == "cat" ]]; then
-        echo -e "${GREEN}✅ ALLOWED${NC} (safe command)"
+        echo -e "${GREEN}ALLOWED${NC} (safe command)"
         TESTS_PASSED=$((TESTS_PASSED + 1))
     else
         echo -e "${RED}❌ BLOCKED${NC} (should be allowed)"
@@ -64,7 +64,7 @@ test_blocked_command "bash" "BashTool blocks curl downloads" "curl http://exampl
 test_blocked_command "bash" "BashTool blocks system modifications" "chmod 777 /etc/passwd" "System modifications"
 test_blocked_command "bash" "BashTool blocks recursive delete" "rm -rf /home/user" "Recursive delete"
 
-echo -e "\n✅ Testing Safe Commands (Should Be Allowed)"
+echo -e "\nTesting Safe Commands (Should Be Allowed)"
 echo "============================================="
 
 # Test safe commands that should be allowed
@@ -83,7 +83,7 @@ test_allowed_command "simple_search" "SimpleSearchTool allows find" "find"
 test_allowed_command "simple_search" "SimpleSearchTool allows ls" "ls"
 test_blocked_command "simple_search" "SimpleSearchTool blocks rm" "rm" "Not in allowed commands"
 
-echo -e "\n📋 Testing Policy Integration"
+echo -e "\nTesting Policy Integration"
 echo "=============================="
 
 # Test that tools integrate with policy system
@@ -97,12 +97,12 @@ echo "Success Rate: $((TESTS_PASSED * 100 / TESTS_RUN))%"
 
 if [ $TESTS_PASSED -eq $TESTS_RUN ]; then
     echo -e "\n${GREEN}🎉 All security tests passed!${NC}"
-    echo "✅ Dangerous commands are properly blocked"
-    echo "✅ Safe commands are allowed"
-    echo "✅ Tools respect security policies"
-    echo "✅ PTY execution is secure"
+    echo "Dangerous commands are properly blocked"
+    echo "Safe commands are allowed"
+    echo "Tools respect security policies"
+    echo "PTY execution is secure"
     exit 0
 else
-    echo -e "\n${RED}⚠️  Some security tests failed. Check the output above.${NC}"
+    echo -e "\n${RED} Some security tests failed. Check the output above.${NC}"
     exit 1
 fi

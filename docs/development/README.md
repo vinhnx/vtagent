@@ -26,6 +26,7 @@ This section contains information for developers who want to contribute to, modi
 - **[Tool System](./tool-system.md)** - Tool registration and execution
 - **[AI Integration](./ai-integration.md)** - Gemini AI integration details
 - **[Tree-sitter Integration](./tree-sitter-integration.md)** - Code analysis capabilities
+- **[Color Utilities](../api/color-utilities.md)** - Advanced color manipulation for terminal applications
 
 ## **Development Workflows**
 

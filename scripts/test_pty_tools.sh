@@ -25,7 +25,7 @@ run_test() {
     TESTS_RUN=$((TESTS_RUN + 1))
 
     if eval "$command" 2>/dev/null | grep -q "$expected_contains"; then
-        echo -e "${GREEN}✅ PASSED${NC}"
+        echo -e "${GREEN}PASSED${NC}"
         TESTS_PASSED=$((TESTS_PASSED + 1))
     else
         echo -e "${RED}❌ FAILED${NC}"
@@ -34,7 +34,7 @@ run_test() {
     fi
 }
 
-echo -e "\n🔧 Testing External Tools Availability"
+echo -e "\nTesting External Tools Availability"
 echo "====================================="
 
 # Test 1: CK search
@@ -64,7 +64,7 @@ run_test "Ripgrep Functionality" "echo 'test content' > /tmp/vtagent_test.txt &&
 # Test 8: AST-grep functionality
 run_test "AST Grep Functionality" "echo 'fn test() {}' > /tmp/vtagent_test.rs && ast-grep --lang rust --pattern 'fn \$A() {}' /tmp/vtagent_test.rs && rm /tmp/vtagent_test.rs" "fn test()"
 
-echo -e "\n📋 Testing Code Structure"
+echo -e "\nTesting Code Structure"
 echo "========================="
 
 # Test 9: Check if PTY methods exist in tools
@@ -84,11 +84,11 @@ echo "Success Rate: $((TESTS_PASSED * 100 / TESTS_RUN))%"
 
 if [ $TESTS_PASSED -eq $TESTS_RUN ]; then
     echo -e "\n${GREEN}🎉 All PTY tool tests passed!${NC}"
-    echo "✅ External tools are available and functional"
-    echo "✅ PTY integration is properly implemented"
-    echo "✅ Tools are compatible with terminal emulation"
+    echo "External tools are available and functional"
+    echo "PTY integration is properly implemented"
+    echo "Tools are compatible with terminal emulation"
     exit 0
 else
-    echo -e "\n${RED}⚠️  Some tests failed. Check the output above.${NC}"
+    echo -e "\n${RED} Some tests failed. Check the output above.${NC}"
     exit 1
 fi

@@ -12,14 +12,14 @@ echo "Checking if LMStudio is accessible at http://localhost:1234/v1..."
 curl -s -X GET "http://localhost:1234/v1/models" > /tmp/lmstudio_response.json 2>/dev/null
 
 if [ $? -eq 0 ]; then
-    echo "✅ Successfully connected to LMStudio!"
-    
+    echo "Successfully connected to LMStudio!"
+
     # Check if we got a valid response
     if grep -q '"data"' /tmp/lmstudio_response.json; then
-        echo "✅ Valid response received from LMStudio:"
+        echo "Valid response received from LMStudio:"
         cat /tmp/lmstudio_response.json | jq '.data[0]' 2>/dev/null || echo "Models available (see full response in /tmp/lmstudio_response.json)"
     else
-        echo "⚠️  Connected but received unexpected response:"
+        echo " Connected but received unexpected response:"
         cat /tmp/lmstudio_response.json
     fi
 else

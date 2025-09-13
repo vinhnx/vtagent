@@ -28,9 +28,9 @@ tools/
 
 ## Backward Compatibility
 
-✅ **All existing tool calls work unchanged**
-✅ **Same function signatures and return types**
-✅ **No migration required for existing code**
+**All existing tool calls work unchanged**
+**Same function signatures and return types**
+**No migration required for existing code**
 
 ## Enhanced Capabilities
 

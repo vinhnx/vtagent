@@ -6,8 +6,8 @@ echo "🔍 Testing LMStudio connection..."
 
 # Test if LMStudio is running
 if curl -s -m 5 "http://localhost:1234/v1/models" > /tmp/models.json 2>/dev/null; then
-    echo "✅ LMStudio is running!"
-    
+    echo "LMStudio is running!"
+
     # Show first few models
     echo "Available models:"
     if command -v jq &> /dev/null; then
@@ -15,7 +15,7 @@ if curl -s -m 5 "http://localhost:1234/v1/models" > /tmp/models.json 2>/dev/null
     else
         grep -o '"id":"[^"]*"' /tmp/models.json | head -3 | cut -d'"' -f4
     fi
-    
+
     # Clean up
     rm -f /tmp/models.json
 else

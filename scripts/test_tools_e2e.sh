@@ -27,7 +27,7 @@ run_test() {
     TESTS_RUN=$((TESTS_RUN + 1))
 
     if eval "$command" 2>/dev/null | grep -q "$expected_contains"; then
-        echo -e "${GREEN}✅ PASSED${NC}"
+        echo -e "${GREEN}PASSED${NC}"
         TESTS_PASSED=$((TESTS_PASSED + 1))
     else
         echo -e "${RED}❌ FAILED${NC}"
@@ -48,7 +48,7 @@ test_tool_directly() {
     if cargo build --bin vtagent >/dev/null 2>&1; then
         # If binary builds, we could test it directly
         # For now, just check if it compiles
-        echo -e "${GREEN}✅ Tool compiles successfully${NC}"
+        echo -e "${GREEN}Tool compiles successfully${NC}"
         TESTS_PASSED=$((TESTS_PASSED + 1))
     else
         echo -e "${RED}❌ Tool compilation failed${NC}"
@@ -56,13 +56,13 @@ test_tool_directly() {
     TESTS_RUN=$((TESTS_RUN + 1))
 }
 
-echo -e "\n📋 Testing Tool Compilation"
+echo -e "\nTesting Tool Compilation"
 echo "============================"
 
 # Test 1: Check if tools compile
 run_test "VTAgent Core Compilation" "cargo check --package vtagent-core --quiet && echo 'success'" "success"
 
-echo -e "\n🔧 Testing PTY Dependencies"
+echo -e "\nTesting PTY Dependencies"
 echo "============================"
 
 # Test 2: Check if rexpect is available (PTY library)
@@ -102,6 +102,6 @@ if [ $TESTS_PASSED -eq $TESTS_RUN ]; then
     echo -e "\n${GREEN}🎉 All tests passed! Tools are working correctly.${NC}"
     exit 0
 else
-    echo -e "\n${RED}⚠️  Some tests failed. Please check the output above.${NC}"
+    echo -e "\n${RED} Some tests failed. Please check the output above.${NC}"
     exit 1
 fi

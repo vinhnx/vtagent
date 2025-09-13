@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0"
 clap = { version = "4.5", features = ["derive"] }
+clap-help = "0.1"
 reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -63,6 +64,8 @@ dotenvy = "0.15"
 dirs = "5.0"
 # YAML support
 serde_yaml = "0.9"
+# Color utilities
+coolor = "1.1.0"
 
 [features]
 default = []

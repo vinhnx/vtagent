@@ -9,7 +9,7 @@ echo "=========================================="
 # Test compilation
 echo "📦 Testing compilation..."
 if cargo check --quiet; then
-    echo "✅ Compilation successful"
+    echo "Compilation successful"
 else
     echo "❌ Compilation failed"
     exit 1
@@ -24,7 +24,7 @@ echo "--------------------"
 gemini_modules=$(find vtagent-core/src/gemini -name "*.rs" | wc -l)
 echo "Gemini modules: $gemini_modules"
 
-# Count config modules  
+# Count config modules
 config_modules=$(find vtagent-core/src/config -name "*.rs" | wc -l)
 echo "Config modules: $config_modules"
 
@@ -58,22 +58,22 @@ echo "---------------------------"
 # Check that legacy files exist
 legacy_files=0
 if [ -f "vtagent-core/src/gemini_legacy.rs" ]; then
-    echo "✅ gemini_legacy.rs preserved"
+    echo "gemini_legacy.rs preserved"
     legacy_files=$((legacy_files + 1))
 fi
 
 if [ -f "vtagent-core/src/config_legacy.rs" ]; then
-    echo "✅ config_legacy.rs preserved"
+    echo "config_legacy.rs preserved"
     legacy_files=$((legacy_files + 1))
 fi
 
 if [ -f "vtagent-core/src/code_completion_legacy.rs" ]; then
-    echo "✅ code_completion_legacy.rs preserved"
+    echo "code_completion_legacy.rs preserved"
     legacy_files=$((legacy_files + 1))
 fi
 
 if [ -f "vtagent-core/src/code_quality_tools_legacy.rs" ]; then
-    echo "✅ code_quality_tools_legacy.rs preserved"
+    echo "code_quality_tools_legacy.rs preserved"
     legacy_files=$((legacy_files + 1))
 fi
 
@@ -82,11 +82,11 @@ echo "Legacy files preserved: $legacy_files"
 echo ""
 echo "🎯 Final Results:"
 echo "----------------"
-echo "✅ Modular architecture implemented"
-echo "✅ $total_modules focused modules created"
-echo "✅ $legacy_files legacy files preserved"
-echo "✅ Compilation successful"
-echo "✅ Backward compatibility maintained"
+echo "Modular architecture implemented"
+echo "$total_modules focused modules created"
+echo "$legacy_files legacy files preserved"
+echo "Compilation successful"
+echo "Backward compatibility maintained"
 
 echo ""
 echo "🚀 Refactoring Complete!"

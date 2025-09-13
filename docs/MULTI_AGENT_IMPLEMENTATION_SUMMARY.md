@@ -69,7 +69,7 @@ The multi-agent system has been fully designed and implemented with the followin
 - **Explorer**: Cannot modify files (read-only)
 - **Coder**: Full access to all tools
 
-### 📋 System Prompts (`prompts/`)
+### System Prompts (`prompts/`)
 
 #### `orchestrator_system.md`
 - Strategic coordination and delegation guidance

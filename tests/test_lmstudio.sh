@@ -5,13 +5,13 @@ echo "Testing LMStudio connection..."
 
 # Check if LMStudio is running
 if curl -s http://localhost:1234/v1/models >/dev/null; then
-    echo "✅ LMStudio is running"
-    
+    echo "LMStudio is running"
+
     # Get model info
     echo "Getting model info:"
     response=$(curl -s http://localhost:1234/v1/models)
     echo "$response" | jq .
-    
+
     # Check if any models are loaded
     model_count=$(echo "$response" | jq '.data | length')
     if [ "$model_count" -gt 0 ]; then
@@ -19,7 +19,7 @@ if curl -s http://localhost:1234/v1/models >/dev/null; then
         # Get the first model
         first_model=$(echo "$response" | jq -r '.data[0].id')
         echo "Using model: $first_model"
-        
+
         # Test chat completion (more appropriate for chat models)
         echo -e "\nTesting chat completion:"
         curl -s http://localhost:1234/v1/chat/completions \

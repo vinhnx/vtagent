@@ -223,56 +223,56 @@ pub enum Commands {
     TreeSitter,
 }
 
-/// Model management commands with latest model support
+/// Model management commands with concise, actionable help
 #[derive(Subcommand, Debug)]
 pub enum ModelCommands {
-    /// **List all available providers and models**\n\n**Shows:**\n• Available providers (Gemini, OpenAI, Anthropic, DeepSeek, xAI, etc.)\n• Supported models per provider\n• Current configuration\n• Provider status and connectivity\n\n**Usage:** vtagent models list
+    /// List all providers and models with status indicators
     List,
 
-    /// **Set the default provider**\n\n**Available providers:**\n• `gemini` - Google Gemini\n• `openai` - OpenAI GPT models\n• `anthropic` - Anthropic Claude models\n• `deepseek` - DeepSeek models\n• `xai` - xAI Grok models\n• `openrouter` - OpenRouter (multi-provider)\n• `lmstudio` - Local LMStudio models\n\n**Example:** vtagent models set-provider deepseek
+    /// Set default provider (gemini, openai, anthropic, deepseek, xai, openrouter, lmstudio)
     #[command(name = "set-provider")]
     SetProvider {
-        /// **Provider name** to set as default
+        /// Provider name to set as default
         provider: String,
     },
 
-    /// **Set the default model**\n\n**Latest models by provider:**\n• Gemini: `gemini-2.5-flash-lite`, `gemini-2.5-flash`, `gemini-2.5-pro`\n• OpenAI: `gpt-5`, `gpt-5-mini`, `gpt-4.1`\n• Anthropic: `claude-sonnet-4-20250514`, `claude-opus-4-1-20250805`\n• DeepSeek: `deepseek-reasoner`, `deepseek-chat`\n• xAI: `grok-3-mini-fast-latest`\n• LMStudio: `qwen/qwen3-4b-2507`, `qwen/qwen3-30b-a3b-2507`\n\n**Example:** vtagent models set-model deepseek-reasoner
+    /// Set default model (e.g., deepseek-reasoner, gpt-5, claude-sonnet-4-20250514)
     #[command(name = "set-model")]
     SetModel {
-        /// **Model name** to set as default
+        /// Model name to set as default
         model: String,
     },
 
-    /// **Configure provider settings**\n\n**Examples:**\n  vtagent models config openai --api-key YOUR_KEY\n  vtagent models config deepseek --api-key YOUR_KEY\n  vtagent models config lmstudio --base-url http://localhost:1234/v1\n  vtagent models config xai --api-key YOUR_KEY
+    /// Configure provider settings (API keys, base URLs, models)
     Config {
-        /// **Provider name** to configure
+        /// Provider name to configure
         provider: String,
 
-        /// **API key** for the provider
+        /// API key for the provider
         #[arg(long)]
         api_key: Option<String>,
 
-        /// **Base URL** for local providers (LMStudio)
+        /// Base URL for local providers (LMStudio)
         #[arg(long)]
         base_url: Option<String>,
 
-        /// **Model name** for this provider
+        /// Default model for this provider
         #[arg(long)]
         model: Option<String>,
     },
 
-    /// **Test provider connectivity**\n\n**Tests:**\n• API key validation\n• Network connectivity\n• Model availability\n• Rate limit status\n\n**Example:** vtagent models test deepseek
+    /// Test provider connectivity and validate configuration
     Test {
-        /// **Provider name** to test
+        /// Provider name to test
         provider: String,
     },
 
-    /// **Compare model performance**\n\n**Compares:**\n• Response times\n• Token usage\n• Cost efficiency\n• Quality metrics\n\n**Usage:** vtagent models compare
+    /// Compare model performance across providers (coming soon)
     Compare,
 
-    /// **Show model information and capabilities**\n\n**Shows:**\n• Model specifications\n• Pricing information\n• Context limits\n• Supported features\n\n**Example:** vtagent models info deepseek-reasoner
+    /// Show detailed model information and specifications
     Info {
-        /// **Model name** to get information about
+        /// Model name to get information about
         model: String,
     },
 }

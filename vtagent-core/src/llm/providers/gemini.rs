@@ -170,9 +170,13 @@ impl GeminiProvider {
                 .iter()
                 .map(|tool| {
                     json!({
-                        "name": tool.function.name,
-                        "description": tool.function.description,
-                        "parameters": tool.function.parameters
+                        "functionDeclarations": [
+                            {
+                                "name": tool.function.name,
+                                "description": tool.function.description,
+                                "parameters": tool.function.parameters
+                            }
+                        ]
                     })
                 })
                 .collect();

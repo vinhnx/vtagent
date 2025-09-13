@@ -15,7 +15,7 @@ I have successfully implemented a comprehensive tool policy system for VTAgent t
 ### 2. CLI Commands (`vtagent-core/src/cli/tool_policy_commands.rs`)
 - `vtagent tool-policy status` - Show current policies
 - `vtagent tool-policy allow <tool>` - Allow specific tool
-- `vtagent tool-policy deny <tool>` - Deny specific tool  
+- `vtagent tool-policy deny <tool>` - Deny specific tool
 - `vtagent tool-policy prompt <tool>` - Set tool to prompt
 - `vtagent tool-policy allow-all` - Allow all tools
 - `vtagent tool-policy deny-all` - Deny all tools
@@ -58,14 +58,14 @@ The system stores configuration in `~/.vtagent/tool-policy.json`:
   "version": 1,
   "available_tools": [
     "read_file",
-    "write_file", 
+    "write_file",
     "list_files",
     "run_terminal_cmd",
     "rp_search"
   ],
   "policies": {
     "read_file": "allow",
-    "write_file": "prompt", 
+    "write_file": "prompt",
     "list_files": "allow",
     "run_terminal_cmd": "deny",
     "rp_search": "allow"
@@ -140,11 +140,11 @@ let result = execute_tool(tool_name, args).await?;
 ## Testing
 
 Created comprehensive test suite demonstrating:
-- ✅ Policy serialization/deserialization
-- ✅ Tool addition and removal
-- ✅ Policy setting and retrieval
-- ✅ Configuration persistence
-- ✅ Status display with color coding
+- Policy serialization/deserialization
+- Tool addition and removal
+- Policy setting and retrieval
+- Configuration persistence
+- Status display with color coding
 
 Test results show all functionality working correctly.
 
@@ -173,11 +173,11 @@ The system is designed for extensibility:
 ## Conclusion
 
 The tool policy system successfully addresses the requirement to:
-1. ✅ Prompt users for tool approval on first use
-2. ✅ Remember user choices persistently
-3. ✅ Minimize repeated prompts in future runs
-4. ✅ Handle dynamic tool list changes
-5. ✅ Provide CLI management interface
-6. ✅ Store configuration in `~/.vtagent/tool-policy.json`
+1. Prompt users for tool approval on first use
+2. Remember user choices persistently
+3. Minimize repeated prompts in future runs
+4. Handle dynamic tool list changes
+5. Provide CLI management interface
+6. Store configuration in `~/.vtagent/tool-policy.json`
 
 The implementation provides a robust, user-friendly, and secure foundation for controlling agent tool execution while maintaining a smooth user experience.

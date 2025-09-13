@@ -12,12 +12,12 @@
   ],
   "policies": {
     "bash": "prompt",
-    "list_files": "allow",
+    "edit_file": "allow",
     "read_file": "allow",
     "run_terminal_cmd": "allow",
     "grep_search": "prompt",
-    "edit_file": "allow",
+    "ast_grep_search": "prompt",
     "write_file": "allow",
-    "ast_grep_search": "prompt"
+    "list_files": "allow"
   }
 }

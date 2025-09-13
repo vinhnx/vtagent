@@ -71,14 +71,14 @@ async fn test_lmstudio_qwen_connection() -> Result<(), Box<dyn std::error::Error
             Ok(response) => {
                 if response.status().is_success() {
                     println!("[SUCCESS] Got successful response from Qwen model: {}", model_name);
-                    
+
                     // Try to parse the response
                     match response.json::<serde_json::Value>().await {
                         Ok(json_response) => {
                             let response_content = json_response["choices"][0]["message"]["content"]
                                 .as_str()
                                 .unwrap_or("");
-                            
+
                             if !response_content.is_empty() {
                                 println!("[SUCCESS] Received non-empty response from {}: {}", model_name, response_content);
                                 success = true;

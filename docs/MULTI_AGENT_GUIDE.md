@@ -457,12 +457,12 @@ vtagent logs --agent orchestrator
 
 The VTAgent multi-agent system provides:
 
-- ✅ **Strategic Coordination**: Intelligent task delegation and planning
-- ✅ **Specialized Agents**: Purpose-built agents for different roles
-- ✅ **Quality Assurance**: Built-in verification and testing workflows
-- ✅ **Scalable Architecture**: Handles both simple and complex tasks
-- ✅ **Performance Optimization**: Efficient resource utilization and caching
-- ✅ **Flexible Configuration**: Customizable for different use cases
+- **Strategic Coordination**: Intelligent task delegation and planning
+- **Specialized Agents**: Purpose-built agents for different roles
+- **Quality Assurance**: Built-in verification and testing workflows
+- **Scalable Architecture**: Handles both simple and complex tasks
+- **Performance Optimization**: Efficient resource utilization and caching
+- **Flexible Configuration**: Customizable for different use cases
 
 The multi-agent system transforms VTAgent from a single-purpose coding assistant into a sophisticated development coordination platform capable of handling complex, multi-step development tasks with professional quality and efficiency.
 

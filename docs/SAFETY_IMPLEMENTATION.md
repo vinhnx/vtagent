@@ -15,7 +15,7 @@ This implementation adds critical safety and efficiency controls to VTAgent, ens
 - Automatically detects when Gemini 2.5 Pro is requested
 - Shows clear warning about cost and performance implications:
   ```
-  ⚠️  Model Upgrade Required
+   Model Upgrade Required
   Current model: gemini-2.5-flash-lite
   Requested model: gemini-2.5-pro
 

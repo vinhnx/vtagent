@@ -14,7 +14,7 @@ use vtagent_core::config::models::{ModelId, Provider};
 use vtagent_core::config::multi_agent::MultiAgentSystemConfig;
 use vtagent_core::config::{ConfigManager, VTAgentConfig};
 use vtagent_core::core::agent::integration::MultiAgentSystem;
-use vtagent_core::core::agent::multi_agent::AgentType;
+use vtagent_core::core::agent::multi_agent::{AgentType, MultiAgentConfig};
 use vtagent_core::llm::factory::create_provider_with_config;
 use vtagent_core::llm::provider::{LLMProvider, LLMRequest, Message, MessageRole};
 use vtagent_core::llm::{AnyClient, make_client};
@@ -72,7 +72,7 @@ async fn load_project_context(
                 let truncated = if content.len() > 1000 {
                     format!("{}...", &content[..1000])
                 } else {
-                    content
+                    content.clone()
                 };
                 context_items.push(format!("{} content: {}", key_file, truncated));
             }
@@ -143,7 +143,12 @@ async fn main() -> Result<()> {
             println!("ToolPolicy command: {:?}", command);
         }
         Some(Commands::Models { command }) => {
-            println!("Models command: {:?}", command);
+            if let Err(e) =
+                vtagent_core::cli::models_commands::handle_models_command(&args, command).await
+            {
+                eprintln!("{}: {}", style("Error").red().bold(), e);
+                std::process::exit(1);
+            }
         }
         Some(Commands::Chat) => {
             if let Err(e) = handle_chat_command(&args, &vtagent_config).await {

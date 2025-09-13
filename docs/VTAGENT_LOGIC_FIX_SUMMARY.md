@@ -81,21 +81,21 @@
 
 ## Verification
 
-✅ **Compilation**: All changes compile successfully
-✅ **Tool Availability**: File editing tools are now available in all appropriate capability levels
-✅ **Message Handling**: No more duplicate messages in conversation history
-✅ **Tool Implementation**: `edit_file` properly implemented with error handling
+**Compilation**: All changes compile successfully
+**Tool Availability**: File editing tools are now available in all appropriate capability levels
+**Message Handling**: No more duplicate messages in conversation history
+**Tool Implementation**: `edit_file` properly implemented with error handling
 
 ## Expected Behavior Now
 
 When user requests: "edit vtagent-core/src/config/constants.rs and add moonshotai/kimi-k2-0905 model to openrouter model list"
 
 The agent will:
-1. ✅ Receive the message only once (no duplicates)
-2. ✅ Have access to proper file editing tools
-3. ✅ Use `read_file` to understand the file structure
-4. ✅ Use `edit_file` to add the new constant properly
-5. ✅ Follow the established pattern in the constants file
+1. Receive the message only once (no duplicates)
+2. Have access to proper file editing tools
+3. Use `read_file` to understand the file structure
+4. Use `edit_file` to add the new constant properly
+5. Follow the established pattern in the constants file
 
 ## Debug Features Added
 

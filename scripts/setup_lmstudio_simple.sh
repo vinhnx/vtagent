@@ -36,16 +36,16 @@ max_sessions = 10
 command_timeout_seconds = 300
 EOF
 
-echo "✅ Created vtagent.toml with minimal configuration"
+echo "Created vtagent.toml with minimal configuration"
 
 # Test LMStudio connection
 echo "🔍 Testing LMStudio connection..."
 if command -v curl >/dev/null 2>&1; then
     if curl -s -m 5 "http://localhost:1234/v1/models" >/dev/null 2>&1; then
-        echo "✅ LMStudio is accessible!"
+        echo "LMStudio is accessible!"
         echo "   You're ready to use VTAgent with LMStudio!"
         echo ""
-        echo "📋 Next steps:"
+        echo "Next steps:"
         echo "   1. Make sure LMStudio is running with a model loaded"
         echo "   2. Verify the model name in vtagent.toml matches your LMStudio model"
         echo "   3. Run: cargo run"
@@ -65,7 +65,7 @@ if command -v curl >/dev/null 2>&1; then
         echo "   5. Run this script again"
     fi
 else
-    echo "⚠️  curl is not installed, skipping connection test"
+    echo " curl is not installed, skipping connection test"
     echo "   Please install curl to enable connection testing"
 fi
 

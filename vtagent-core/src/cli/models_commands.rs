@@ -1,13 +1,12 @@
-//! Model management command handlers
+//! Model management command handlers with concise, actionable output
 
 use super::args::{Cli, ModelCommands};
 use crate::llm::factory::{create_provider_with_config, get_factory};
 use crate::utils::dot_config::{DotConfig, get_dot_manager, load_user_config};
 use anyhow::{Result, anyhow};
 use owo_colors::*;
-// No content change needed - this line doesn't exist
 
-/// Handle model management commands
+/// Handle model management commands with concise output
 pub async fn handle_models_command(cli: &Cli, command: &ModelCommands) -> Result<()> {
     match command {
         ModelCommands::List => handle_list_models(cli).await,
@@ -34,173 +33,149 @@ pub async fn handle_models_command(cli: &Cli, command: &ModelCommands) -> Result
     }
 }
 
-/// List all available providers and models
+/// Display available providers and models with status
 async fn handle_list_models(_cli: &Cli) -> Result<()> {
-    println!("{}", "Available LLM Providers & Models".bold().underline());
+    println!("{}", "Available Providers & Models".bold().underline());
     println!();
 
     let factory = get_factory().lock().unwrap();
-
-    // Get current configuration
-    let config = match load_user_config() {
-        Ok(cfg) => cfg,
-        Err(_) => DotConfig::default(),
-    };
-
-    let current_provider = config.preferences.default_provider;
-    let current_model = config.preferences.default_model;
-
-    // List all providers
+    let config = load_user_config().unwrap_or_default();
     let providers = factory.list_providers();
 
     for provider_name in &providers {
-        let is_current = Some(provider_name.clone()) == Some(current_provider.clone());
-        let prefix = if is_current { "▶️ " } else { "  " };
+        let is_current = config.preferences.default_provider == *provider_name;
+        let status = if is_current { "▶️" } else { "  " };
+        let provider_display = format!("{}{}", status, provider_name.to_uppercase());
 
-        println!("{}{}", prefix, provider_name.to_uppercase().bold());
+        // Color the provider name based on whether it's the current provider
+        let colored_provider = if is_current {
+            format!("{}", provider_display.bold().green())
+        } else {
+            format!("{}", provider_display.bold())
+        };
+        println!("{}", colored_provider);
 
-        // Try to create provider to get supported models
+        // Show models concisely
         if let Ok(provider) =
-            create_provider_with_config(provider_name, Some("dummy_key".to_string()), None, None)
+            create_provider_with_config(provider_name, Some("dummy".to_string()), None, None)
         {
             let models = provider.supported_models();
-            for model in models {
-                let is_current_model = Some(model.clone()) == Some(current_model.clone());
-                let model_prefix = if is_current_model { "  ⭐ " } else { "    " };
-                println!("{}{}", model_prefix, model.cyan());
+            let current_model = &config.preferences.default_model;
+
+            for model in models.iter().take(3) {
+                // Show first 3 models
+                let is_current_model = current_model == model;
+                let model_status = if is_current_model { "⭐" } else { "  " };
+                let colored_model = if is_current_model {
+                    format!("{}", model.clone().bold().cyan())
+                } else {
+                    format!("{}", model.clone().cyan())
+                };
+                println!("  {}{}", model_status, colored_model);
+            }
+            if models.len() > 3 {
+                println!("  {} +{} more models", "...".dimmed(), models.len() - 3);
             }
         } else {
-            println!("    {}", "[ERROR] Configuration required".red());
+            println!("  {}", "⚠️  Setup required".yellow());
         }
 
-        // Show provider configuration status
-        let providers_config = &config.providers;
-        match provider_name.as_str() {
-            "openai" => {
-                if providers_config
-                    .openai
-                    .as_ref()
-                    .map(|p| p.enabled)
-                    .unwrap_or(false)
-                {
-                    println!("    {}", "[SUCCESS] Configured".green());
-                } else {
-                    println!("    {}", "[WARNING] Not configured".yellow());
-                }
-            }
-            "anthropic" => {
-                if providers_config
-                    .anthropic
-                    .as_ref()
-                    .map(|p| p.enabled)
-                    .unwrap_or(false)
-                {
-                    println!("    {}", "[SUCCESS] Configured".green());
-                } else {
-                    println!("    {}", "[WARNING] Not configured".yellow());
-                }
-            }
-            "gemini" => {
-                if providers_config
-                    .gemini
-                    .as_ref()
-                    .map(|p| p.enabled)
-                    .unwrap_or(false)
-                {
-                    println!("    {}", "[SUCCESS] Configured".green());
-                } else {
-                    println!("    {}", "[WARNING] Not configured".yellow());
-                }
-            }
-            "openrouter" => {
-                if providers_config
-                    .openrouter
-                    .as_ref()
-                    .map(|p| p.enabled)
-                    .unwrap_or(false)
-                {
-                    println!("    {}", "[SUCCESS] Configured".green());
-                } else {
-                    println!("    {}", "[WARNING] Not configured".yellow());
-                }
-            }
-            "lmstudio" => {
-                if providers_config
-                    .lmstudio
-                    .as_ref()
-                    .map(|p| p.enabled)
-                    .unwrap_or(false)
-                {
-                    println!("    {}", "[SUCCESS] Configured".green());
-                } else {
-                    println!("    {}", "[WARNING] Not configured".yellow());
-                }
-            }
-            _ => {}
-        }
-
+        // Configuration status
+        let configured = is_provider_configured(&config, provider_name);
+        let config_status = if configured {
+            format!("{}", "✅ Configured".green())
+        } else {
+            format!("{}", "⚠️  Not configured".yellow())
+        };
+        println!("  {}", config_status);
         println!();
     }
 
-    // Show current configuration summary
-    println!("{}", "[CONFIG] Current Configuration".bold().underline());
-    println!("Provider: {}", current_provider.cyan());
-    println!("Model: {}", current_model.cyan());
-    println!(
-        "Temperature: {:.1}",
-        config.preferences.temperature.unwrap_or(0.7)
-    );
-    println!(
-        "Max Tokens: {}",
-        config.preferences.max_tokens.unwrap_or(4096)
-    );
+    // Current config summary
+    println!("{}", "📋 Current Config".bold().underline());
+    println!("Provider: {}", config.preferences.default_provider.cyan());
+    println!("Model: {}", config.preferences.default_model.cyan());
 
     Ok(())
 }
 
-/// Set the default provider
-async fn handle_set_provider(_cli: &Cli, provider: &str) -> Result<()> {
-    // Validate provider exists
-    let factory = get_factory().lock().unwrap();
-    let providers = factory.list_providers();
+/// Check if provider is configured
+fn is_provider_configured(config: &DotConfig, provider: &str) -> bool {
+    match provider {
+        "openai" => config
+            .providers
+            .openai
+            .as_ref()
+            .map(|p| p.enabled)
+            .unwrap_or(false),
+        "anthropic" => config
+            .providers
+            .anthropic
+            .as_ref()
+            .map(|p| p.enabled)
+            .unwrap_or(false),
+        "gemini" => config
+            .providers
+            .gemini
+            .as_ref()
+            .map(|p| p.enabled)
+            .unwrap_or(false),
+        "openrouter" => config
+            .providers
+            .openrouter
+            .as_ref()
+            .map(|p| p.enabled)
+            .unwrap_or(false),
+        "lmstudio" => config
+            .providers
+            .lmstudio
+            .as_ref()
+            .map(|p| p.enabled)
+            .unwrap_or(false),
+        _ => false,
+    }
+}
 
-    if !providers.contains(&provider.to_string()) {
+/// Set default provider
+async fn handle_set_provider(_cli: &Cli, provider: &str) -> Result<()> {
+    let factory = get_factory().lock().unwrap();
+    let available = factory.list_providers();
+
+    if !available.contains(&provider.to_string()) {
         return Err(anyhow!(
-            "Unknown provider: {}. Available providers: {:?}",
+            "Unknown provider '{}'. Available: {}",
             provider,
-            providers
+            available.join(", ")
         ));
     }
 
-    // Update configuration
     let manager = get_dot_manager().lock().unwrap();
     manager.update_config(|config| {
         config.preferences.default_provider = provider.to_string();
     })?;
 
     println!(
-        "[SUCCESS] Default provider set to: {}",
+        "{} Provider set to: {}",
+        "✅".green(),
         provider.bold().green()
     );
-    println!("[INFO] You may need to configure API keys for this provider using:");
     println!(
-        "   vtagent models config {} --api-key YOUR_API_KEY",
-        provider
+        "{} Configure: {}",
+        "💡".blue(),
+        format!("vtagent models config {} --api-key YOUR_KEY", provider).dimmed()
     );
 
     Ok(())
 }
 
-/// Set the default model
+/// Set default model
 async fn handle_set_model(_cli: &Cli, model: &str) -> Result<()> {
-    // Update configuration
     let manager = get_dot_manager().lock().unwrap();
     manager.update_config(|config| {
         config.preferences.default_model = model.to_string();
     })?;
 
-    println!("[SUCCESS] Default model set to: {}", model.bold().green());
-
+    println!("{} Model set to: {}", "✅".green(), model.bold().green());
     Ok(())
 }
 
@@ -215,163 +190,111 @@ async fn handle_config_provider(
     let manager = get_dot_manager().lock().unwrap();
     let mut config = manager.load_config()?;
 
-    // Providers config always exists, no need to check
-    let providers = &mut config.providers;
-
     match provider {
-        "openai" => {
-            let provider_config = providers.openai.get_or_insert_with(Default::default);
-            if let Some(key) = api_key {
-                provider_config.api_key = Some(key.to_string());
-            }
-            if let Some(m) = model {
-                provider_config.model = Some(m.to_string());
-            }
-            provider_config.enabled = api_key.is_some() || provider_config.api_key.is_some();
-        }
-        "anthropic" => {
-            let provider_config = providers.anthropic.get_or_insert_with(Default::default);
-            if let Some(key) = api_key {
-                provider_config.api_key = Some(key.to_string());
-            }
-            if let Some(m) = model {
-                provider_config.model = Some(m.to_string());
-            }
-            provider_config.enabled = api_key.is_some() || provider_config.api_key.is_some();
-        }
-        "gemini" => {
-            let provider_config = providers.gemini.get_or_insert_with(Default::default);
-            if let Some(key) = api_key {
-                provider_config.api_key = Some(key.to_string());
-            }
-            if let Some(m) = model {
-                provider_config.model = Some(m.to_string());
-            }
-            provider_config.enabled = api_key.is_some() || provider_config.api_key.is_some();
-        }
-        "openrouter" => {
-            let provider_config = providers.openrouter.get_or_insert_with(Default::default);
-            if let Some(key) = api_key {
-                provider_config.api_key = Some(key.to_string());
-            }
-            if let Some(m) = model {
-                provider_config.model = Some(m.to_string());
-            }
-            provider_config.enabled = api_key.is_some() || provider_config.api_key.is_some();
+        "openai" | "anthropic" | "gemini" | "openrouter" => {
+            configure_standard_provider(&mut config, provider, api_key, model)?;
         }
         "lmstudio" => {
-            let provider_config = providers.lmstudio.get_or_insert_with(Default::default);
-            if let Some(key) = api_key {
-                provider_config.api_key = Some(key.to_string());
-            }
-            if let Some(url) = base_url {
-                provider_config.base_url = Some(url.to_string());
-            }
-            if let Some(m) = model {
-                provider_config.model = Some(m.to_string());
-            }
-            provider_config.enabled = true; // LMStudio can work without API key
+            configure_lmstudio_provider(&mut config, api_key, base_url, model)?;
         }
-        _ => {
-            return Err(anyhow!("Unknown provider: {}", provider));
-        }
+        _ => return Err(anyhow!("Unsupported provider: {}", provider)),
     }
 
     manager.save_config(&config)?;
-
-    println!(
-        "[SUCCESS] Provider {} configured successfully!",
-        provider.bold().green()
-    );
+    println!("{} {} configured!", "✅".green(), provider.bold().green());
 
     if let Some(key) = api_key {
-        println!(
-            "   API Key: {}",
-            if key.len() > 8 {
-                format!("{}****{}", &key[..4], &key[key.len() - 4..])
-            } else {
-                "****".to_string()
-            }
-        );
+        let masked = mask_api_key(key);
+        println!("  API Key: {}", masked.dimmed());
     }
-
     if let Some(url) = base_url {
-        println!("   Base URL: {}", url);
+        println!("  Base URL: {}", url.dimmed());
+    }
+    if let Some(m) = model {
+        println!("  Model: {}", m.dimmed());
     }
 
-    if let Some(m) = model {
-        println!("   Model: {}", m);
+    Ok(())
+}
+
+/// Configure standard providers
+fn configure_standard_provider(
+    config: &mut DotConfig,
+    provider: &str,
+    api_key: Option<&str>,
+    model: Option<&str>,
+) -> Result<()> {
+    let provider_config = match provider {
+        "openai" => config.providers.openai.get_or_insert_with(Default::default),
+        "anthropic" => config
+            .providers
+            .anthropic
+            .get_or_insert_with(Default::default),
+        "gemini" => config.providers.gemini.get_or_insert_with(Default::default),
+        "openrouter" => config
+            .providers
+            .openrouter
+            .get_or_insert_with(Default::default),
+        _ => return Err(anyhow!("Unknown provider: {}", provider)),
+    };
+
+    if let Some(key) = api_key {
+        provider_config.api_key = Some(key.to_string());
     }
+    if let Some(m) = model {
+        provider_config.model = Some(m.to_string());
+    }
+    provider_config.enabled = api_key.is_some() || provider_config.api_key.is_some();
+
+    Ok(())
+}
+
+/// Configure LMStudio provider
+fn configure_lmstudio_provider(
+    config: &mut DotConfig,
+    api_key: Option<&str>,
+    base_url: Option<&str>,
+    model: Option<&str>,
+) -> Result<()> {
+    let provider_config = config
+        .providers
+        .lmstudio
+        .get_or_insert_with(Default::default);
+
+    if let Some(key) = api_key {
+        provider_config.api_key = Some(key.to_string());
+    }
+    if let Some(url) = base_url {
+        provider_config.base_url = Some(url.to_string());
+    }
+    if let Some(m) = model {
+        provider_config.model = Some(m.to_string());
+    }
+    provider_config.enabled = true;
 
     Ok(())
 }
 
 /// Test provider connectivity
 async fn handle_test_provider(_cli: &Cli, provider: &str) -> Result<()> {
-    println!("[TEST] Testing {} provider connectivity...", provider);
+    println!("{} Testing {}...", "🔍".blue(), provider.bold());
 
-    // Load configuration
     let config = load_user_config()?;
-    let providers = &config.providers;
+    let (api_key, base_url, model) = get_provider_credentials(&config, provider)?;
 
-    // Get provider config
-    let (api_key, base_url, model) = match provider {
-        "openai" => {
-            let cfg = providers
-                .openai
-                .as_ref()
-                .ok_or_else(|| anyhow!("OpenAI provider not configured"))?;
-            (cfg.api_key.clone(), cfg.base_url.clone(), cfg.model.clone())
-        }
-        "anthropic" => {
-            let cfg = providers
-                .anthropic
-                .as_ref()
-                .ok_or_else(|| anyhow!("Anthropic provider not configured"))?;
-            (cfg.api_key.clone(), cfg.base_url.clone(), cfg.model.clone())
-        }
-        "gemini" => {
-            let cfg = providers
-                .gemini
-                .as_ref()
-                .ok_or_else(|| anyhow!("Gemini provider not configured"))?;
-            (cfg.api_key.clone(), cfg.base_url.clone(), cfg.model.clone())
-        }
-        "openrouter" => {
-            let cfg = providers
-                .openrouter
-                .as_ref()
-                .ok_or_else(|| anyhow!("OpenRouter provider not configured"))?;
-            (cfg.api_key.clone(), cfg.base_url.clone(), cfg.model.clone())
-        }
-        "lmstudio" => {
-            let cfg = providers
-                .lmstudio
-                .as_ref()
-                .ok_or_else(|| anyhow!("LMStudio provider not configured"))?;
-            (cfg.api_key.clone(), cfg.base_url.clone(), cfg.model.clone())
-        }
-        _ => {
-            return Err(anyhow!("Unknown provider: {}", provider));
-        }
-    };
-
-    // Create provider instance
     let provider_instance =
         create_provider_with_config(provider, api_key, base_url, model.clone())?;
 
-    // Test with a simple prompt
     let test_request = crate::llm::provider::LLMRequest {
         messages: vec![crate::llm::provider::Message {
             role: crate::llm::provider::MessageRole::User,
-            content: "Hello! Please respond with just 'OK' if you can read this message."
-                .to_string(),
+            content: "Respond with 'OK' if you receive this message.".to_string(),
             tool_calls: None,
             tool_call_id: None,
         }],
         system_prompt: None,
         tools: None,
-        model: model.clone().unwrap_or_else(|| "test".to_string()),
+        model: model.unwrap_or_else(|| "test".to_string()),
         max_tokens: Some(10),
         temperature: Some(0.1),
         stream: false,
@@ -382,73 +305,107 @@ async fn handle_test_provider(_cli: &Cli, provider: &str) -> Result<()> {
 
     match provider_instance.generate(test_request).await {
         Ok(response) => {
-            if response
-                .content
-                .as_ref()
-                .map(|c| c.to_lowercase().contains("ok"))
-                .unwrap_or(false)
-            {
+            let content = response.content.unwrap_or_default();
+            if content.to_lowercase().contains("ok") {
                 println!(
-                    "[SUCCESS] {} provider test successful!",
+                    "{} {} test successful!",
+                    "✅".green(),
                     provider.bold().green()
-                );
-                println!(
-                    "   Response: {}",
-                    response.content.unwrap_or_default().trim()
                 );
             } else {
                 println!(
-                    "[WARNING] {} provider responded but with unexpected content",
-                    provider.yellow()
-                );
-                println!(
-                    "   Response: {}",
-                    response.content.unwrap_or_default().trim()
+                    "{} {} responded unexpectedly",
+                    "⚠️".yellow(),
+                    provider.bold().yellow()
                 );
             }
         }
         Err(e) => {
-            println!("[ERROR] {} provider test failed: {}", provider.red(), e);
-            println!("[INFO] Make sure your API key and configuration are correct");
+            println!(
+                "{} {} test failed: {}",
+                "❌".red(),
+                provider.bold().red(),
+                e
+            );
         }
     }
 
     Ok(())
 }
 
-/// Compare model performance across providers
+/// Get provider credentials
+fn get_provider_credentials(
+    config: &DotConfig,
+    provider: &str,
+) -> Result<(Option<String>, Option<String>, Option<String>)> {
+    let get_config = |p: Option<&crate::utils::dot_config::ProviderConfig>| {
+        p.map(|c| (c.api_key.clone(), c.base_url.clone(), c.model.clone()))
+            .unwrap_or((None, None, None))
+    };
+
+    match provider {
+        "openai" => Ok(get_config(config.providers.openai.as_ref())),
+        "anthropic" => Ok(get_config(config.providers.anthropic.as_ref())),
+        "gemini" => Ok(get_config(config.providers.gemini.as_ref())),
+        "openrouter" => Ok(get_config(config.providers.openrouter.as_ref())),
+        "lmstudio" => Ok(get_config(config.providers.lmstudio.as_ref())),
+        _ => Err(anyhow!("Unknown provider: {}", provider)),
+    }
+}
+
+/// Compare model performance (placeholder)
 async fn handle_compare_models(_cli: &Cli) -> Result<()> {
-    println!("{}", "Model Performance Comparison".bold().underline());
+    println!("{}", "📊 Model Performance Comparison".bold().underline());
     println!();
-    println!("This feature is coming soon! It will compare:");
-    println!("• Response times across models");
-    println!("• Token usage efficiency");
-    println!("• Cost per request");
-    println!("• Quality metrics");
+    println!("{} Coming soon! Will compare:", "🚧".yellow());
+    println!("• Response times • Token usage • Cost • Quality");
     println!();
-    println!("For now, use 'vtagent models list' to see available models.");
+    println!(
+        "{} Use 'vtagent models list' for available models",
+        "💡".blue()
+    );
+
     Ok(())
 }
 
-/// Show detailed information about a specific model
+/// Show model information
 async fn handle_model_info(_cli: &Cli, model: &str) -> Result<()> {
-    println!(
-        "{}",
-        format!("Model Information: {}", model).bold().underline()
-    );
+    println!("{} Model Info: {}", "📋".blue(), model.bold().underline());
     println!();
 
-    // This would ideally read from docs/models.json
-    // For now, provide basic information
     println!("Model: {}", model.cyan());
+    println!("Provider: {}", infer_provider_from_model(model));
     println!("Status: {}", "Available".green());
     println!();
-    println!("For detailed specifications, check docs/models.json");
-    println!("Features may include:");
-    println!("• Tool calling support");
-    println!("• Reasoning capabilities");
-    println!("• Context window size");
-    println!("• Pricing information");
+    println!("{} Check docs/models.json for specs", "💡".blue());
 
     Ok(())
+}
+
+/// Infer provider from model name
+fn infer_provider_from_model(model: &str) -> &'static str {
+    if model.starts_with("gpt-") {
+        "OpenAI"
+    } else if model.starts_with("claude-") {
+        "Anthropic"
+    } else if model.starts_with("gemini-") {
+        "Google Gemini"
+    } else if model.starts_with("deepseek-") {
+        "DeepSeek"
+    } else if model.starts_with("grok-") {
+        "xAI"
+    } else if model.contains("qwen") {
+        "LMStudio/Qwen"
+    } else {
+        "Unknown"
+    }
+}
+
+/// Mask API key for display
+fn mask_api_key(key: &str) -> String {
+    if key.len() > 8 {
+        format!("{}****{}", &key[..4], &key[key.len().saturating_sub(4)..])
+    } else {
+        "****".to_string()
+    }
 }

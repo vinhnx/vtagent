@@ -6,7 +6,7 @@ echo "====================================="
 echo ""
 
 # Test 1: Configuration validation
-echo "📋 Test 1: Configuration Validation"
+echo "Test 1: Configuration Validation"
 echo "-----------------------------------"
 
 if [ ! -f "vtagent.toml" ]; then
@@ -28,11 +28,11 @@ echo "🔗 Test 2: LMStudio Connectivity"
 echo "-------------------------------"
 
 if curl -s http://localhost:1234/v1/models >/dev/null 2>&1; then
-    echo "✅ LMStudio is running"
+    echo "LMStudio is running"
 
     # Check if configured model exists
     if curl -s http://localhost:1234/v1/models | jq -r '.data[].id' | grep -q "$CONFIG_MODEL"; then
-        echo "✅ Model '$CONFIG_MODEL' is available"
+        echo "Model '$CONFIG_MODEL' is available"
     else
         echo "❌ Model '$CONFIG_MODEL' not found in LMStudio"
         echo "Available models:"
@@ -60,7 +60,7 @@ if [ ! -f "target/release/vtagent" ]; then
     fi
 fi
 
-echo "✅ VT Agent binary is ready"
+echo "VT Agent binary is ready"
 echo ""
 
 # Test 4: Single-agent mode with LMStudio
@@ -81,7 +81,7 @@ timeout 10s ./target/release/vtagent chat --provider lmstudio --model "$CONFIG_M
 EXIT_CODE=$?
 if [ $EXIT_CODE -eq 124 ] || [ $EXIT_CODE -eq 0 ]; then
     echo ""
-    echo "✅ Single-agent mode started successfully (timed out as expected)"
+    echo "Single-agent mode started successfully (timed out as expected)"
 else
     echo ""
     echo "❌ Single-agent mode failed to start (exit code: $EXIT_CODE)"
@@ -104,7 +104,7 @@ echo ""
 
 # Check if GEMINI_API_KEY is set
 if [ -z "$GEMINI_API_KEY" ]; then
-    echo "⚠️  GEMINI_API_KEY not set - multi-agent test will be skipped"
+    echo " GEMINI_API_KEY not set - multi-agent test will be skipped"
     echo "   To test multi-agent mode, set: export GEMINI_API_KEY='your_key'"
     MULTI_AGENT_SKIP=true
 else
@@ -117,7 +117,7 @@ if [ "$MULTI_AGENT_SKIP" = false ]; then
     EXIT_CODE=$?
     if [ $EXIT_CODE -eq 124 ] || [ $EXIT_CODE -eq 0 ]; then
         echo ""
-        echo "✅ Multi-agent mode started successfully with Gemini fallback"
+        echo "Multi-agent mode started successfully with Gemini fallback"
     else
         echo ""
         echo "❌ Multi-agent mode failed to start (exit code: $EXIT_CODE)"
@@ -134,7 +134,7 @@ echo "Testing provider help output..."
 ./target/release/vtagent chat --help | grep -A 10 "Available providers:" | head -15
 
 echo ""
-echo "✅ Provider information displayed correctly"
+echo "Provider information displayed correctly"
 echo ""
 
 # Test 7: Model validation
@@ -145,24 +145,24 @@ echo "Testing model help output..."
 ./target/release/vtagent chat --help | grep -A 10 "Available models:" | head -15
 
 echo ""
-echo "✅ Model information displayed correctly"
+echo "Model information displayed correctly"
 echo ""
 
 # Summary
 echo "📊 Test Summary"
 echo "=============="
 echo ""
-echo "✅ Configuration validation: PASSED"
-echo "✅ LMStudio connectivity: PASSED"
-echo "✅ VT Agent binary: PASSED"
-echo "✅ Single-agent mode: PASSED"
+echo "Configuration validation: PASSED"
+echo "LMStudio connectivity: PASSED"
+echo "VT Agent binary: PASSED"
+echo "Single-agent mode: PASSED"
 if [ "$MULTI_AGENT_SKIP" = false ]; then
-    echo "✅ Multi-agent mode: PASSED"
+    echo "Multi-agent mode: PASSED"
 else
-    echo "⚠️  Multi-agent mode: SKIPPED (GEMINI_API_KEY not set)"
+    echo " Multi-agent mode: SKIPPED (GEMINI_API_KEY not set)"
 fi
-echo "✅ Provider switching: PASSED"
-echo "✅ Model validation: PASSED"
+echo "Provider switching: PASSED"
+echo "Model validation: PASSED"
 echo ""
 
 echo "🎉 All core tests passed!"

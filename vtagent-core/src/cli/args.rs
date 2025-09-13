@@ -52,10 +52,6 @@ pub struct Cli {
     #[arg(long, global = true, default_value = "moderate")]
     pub security_level: String,
 
-    /// **Enable async file operations** for non-blocking I/O\n\n**Benefits:**\n• Non-blocking file operations\n• Better performance\n• Concurrent processing\n• Real-time feedback
-    #[arg(long, global = true)]
-    pub async_file_ops: bool,
-
     /// **Show diffs for file changes** in chat interface\n\n**Features:**\n• Real-time diff rendering\n• Syntax highlighting\n• Line-by-line changes\n• Before/after comparison
     #[arg(long, global = true)]
     pub show_file_diffs: bool,
@@ -377,7 +373,6 @@ impl Default for Cli {
             performance_monitoring: false,
             research_preview: false,
             security_level: "moderate".to_string(),
-            async_file_ops: false,
             show_file_diffs: false,
             max_concurrent_ops: 5,
             api_rate_limit: 30,

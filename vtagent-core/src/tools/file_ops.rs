@@ -326,8 +326,9 @@ impl FileOpsTool {
         }
 
         Err(anyhow!(
-            "Error: File not found: {}. Example: read_file({{\"path\": \"src/main.rs\"}})",
-            input.path
+            "Error: File not found: {}. Tried paths: {}. Suggestions: 1) Check the file path and case sensitivity, 2) Use 'list_files' to explore the directory structure, 3) Try case-insensitive search with just the filename. Example: read_file({{\"path\": \"src/main.rs\"}})",
+            input.path,
+            potential_paths.iter().map(|p| p.strip_prefix(&self.workspace_root).unwrap_or(p).to_string_lossy()).collect::<Vec<_>>().join(", ")
         ))
     }
 
@@ -381,18 +382,90 @@ impl FileOpsTool {
         }))
     }
 
-    /// Resolve file path with intelligent fallbacks
+    /// Resolve file path with intelligent fallbacks including case-insensitive search
     fn resolve_file_path(&self, path: &str) -> Result<Vec<PathBuf>> {
         let mut paths = Vec::new();
 
         // Try exact path first
         paths.push(self.workspace_root.join(path));
 
-        // If it's just a filename, try common directories
+        // If it's just a filename, try common directories that exist in most projects
         if !path.contains('/') && !path.contains('\\') {
+            // Generic source directories found in most projects
             paths.push(self.workspace_root.join("src").join(path));
             paths.push(self.workspace_root.join("lib").join(path));
             paths.push(self.workspace_root.join("bin").join(path));
+            paths.push(self.workspace_root.join("app").join(path));
+            paths.push(self.workspace_root.join("source").join(path));
+            paths.push(self.workspace_root.join("sources").join(path));
+            paths.push(self.workspace_root.join("include").join(path));
+            paths.push(self.workspace_root.join("docs").join(path));
+            paths.push(self.workspace_root.join("doc").join(path));
+            paths.push(self.workspace_root.join("examples").join(path));
+            paths.push(self.workspace_root.join("example").join(path));
+            paths.push(self.workspace_root.join("tests").join(path));
+            paths.push(self.workspace_root.join("test").join(path));
+        }
+
+        // Try case-insensitive variants for filenames
+        if !path.contains('/') && !path.contains('\\') {
+            if let Ok(entries) = std::fs::read_dir(&self.workspace_root) {
+                for entry in entries.flatten() {
+                    if let Ok(name) = entry.file_name().into_string() {
+                        if name.to_lowercase() == path.to_lowercase() {
+                            paths.push(entry.path());
+                        }
+                    }
+                }
+            }
+
+            // Also check common subdirectories for case-insensitive matches
+            let common_dirs = ["src", "lib", "bin", "app", "source", "sources", "include", "docs", "doc", "examples", "example", "tests", "test"];
+            for dir in &common_dirs {
+                if let Ok(entries) = std::fs::read_dir(self.workspace_root.join(dir)) {
+                    for entry in entries.flatten() {
+                        if let Ok(name) = entry.file_name().into_string() {
+                            if name.to_lowercase() == path.to_lowercase() {
+                                paths.push(entry.path());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // If path contains directories, try case-insensitive directory matching
+        if path.contains('/') || path.contains('\\') {
+            let parts: Vec<&str> = path.split(|c| c == '/' || c == '\\').collect();
+            if parts.len() > 1 {
+                let mut current_path = self.workspace_root.clone();
+                for (i, part) in parts.iter().enumerate() {
+                    let _is_last = i == parts.len() - 1;
+                    if let Ok(entries) = std::fs::read_dir(&current_path) {
+                        let mut found = false;
+                        for entry in entries.flatten() {
+                            if let Ok(name) = entry.file_name().into_string() {
+                                if name.to_lowercase() == part.to_lowercase() {
+                                    current_path = entry.path();
+                                    found = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if !found {
+                            // If we can't find a case-insensitive match, try the original
+                            current_path = current_path.join(part);
+                        }
+                    } else {
+                        // Directory doesn't exist, append remaining parts
+                        for remaining_part in &parts[i..] {
+                            current_path = current_path.join(remaining_part);
+                        }
+                        break;
+                    }
+                }
+                paths.push(current_path);
+            }
         }
 
         Ok(paths)

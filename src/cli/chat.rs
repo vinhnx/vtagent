@@ -170,6 +170,36 @@ pub async fn handle_chat_command(config: &CoreAgentConfig, force_multi_agent: bo
                 // This will properly handle the human-in-the-loop confirmation when policy is Prompt
                 match tool_registry.execute_tool(name, args).await {
                     Ok(tool_output) => {
+                        // Display tool execution results to user
+                        // For streaming mode, output was already displayed during execution
+                        let is_streaming = tool_output.get("streaming").and_then(|s| s.as_bool()).unwrap_or(false);
+                        let shell_rendered = tool_output.get("shell_rendered").and_then(|s| s.as_bool()).unwrap_or(false);
+
+                        if !is_streaming || !shell_rendered {
+                            if let Some(stdout) = tool_output.get("stdout").and_then(|s| s.as_str()) {
+                                if !stdout.trim().is_empty() {
+                                    println!("{}", stdout);
+                                }
+                            }
+                            if let Some(stderr) = tool_output.get("stderr").and_then(|s| s.as_str()) {
+                                if !stderr.trim().is_empty() {
+                                    eprintln!("{}", stderr);
+                                }
+                            }
+                        }
+
+                        // For PTY mode, show additional PTY information
+                        if tool_output.get("pty_enabled").and_then(|p| p.as_bool()).unwrap_or(false) {
+                            if !is_streaming {
+                                println!("{}", style("[PTY Session Completed]").blue().bold());
+                            } else {
+                                println!("{}", style("[PTY Streaming Session Completed]").green().bold());
+                            }
+                        }
+                        if tool_output.get("streaming_enabled").and_then(|s| s.as_bool()).unwrap_or(false) {
+                            println!("{}", style("[Streaming Session Completed]").green().bold());
+                        }
+
                         // Heuristic: mark write effects for write/edit/create/delete
                         if matches!(name, "write_file" | "edit_file" | "create_file" | "delete_file") {
                             any_write_effect = true;
@@ -181,7 +211,7 @@ pub async fn handle_chat_command(config: &CoreAgentConfig, force_multi_agent: bo
                     Err(e) => {
                         // Check if the error is due to policy denial
                         if e.to_string().contains("execution denied by policy") {
-                            println!("{} Tool '{}' was denied by policy. You can change this with :policy commands in chat mode.", 
+                            println!("{} Tool '{}' was denied by policy. You can change this with :policy commands in chat mode.",
                                 style("[DENIED]").yellow().bold(), name);
                         } else {
                             eprintln!("{} Tool '{}' failed: {}", style("[ERROR]").red().bold(), name, e);

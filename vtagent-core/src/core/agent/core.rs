@@ -39,17 +39,16 @@ impl Agent {
         let decision_tracker = DecisionTracker::new();
         let error_recovery = ErrorRecoveryManager::new();
         let summarizer = ConversationSummarizer::new();
-        let tree_sitter_analyzer = TreeSitterAnalyzer::new()
-            .map_err(|e| {
+        let tree_sitter_analyzer = match TreeSitterAnalyzer::new() {
+            Ok(analyzer) => analyzer,
+            Err(e) => {
                 eprintln!("Warning: Failed to initialize tree-sitter analyzer: {}", e);
-                e
-            })
-            .unwrap_or_else(|_| {
-                // Create a fallback analyzer that gracefully handles errors
-                TreeSitterAnalyzer::new().unwrap_or_else(|_| {
-                    panic!("Critical: Could not initialize tree-sitter analyzer")
-                })
-            });
+                eprintln!("Continuing without tree-sitter analysis capabilities");
+                // Create a minimal fallback that doesn't panic
+                // This is a temporary solution - ideally we'd have a proper fallback
+                return Err(anyhow!("Tree-sitter analyzer initialization failed: {}", e));
+            }
+        };
 
         let session_id = format!(
             "session_{}",

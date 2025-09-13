@@ -5,7 +5,7 @@
 //! prioritizing security by checking environment variables first, then .env files, and finally
 //! falling back to configuration file values.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::env;
 
 /// API key sources for different providers
@@ -158,7 +158,9 @@ mod tests {
     #[test]
     fn test_get_gemini_api_key_from_env() {
         // Set environment variable
-        env::set_var("TEST_GEMINI_KEY", "test-gemini-key");
+        unsafe {
+            env::set_var("TEST_GEMINI_KEY", "test-gemini-key");
+        }
 
         let sources = ApiKeySources {
             gemini_env: "TEST_GEMINI_KEY".to_string(),
@@ -170,13 +172,17 @@ mod tests {
         assert_eq!(result.unwrap(), "test-gemini-key");
 
         // Clean up
-        env::remove_var("TEST_GEMINI_KEY");
+        unsafe {
+            env::remove_var("TEST_GEMINI_KEY");
+        }
     }
 
     #[test]
     fn test_get_anthropic_api_key_from_env() {
         // Set environment variable
-        env::set_var("TEST_ANTHROPIC_KEY", "test-anthropic-key");
+        unsafe {
+            env::set_var("TEST_ANTHROPIC_KEY", "test-anthropic-key");
+        }
 
         let sources = ApiKeySources {
             anthropic_env: "TEST_ANTHROPIC_KEY".to_string(),
@@ -188,13 +194,17 @@ mod tests {
         assert_eq!(result.unwrap(), "test-anthropic-key");
 
         // Clean up
-        env::remove_var("TEST_ANTHROPIC_KEY");
+        unsafe {
+            env::remove_var("TEST_ANTHROPIC_KEY");
+        }
     }
 
     #[test]
     fn test_get_openai_api_key_from_env() {
         // Set environment variable
-        env::set_var("TEST_OPENAI_KEY", "test-openai-key");
+        unsafe {
+            env::set_var("TEST_OPENAI_KEY", "test-openai-key");
+        }
 
         let sources = ApiKeySources {
             openai_env: "TEST_OPENAI_KEY".to_string(),
@@ -206,7 +216,9 @@ mod tests {
         assert_eq!(result.unwrap(), "test-openai-key");
 
         // Clean up
-        env::remove_var("TEST_OPENAI_KEY");
+        unsafe {
+            env::remove_var("TEST_OPENAI_KEY");
+        }
     }
 
     #[test]
@@ -224,7 +236,9 @@ mod tests {
     #[test]
     fn test_get_api_key_with_fallback_prefers_env() {
         // Set environment variable
-        env::set_var("TEST_FALLBACK_KEY", "env-key");
+        unsafe {
+            env::set_var("TEST_FALLBACK_KEY", "env-key");
+        }
 
         let sources = ApiKeySources {
             openai_env: "TEST_FALLBACK_KEY".to_string(),
@@ -237,7 +251,9 @@ mod tests {
         assert_eq!(result.unwrap(), "env-key"); // Should prefer env var
 
         // Clean up
-        env::remove_var("TEST_FALLBACK_KEY");
+        unsafe {
+            env::remove_var("TEST_FALLBACK_KEY");
+        }
     }
 
     #[test]

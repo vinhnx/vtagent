@@ -31,6 +31,8 @@ pub struct OrchestratorAgent {
     pub workspace: std::path::PathBuf,
     /// Reasoning effort level
     pub reasoning_effort: Option<String>,
+    /// Shared summary buffer for cross-agent handoffs
+    pub shared_summary: Arc<std::sync::Mutex<Vec<String>>>,
 }
 
 impl OrchestratorAgent {
@@ -56,6 +58,7 @@ impl OrchestratorAgent {
             api_key,
             workspace,
             reasoning_effort,
+            shared_summary: Arc::new(std::sync::Mutex::new(Vec::new())),
         }
     }
 
@@ -220,6 +223,38 @@ impl OrchestratorAgent {
 
         self.add_context(task_summary_context)?;
 
+        // Create explicit handoff context and update shared summary buffer
+        let handoff_context_id = format!("{}_handoff", task_id);
+        let handoff_content = format!(
+            "Handoff for '{}':\nAgent: {}\nNext steps: review modified files and run tests.\nModified files: {}\nWarnings: {}",
+            task.title,
+            task.agent_type,
+            if results.modified_files.is_empty() {
+                "None".to_string()
+            } else {
+                results.modified_files.join(", ")
+            },
+            if results.warnings.is_empty() {
+                "None".to_string()
+            } else {
+                results.warnings.join(", ")
+            },
+        );
+        let handoff_ctx = ContextItem {
+            id: handoff_context_id.clone(),
+            content: handoff_content.clone(),
+            created_by: task.agent_type,
+            session_id: self.session_id.clone(),
+            created_at: SystemTime::now(),
+            tags: vec!["handoff".to_string(), task.agent_type.to_string()],
+            context_type: ContextType::Analysis,
+            related_files: results.modified_files.clone(),
+        };
+        let _ = self.add_context(handoff_ctx);
+        if let Ok(mut buf) = self.shared_summary.lock() {
+            buf.push(handoff_content);
+        }
+
         Ok(results)
     }
 
@@ -331,6 +366,31 @@ impl OrchestratorAgent {
             }
         }
 
+        // Include a synthesized shared handoff summary to reduce repetition
+        if let Ok(buf) = self.shared_summary.lock() {
+            if !buf.is_empty() {
+                let content = format!(
+                    "Handoff Summary (last {}):\n{}",
+                    buf.len().min(5),
+                    buf.iter()
+                        .rev()
+                        .take(5)
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                );
+                contexts.push(ContextItem {
+                    id: "shared_summary".to_string(),
+                    content,
+                    created_by: task.agent_type,
+                    session_id: self.session_id.clone(),
+                    created_at: SystemTime::now(),
+                    tags: vec!["handoff".to_string(), "shared".to_string()],
+                    context_type: ContextType::Analysis,
+                    related_files: vec![],
+                });
+            }
+        }
         Ok(contexts)
     }
 

@@ -1,3 +1,29 @@
+1. evaluate your tools
+use agents to create a test set of real-world tasks. then evaluate your tool on this benchmark. refine your tool description and args. create a hold-out test set and evaluate on that too. measure your tool performance and make sure it works.
+
+2. don't overflow the agent with tools
+more tools don't lead to better outcomes. they fill the precious context very fast. build few super-optimized tools for high-impact workflows.
+3. namespace your tools
+choose a prefix/suffix for the tools that are related or target a certain functionality. this helps the agent make more sense out of them, especially if it's working with a high number of MCPs/tools. I've seen this done by other companies as well.
+4. return meaningful context from tools
+especially try to replace technical identifiers (uuid, mime_type) with natural language identifiers. this will help the agent in the long run for retrieving the right context. even the format of the response (json, markdown) has impact.
+5. prompt-engineer your tool descriptions
+think of how you'd define the tool to a junior dev. use unambigious argument names (user_id instead of user). very small refinements of the prompt has
+drastic impact on the effectiveness of the tool.
+
+6. concise tool response instead of detailed tool response to save tokens.
+Even your tool response structure—for example XML, JSON, or Markdown—can have an impact on evaluation performance: there is no one-size-fits-all solution. This is because LLMs are trained on next-token prediction and tend to perform better with formats that match their training data. The optimal response structure will vary widely by task and agent. We encourage you to select the best response structure based on your own evaluation.
+Optimizing tool responses for token efficiency
+
+Optimizing the quality of context is important. But so is optimizing the quantity of context returned back to agents in tool responses.
+
+We suggest implementing some combination of pagination, range selection, filtering, and/or truncation with sensible default parameter values for any tool responses that could use up lots of context. For Claude Code, we restrict tool responses to 25,000 tokens by default. We expect the effective context length of agents to grow over time, but the need for context-efficient tools to remain.
+
+If you choose to truncate responses, be sure to steer agents with helpful instructions. You can directly encourage agents to pursue more token-efficient strategies, like making many small and targeted searches instead of a single, broad search for a knowledge retrieval task. Similarly, if a tool call raises an error (for example, during input validation), you can prompt-engineer your error responses to clearly communicate specific and actionable improvements, rather than opaque error codes or tracebacks.
+
+
+--
+
 
 What can we learn from Anthropic’s Blog about building tools for Agents? Here are the key principles I extracted for building Tools and MCP Servers for Agents:
 

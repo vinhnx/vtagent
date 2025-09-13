@@ -8,6 +8,7 @@ use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 
 /// Simple project manager
+#[derive(Clone)]
 pub struct SimpleProjectManager {
     /// Project storage using markdown
     storage: ProjectStorage,
@@ -64,6 +65,16 @@ impl SimpleProjectManager {
     /// Get project data directory
     pub fn project_data_dir(&self, project_name: &str) -> PathBuf {
         self.workspace_root.join(".vtagent").join("projects").join(project_name)
+    }
+
+    /// Get project config directory
+    pub fn config_dir(&self, project_name: &str) -> PathBuf {
+        self.project_data_dir(project_name).join("config")
+    }
+
+    /// Get project cache directory
+    pub fn cache_dir(&self, project_name: &str) -> PathBuf {
+        self.project_data_dir(project_name).join("cache")
     }
 
     /// Get workspace root

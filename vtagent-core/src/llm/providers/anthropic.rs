@@ -1,7 +1,7 @@
 use crate::config::constants::{model_helpers, models};
 use crate::llm::client::LLMClient;
 use crate::llm::provider::{
-    FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, MessageRole, ToolCall,
+    FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
 };
 use crate::llm::types as llm_types;
 use async_trait::async_trait;
@@ -276,24 +276,20 @@ impl LLMClient for AnthropicProvider {
 
         let request = LLMRequest {
             model: model.clone(),
-            messages: vec![json!({
-                "role": "user",
-                "content": prompt
-            })],
+            messages: vec![Message {
+                role: MessageRole::User,
+                content: prompt.to_string(),
+                tool_calls: None,
+                tool_call_id: None,
+            }],
             max_tokens: None,
             temperature: None,
-            top_p: None,
-            frequency_penalty: None,
-            presence_penalty: None,
-            stream: None,
-            logprobs: None,
-            stop: None,
-            user: None,
+            stream: false,
+            tool_choice: None,
+            parallel_tool_calls: None,
+            reasoning_effort: None,
             system_prompt: None,
             tools: None,
-            tool_choice: None,
-            n: None,
-            prompt: None,
         };
 
         let response = LLMProvider::generate(self, request.clone()).await?;

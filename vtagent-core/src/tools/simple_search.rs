@@ -23,7 +23,7 @@ pub struct SimpleSearchTool {
 impl SimpleSearchTool {
     /// Create a new simple search tool
     pub fn new(workspace_root: PathBuf) -> Self {
-        let mut indexer = SimpleIndexer::new(workspace_root.clone());
+        let indexer = SimpleIndexer::new(workspace_root.clone());
         indexer.init().unwrap_or_else(|e| {
             eprintln!("Warning: Failed to initialize indexer: {}", e);
         });

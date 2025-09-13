@@ -17,21 +17,28 @@ use vtagent_core::core::agent::multi_agent::{AgentType, MultiAgentConfig};
 use vtagent_core::llm::factory::create_provider_with_config;
 use vtagent_core::llm::provider::{LLMProvider, LLMRequest, Message, MessageRole};
 use vtagent_core::llm::{AnyClient, make_client};
+use vtagent_core::config::multi_agent::MultiAgentSystemConfig;
 
 /// Load project-specific context for better agent performance
 async fn load_project_context(
-    project_manager: &vtagent_core::project::ProjectManager,
+    project_manager: &vtagent_core::project::SimpleProjectManager,
     project_name: &str,
 ) -> Result<Vec<String>> {
     let mut context_items = Vec::new();
 
     // Load project metadata
-    if let Some(metadata) = project_manager.load_project_metadata(project_name)? {
-        context_items.push(format!("Project: {}", metadata.name));
-        if let Some(description) = metadata.description {
-            context_items.push(format!("Description: {}", description));
+    match project_manager.load_project(project_name) {
+        Ok(project_data) => {
+            context_items.push(format!("Project: {}", project_data.name));
+            if let Some(desc) = &project_data.description {
+                context_items.push(format!("Description: {}", desc));
+            }
+            context_items.push(format!("Version: {}", project_data.version));
         }
-        context_items.push(format!("Created: {}", metadata.created_at));
+        Err(_) => {
+            // Project doesn't exist or can't be loaded
+            context_items.push(format!("Project '{}' not found or could not be loaded", project_name));
+        }
     }
 
     // Load README.md if it exists
@@ -73,10 +80,13 @@ async fn load_project_context(
 }
 
 /// Handle the ask command - single prompt mode
-async fn handle_ask_command(_args: &Cli, prompt: &[String]) -> Result<()> {
+async fn handle_ask_command(_args: &Cli, prompt: &[String], _vtagent_config: &VTAgentConfig) -> Result<()> {
     println!("Ask command - Single prompt mode: {:?}", prompt);
     Ok(())
 }
+
+/// Load system prompt from file or use fallback
+fn load_system_prompt(_config: &VTAgentConfig) -> Result<String> {
     use std::fs;
     use std::path::Path;
 
@@ -117,6 +127,10 @@ async fn handle_ask_command(_args: &Cli, prompt: &[String]) -> Result<()> {
 async fn main() -> Result<()> {
     let args = Cli::parse();
 
+    // Load configuration
+    let config_manager = ConfigManager::load()?;
+    let vtagent_config = config_manager.config();
+
     match &args.command {
         Some(Commands::ToolPolicy { command }) => {
             println!("ToolPolicy command: {:?}", command);
@@ -125,13 +139,13 @@ async fn main() -> Result<()> {
             println!("Models command: {:?}", command);
         }
         Some(Commands::Chat) => {
-            if let Err(e) = handle_chat_command(&args).await {
+            if let Err(e) = handle_chat_command(&args, &vtagent_config).await {
                 eprintln!("{}: {}", style("Error").red().bold(), e);
                 std::process::exit(1);
             }
         }
         Some(Commands::Ask { prompt }) => {
-            if let Err(e) = handle_ask_command(&args, prompt).await {
+            if let Err(e) = handle_ask_command(&args, prompt, &vtagent_config).await {
                 eprintln!("{}: {}", style("Error").red().bold(), e);
                 std::process::exit(1);
             }
@@ -170,13 +184,13 @@ async fn main() -> Result<()> {
             println!("Init command - Initialize project with AGENTS.md");
         }
         Some(Commands::Config { output, global }) => {
-            if let Err(e) = handle_config_command(output.as_deref(), global).await {
+            if let Err(e) = handle_config_command(output.as_deref(), *global, &vtagent_config).await {
                 eprintln!("{}: {}", style("Error").red().bold(), e);
                 std::process::exit(1);
             }
         }
         Some(Commands::InitProject { name, force, migrate }) => {
-            if let Err(e) = handle_init_project_command(name, force, migrate).await {
+            if let Err(e) = handle_init_project_command(name.as_ref(), *force, *migrate, &vtagent_config).await {
                 eprintln!("{}: {}", style("Error").red().bold(), e);
                 std::process::exit(1);
             }
@@ -189,8 +203,32 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+/// Handle the config command
+async fn handle_config_command(output: Option<&std::path::Path>, global: bool, config: &VTAgentConfig) -> Result<()> {
+    // For now, just print the config values
+    println!("Config command - Output: {:?}, Global: {}", output, global);
+
+    // Print the entire config for debugging
+    println!("{:#?}", config);
+
+    // If output path is specified, write the config to that path
+    if let Some(output_path) = output {
+        // Serialize the config to TOML format
+        let toml_string = toml::to_string(config)
+            .with_context(|| format!("Failed to serialize config to TOML"))?;
+
+        // Write to the specified output path
+        std::fs::write(output_path, toml_string)
+            .with_context(|| format!("Failed to write config to {}", output_path.display()))?;
+
+        println!("Config written to: {}", output_path.display());
+    }
+
+    Ok(())
+}
+
 /// Handle the chat command - interactive REPL
-async fn handle_chat_command(args: &Cli) -> Result<()> {
+async fn handle_chat_command(args: &Cli, vtagent_config: &VTAgentConfig) -> Result<()> {
     println!("VT Agent - Interactive AI Coding Assistant");
 
     // Determine workspace
@@ -209,15 +247,11 @@ async fn handle_chat_command(args: &Cli) -> Result<()> {
 
         // Initialize cache
         let cache_dir = project_manager.cache_dir(project_name);
-        let cache = vtagent_core::project::FileCache::new(cache_dir)
-            .context("Failed to initialize project cache")?;
+        let cache = vtagent_core::project::SimpleCache::new(cache_dir);
+        cache.init().context("Failed to initialize project cache")?;
 
-        // Clean expired cache entries
-        if let Ok(cleaned) = cache.clean_expired() {
-            if cleaned > 0 {
-                println!("Cleaned {} expired cache entries", cleaned);
-            }
-        }
+        // Cache is ready for use
+        println!("Project cache initialized");
 
         // Load project-specific context for better agent performance
         let project_context = load_project_context(project_manager, project_name)
@@ -292,16 +326,19 @@ async fn handle_single_agent_chat(
     let tool_definitions: Vec<ToolDefinition> = function_declarations
         .into_iter()
         .map(|fd| ToolDefinition {
-            name: fd.name,
-            description: fd.description,
-            parameters: fd.parameters,
+            tool_type: "function".to_string(),
+            function: vtagent_core::llm::provider::FunctionDefinition {
+                name: fd.name,
+                description: fd.description,
+                parameters: fd.parameters,
+            },
         })
         .collect();
 
     if debug_enabled {
         println!(
             "DEBUG: Available tools: {:?}",
-            tool_definitions.iter().map(|t| &t.name).collect::<Vec<_>>()
+            tool_definitions.iter().map(|t| &t.function.name).collect::<Vec<_>>()
         );
     }
 
@@ -526,7 +563,7 @@ async fn handle_single_agent_chat(
             stream: false,
             tool_choice: None,
             parallel_tool_calls: None,
-            reasoning_effort: Some(vtagent_config.agent.reasoning_effort.clone()),
+            reasoning_effort: Some(config.agent.reasoning_effort.clone()),
         };
 
         // Get response from AI
@@ -571,20 +608,20 @@ async fn handle_single_agent_chat(
                         println!(
                             "{} {} {}",
                             style(format!("  {}.", tool_call_index + 1)).dim(),
-                            style(&tool_call.name).cyan().bold(),
-                            style(&tool_call.arguments).dim()
+                            style(&tool_call.function.name).cyan().bold(),
+                            style(&tool_call.function.arguments).dim()
                         );
 
                         // Execute the tool
                         match tool_registry
-                            .execute_tool(&tool_call.name, tool_call.arguments.clone())
+                            .execute_tool(&tool_call.function.name, serde_json::from_str(&tool_call.function.arguments).unwrap_or(serde_json::Value::Null))
                             .await
                         {
                             Ok(result) => {
                                 println!(
                                     "{} {} executed successfully",
                                     style("[SUCCESS]").green(),
-                                    style(&tool_call.name).cyan().bold()
+                                    style(&tool_call.function.name).cyan().bold()
                                 );
 
                                 // Add tool result to conversation
@@ -608,14 +645,14 @@ async fn handle_single_agent_chat(
                                 println!(
                                     "{} {} failed: {}",
                                     style("[ERROR]").red(),
-                                    style(&tool_call.name).cyan().bold(),
+                                    style(&tool_call.function.name).cyan().bold(),
                                     style(&e).red()
                                 );
 
                                 // Add error result to conversation
                                 conversation_history.push(Message {
                                     role: MessageRole::Tool,
-                                    content: format!("Tool {} failed: {}", tool_call.name, e),
+                                    content: format!("Tool {} failed: {}", tool_call.function.name, e),
                                     tool_calls: None,
                                     tool_call_id: Some(tool_call.id.clone()),
                                 });
@@ -634,7 +671,7 @@ async fn handle_single_agent_chat(
                         stream: false,
                         tool_choice: None,
                         parallel_tool_calls: None,
-                        reasoning_effort: Some(vtagent_config.agent.reasoning_effort.clone()),
+                        reasoning_effort: Some(config.agent.reasoning_effort.clone()),
                     };
 
                     match client.generate(follow_up_request).await {
@@ -651,20 +688,20 @@ async fn handle_single_agent_chat(
                                     println!(
                                         "{}: Calling tool: {} with args: {}",
                                         style("[TOOL_CALL]").cyan().bold().on_black(),
-                                        tool_call.name,
-                                        tool_call.arguments
+                                        tool_call.function.name,
+                                        tool_call.function.arguments
                                     );
 
                                     // Execute the tool
                                     match tool_registry
-                                        .execute_tool(&tool_call.name, tool_call.arguments.clone())
+                                        .execute_tool(&tool_call.function.name, serde_json::from_str(&tool_call.function.arguments).unwrap_or(serde_json::Value::Null))
                                         .await
                                     {
                                         Ok(result) => {
                                             println!(
                                                 "{}: Tool {} executed successfully",
                                                 style("(SUCCESS)").green().bold(),
-                                                tool_call.name
+                                                tool_call.function.name
                                             );
 
                                             // Add tool result to conversation
@@ -686,15 +723,15 @@ async fn handle_single_agent_chat(
                                         Err(e) => {
                                             println!(
                                                 "{}: Tool {} failed: {}",
-                                                style("(ERROR)").red().bold().on_black(),
-                                                tool_call.name,
+                                                style("(ERROR)").red().bold().on_bright_black(),
+                                                tool_call.function.name,
                                                 e
                                             );
 
                                             // Add error result to conversation
                                             conversation_history.push(Message {
                                                 role: MessageRole::Tool,
-                                                content: format!("Tool {} failed: {}", tool_call.name, e),
+                                                content: format!("Tool {} failed: {}", tool_call.function.name, e),
                                                 tool_calls: None,
                                                 tool_call_id: Some(tool_call.id.clone()),
                                             });
@@ -713,7 +750,7 @@ async fn handle_single_agent_chat(
                                     stream: false,
                                     tool_choice: None,
                                     parallel_tool_calls: None,
-                                    reasoning_effort: Some(vtagent_config.agent.reasoning_effort.clone()),
+                                    reasoning_effort: Some(config.agent.reasoning_effort.clone()),
                                 };
 
                                 match client.generate(final_follow_up_request).await {
@@ -894,10 +931,11 @@ async fn handle_multi_agent_chat(
             use_single_model: config.multi_agent.use_single_model,
             provider: Provider::LMStudio,
             orchestrator_model: orchestrator_model.clone(),
+            executor_model: executor_model.clone(),
             subagent_model: executor_model.clone(),
             max_concurrent_subagents: config.multi_agent.max_concurrent_subagents,
-            context_store_enabled: config.multi_agent.context_sharing_enabled,
-            execution_mode: crate::core::agent::ExecutionMode::Auto,
+            context_store_enabled: config.multi_agent.context_store_enabled,
+            execution_mode: vtagent_core::config::multi_agent::ExecutionMode::Auto,
             ..Default::default()
         }
     } else {
@@ -906,10 +944,11 @@ async fn handle_multi_agent_chat(
             enabled: true,
             use_single_model: config.multi_agent.use_single_model,
             orchestrator_model,
+            executor_model: executor_model.clone(),
             subagent_model: executor_model,
             max_concurrent_subagents: config.multi_agent.max_concurrent_subagents,
-            context_store_enabled: config.multi_agent.context_sharing_enabled,
-            execution_mode: crate::core::agent::ExecutionMode::Auto,
+            context_store_enabled: config.multi_agent.context_store_enabled,
+            execution_mode: vtagent_core::config::multi_agent::ExecutionMode::Auto,
             ..Default::default()
         }
     };
@@ -939,7 +978,7 @@ async fn handle_multi_agent_chat(
         system_config,
         api_key,
         workspace.clone(),
-        Some(vtagent_config.agent.reasoning_effort.clone())
+        Some(config.agent.reasoning_effort.clone())
     )
         .await
         .context("Failed to initialize multi-agent system")?;
@@ -988,6 +1027,28 @@ async fn handle_multi_agent_chat(
         .shutdown()
         .await
         .context("Failed to shutdown multi-agent system")?;
+
+    Ok(())
+}
+
+/// Handle the init project command
+async fn handle_init_project_command(name: Option<&String>, force: bool, migrate: bool, config: &VTAgentConfig) -> Result<()> {
+    // For now, just print the project initialization parameters
+    println!("InitProject command - Name: {:?}, Force: {}, Migrate: {}", name, force, migrate);
+
+    // Here we would add the logic to initialize a new project, e.g.:
+    // - Create project directory
+    // - Initialize Git repository
+    // - Create initial files from templates
+    // - etc.
+
+    // For demonstration, let's just create a README.md file
+    if let Some(project_name) = name {
+        let readme_path = format!("{}/README.md", project_name);
+        std::fs::write(&readme_path, "# New Project\n\nThis is the README file for the new project.")
+            .with_context(|| format!("Failed to create README.md in {}", project_name))?;
+        println!("Created README.md in {}", project_name);
+    }
 
     Ok(())
 }

@@ -304,9 +304,17 @@ impl LLMClient for OpenAIProvider {
             messages: vec![Message {
                 role: MessageRole::User,
                 content: prompt.to_string(),
-                ..Default::default()
+                tool_calls: None,
+                tool_call_id: None,
             }],
-            ..Default::default()
+            system_prompt: None,
+            tools: None,
+            max_tokens: None,
+            temperature: None,
+            stream: false,
+            tool_choice: None,
+            parallel_tool_calls: None,
+            reasoning_effort: None,
         };
 
         let response = LLMProvider::generate(self, request.clone()).await?;

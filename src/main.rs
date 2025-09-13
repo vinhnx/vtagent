@@ -175,9 +175,6 @@ async fn main() -> Result<()> {
         Some(Commands::CompressContext) => {
             println!("CompressContext command - Compress conversation context");
         }
-        Some(Commands::DemoAsync) => {
-            println!("DemoAsync command - Demo async file operations");
-        }
         Some(Commands::Revert { turn, partial }) => {
             println!("Revert command - Turn: {}, Partial: {:?}", turn, partial);
         }
@@ -208,6 +205,15 @@ async fn main() -> Result<()> {
                 eprintln!("{}: {}", style("Error").red().bold(), e);
                 std::process::exit(1);
             }
+        }
+        Some(Commands::Benchmark) => {
+            println!("Benchmark command - Benchmark against SWE-bench framework");
+        }
+        Some(Commands::Security) => {
+            println!("Security command - Security and safety management");
+        }
+        Some(Commands::TreeSitter) => {
+            println!("TreeSitter command - Tree-sitter code analysis tools");
         }
         None => {
             println!("No command specified. Use --help for usage information.");

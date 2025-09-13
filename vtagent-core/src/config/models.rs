@@ -17,8 +17,6 @@ pub enum Provider {
     OpenAI,
     /// Anthropic Claude models
     Anthropic,
-    /// LMStudio local models
-    LMStudio,
 }
 
 impl Provider {
@@ -28,18 +26,12 @@ impl Provider {
             Provider::Gemini => "GEMINI_API_KEY",
             Provider::OpenAI => "OPENAI_API_KEY",
             Provider::Anthropic => "ANTHROPIC_API_KEY",
-            Provider::LMStudio => "", // LMStudio typically doesn't require API key for local models
         }
     }
 
     /// Get all supported providers
     pub fn all_providers() -> Vec<Provider> {
-        vec![
-            Provider::Gemini,
-            Provider::OpenAI,
-            Provider::Anthropic,
-            Provider::LMStudio,
-        ]
+        vec![Provider::Gemini, Provider::OpenAI, Provider::Anthropic]
     }
 }
 
@@ -49,7 +41,6 @@ impl fmt::Display for Provider {
             Provider::Gemini => write!(f, "gemini"),
             Provider::OpenAI => write!(f, "openai"),
             Provider::Anthropic => write!(f, "anthropic"),
-            Provider::LMStudio => write!(f, "lmstudio"),
         }
     }
 }
@@ -62,7 +53,6 @@ impl FromStr for Provider {
             "gemini" => Ok(Provider::Gemini),
             "openai" => Ok(Provider::OpenAI),
             "anthropic" => Ok(Provider::Anthropic),
-            "lmstudio" => Ok(Provider::LMStudio),
             _ => Err(ModelParseError::InvalidProvider(s.to_string())),
         }
     }
@@ -90,10 +80,6 @@ pub enum ModelId {
     ClaudeSonnet4,
     /// Claude Opus 4.1 - Powerful model for complex tasks
     ClaudeOpus41,
-
-    // LMStudio models
-    /// LMStudio local model (generic placeholder)
-    LMStudioLocal,
 }
 impl ModelId {
     /// Convert the model identifier to its string representation
@@ -111,8 +97,6 @@ impl ModelId {
             // Anthropic models
             ModelId::ClaudeSonnet4 => models::CLAUDE_SONNET_4_20250514,
             ModelId::ClaudeOpus41 => models::CLAUDE_OPUS_4_1_20250805,
-            // LMStudio models
-            ModelId::LMStudioLocal => "local-model", // Generic placeholder for LMStudio
         }
     }
 
@@ -124,7 +108,6 @@ impl ModelId {
             }
             ModelId::GPT5 | ModelId::GPT5Mini => Provider::OpenAI,
             ModelId::ClaudeSonnet4 | ModelId::ClaudeOpus41 => Provider::Anthropic,
-            ModelId::LMStudioLocal => Provider::LMStudio,
         }
     }
 
@@ -141,8 +124,6 @@ impl ModelId {
             // Anthropic models
             ModelId::ClaudeSonnet4 => "Claude Sonnet 4",
             ModelId::ClaudeOpus41 => "Claude Opus 4.1",
-            // LMStudio models
-            ModelId::LMStudioLocal => "LMStudio Local Model",
         }
     }
 
@@ -161,8 +142,6 @@ impl ModelId {
             // Anthropic models
             ModelId::ClaudeSonnet4 => "Most intelligent model",
             ModelId::ClaudeOpus41 => "Powerful model for complex tasks",
-            // LMStudio models
-            ModelId::LMStudioLocal => "Local model running via LMStudio",
         }
     }
 
@@ -179,8 +158,6 @@ impl ModelId {
             // Anthropic models
             ModelId::ClaudeSonnet4,
             ModelId::ClaudeOpus41,
-            // LMStudio models
-            ModelId::LMStudioLocal,
         ]
     }
 
@@ -223,7 +200,6 @@ impl ModelId {
             Provider::Gemini => ModelId::Gemini25FlashLite,
             Provider::OpenAI => ModelId::GPT5,
             Provider::Anthropic => ModelId::ClaudeSonnet4,
-            Provider::LMStudio => ModelId::LMStudioLocal, // Use LMStudio local model
         }
     }
 
@@ -233,7 +209,6 @@ impl ModelId {
             Provider::Gemini => ModelId::Gemini25FlashLite,
             Provider::OpenAI => ModelId::GPT5Mini,
             Provider::Anthropic => ModelId::ClaudeOpus41,
-            Provider::LMStudio => ModelId::LMStudioLocal, // Use LMStudio local model
         }
     }
 
@@ -243,7 +218,6 @@ impl ModelId {
             Provider::Gemini => ModelId::Gemini25Flash,
             Provider::OpenAI => ModelId::GPT5,
             Provider::Anthropic => ModelId::ClaudeSonnet4,
-            Provider::LMStudio => ModelId::LMStudioLocal, // Use LMStudio local model
         }
     }
 
@@ -266,11 +240,7 @@ impl ModelId {
     pub fn is_top_tier(&self) -> bool {
         matches!(
             self,
-            ModelId::Gemini25Pro
-                | ModelId::GPT5
-                | ModelId::ClaudeSonnet4
-                | ModelId::ClaudeOpus41
-                | ModelId::LMStudioLocal
+            ModelId::Gemini25Pro | ModelId::GPT5 | ModelId::ClaudeSonnet4 | ModelId::ClaudeOpus41
         )
     }
 
@@ -284,8 +254,6 @@ impl ModelId {
             // Anthropic generations
             ModelId::ClaudeSonnet4 => "4",
             ModelId::ClaudeOpus41 => "4.1",
-            // LMStudio generations
-            ModelId::LMStudioLocal => "local",
         }
     }
 }
@@ -312,8 +280,6 @@ impl FromStr for ModelId {
             // Anthropic models
             s if s == models::CLAUDE_SONNET_4_20250514 => Ok(ModelId::ClaudeSonnet4),
             s if s == models::CLAUDE_OPUS_4_1_20250805 => Ok(ModelId::ClaudeOpus41),
-            // LMStudio models
-            s if s == models::LMSTUDIO_LOCAL => Ok(ModelId::LMStudioLocal),
             _ => Err(ModelParseError::InvalidModel(s.to_string())),
         }
     }
@@ -374,8 +340,6 @@ mod tests {
         // Anthropic models
         assert_eq!(ModelId::ClaudeSonnet4.as_str(), "claude-sonnet-4-20250514");
         assert_eq!(ModelId::ClaudeOpus41.as_str(), "claude-opus-4-1-20250805");
-        // LMStudio models
-        assert_eq!(ModelId::LMStudioLocal.as_str(), "lmstudio-local");
     }
 
     #[test]
@@ -409,7 +373,6 @@ mod tests {
             "anthropic".parse::<Provider>().unwrap(),
             Provider::Anthropic
         );
-        assert_eq!("lmstudio".parse::<Provider>().unwrap(), Provider::LMStudio);
         assert!("invalid-provider".parse::<Provider>().is_err());
     }
 
@@ -418,7 +381,6 @@ mod tests {
         assert_eq!(ModelId::Gemini25Flash.provider(), Provider::Gemini);
         assert_eq!(ModelId::GPT5.provider(), Provider::OpenAI);
         assert_eq!(ModelId::ClaudeSonnet4.provider(), Provider::Anthropic);
-        assert_eq!(ModelId::LMStudioLocal.provider(), Provider::LMStudio);
     }
 
     #[test]
@@ -435,10 +397,6 @@ mod tests {
             ModelId::default_orchestrator_for_provider(Provider::Anthropic),
             ModelId::ClaudeSonnet4
         );
-        assert_eq!(
-            ModelId::default_orchestrator_for_provider(Provider::LMStudio),
-            ModelId::LMStudioLocal
-        );
 
         assert_eq!(
             ModelId::default_subagent_for_provider(Provider::Gemini),
@@ -451,10 +409,6 @@ mod tests {
         assert_eq!(
             ModelId::default_subagent_for_provider(Provider::Anthropic),
             ModelId::ClaudeOpus41
-        );
-        assert_eq!(
-            ModelId::default_subagent_for_provider(Provider::LMStudio),
-            ModelId::LMStudioLocal
         );
     }
 
@@ -485,7 +439,6 @@ mod tests {
         assert!(ModelId::Gemini25Pro.is_top_tier());
         assert!(ModelId::GPT5.is_top_tier());
         assert!(ModelId::ClaudeSonnet4.is_top_tier());
-        assert!(ModelId::LMStudioLocal.is_top_tier());
         assert!(!ModelId::Gemini25FlashLite.is_top_tier());
     }
 
@@ -502,9 +455,6 @@ mod tests {
         // Anthropic generations
         assert_eq!(ModelId::ClaudeSonnet4.generation(), "4");
         assert_eq!(ModelId::ClaudeOpus41.generation(), "4.1");
-
-        // LMStudio generations
-        assert_eq!(ModelId::LMStudioLocal.generation(), "local");
     }
 
     #[test]
@@ -520,10 +470,6 @@ mod tests {
         let anthropic_models = ModelId::models_for_provider(Provider::Anthropic);
         assert!(anthropic_models.contains(&ModelId::ClaudeSonnet4));
         assert!(!anthropic_models.contains(&ModelId::GPT5));
-
-        let lmstudio_models = ModelId::models_for_provider(Provider::LMStudio);
-        assert!(lmstudio_models.contains(&ModelId::LMStudioLocal));
-        assert!(!lmstudio_models.contains(&ModelId::ClaudeSonnet4));
     }
 
     #[test]

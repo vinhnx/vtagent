@@ -15,11 +15,11 @@ impl Spinner {
         pb.set_style(
             ProgressStyle::with_template("{spinner:.green} {msg}")
                 .unwrap()
-                .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")
+                .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"),
         );
         pb.set_message(message.to_string());
         pb.enable_steady_tick(Duration::from_millis(100));
-        
+
         Self { pb }
     }
 
@@ -30,7 +30,7 @@ impl Spinner {
             .unwrap()
             .progress_chars("#>-"));
         pb.set_message(message.to_string());
-        
+
         Self { pb }
     }
 

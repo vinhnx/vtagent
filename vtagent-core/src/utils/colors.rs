@@ -88,7 +88,7 @@ pub fn rgb(text: &str, r: u8, g: u8, b: u8) -> ColoredString {
 /// Combine multiple color and style operations
 pub fn custom_style(text: &str, styles: &[&str]) -> ColoredString {
     let mut colored_text = ColoredString::from(text);
-    
+
     for style in styles {
         colored_text = match *style {
             "red" => colored_text.red(),
@@ -109,7 +109,7 @@ pub fn custom_style(text: &str, styles: &[&str]) -> ColoredString {
             _ => colored_text, // Ignore unknown styles
         };
     }
-    
+
     colored_text
 }
 
@@ -121,7 +121,7 @@ mod tests {
     fn test_basic_colors() {
         let red_text = red("Hello");
         assert!(red_text.to_string().contains("Hello"));
-        
+
         let green_text = green("World");
         assert!(green_text.to_string().contains("World"));
     }
@@ -130,7 +130,7 @@ mod tests {
     fn test_styles() {
         let bold_text = bold("Bold");
         assert!(bold_text.to_string().contains("Bold"));
-        
+
         let italic_text = italic("Italic");
         assert!(italic_text.to_string().contains("Italic"));
     }

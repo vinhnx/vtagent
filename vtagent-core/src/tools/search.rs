@@ -176,9 +176,13 @@ impl SearchTool {
 
         // Read reference file to extract patterns
         let ref_path = self.workspace_root.join(reference_file);
-        let ref_content = tokio::fs::read_to_string(&ref_path)
-            .await
-            .map_err(|e| anyhow!("Error: Failed to read reference file '{}': {}", reference_file, e))?;
+        let ref_content = tokio::fs::read_to_string(&ref_path).await.map_err(|e| {
+            anyhow!(
+                "Error: Failed to read reference file '{}': {}",
+                reference_file,
+                e
+            )
+        })?;
 
         // Extract patterns based on content type
         let patterns = self.extract_similarity_patterns(&ref_content, content_type)?;
@@ -294,7 +298,9 @@ impl SearchTool {
         }
 
         if patterns.is_empty() {
-            return Err(anyhow!("No patterns extracted from reference file. Try content_type='all' or provide a different reference_file."));
+            return Err(anyhow!(
+                "No patterns extracted from reference file. Try content_type='all' or provide a different reference_file."
+            ));
         }
 
         Ok(patterns)
@@ -403,7 +409,10 @@ pub(crate) fn transform_matches_to_concise(events: &[Value]) -> Vec<Value> {
                 .and_then(|p| p.get("text"))
                 .and_then(|t| t.as_str())
                 .unwrap_or("");
-            let line = data.get("line_number").and_then(|n| n.as_u64()).unwrap_or(0);
+            let line = data
+                .get("line_number")
+                .and_then(|n| n.as_u64())
+                .unwrap_or(0);
             let preview = data
                 .get("lines")
                 .and_then(|l| l.get("text"))

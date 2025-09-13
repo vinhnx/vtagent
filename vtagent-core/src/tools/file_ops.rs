@@ -78,7 +78,11 @@ impl FileOpsTool {
         let end = (start + per_page).min(capped_total);
         let has_more = end < capped_total;
 
-        let mut page_items = if start < end { all_items[start..end].to_vec() } else { vec![] };
+        let mut page_items = if start < end {
+            all_items[start..end].to_vec()
+        } else {
+            vec![]
+        };
 
         // Respect response_format
         let concise = input
@@ -97,7 +101,10 @@ impl FileOpsTool {
         let guidance = if has_more || capped_total < all_items.len() {
             Some(format!(
                 "Showing {} of {} items (page {}, per_page {}). Use 'page' and 'per_page' to page through results.",
-                page_items.len(), capped_total, page, per_page
+                page_items.len(),
+                capped_total,
+                page,
+                per_page
             ))
         } else {
             None
@@ -115,7 +122,9 @@ impl FileOpsTool {
             "response_format": if concise { "concise" } else { "detailed" }
         });
 
-        if let Some(msg) = guidance { out["message"] = json!(msg); }
+        if let Some(msg) = guidance {
+            out["message"] = json!(msg);
+        }
         Ok(out)
     }
 
@@ -131,7 +140,9 @@ impl FileOpsTool {
         let mut count = 0;
 
         for entry in WalkDir::new(&search_path).max_depth(10) {
-            if count >= input.max_items { break; }
+            if count >= input.max_items {
+                break;
+            }
 
             let entry = entry.map_err(|e| anyhow!("Walk error: {}", e))?;
             let path = entry.path();
@@ -354,10 +365,12 @@ impl FileOpsTool {
                 }
                 tokio::fs::write(&file_path, &input.content).await?;
             }
-            _ => return Err(anyhow!(format!(
-                "Error: Unsupported write mode '{}'. Allowed: overwrite, append, skip_if_exists.",
-                input.mode
-            ))),
+            _ => {
+                return Err(anyhow!(format!(
+                    "Error: Unsupported write mode '{}'. Allowed: overwrite, append, skip_if_exists.",
+                    input.mode
+                )));
+            }
         }
 
         Ok(json!({
@@ -475,7 +488,11 @@ impl FileOpsTool {
         let start = (page - 1).saturating_mul(per_page);
         let end = (start + per_page).min(total_capped);
         let has_more = end < total_capped;
-        let mut page_items = if start < end { items[start..end].to_vec() } else { vec![] };
+        let mut page_items = if start < end {
+            items[start..end].to_vec()
+        } else {
+            vec![]
+        };
 
         let concise = input
             .response_format
@@ -501,9 +518,15 @@ impl FileOpsTool {
             "mode": mode,
             "response_format": if concise { "concise" } else { "detailed" }
         });
-        if let Some(p) = pattern { out["pattern"] = json!(p); }
+        if let Some(p) = pattern {
+            out["pattern"] = json!(p);
+        }
         if has_more {
-            out["message"] = json!(format!("Showing {} of {} results. Use 'page' to continue.", out["count"].as_u64().unwrap_or(0), total_capped));
+            out["message"] = json!(format!(
+                "Showing {} of {} results. Use 'page' to continue.",
+                out["count"].as_u64().unwrap_or(0),
+                total_capped
+            ));
         }
         out
     }

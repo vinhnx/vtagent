@@ -6,7 +6,6 @@ pub enum BackendKind {
     Gemini,
     OpenAI,
     Anthropic,
-    LMStudio,
 }
 
 /// Unified LLM response structure

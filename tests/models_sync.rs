@@ -42,10 +42,6 @@ fn constants_cover_models_json() {
                 validated_providers.insert("anthropic");
                 Some(models::anthropic::SUPPORTED_MODELS)
             }
-            "lmstudio" => {
-                validated_providers.insert("lmstudio");
-                Some(models::lmstudio::SUPPORTED_MODELS)
-            }
             "google" => {
                 validated_providers.insert("google");
                 Some(models::google::SUPPORTED_MODELS)
@@ -123,7 +119,7 @@ fn constants_cover_models_json() {
     }
 
     // Ensure we validated the expected providers
-    let expected_providers = ["openai", "anthropic", "lmstudio", "google"];
+    let expected_providers = ["openai", "anthropic", "google"];
     for expected in &expected_providers {
         assert!(
             validated_providers.contains(expected),
@@ -148,7 +144,6 @@ fn model_helpers_validation_edge_cases() {
     // Test invalid models for valid providers
     assert!(!model_helpers::is_valid("openai", "invalid-model-id"));
     assert!(!model_helpers::is_valid("anthropic", "invalid-model-id"));
-    assert!(!model_helpers::is_valid("lmstudio", "invalid-model-id"));
     assert!(!model_helpers::is_valid("google", "invalid-model-id"));
 
     // Test valid models for valid providers
@@ -159,10 +154,6 @@ fn model_helpers_validation_edge_cases() {
     assert!(model_helpers::is_valid(
         "anthropic",
         models::anthropic::DEFAULT_MODEL
-    ));
-    assert!(model_helpers::is_valid(
-        "lmstudio",
-        models::lmstudio::DEFAULT_MODEL
     ));
     assert!(model_helpers::is_valid(
         "google",
@@ -176,7 +167,6 @@ fn backwards_compatibility_constants() {
     assert!(!models::GEMINI_2_5_FLASH.is_empty());
     assert!(!models::GPT_5.is_empty());
     assert!(!models::CLAUDE_SONNET_4_20250514.is_empty());
-    assert!(!models::LMSTUDIO_QWEN_30B_A3B_2507.is_empty());
 
     // Test that backwards compatibility constants match the new structure
     assert_eq!(models::GEMINI_2_5_FLASH, models::google::GEMINI_2_5_FLASH);
@@ -184,9 +174,5 @@ fn backwards_compatibility_constants() {
     assert_eq!(
         models::CLAUDE_SONNET_4_20250514,
         models::anthropic::CLAUDE_SONNET_4_20250514
-    );
-    assert_eq!(
-        models::LMSTUDIO_QWEN_30B_A3B_2507,
-        models::lmstudio::LMSTUDIO_QWEN_30B_A3B_2507
     );
 }

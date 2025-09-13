@@ -152,7 +152,7 @@ impl ToolChoice {
                 json!({"mode": "any", "allowed_function_names": [choice.function.name]})
             }
 
-            // Generic/LMStudio follows OpenAI format
+            // Generic follows OpenAI format
             _ => match self {
                 Self::Auto => json!("auto"),
                 Self::None => json!("none"),
@@ -268,7 +268,7 @@ impl Message {
 
         // Provider-specific validations based on official docs
         match provider {
-            "openai" | "lmstudio" => {
+            "openai" => {
                 if self.role == MessageRole::Tool && self.tool_call_id.is_none() {
                     return Err(format!(
                         "{} requires tool_call_id for tool messages",
@@ -398,9 +398,6 @@ impl MessageRole {
         match (self, provider) {
             (MessageRole::Tool, "openai") if !has_tool_call_id => {
                 Err("OpenAI tool messages must have tool_call_id".to_string())
-            }
-            (MessageRole::Tool, "lmstudio") if !has_tool_call_id => {
-                Err("LMStudio tool messages should have tool_call_id".to_string())
             }
             (MessageRole::Tool, "gemini") if !has_tool_call_id => {
                 Err("Gemini tool messages need tool_call_id for function mapping".to_string())

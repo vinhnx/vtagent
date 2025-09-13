@@ -53,10 +53,8 @@ impl LLMProvider for GeminiProvider {
             .send()
             .await
             .map_err(|e| {
-                let formatted_error = error_display::format_llm_error(
-                    "Gemini",
-                    &format!("Network error: {}", e)
-                );
+                let formatted_error =
+                    error_display::format_llm_error("Gemini", &format!("Network error: {}", e));
                 LLMError::Network(formatted_error)
             })?;
 
@@ -64,22 +62,19 @@ impl LLMProvider for GeminiProvider {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             let formatted_error = error_display::format_llm_error(
-                "Gemini", 
-                &format!("HTTP {}: {}", status, error_text)
+                "Gemini",
+                &format!("HTTP {}: {}", status, error_text),
             );
             return Err(LLMError::Provider(formatted_error));
         }
 
-        let gemini_response: Value = response
-            .json()
-            .await
-            .map_err(|e| {
-                let formatted_error = error_display::format_llm_error(
-                    "Gemini",
-                    &format!("Failed to parse response: {}", e)
-                );
-                LLMError::Provider(formatted_error)
-            })?;
+        let gemini_response: Value = response.json().await.map_err(|e| {
+            let formatted_error = error_display::format_llm_error(
+                "Gemini",
+                &format!("Failed to parse response: {}", e),
+            );
+            LLMError::Provider(formatted_error)
+        })?;
 
         self.convert_from_gemini_format(gemini_response)
     }
@@ -96,7 +91,7 @@ impl LLMProvider for GeminiProvider {
         if !self.supported_models().contains(&request.model) {
             let formatted_error = error_display::format_llm_error(
                 "Gemini",
-                &format!("Unsupported model: {}", request.model)
+                &format!("Unsupported model: {}", request.model),
             );
             return Err(LLMError::InvalidRequest(formatted_error));
         }
@@ -205,25 +200,17 @@ impl GeminiProvider {
     }
 
     fn convert_from_gemini_format(&self, response: Value) -> Result<LLMResponse, LLMError> {
-        let candidates = response["candidates"]
-            .as_array()
-            .ok_or_else(|| {
-                let formatted_error = error_display::format_llm_error(
-                    "Gemini",
-                    "No candidates in response"
-                );
-                LLMError::Provider(formatted_error)
-            })?;
+        let candidates = response["candidates"].as_array().ok_or_else(|| {
+            let formatted_error =
+                error_display::format_llm_error("Gemini", "No candidates in response");
+            LLMError::Provider(formatted_error)
+        })?;
 
-        let candidate = candidates
-            .first()
-            .ok_or_else(|| {
-                let formatted_error = error_display::format_llm_error(
-                    "Gemini",
-                    "No candidate in response"
-                );
-                LLMError::Provider(formatted_error)
-            })?;
+        let candidate = candidates.first().ok_or_else(|| {
+            let formatted_error =
+                error_display::format_llm_error("Gemini", "No candidate in response");
+            LLMError::Provider(formatted_error)
+        })?;
 
         // Check if content exists and has parts
         if let Some(content) = candidate.get("content") {

@@ -1,6 +1,5 @@
-use super::providers::{AnthropicProvider, GeminiProvider, OpenAIProvider, OpenRouterProvider};
+use super::providers::{AnthropicProvider, GeminiProvider, OpenAIProvider};
 use crate::llm::provider::{LLMError, LLMProvider};
-use crate::llm::providers::LMStudioProvider;
 use std::collections::HashMap;
 
 /// LLM provider factory and registry
@@ -46,25 +45,6 @@ impl LLMFactory {
             }),
         );
 
-        factory.register_provider(
-            "openrouter",
-            Box::new(|config: ProviderConfig| {
-                let api_key = config.api_key.unwrap_or_default();
-                Box::new(OpenRouterProvider::new(api_key)) as Box<dyn LLMProvider>
-            }),
-        );
-
-        factory.register_provider(
-            "lmstudio",
-            Box::new(|config: ProviderConfig| {
-                let base_url = config.base_url.unwrap_or_else(|| {
-                    crate::config::constants::urls::LMSTUDIO_DEFAULT_BASE_URL.to_string()
-                });
-                let api_key = config.api_key;
-                Box::new(LMStudioProvider::new(api_key, Some(base_url))) as Box<dyn LLMProvider>
-            }),
-        );
-
         factory
     }
 
@@ -104,18 +84,6 @@ impl LLMFactory {
             Some("anthropic".to_string())
         } else if m.contains("gemini") || m.starts_with("palm") {
             Some("gemini".to_string())
-        } else if m.contains("/") {
-            // Handle OpenRouter format: provider/model
-            if let Some(provider) = m.split('/').next() {
-                match provider {
-                    "anthropic" | "openai" | "google" | "meta-llama" | "mistralai" => {
-                        Some("openrouter".to_string())
-                    }
-                    _ => None,
-                }
-            } else {
-                None
-            }
         } else {
             None
         }

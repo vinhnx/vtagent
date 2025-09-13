@@ -4,7 +4,7 @@ use vtagent_core::utils::colors::*;
 fn test_basic_colors() {
     let red_text = red("Hello");
     assert!(red_text.to_string().contains("Hello"));
-    
+
     let green_text = green("World");
     assert!(green_text.to_string().contains("World"));
 }
@@ -13,7 +13,7 @@ fn test_basic_colors() {
 fn test_styles() {
     let bold_text = bold("Bold");
     assert!(bold_text.to_string().contains("Bold"));
-    
+
     let italic_text = italic("Italic");
     assert!(italic_text.to_string().contains("Italic"));
 }

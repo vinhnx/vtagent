@@ -30,10 +30,7 @@ Update the VTAgent codebase to focus on the latest and most capable AI models as
    - DeepSeek Reasoner
    - DeepSeek Chat
 
-5. **Grok 4** - xAI's latest model
-   - Grok 4
-
-6. **Gemini 2.5** - Google's latest models (already implemented)
+5. **Gemini 2.5** - Google's latest models (already implemented)
    - Gemini 2.5 Flash Lite Preview 06-17
    - Gemini 2.5 Pro Preview 06-05
    - Gemini 2.5 Flash
@@ -60,7 +57,6 @@ Update the VTAgent codebase to focus on the latest and most capable AI models as
 1. Reviewed existing model definitions and provider implementations
 2. Identified models to keep based on September 2025 capabilities
 3. Identified providers to remove:
-   - XAI provider (accessed through OpenRouter instead)
    - Ollama provider (removed completely)
    - Groq provider (accessed through OpenAI-compatible APIs)
 
@@ -79,16 +75,15 @@ Update the VTAgent codebase to focus on the latest and most capable AI models as
 4. Added DeepSeek models to ModelId enum:
    - DeepSeekReasoner (`deepseek-reasoner`)
    - DeepSeekChat (`deepseek-chat`)
-5. Added Grok 4 model to ModelId enum:
-   - Grok4 (`x-ai/grok-4`)
+5. Added DeepSeek models to ModelId enum:
+   - DeepSeekChat (`deepseek/deepseek-chat-v3.1`)
+   - DeepSeekReasoner (`deepseek/deepseek-reasoner`)
 
 ### Phase 3: Provider Updates
-1. Removed XAI provider from provider definitions
-2. Updated provider mappings for new models:
+1. Updated provider mappings for new models:
    - Kimi, GLM, Qwen models → OpenAI provider
    - DeepSeek models → DeepSeek provider
-   - Grok 4 model → OpenRouter provider
-3. Removed unused provider modules (Ollama, Groq)
+2. Removed unused provider modules (Ollama, Groq)
 
 ### Phase 4: Client Factory Updates
 1. Updated client factory to remove direct provider implementations
@@ -103,19 +98,6 @@ Update the VTAgent codebase to focus on the latest and most capable AI models as
 - **Models**:
   - `deepseek-reasoner` - Latest reasoning model (Jan 2025, updated Aug 2025)
   - `deepseek-chat` - Latest chat model (Dec 2024, updated Aug 2025)
-
-### xAI Provider
-- **API Key**: `XAI_API_KEY`
-- **Specialization**: Grok models from Elon Musk's xAI company
-- **Models**:
-  - `grok-4` - Latest and most capable model (July 2025)
-  - `grok-3-mini-fast` - Fastest small model (Feb 2025)
-  - `grok-3-fast` - Fast large model (Feb 2025)
-  - `grok-3-latest` - Latest stable model (Feb 2025)
-  - `grok-3-mini` - Small efficient model (Feb 2025)
-  - `grok-3` - Main model (Feb 2025)
-  - `grok-2-vision-latest` - Latest vision model (Dec 2024)
-  - `grok-2-latest` - Latest text model (Dec 2024)
 
 ## Updated Existing Providers
 
@@ -170,7 +152,7 @@ Update the VTAgent codebase to focus on the latest and most capable AI models as
 
 #### 1. Model Infrastructure Update
 - Updated `ModelId` enum with 67 models (was ~20)
-- Added new providers: `DeepSeek`, `XAI`
+- Added new providers: `DeepSeek`
 - Updated all existing providers with 2025 models
 - Complete display names and descriptions for all models
 - Updated provider factory with new provider support
@@ -178,7 +160,6 @@ Update the VTAgent codebase to focus on the latest and most capable AI models as
 
 #### 2. New Providers Added
 - **DeepSeek** (2 models): Reasoning specialist with R1 technology
-- **xAI** (8 models): Grok models with latest capabilities
 
 #### 3. Updated Existing Providers
 - **Gemini** (5 models): Latest 2.5 series
@@ -203,13 +184,13 @@ Update the VTAgent codebase to focus on the latest and most capable AI models as
 
 ### Before → After
 - **Models**: ~20 → 67 models (+235% increase)
-- **Providers**: 7 → 9 providers (+2 new)
-- **Latest Tech**: Added GPT-5, Claude Opus 4.1, Grok 4, DeepSeek R1
+- **Providers**: 7 → 8 providers (+1 new)
+- **Latest Tech**: Added GPT-5, Claude Opus 4.1, DeepSeek R1
 - **Performance**: Maintained ultra-fast Groq inference, added reasoning models
 
 ### New Capabilities
 - **Advanced Reasoning**: DeepSeek R1, OpenAI o3/o4 series
-- **Latest Generation**: GPT-5, Claude 4.1, Grok 4
+- **Latest Generation**: GPT-5, Claude 4.1
 - **Specialized Models**: Code generation, reasoning, vision models
 - **Cost Optimization**: New preview and lite models for efficiency
 
@@ -225,7 +206,7 @@ Update the VTAgent codebase to focus on the latest and most capable AI models as
    - Add basic display names for compilation
 
 2. **Provider Implementation** (10 minutes):
-   - Add DeepSeek and xAI to LLM client factory
+   - Add DeepSeek to LLM client factory
    - Add basic provider routing
 
 3. **Complete Model Registry** (15 minutes):
@@ -234,6 +215,6 @@ Update the VTAgent codebase to focus on the latest and most capable AI models as
 
 ## Success Metrics
 - **67 models** successfully defined and configured
-- **2 new providers** (DeepSeek, xAI) integrated
+- **1 new provider** (DeepSeek) integrated
 - **All existing providers** updated with latest models
 - **Complete metadata** for all models (names, descriptions, generations)

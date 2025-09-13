@@ -13,7 +13,7 @@ VTAgent is a Rust-based terminal coding agent with modular architecture supporti
 ### Core Capabilities
 
 - **Multi-Agent Architecture**: Orchestrator, Explorer, and Coder agents for specialized tasks
-- **Multiple LLM Providers**: Gemini, OpenAI, Anthropic, and LMStudio support
+- **Multiple LLM Providers**: Gemini, OpenAI, Anthropic support
 - **Advanced Code Analysis**: Tree-sitter parsers for Rust, Python, JavaScript, TypeScript, Go, Java
 - **Intelligent Tool Suite**: File operations, search, terminal commands, and PTY integration
 - **Configuration Management**: TOML-based configuration with comprehensive policies

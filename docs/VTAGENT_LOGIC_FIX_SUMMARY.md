@@ -88,7 +88,7 @@
 
 ## Expected Behavior Now
 
-When user requests: "edit vtagent-core/src/config/constants.rs and add moonshotai/kimi-k2-0905 model to openrouter model list"
+When user requests: "edit vtagent-core/src/config/constants.rs and add moonshotai/kimi-k2-0905 model to supported model list"
 
 The agent will:
 1. Receive the message only once (no duplicates)

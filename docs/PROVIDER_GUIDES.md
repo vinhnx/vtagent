@@ -34,13 +34,13 @@ api_key_env = "GEMINI_API_KEY"
 ```toml
 [agent]
 provider = "openai"
-default_model = "gpt-4o"
+default_model = "gpt-5"
 api_key_env = "OPENAI_API_KEY"
 ```
 
 #### Available Models
-- `gpt-4o` - Latest GPT-4 optimized
-- `gpt-4o-mini` - Fast, cost-effective GPT-4
+- `gpt-5` - Latest GPT-4 optimized
+- `gpt-5-mini` - Fast, cost-effective GPT-4
 - `gpt-4-turbo` - Previous generation turbo
 - `gpt-3.5-turbo` - Fast, economical model
 

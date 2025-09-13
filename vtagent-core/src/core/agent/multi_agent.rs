@@ -1,8 +1,8 @@
 //! Multi-agent system types and structures
 
+use crate::config::constants::{prompts, tools};
 use crate::config::models::{ModelId, Provider};
 use crate::config::{ContextStoreDefaults, MultiAgentDefaults};
-use crate::config::constants::{tools, prompts};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
@@ -74,7 +74,7 @@ impl AgentType {
                 tools::WRITE_FILE,
                 tools::EDIT_FILE,
                 tools::DELETE_FILE,
-                tools::CREATE_FILE
+                tools::CREATE_FILE,
             ],
             AgentType::Coder => vec![],  // No restrictions
             AgentType::Single => vec![], // No restrictions

@@ -173,7 +173,8 @@ impl SimpleKVStorage {
 
     pub fn put(&self, key: &str, value: &str) -> Result<()> {
         let data = HashMap::from([("value".to_string(), value.to_string())]);
-        self.storage.store(key, &data, &format!("Key-Value: {}", key))
+        self.storage
+            .store(key, &data, &format!("Key-Value: {}", key))
     }
 
     pub fn get(&self, key: &str) -> Result<String> {
@@ -235,7 +236,7 @@ impl ProjectStorage {
         self.storage.store(
             &project.name,
             project,
-            &format!("Project: {}", project.name)
+            &format!("Project: {}", project.name),
         )
     }
 

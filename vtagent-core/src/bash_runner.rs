@@ -43,7 +43,9 @@ impl BashRunner {
 
     /// List directory contents (like ls)
     pub fn ls(&self, path: Option<&str>, show_hidden: bool) -> Result<String> {
-        let target_path = path.map(|p| self.resolve_path(p)).unwrap_or_else(|| self.working_dir.clone());
+        let target_path = path
+            .map(|p| self.resolve_path(p))
+            .unwrap_or_else(|| self.working_dir.clone());
 
         let mut cmd = Command::new("ls");
         if show_hidden {
@@ -53,13 +55,17 @@ impl BashRunner {
         }
         cmd.arg(&target_path);
 
-        let output = cmd.output()
+        let output = cmd
+            .output()
             .with_context(|| format!("Failed to execute ls command"))?;
 
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).to_string())
         } else {
-            Err(anyhow::anyhow!("ls failed: {}", String::from_utf8_lossy(&output.stderr)))
+            Err(anyhow::anyhow!(
+                "ls failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ))
         }
     }
 
@@ -78,13 +84,17 @@ impl BashRunner {
         }
         cmd.arg(&target_path);
 
-        let output = cmd.output()
+        let output = cmd
+            .output()
             .with_context(|| format!("Failed to execute mkdir command"))?;
 
         if output.status.success() {
             Ok(())
         } else {
-            Err(anyhow::anyhow!("mkdir failed: {}", String::from_utf8_lossy(&output.stderr)))
+            Err(anyhow::anyhow!(
+                "mkdir failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ))
         }
     }
 
@@ -101,13 +111,17 @@ impl BashRunner {
         }
         cmd.arg(&target_path);
 
-        let output = cmd.output()
+        let output = cmd
+            .output()
             .with_context(|| format!("Failed to execute rm command"))?;
 
         if output.status.success() {
             Ok(())
         } else {
-            Err(anyhow::anyhow!("rm failed: {}", String::from_utf8_lossy(&output.stderr)))
+            Err(anyhow::anyhow!(
+                "rm failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ))
         }
     }
 
@@ -122,13 +136,17 @@ impl BashRunner {
         }
         cmd.arg(&source_path).arg(&dest_path);
 
-        let output = cmd.output()
+        let output = cmd
+            .output()
             .with_context(|| format!("Failed to execute cp command"))?;
 
         if output.status.success() {
             Ok(())
         } else {
-            Err(anyhow::anyhow!("cp failed: {}", String::from_utf8_lossy(&output.stderr)))
+            Err(anyhow::anyhow!(
+                "cp failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ))
         }
     }
 
@@ -146,13 +164,18 @@ impl BashRunner {
         if output.status.success() {
             Ok(())
         } else {
-            Err(anyhow::anyhow!("mv failed: {}", String::from_utf8_lossy(&output.stderr)))
+            Err(anyhow::anyhow!(
+                "mv failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ))
         }
     }
 
     /// Search for text in files (like grep)
     pub fn grep(&self, pattern: &str, path: Option<&str>, recursive: bool) -> Result<String> {
-        let target_path = path.map(|p| self.resolve_path(p)).unwrap_or_else(|| self.working_dir.clone());
+        let target_path = path
+            .map(|p| self.resolve_path(p))
+            .unwrap_or_else(|| self.working_dir.clone());
 
         let mut cmd = Command::new("grep");
         cmd.arg("-n"); // Show line numbers
@@ -161,7 +184,8 @@ impl BashRunner {
         }
         cmd.arg(pattern).arg(&target_path);
 
-        let output = cmd.output()
+        let output = cmd
+            .output()
             .with_context(|| format!("Failed to execute grep command"))?;
 
         if output.status.success() {
@@ -178,8 +202,15 @@ impl BashRunner {
     }
 
     /// Find files (like find)
-    pub fn find(&self, path: Option<&str>, name_pattern: Option<&str>, type_filter: Option<&str>) -> Result<String> {
-        let target_path = path.map(|p| self.resolve_path(p)).unwrap_or_else(|| self.working_dir.clone());
+    pub fn find(
+        &self,
+        path: Option<&str>,
+        name_pattern: Option<&str>,
+        type_filter: Option<&str>,
+    ) -> Result<String> {
+        let target_path = path
+            .map(|p| self.resolve_path(p))
+            .unwrap_or_else(|| self.working_dir.clone());
 
         let mut cmd = Command::new("find");
         cmd.arg(&target_path);
@@ -192,18 +223,27 @@ impl BashRunner {
             cmd.arg("-type").arg(type_filter);
         }
 
-        let output = cmd.output()
+        let output = cmd
+            .output()
             .with_context(|| format!("Failed to execute find command"))?;
 
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).to_string())
         } else {
-            Err(anyhow::anyhow!("find failed: {}", String::from_utf8_lossy(&output.stderr)))
+            Err(anyhow::anyhow!(
+                "find failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ))
         }
     }
 
     /// Show file contents (like cat)
-    pub fn cat(&self, path: &str, start_line: Option<usize>, end_line: Option<usize>) -> Result<String> {
+    pub fn cat(
+        &self,
+        path: &str,
+        start_line: Option<usize>,
+        end_line: Option<usize>,
+    ) -> Result<String> {
         let file_path = self.resolve_path(path);
 
         if let (Some(start), Some(end)) = (start_line, end_line) {
@@ -219,7 +259,10 @@ impl BashRunner {
             if output.status.success() {
                 Ok(String::from_utf8_lossy(&output.stdout).to_string())
             } else {
-                Err(anyhow::anyhow!("sed failed: {}", String::from_utf8_lossy(&output.stderr)))
+                Err(anyhow::anyhow!(
+                    "sed failed: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                ))
             }
         } else {
             // Simple cat
@@ -231,7 +274,10 @@ impl BashRunner {
             if output.status.success() {
                 Ok(String::from_utf8_lossy(&output.stdout).to_string())
             } else {
-                Err(anyhow::anyhow!("cat failed: {}", String::from_utf8_lossy(&output.stderr)))
+                Err(anyhow::anyhow!(
+                    "cat failed: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                ))
             }
         }
     }
@@ -250,7 +296,10 @@ impl BashRunner {
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).to_string())
         } else {
-            Err(anyhow::anyhow!("head failed: {}", String::from_utf8_lossy(&output.stderr)))
+            Err(anyhow::anyhow!(
+                "head failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ))
         }
     }
 
@@ -267,7 +316,10 @@ impl BashRunner {
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).to_string())
         } else {
-            Err(anyhow::anyhow!("tail failed: {}", String::from_utf8_lossy(&output.stderr)))
+            Err(anyhow::anyhow!(
+                "tail failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ))
         }
     }
 
@@ -284,7 +336,10 @@ impl BashRunner {
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).to_string())
         } else {
-            Err(anyhow::anyhow!("stat failed: {}", String::from_utf8_lossy(&output.stderr)))
+            Err(anyhow::anyhow!(
+                "stat failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ))
         }
     }
 

@@ -48,7 +48,7 @@
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Universal LLM request structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -141,12 +141,16 @@ impl ToolChoice {
             (Self::Auto, "anthropic") => json!({"type": "auto"}),
             (Self::None, "anthropic") => json!({"type": "none"}),
             (Self::Any, "anthropic") => json!({"type": "any"}),
-            (Self::Specific(choice), "anthropic") => json!({"type": "tool", "name": choice.function.name}),
+            (Self::Specific(choice), "anthropic") => {
+                json!({"type": "tool", "name": choice.function.name})
+            }
 
             (Self::Auto, "gemini") => json!({"mode": "auto"}),
             (Self::None, "gemini") => json!({"mode": "none"}),
             (Self::Any, "gemini") => json!({"mode": "any"}),
-            (Self::Specific(choice), "gemini") => json!({"mode": "any", "allowed_function_names": [choice.function.name]}),
+            (Self::Specific(choice), "gemini") => {
+                json!({"mode": "any", "allowed_function_names": [choice.function.name]})
+            }
 
             // Generic/LMStudio follows OpenAI format
             _ => match self {
@@ -154,7 +158,7 @@ impl ToolChoice {
                 Self::None => json!("none"),
                 Self::Any => json!("required"),
                 Self::Specific(choice) => json!(choice),
-            }
+            },
         }
     }
 }
@@ -230,7 +234,11 @@ impl Message {
 
     /// Create a tool response message with function name (for compatibility)
     /// Some providers might need the function name in addition to tool_call_id
-    pub fn tool_response_with_name(tool_call_id: String, _function_name: String, content: String) -> Self {
+    pub fn tool_response_with_name(
+        tool_call_id: String,
+        _function_name: String,
+        content: String,
+    ) -> Self {
         // We can store the function name in the content metadata or handle it provider-specifically
         Self::tool_response(tool_call_id, content)
     }
@@ -239,7 +247,8 @@ impl Message {
     /// Based on official API documentation constraints
     pub fn validate_for_provider(&self, provider: &str) -> Result<(), String> {
         // Check role-specific constraints
-        self.role.validate_for_provider(provider, self.tool_call_id.is_some())?;
+        self.role
+            .validate_for_provider(provider, self.tool_call_id.is_some())?;
 
         // Check tool call constraints
         if let Some(tool_calls) = &self.tool_calls {
@@ -261,12 +270,18 @@ impl Message {
         match provider {
             "openai" | "lmstudio" => {
                 if self.role == MessageRole::Tool && self.tool_call_id.is_none() {
-                    return Err(format!("{} requires tool_call_id for tool messages", provider));
+                    return Err(format!(
+                        "{} requires tool_call_id for tool messages",
+                        provider
+                    ));
                 }
             }
             "gemini" => {
                 if self.role == MessageRole::Tool && self.tool_call_id.is_none() {
-                    return Err("Gemini tool responses need tool_call_id for function name mapping".to_string());
+                    return Err(
+                        "Gemini tool responses need tool_call_id for function name mapping"
+                            .to_string(),
+                    );
                 }
                 // Gemini has additional constraints on content structure
                 if self.role == MessageRole::System && !self.content.is_empty() {
@@ -285,7 +300,9 @@ impl Message {
 
     /// Check if this message has tool calls
     pub fn has_tool_calls(&self) -> bool {
-        self.tool_calls.as_ref().map_or(false, |calls| !calls.is_empty())
+        self.tool_calls
+            .as_ref()
+            .map_or(false, |calls| !calls.is_empty())
     }
 
     /// Get the tool calls if present
@@ -373,7 +390,11 @@ impl MessageRole {
 
     /// Validate message role constraints for a given provider
     /// Based on official API documentation requirements
-    pub fn validate_for_provider(&self, provider: &str, has_tool_call_id: bool) -> Result<(), String> {
+    pub fn validate_for_provider(
+        &self,
+        provider: &str,
+        has_tool_call_id: bool,
+    ) -> Result<(), String> {
         match (self, provider) {
             (MessageRole::Tool, "openai") if !has_tool_call_id => {
                 Err("OpenAI tool messages must have tool_call_id".to_string())
@@ -384,7 +405,7 @@ impl MessageRole {
             (MessageRole::Tool, "gemini") if !has_tool_call_id => {
                 Err("Gemini tool messages need tool_call_id for function mapping".to_string())
             }
-            _ => Ok(())
+            _ => Ok(()),
         }
     }
 }
@@ -435,7 +456,10 @@ impl ToolDefinition {
     /// Validate that this tool definition is properly formed
     pub fn validate(&self) -> Result<(), String> {
         if self.tool_type != "function" {
-            return Err(format!("Only 'function' type is supported, got: {}", self.tool_type));
+            return Err(format!(
+                "Only 'function' type is supported, got: {}",
+                self.tool_type
+            ));
         }
 
         if self.function.name.is_empty() {
@@ -498,7 +522,10 @@ impl ToolCall {
     /// Validate that this tool call is properly formed
     pub fn validate(&self) -> Result<(), String> {
         if self.call_type != "function" {
-            return Err(format!("Only 'function' type is supported, got: {}", self.call_type));
+            return Err(format!(
+                "Only 'function' type is supported, got: {}",
+                self.call_type
+            ));
         }
 
         if self.id.is_empty() {

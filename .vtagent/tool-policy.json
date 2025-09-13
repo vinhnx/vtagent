@@ -1,19 +1,25 @@
 {
   "version": 1,
   "available_tools": [
-    "rp_search",
+    "grep_search",
     "list_files",
     "run_terminal_cmd",
     "read_file",
     "write_file",
-    "edit_file"
+    "edit_file",
+    "ck_semantic_search",
+    "bash",
+    "ast_grep_search"
   ],
   "policies": {
-    "list_files": "allow",
-    "rp_search": "allow",
+    "grep_search": "prompt",
+    "ast_grep_search": "prompt",
     "edit_file": "allow",
-    "run_terminal_cmd": "allow",
+    "bash": "prompt",
     "write_file": "allow",
-    "read_file": "allow"
+    "read_file": "allow",
+    "run_terminal_cmd": "allow",
+    "ck_semantic_search": "prompt",
+    "list_files": "allow"
   }
 }

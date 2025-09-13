@@ -53,29 +53,32 @@ impl CkTool {
 
     /// Execute semantic search operation
     async fn semantic_search(&self, args: Value) -> Result<Value> {
-        let query = args.get("query")
+        let query = args
+            .get("query")
             .and_then(|v| v.as_str())
             .context("'query' is required for semantic search")?;
 
-        let path = args.get("path")
-            .and_then(|v| v.as_str())
-            .unwrap_or(".");
+        let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
 
         let path = self.normalize_path(path)?;
 
-        let threshold = args.get("threshold")
+        let threshold = args
+            .get("threshold")
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0);
 
-        let top_k = args.get("top_k")
+        let top_k = args
+            .get("top_k")
             .and_then(|v| v.as_u64())
             .map(|v| v as usize);
 
-        let full_section = args.get("full_section")
+        let full_section = args
+            .get("full_section")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        let scores = args.get("scores")
+        let scores = args
+            .get("scores")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
@@ -104,7 +107,9 @@ impl CkTool {
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
 
-        let output = cmd.output().await
+        let output = cmd
+            .output()
+            .await
             .context("Failed to execute ck semantic search")?;
 
         if !output.status.success() {
@@ -134,25 +139,27 @@ impl CkTool {
 
     /// Execute hybrid search operation (semantic + keyword)
     async fn hybrid_search(&self, args: Value) -> Result<Value> {
-        let query = args.get("query")
+        let query = args
+            .get("query")
             .and_then(|v| v.as_str())
             .context("'query' is required for hybrid search")?;
 
-        let path = args.get("path")
-            .and_then(|v| v.as_str())
-            .unwrap_or(".");
+        let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
 
         let path = self.normalize_path(path)?;
 
-        let threshold = args.get("threshold")
+        let threshold = args
+            .get("threshold")
             .and_then(|v| v.as_f64())
             .unwrap_or(0.0);
 
-        let top_k = args.get("top_k")
+        let top_k = args
+            .get("top_k")
             .and_then(|v| v.as_u64())
             .map(|v| v as usize);
 
-        let scores = args.get("scores")
+        let scores = args
+            .get("scores")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
@@ -177,7 +184,9 @@ impl CkTool {
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
 
-        let output = cmd.output().await
+        let output = cmd
+            .output()
+            .await
             .context("Failed to execute ck hybrid search")?;
 
         if !output.status.success() {
@@ -206,25 +215,27 @@ impl CkTool {
 
     /// Execute regex search operation (traditional grep)
     async fn regex_search(&self, args: Value) -> Result<Value> {
-        let pattern = args.get("pattern")
+        let pattern = args
+            .get("pattern")
             .and_then(|v| v.as_str())
             .context("'pattern' is required for regex search")?;
 
-        let path = args.get("path")
-            .and_then(|v| v.as_str())
-            .unwrap_or(".");
+        let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
 
         let path = self.normalize_path(path)?;
 
-        let case_insensitive = args.get("case_insensitive")
+        let case_insensitive = args
+            .get("case_insensitive")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        let line_numbers = args.get("line_numbers")
+        let line_numbers = args
+            .get("line_numbers")
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
 
-        let context_lines = args.get("context_lines")
+        let context_lines = args
+            .get("context_lines")
             .and_then(|v| v.as_u64())
             .map(|v| v as usize);
 
@@ -248,7 +259,9 @@ impl CkTool {
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
 
-        let output = cmd.output().await
+        let output = cmd
+            .output()
+            .await
             .context("Failed to execute ck regex search")?;
 
         if !output.status.success() {
@@ -271,15 +284,19 @@ impl CkTool {
 
     /// Index the workspace for semantic search
     async fn index_workspace(&self, args: Value) -> Result<Value> {
-        let path = args.get("path")
-            .and_then(|v| v.as_str())
-            .unwrap_or(".");
+        let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
 
         let path = self.normalize_path(path)?;
 
-        let exclude_patterns: Vec<String> = args.get("exclude_patterns")
+        let exclude_patterns: Vec<String> = args
+            .get("exclude_patterns")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str()).map(|s| s.to_string()).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .collect()
+            })
             .unwrap_or_default();
 
         // Build ck index command
@@ -294,8 +311,7 @@ impl CkTool {
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
 
-        let output = cmd.output().await
-            .context("Failed to execute ck index")?;
+        let output = cmd.output().await.context("Failed to execute ck index")?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -314,9 +330,7 @@ impl CkTool {
 
     /// Check index status
     async fn index_status(&self, args: Value) -> Result<Value> {
-        let path = args.get("path")
-            .and_then(|v| v.as_str())
-            .unwrap_or(".");
+        let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
 
         let path = self.normalize_path(path)?;
 
@@ -326,8 +340,7 @@ impl CkTool {
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
 
-        let output = cmd.output().await
-            .context("Failed to execute ck status")?;
+        let output = cmd.output().await.context("Failed to execute ck status")?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -345,18 +358,18 @@ impl CkTool {
 
     /// Execute combined analysis operation (ck + ast-grep integration)
     async fn analyze_and_search(&self, args: Value) -> Result<Value> {
-        let query = args.get("query")
+        let query = args
+            .get("query")
             .and_then(|v| v.as_str())
             .context("'query' is required for analyze_and_search operation")?;
 
-        let path = args.get("path")
-            .and_then(|v| v.as_str())
-            .unwrap_or(".");
+        let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
 
         let path_normalized = self.normalize_path(path)?;
 
         let ast_grep_pattern = args.get("ast_grep_pattern").and_then(|v| v.as_str());
-        let max_results = args.get("max_results")
+        let max_results = args
+            .get("max_results")
             .and_then(|v| v.as_u64())
             .map(|v| v as usize)
             .unwrap_or(10);
@@ -370,7 +383,9 @@ impl CkTool {
         ck_cmd.stdout(Stdio::piped());
         ck_cmd.stderr(Stdio::piped());
 
-        let ck_output = ck_cmd.output().await
+        let ck_output = ck_cmd
+            .output()
+            .await
             .context("Failed to execute ck semantic search")?;
 
         if !ck_output.status.success() {
@@ -415,7 +430,11 @@ impl CkTool {
     }
 
     /// Analyze a specific file with ast-grep pattern
-    async fn analyze_file_with_ast_grep(&self, file_path: &str, pattern: &str) -> Result<Option<Value>> {
+    async fn analyze_file_with_ast_grep(
+        &self,
+        file_path: &str,
+        pattern: &str,
+    ) -> Result<Option<Value>> {
         // This would integrate with the ast-grep tool
         // For now, return a placeholder structure
         // In a full implementation, this would call the AstGrepTool
@@ -432,7 +451,8 @@ impl CkTool {
 #[async_trait]
 impl Tool for CkTool {
     async fn execute(&self, args: Value) -> Result<Value> {
-        let operation = args.get("operation")
+        let operation = args
+            .get("operation")
             .and_then(|v| v.as_str())
             .unwrap_or("semantic_search");
 
@@ -460,22 +480,30 @@ impl Tool for CkTool {
             match operation {
                 "semantic_search" => {
                     if args.get("query").is_none() {
-                        return Err(anyhow::anyhow!("'query' is required for semantic_search operation"));
+                        return Err(anyhow::anyhow!(
+                            "'query' is required for semantic_search operation"
+                        ));
                     }
                 }
                 "hybrid_search" => {
                     if args.get("query").is_none() {
-                        return Err(anyhow::anyhow!("'query' is required for hybrid_search operation"));
+                        return Err(anyhow::anyhow!(
+                            "'query' is required for hybrid_search operation"
+                        ));
                     }
                 }
                 "regex_search" => {
                     if args.get("pattern").is_none() {
-                        return Err(anyhow::anyhow!("'pattern' is required for regex_search operation"));
+                        return Err(anyhow::anyhow!(
+                            "'pattern' is required for regex_search operation"
+                        ));
                     }
                 }
                 "analyze_and_search" => {
                     if args.get("query").is_none() {
-                        return Err(anyhow::anyhow!("'query' is required for analyze_and_search operation"));
+                        return Err(anyhow::anyhow!(
+                            "'query' is required for analyze_and_search operation"
+                        ));
                     }
                     // ast_grep_pattern is optional for this operation
                 }

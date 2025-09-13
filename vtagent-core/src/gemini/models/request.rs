@@ -1,4 +1,4 @@
-use super::{Content, Tool, ToolConfig, SystemInstruction};
+use super::{Content, SystemInstruction, Tool, ToolConfig};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

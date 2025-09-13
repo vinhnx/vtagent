@@ -26,7 +26,7 @@ use cli::*;
 #[command(
     name = "vtcode",
     version,
-    about = "**Research-preview Rust coding agent** powered by Gemini with Anthropic-inspired architecture"
+    about = "minimal coding agent",
 )]
 pub struct Cli {
     /// Gemini model ID (e.g., gemini-2.5-flash-lite)
@@ -70,7 +70,7 @@ pub enum Commands {
     /// Create a new project
     CreateProject { name: String, features: Vec<String> },
     /// Initialize VTAgent configuration
-    Init { 
+    Init {
         #[arg(long)]
         force: bool,
         /// Run vtagent after initialization
@@ -78,9 +78,9 @@ pub enum Commands {
         run: bool,
     },
     /// Generate configuration file
-    Config { 
+    Config {
         #[arg(long)]
-        output: Option<PathBuf> 
+        output: Option<PathBuf>
     },
     /// Show performance metrics
     Performance,
@@ -116,7 +116,7 @@ async fn main() -> Result<()> {
 
     // Get API key using our new secure retrieval system
     let provider_name = model.provider_name(); // This would need to be implemented
-    
+
     let api_key = if !args.api_key_env.is_empty() && args.api_key_env != "GEMINI_API_KEY" {
         // Use explicit API key environment variable from command line
         std::env::var(&args.api_key_env)
@@ -156,14 +156,14 @@ async fn main() -> Result<()> {
             let prompt_text = prompt.join(" ");
             println!("{}", style("Ask mode").blue().bold());
             println!("Question: {}", prompt_text);
-            
+
             // Ask implementation
             // Create a simple LLM client and get a response
             let client = vtagent_core::llm::make_client(
-                config.api_key.clone(), 
+                config.api_key.clone(),
                 config.model.parse().unwrap_or_default()
             );
-            
+
             // For a minimal implementation, we'll just print a placeholder response
             // In a full implementation, this would actually call the LLM
             println!("Answer: This is a placeholder response. In a full implementation, this would call the LLM with your question.");
@@ -182,7 +182,7 @@ async fn main() -> Result<()> {
         }
         Commands::Performance => {
             println!("{}", style("Performance metrics mode selected").blue().bold());
-            
+
             // Performance metrics implementation
             // In a real implementation, this would collect and display actual performance metrics
             println!("Performance Metrics:");

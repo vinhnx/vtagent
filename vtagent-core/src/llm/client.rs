@@ -18,7 +18,10 @@ pub type AnyClient = Box<dyn LLMClient>;
 /// Create a client based on the model ID
 pub fn make_client(api_key: String, model: ModelId) -> AnyClient {
     match model.provider() {
-        Provider::Gemini => Box::new(GeminiProvider::with_model(api_key, model.as_str().to_string())),
+        Provider::Gemini => Box::new(GeminiProvider::with_model(
+            api_key,
+            model.as_str().to_string(),
+        )),
         Provider::OpenAI => Box::new(OpenAIProvider::new(api_key)),
         Provider::Anthropic => Box::new(AnthropicProvider::new(api_key)),
         Provider::LMStudio => Box::new(LMStudioProvider::new(

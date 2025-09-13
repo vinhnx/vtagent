@@ -1,21 +1,21 @@
 //! Tool registry and function declarations
 
+use super::bash_tool::BashTool;
 use super::cache::FILE_CACHE;
+use super::ck_tool::CkTool;
 use super::command::CommandTool;
 use super::file_ops::FileOpsTool;
 use super::search::SearchTool;
 use super::simple_search::SimpleSearchTool;
-use super::bash_tool::BashTool;
-use super::ck_tool::CkTool;
 use super::traits::Tool;
-use crate::config::types::CapabilityLevel;
-use crate::config::constants::tools;
 use crate::config::PtyConfig;
+use crate::config::constants::tools;
+use crate::config::types::CapabilityLevel;
 use crate::gemini::FunctionDeclaration;
 use crate::tool_policy::{ToolPolicy, ToolPolicyManager};
 use crate::tools::ast_grep::AstGrepEngine;
 use crate::tools::grep_search::GrepSearchManager;
-use anyhow::{Result, anyhow, Context};
+use anyhow::{Context, Result, anyhow};
 use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -65,11 +65,12 @@ impl ToolRegistry {
         };
 
         // Initialize policy manager and update available tools
-        let mut policy_manager = ToolPolicyManager::new_with_workspace(&workspace_root).unwrap_or_else(|e| {
-            eprintln!("Warning: Failed to initialize tool policy manager: {}", e);
-            // Create a fallback that allows all tools
-            ToolPolicyManager::new().unwrap()
-        });
+        let mut policy_manager = ToolPolicyManager::new_with_workspace(&workspace_root)
+            .unwrap_or_else(|e| {
+                eprintln!("Warning: Failed to initialize tool policy manager: {}", e);
+                // Create a fallback that allows all tools
+                ToolPolicyManager::new().unwrap()
+            });
 
         // Update available tools in policy manager
         let mut available_tools = vec![
@@ -186,7 +187,11 @@ impl ToolRegistry {
     /// Check if a tool exists
     pub fn has_tool(&self, name: &str) -> bool {
         match name {
-            tools::GREP_SEARCH | tools::LIST_FILES | tools::RUN_TERMINAL_CMD | tools::READ_FILE | tools::WRITE_FILE => true,
+            tools::GREP_SEARCH
+            | tools::LIST_FILES
+            | tools::RUN_TERMINAL_CMD
+            | tools::READ_FILE
+            | tools::WRITE_FILE => true,
             tools::AST_GREP_SEARCH => self.ast_grep_engine.is_some(),
             tools::CK_SEMANTIC_SEARCH => true,
             tools::SIMPLE_SEARCH | tools::BASH => true,
@@ -273,7 +278,8 @@ impl ToolRegistry {
         });
 
         let read_result = self.file_ops_tool.read_file(read_args).await?;
-        let current_content = read_result["content"].as_str()
+        let current_content = read_result["content"]
+            .as_str()
             .ok_or_else(|| anyhow!("Failed to read file content"))?;
 
         // Try multiple matching strategies for better compatibility
@@ -306,12 +312,8 @@ impl ToolRegistry {
                         let after = content_lines[i + old_lines.len()..].join("\n");
                         let replacement_lines: Vec<&str> = input.new_str.lines().collect();
 
-                        new_content = format!(
-                            "{}\n{}\n{}",
-                            before,
-                            replacement_lines.join("\n"),
-                            after
-                        );
+                        new_content =
+                            format!("{}\n{}\n{}", before, replacement_lines.join("\n"), after);
                         replacement_occurred = true;
                         break;
                     }
@@ -322,7 +324,11 @@ impl ToolRegistry {
         // If no replacement occurred, provide detailed error
         if !replacement_occurred {
             let content_preview = if current_content.len() > 500 {
-                format!("{}...{}", &current_content[..250], &current_content[current_content.len().saturating_sub(250)..])
+                format!(
+                    "{}...{}",
+                    &current_content[..250],
+                    &current_content[current_content.len().saturating_sub(250)..]
+                )
             } else {
                 current_content.to_string()
             };
@@ -397,54 +403,86 @@ impl ToolRegistry {
 
     /// Execute AST-grep tool
     async fn execute_ast_grep(&self, args: Value) -> Result<Value> {
-        let engine = self.ast_grep_engine.as_ref()
+        let engine = self
+            .ast_grep_engine
+            .as_ref()
             .ok_or_else(|| anyhow!("AST-grep engine not available"))?;
 
-        let operation = args.get("operation")
+        let operation = args
+            .get("operation")
             .and_then(|v| v.as_str())
             .unwrap_or("search");
 
         match operation {
             "search" => {
-                let pattern = args.get("pattern")
+                let pattern = args
+                    .get("pattern")
                     .and_then(|v| v.as_str())
                     .context("'pattern' is required")?;
 
-                let path = args.get("path")
+                let path = args
+                    .get("path")
                     .and_then(|v| v.as_str())
                     .context("'path' is required")?;
 
                 let path = self.normalize_path(path)?;
 
                 let language = args.get("language").and_then(|v| v.as_str());
-                let context_lines = args.get("context_lines").and_then(|v| v.as_u64()).map(|v| v as usize);
-                let max_results = args.get("max_results").and_then(|v| v.as_u64()).map(|v| v as usize);
+                let context_lines = args
+                    .get("context_lines")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
+                let max_results = args
+                    .get("max_results")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
 
-                engine.search(pattern, &path, language, context_lines, max_results).await
+                engine
+                    .search(pattern, &path, language, context_lines, max_results)
+                    .await
             }
             "transform" => {
-                let pattern = args.get("pattern")
+                let pattern = args
+                    .get("pattern")
                     .and_then(|v| v.as_str())
                     .context("'pattern' is required")?;
 
-                let replacement = args.get("replacement")
+                let replacement = args
+                    .get("replacement")
                     .and_then(|v| v.as_str())
                     .context("'replacement' is required")?;
 
-                let path = args.get("path")
+                let path = args
+                    .get("path")
                     .and_then(|v| v.as_str())
                     .context("'path' is required")?;
 
                 let path = self.normalize_path(path)?;
 
                 let language = args.get("language").and_then(|v| v.as_str());
-                let preview_only = args.get("preview_only").and_then(|v| v.as_bool()).unwrap_or(true);
-                let update_all = args.get("update_all").and_then(|v| v.as_bool()).unwrap_or(false);
+                let preview_only = args
+                    .get("preview_only")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true);
+                let update_all = args
+                    .get("update_all")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
 
-                engine.transform(pattern, replacement, &path, language, preview_only, update_all).await
+                engine
+                    .transform(
+                        pattern,
+                        replacement,
+                        &path,
+                        language,
+                        preview_only,
+                        update_all,
+                    )
+                    .await
             }
             "lint" => {
-                let path = args.get("path")
+                let path = args
+                    .get("path")
                     .and_then(|v| v.as_str())
                     .context("'path' is required")?;
 
@@ -456,25 +494,29 @@ impl ToolRegistry {
                 engine.lint(&path, language, severity_filter, None).await
             }
             "refactor" => {
-                let path = args.get("path")
+                let path = args
+                    .get("path")
                     .and_then(|v| v.as_str())
                     .context("'path' is required")?;
 
                 let path = self.normalize_path(path)?;
 
                 let language = args.get("language").and_then(|v| v.as_str());
-                let refactor_type = args.get("refactor_type")
+                let refactor_type = args
+                    .get("refactor_type")
                     .and_then(|v| v.as_str())
                     .context("'refactor_type' is required")?;
 
                 engine.refactor(&path, language, refactor_type).await
             }
             "custom" => {
-                let pattern = args.get("pattern")
+                let pattern = args
+                    .get("pattern")
                     .and_then(|v| v.as_str())
                     .context("'pattern' is required")?;
 
-                let path = args.get("path")
+                let path = args
+                    .get("path")
                     .and_then(|v| v.as_str())
                     .context("'path' is required")?;
 
@@ -482,21 +524,35 @@ impl ToolRegistry {
 
                 let language = args.get("language").and_then(|v| v.as_str());
                 let rewrite = args.get("rewrite").and_then(|v| v.as_str());
-                let context_lines = args.get("context_lines").and_then(|v| v.as_u64()).map(|v| v as usize);
-                let max_results = args.get("max_results").and_then(|v| v.as_u64()).map(|v| v as usize);
-                let interactive = args.get("interactive").and_then(|v| v.as_bool()).unwrap_or(false);
-                let update_all = args.get("update_all").and_then(|v| v.as_bool()).unwrap_or(false);
+                let context_lines = args
+                    .get("context_lines")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
+                let max_results = args
+                    .get("max_results")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
+                let interactive = args
+                    .get("interactive")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                let update_all = args
+                    .get("update_all")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
 
-                engine.run_custom(
-                    pattern,
-                    &path,
-                    language,
-                    rewrite,
-                    context_lines,
-                    max_results,
-                    interactive,
-                    update_all,
-                ).await
+                engine
+                    .run_custom(
+                        pattern,
+                        &path,
+                        language,
+                        rewrite,
+                        context_lines,
+                        max_results,
+                        interactive,
+                        update_all,
+                    )
+                    .await
             }
             _ => Err(anyhow!("Unknown AST-grep operation: {}", operation)),
         }
@@ -789,30 +845,34 @@ pub fn build_function_declarations_for_level(level: CapabilityLevel) -> Vec<Func
             .collect(),
         CapabilityLevel::Bash => all_declarations
             .into_iter()
-            .filter(|fd| fd.name == tools::LIST_FILES || fd.name == tools::RUN_TERMINAL_CMD || fd.name == tools::READ_FILE)
+            .filter(|fd| {
+                fd.name == tools::LIST_FILES
+                    || fd.name == tools::RUN_TERMINAL_CMD
+                    || fd.name == tools::READ_FILE
+            })
             .collect(),
         CapabilityLevel::Editing => all_declarations
             .into_iter()
             .filter(|fd| {
                 fd.name == tools::LIST_FILES
-                || fd.name == tools::READ_FILE
-                || fd.name == tools::WRITE_FILE
-                || fd.name == tools::EDIT_FILE
-                || fd.name == tools::RUN_TERMINAL_CMD
+                    || fd.name == tools::READ_FILE
+                    || fd.name == tools::WRITE_FILE
+                    || fd.name == tools::EDIT_FILE
+                    || fd.name == tools::RUN_TERMINAL_CMD
             })
             .collect(),
         CapabilityLevel::CodeSearch => all_declarations
             .into_iter()
             .filter(|fd| {
                 fd.name == tools::LIST_FILES
-                || fd.name == tools::RUN_TERMINAL_CMD
-                || fd.name == tools::GREP_SEARCH
-                || fd.name == tools::READ_FILE
-                || fd.name == tools::WRITE_FILE
-                || fd.name == tools::EDIT_FILE
-                || fd.name == tools::AST_GREP_SEARCH
-                || fd.name == tools::SIMPLE_SEARCH
-                || fd.name == tools::BASH
+                    || fd.name == tools::RUN_TERMINAL_CMD
+                    || fd.name == tools::GREP_SEARCH
+                    || fd.name == tools::READ_FILE
+                    || fd.name == tools::WRITE_FILE
+                    || fd.name == tools::EDIT_FILE
+                    || fd.name == tools::AST_GREP_SEARCH
+                    || fd.name == tools::SIMPLE_SEARCH
+                    || fd.name == tools::BASH
             })
             .collect(),
     }

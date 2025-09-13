@@ -3,10 +3,10 @@
 //! This module provides the main integration point for the multi-agent system,
 //! orchestrating all components including verification workflows and performance optimization.
 
+use crate::config::ContextStoreDefaults;
 use crate::config::constants::models;
 use crate::config::models::ModelId;
 use crate::config::multi_agent::MultiAgentSystemConfig;
-use crate::config::ContextStoreDefaults;
 use crate::core::agent::multi_agent::*;
 use crate::core::agent::optimization::{PerformanceConfig, PerformanceMonitor};
 use crate::core::agent::orchestrator::OrchestratorAgent;
@@ -523,7 +523,9 @@ impl MultiAgentSystem {
 
 /// Convert MultiAgentSystemConfig to MultiAgentConfig
 fn convert_to_multi_agent_config(system_config: &MultiAgentSystemConfig) -> MultiAgentConfig {
-    use crate::core::agent::multi_agent::{ExecutionMode, VerificationStrategy, DelegationStrategy};
+    use crate::core::agent::multi_agent::{
+        DelegationStrategy, ExecutionMode, VerificationStrategy,
+    };
 
     let execution_mode = match system_config.execution_mode {
         crate::config::multi_agent::ExecutionMode::Single => ExecutionMode::Single,
@@ -533,14 +535,22 @@ fn convert_to_multi_agent_config(system_config: &MultiAgentSystemConfig) -> Mult
 
     let verification_strategy = match system_config.verification_strategy {
         crate::config::multi_agent::VerificationStrategy::Always => VerificationStrategy::Always,
-        crate::config::multi_agent::VerificationStrategy::OnLowConfidence => VerificationStrategy::ComplexOnly,
+        crate::config::multi_agent::VerificationStrategy::OnLowConfidence => {
+            VerificationStrategy::ComplexOnly
+        }
         crate::config::multi_agent::VerificationStrategy::Never => VerificationStrategy::Never,
     };
 
     let delegation_strategy = match system_config.delegation_strategy {
-        crate::config::multi_agent::DelegationStrategy::ByCapability => DelegationStrategy::Adaptive,
-        crate::config::multi_agent::DelegationStrategy::RoundRobin => DelegationStrategy::Conservative,
-        crate::config::multi_agent::DelegationStrategy::BySpecialization => DelegationStrategy::Aggressive,
+        crate::config::multi_agent::DelegationStrategy::ByCapability => {
+            DelegationStrategy::Adaptive
+        }
+        crate::config::multi_agent::DelegationStrategy::RoundRobin => {
+            DelegationStrategy::Conservative
+        }
+        crate::config::multi_agent::DelegationStrategy::BySpecialization => {
+            DelegationStrategy::Aggressive
+        }
     };
 
     MultiAgentConfig {

@@ -66,10 +66,16 @@ terminal_size = "0.4.3"
 is-terminal = "0.4.16"
 async-trait = "0.1.89"
 
+[profile.dev]
+split-debuginfo = "unpacked"
+
 [profile.release]
 codegen-units = 1
 opt-level = 3
 lto = true
+debug = false
+strip = true
+panic = "abort"
 
 [[bin]]
 name = "vtagent"
@@ -79,6 +85,3 @@ path = "src/main.rs"
 criterion = "0.5"
 tempfile = "3.0"
 rexpect = "0.6.2"
-
-[profile.dev]
-split-debuginfo = "unpacked"

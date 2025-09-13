@@ -1,8 +1,8 @@
 //! Tests for AST-grep tool integration
 
+use serde_json::json;
 use std::path::PathBuf;
 use vtagent_core::tools::registry::ToolRegistry;
-use serde_json::json;
 
 #[cfg(test)]
 mod tests {
@@ -30,13 +30,17 @@ mod tests {
 
         // Create a simple test file
         let test_file = temp_dir.path().join("test.rs");
-        std::fs::write(&test_file, r#"
+        std::fs::write(
+            &test_file,
+            r#"
 fn main() {
     println!("Hello, world!");
     let x = 42;
     println!("{}", x);
 }
-"#).unwrap();
+"#,
+        )
+        .unwrap();
 
         // Test AST-grep search if available
         if registry.has_tool("ast_grep_search") {
@@ -53,7 +57,10 @@ fn main() {
                     assert!(response["success"].as_bool().unwrap_or(false));
                 }
                 Err(e) => {
-                    println!("AST-grep search failed (expected if ast-grep not installed): {}", e);
+                    println!(
+                        "AST-grep search failed (expected if ast-grep not installed): {}",
+                        e
+                    );
                 }
             }
         } else {

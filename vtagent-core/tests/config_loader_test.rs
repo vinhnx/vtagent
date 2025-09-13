@@ -12,7 +12,7 @@ fn test_load_config_from_home_directory() {
     let home_dir = temp_dir.path();
     let vtagent_dir = home_dir.join(".vtagent");
     fs::create_dir_all(&vtagent_dir).expect("Failed to create .vtagent directory");
-    
+
     // Create a sample config file in the home directory
     let config_content = r#"
 [agent]
@@ -23,27 +23,28 @@ max_conversation_turns = 50
 [security]
 human_in_the_loop = false
 "#;
-    
+
     let config_path = vtagent_dir.join("vtagent.toml");
     fs::write(&config_path, config_content).expect("Failed to write config file");
-    
+
     // Create a mock workspace directory
     let workspace_dir = temp_dir.path().join("workspace");
     fs::create_dir_all(&workspace_dir).expect("Failed to create workspace directory");
-    
+
     // Test that we can load the config from home directory
     // We need to mock the home directory detection for this test
     // Since we can't easily mock environment variables in a test,
     // we'll directly test the bootstrap function with our temp directory
     let created_files = VTAgentConfig::bootstrap_project_with_options(
         &workspace_dir,
-        true,  // force
-        true   // use home directory
-    ).expect("Failed to bootstrap project with home directory");
-    
+        true, // force
+        true, // use home directory
+    )
+    .expect("Failed to bootstrap project with home directory");
+
     assert!(!created_files.is_empty());
     assert!(created_files.contains(&"vtagent.toml".to_string()));
-    
+
     // Check that the files were created in the home directory
     let home_config_path = vtagent_dir.join("vtagent.toml");
     let home_gitignore_path = vtagent_dir.join(".vtagentgitignore");

@@ -32,7 +32,7 @@ impl Content {
         Content {
             role: "user".into(), // Convert system to user to avoid API error
             parts: vec![Part::Text {
-                text: format!("System: {}", text.into())
+                text: format!("System: {}", text.into()),
             }],
         }
     }

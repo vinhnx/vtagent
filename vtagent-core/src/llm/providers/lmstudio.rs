@@ -1,8 +1,8 @@
 use crate::config::constants::{model_helpers, models, urls};
 use crate::llm::client::LLMClient;
 use crate::llm::provider::{
-    FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
-    FunctionCall,
+    FinishReason, FunctionCall, LLMError, LLMProvider, LLMRequest, LLMResponse, Message,
+    MessageRole, ToolCall,
 };
 use crate::llm::types as llm_types;
 use async_trait::async_trait;
@@ -308,7 +308,9 @@ impl LLMClient for LMStudioProvider {
                             let role = match content.role.as_str() {
                                 crate::config::constants::message_roles::USER => MessageRole::User,
                                 "model" => MessageRole::Assistant,
-                                crate::config::constants::message_roles::SYSTEM => MessageRole::System,
+                                crate::config::constants::message_roles::SYSTEM => {
+                                    MessageRole::System
+                                }
                                 _ => MessageRole::User,
                             };
 

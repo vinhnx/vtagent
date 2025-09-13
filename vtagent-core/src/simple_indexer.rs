@@ -93,7 +93,8 @@ impl SimpleIndexer {
             tags: vec![],
         };
 
-        self.index_cache.insert(file_path.to_string_lossy().to_string(), index.clone());
+        self.index_cache
+            .insert(file_path.to_string_lossy().to_string(), index.clone());
 
         // Save to markdown file
         self.save_index_to_markdown(&index)?;
@@ -170,7 +171,12 @@ impl SimpleIndexer {
     }
 
     /// Get file content with line numbers
-    pub fn get_file_content(&self, file_path: &str, start_line: Option<usize>, end_line: Option<usize>) -> Result<String> {
+    pub fn get_file_content(
+        &self,
+        file_path: &str,
+        start_line: Option<usize>,
+        end_line: Option<usize>,
+    ) -> Result<String> {
         let content = fs::read_to_string(file_path)?;
         let lines: Vec<&str> = content.lines().collect();
 
@@ -257,7 +263,10 @@ impl SimpleIndexer {
                 // Skip common directories
                 if let Some(name) = path.file_name() {
                     let name_str = name.to_string_lossy();
-                    if name_str.starts_with('.') || name_str == "target" || name_str == "node_modules" {
+                    if name_str.starts_with('.')
+                        || name_str == "target"
+                        || name_str == "node_modules"
+                    {
                         continue;
                     }
                 }

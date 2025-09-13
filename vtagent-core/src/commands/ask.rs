@@ -2,8 +2,8 @@
 
 use crate::config::models::ModelId;
 use crate::config::types::AgentConfig;
-use crate::gemini::{Content, GenerateContentRequest};
 use crate::gemini::models::SystemInstruction;
+use crate::gemini::{Content, GenerateContentRequest};
 use crate::llm::make_client;
 use crate::prompts::{generate_lightweight_instruction, read_system_prompt_from_md};
 use anyhow::Result;
@@ -31,13 +31,13 @@ pub async fn handle_ask_command(config: AgentConfig, prompt: Vec<String>) -> Res
         } else {
             SystemInstruction::new(
                 &read_system_prompt_from_md()
-                    .unwrap_or_else(|_| "You are a helpful coding assistant.".to_string())
+                    .unwrap_or_else(|_| "You are a helpful coding assistant.".to_string()),
             )
         }
     } else {
         SystemInstruction::new(
             &read_system_prompt_from_md()
-                .unwrap_or_else(|_| "You are a helpful coding assistant.".to_string())
+                .unwrap_or_else(|_| "You are a helpful coding assistant.".to_string()),
         )
     };
 

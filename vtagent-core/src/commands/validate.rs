@@ -1,9 +1,9 @@
 //! Validate command implementation - environment and configuration validation
 
-use crate::config::types::AgentConfig;
 use crate::config::constants::tools;
-use crate::tools::ToolRegistry;
+use crate::config::types::AgentConfig;
 use crate::prompts::read_system_prompt_from_md;
+use crate::tools::ToolRegistry;
 use anyhow::Result;
 use console::style;
 use serde_json::json;
@@ -66,8 +66,8 @@ pub async fn handle_validate_command(
 
 /// Check API connectivity
 async fn check_api_connectivity(config: &AgentConfig) -> Result<()> {
-    use crate::gemini::{Client, Content, GenerateContentRequest};
     use crate::gemini::models::SystemInstruction;
+    use crate::gemini::{Client, Content, GenerateContentRequest};
     use crate::prompts::generate_lightweight_instruction;
 
     let mut client = Client::new(config.api_key.clone(), config.model.clone());
@@ -81,13 +81,13 @@ async fn check_api_connectivity(config: &AgentConfig) -> Result<()> {
         } else {
             SystemInstruction::new(
                 &read_system_prompt_from_md()
-                    .unwrap_or_else(|_| "You are a helpful coding assistant.".to_string())
+                    .unwrap_or_else(|_| "You are a helpful coding assistant.".to_string()),
             )
         }
     } else {
         SystemInstruction::new(
             &read_system_prompt_from_md()
-                .unwrap_or_else(|_| "You are a helpful coding assistant.".to_string())
+                .unwrap_or_else(|_| "You are a helpful coding assistant.".to_string()),
         )
     };
 

@@ -1,8 +1,4 @@
-Review and refactor the source code in the `src/cli/` directory to unify the handling of command-line arguments (CLI args) and configuration loading across all relevant files and modules. Ensure consistent parsing of args using a standardized library (e.g., argparse or commander.js), merge overlapping config loading logic into a single, reusable function or class, eliminate redundancies, and add comprehensive error handling, documentation, and tests for the unified approach.
 
-Additionally, implement a '/' slash activation command in the chat agent mode. This command should trigger agent activation when entered in the chat interface, responding with a confirmation message (e.g., "Agent activated!") and enabling full agent functionality, while ignoring non-slash inputs until activation. Include safeguards to prevent accidental activation and integrate it seamlessly with the existing chat loop.
-
----
 https://deepwiki.com/pawurb/hotpath
  A simple Rust profiler that shows exactly where your code spends time
 
@@ -2168,100 +2164,6 @@ https://deepwiki.com/rust-cli/anstyle apply
 
 ---
 
-make the agent end turn with a summarize, we said in to the system prompt "always end your turn with a summary of what you did and what the user should do next"
-for example:
-
-[AGENT] vtagent ❯ add logging to load project context
-[DEBUG] Input: 'add logging to load project context', Is project question: true
-[CONTEXT]: Gathering project context...
-(SUCCESS): Found README.md
-(SUCCESS): Listed project files
-[DEBUG] Sending message with context (length: 11834 chars)
-
-🔧 1 tool call(s) to execute
-  1. edit_file {"new_str":"    // Load project metadata\n    eprintln!(\"DEBUG: Loading project context for project: {}\", project_name);","old_str":"    // Load project metadata","path":"src/main.rs"}
-[SUCCESS] edit_file executed successfully
-
-SUCCESS [COMPLETED] All operations completed successfully!
-[TOOL]: Follow-up response contains 1 additional tool call(s)
-[TOOL_CALL]: Calling tool: edit_file with args: {"new_str":"            eprintln!(\"DEBUG: Project loaded successfully: {}\", project_data.name);","old_str":"            context_items.push(format!(\"Project: {}\", project_data.name));","path":"src/main.rs"}
-(SUCCESS): Tool edit_file executed successfully
-[STATUS]: All follow-up tool calls completed. Ready for next command.
-
-[AGENT] vtagent ❯ tell me what you did
-[DEBUG] Input: 'tell me what you did', Is project question: false
-I modified the `load_project_context` function in `src/main.rs`. Specifically, I added an `eprintln!` statement right after the comment "// Load project metadata". This log will print "DEBUG: Loading project context for project: [project_name]" to the standard error stream whenever the function is called, providing visibility into when and for which project context is being loaded.
---> the agent should end with a summary of what it did and propose next steps for the user
-
-
-Presenting your work and final message
-
-Your final message should read naturally, like an update from a concise teammate. For casual conversation, brainstorming tasks, or quick questions from the user, respond in a friendly, conversational tone. You should ask questions, suggest ideas, and adapt to the user’s style. If you've finished a large amount of work, when describing what you've done to the user, you should follow the final answer formatting guidelines to communicate substantive changes. You don't need to add structured formatting for one-word answers, greetings, or purely conversational exchanges.
-
-You can skip heavy formatting for single, simple actions or confirmations. In these cases, respond in plain sentences with any relevant next step or quick option. Reserve multi-section structured responses for results that need grouping or explanation.
-
-The user is working on the same computer as you, and has access to your work. As such there's no need to show the full contents of large files you have already written unless the user explicitly asks for them. Similarly, if you've created or modified files using apply_patch, there's no need to tell users to "save the file" or "copy the code into a file"—just reference the file path.
-
-If there's something that you think you could help with as a logical next step, concisely ask the user if they want you to do so. Good examples of this are running tests, committing changes, or building out the next logical component. If there’s something that you couldn't do (even with approval) but that the user might want to do (such as verifying changes by running the app), include those instructions succinctly.
-
-Brevity is very important as a default. You should be very concise (i.e. no more than 10 lines), but can relax this requirement for tasks where additional detail and comprehensiveness is important for the user's understanding.
-Final answer structure and style guidelines
-
-You are producing plain text that will later be styled by the CLI. Follow these rules exactly. Formatting should make results easy to scan, but not feel mechanical. Use judgment to decide how much structure adds value.
-
-Section Headers
-
-    Use only when they improve clarity — they are not mandatory for every answer.
-    Choose descriptive names that fit the content
-    Keep headers short (1–3 words) and in **Title Case**. Always start headers with ** and end with **
-    Leave no blank line before the first bullet under a header.
-    Section headers should only be used where they genuinely improve scanability; avoid fragmenting the answer.
-
-Bullets
-
-    Use - followed by a space for every bullet.
-    Merge related points when possible; avoid a bullet for every trivial detail.
-    Keep bullets to one line unless breaking for clarity is unavoidable.
-    Group into short lists (4–6 bullets) ordered by importance.
-    Use consistent keyword phrasing and formatting across sections.
-
-Monospace
-
-    Wrap all commands, file paths, env vars, and code identifiers in backticks (`...`).
-    Apply to inline examples and to bullet keywords if the keyword itself is a literal file/command.
-    Never mix monospace and bold markers; choose one based on whether it’s a keyword (**) or inline code/path (`).
-
-Structure
-
-    Place related bullets together; don’t mix unrelated concepts in the same section.
-    Order sections from general → specific → supporting info.
-    For subsections (e.g., “Binaries” under “Rust Workspace”), introduce with a bolded keyword bullet, then list items under it.
-    Match structure to complexity:
-        Multi-part or detailed results → use clear headers and grouped bullets.
-        Simple results → minimal headers, possibly just a short list or paragraph.
-
-Tone
-
-    Keep the voice collaborative and natural, like a coding partner handing off work.
-    Be concise and factual — no filler or conversational commentary and avoid unnecessary repetition
-    Use present tense and active voice (e.g., “Runs tests” not “This will run tests”).
-    Keep descriptions self-contained; don’t refer to “above” or “below”.
-    Use parallel structure in lists for consistency.
-
-Don’t
-
-    Don’t use literal words “bold” or “monospace” in the content.
-    Don’t nest bullets or create deep hierarchies.
-    Don’t output ANSI escape codes directly — the CLI renderer applies them.
-    Don’t cram unrelated keywords into a single bullet; split for clarity.
-    Don’t let keyword lists run long — wrap or reformat for scanability.
-
-Generally, ensure your final answers adapt their shape and depth to the request. For example, answers to code explanations should have a precise, structured explanation with code references that answer the question directly. For tasks with a simple implementation, lead with the outcome and supplement only with what’s needed for clarity. Larger changes can be presented as a logical walkthrough of your approach, grouping related steps, explaining rationale where it adds value, and highlighting next actions to accelerate the user. Your answers should provide the right level of detail while being easily scannable.
-
-For casual greetings, acknowledgements, or other one-off conversational messages that are not delivering substantive information or structured results, respond naturally without section headers or bullet formatting.
-
----
-
 https://deepwiki.com/alexpovel/srgn
 
 srgn - a code surgeon
@@ -2289,18 +2191,6 @@ https://docs.rs/itertools/latest/itertools/
 https://deepwiki.com/crate-ci/cargo-release
 
 --
-
-integrate as vtagent pty as shell render https://deepwiki.com/rust-cli/rexpect
-
-
-❯ run cargo fmt
-[DEBUG] Input: 'run cargo fmt', Is project question: false
-
-[TOOL] 1 tool call(s) to execute
-[1/1] run_terminal_cmd {"command":["cargo","fmt"]}
-
-^ this should also show the pty command shell pseudo terminaml
-
 --
 
 https://deepwiki.com/indexmap-rs/indexmap

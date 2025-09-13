@@ -109,9 +109,13 @@ fn load_system_prompt(_config: &VTAgentConfig) -> Result<String> {
     // Try multiple possible paths for the system prompt file
     let possible_paths = [
         "prompts/system.md",                  // From project root
-        "../prompts/system.md",               // From src/ or vtagent-core/
+        "../prompts/system.md",               // From src/ or lib/
         "../../prompts/system.md",            // From deeper subdirectories
-        "vtagent-core/src/prompts/system.md", // Direct path
+        "src/prompts/system.md",              // Common src directory
+        "lib/prompts/system.md",              // Common lib directory
+        "app/prompts/system.md",              // Common app directory
+        "config/prompts/system.md",           // Config directory
+        "etc/prompts/system.md",              // etc directory
     ];
 
     for path in &possible_paths {
@@ -262,6 +266,85 @@ async fn handle_config_command(
         println!("Config written to: {}", output_path.display());
     }
 
+    Ok(())
+}
+
+/// Check if a tool result is from a PTY-enabled tool
+fn is_pty_tool_result(result: &serde_json::Value) -> bool {
+    result.get("pty_enabled").and_then(|v| v.as_bool()).unwrap_or(false) ||
+    result.get("shell_rendered").and_then(|v| v.as_bool()).unwrap_or(false) ||
+    result.get("streaming_enabled").and_then(|v| v.as_bool()).unwrap_or(false)
+}
+
+/// Render PTY output with proper formatting
+fn render_pty_output(result: &serde_json::Value, tool_name: &str, arguments: &str) -> Result<()> {
+    use console::style;
+    use std::io::Write;
+    
+    // Extract output content
+    let output = result.get("stdout").and_then(|v| v.as_str())
+        .or_else(|| result.get("output").and_then(|v| v.as_str()))
+        .unwrap_or("");
+    
+    if output.is_empty() {
+        return Ok(());
+    }
+    
+    // Extract command for display
+    let command_str = result.get("command").and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .or_else(|| {
+            // Try to parse command from arguments if not in result
+            if let Ok(args_val) = serde_json::from_str::<serde_json::Value>(arguments) {
+                args_val.get("command").and_then(|cmd| {
+                    if cmd.is_array() {
+                        Some(cmd.as_array().unwrap().iter()
+                            .filter_map(|v| v.as_str())
+                            .collect::<Vec<_>>()
+                            .join(" "))
+                    } else {
+                        cmd.as_str().map(|s| s.to_string())
+                    }
+                })
+            } else {
+                None
+            }
+        });
+    
+    // Determine title based on tool type
+    let title = if tool_name == "run_terminal_cmd" {
+        if result.get("mode").and_then(|v| v.as_str()).unwrap_or("") == "streaming" {
+            "PTY Streaming Output"
+        } else {
+            "PTY Command Output"
+        }
+    } else {
+        "PTY Tool Output"
+    };
+    
+    // Print top border
+    println!("{}", style("=".repeat(80)).dim());
+    
+    // Print title
+    println!("{} {}", style("==").blue().bold(), style(title).blue().bold());
+    
+    // Print command if available
+    if let Some(cmd) = &command_str {
+        println!("{}", style(format!("> {}", cmd)).dim());
+    }
+    
+    // Print separator
+    println!("{}", style("-".repeat(80)).dim());
+    
+    // Print the output
+    print!("{}", output);
+    std::io::stdout().flush()?;
+    
+    // Print bottom border
+    println!("{}", style("-".repeat(80)).dim());
+    println!("{}", style("==").blue().bold());
+    println!("{}", style("=".repeat(80)).dim());
+    
     Ok(())
 }
 
@@ -846,10 +929,10 @@ async fn handle_single_agent_chat(
                             Err(e) => {
                                 tool_spinner.finish_and_clear();
                                 progress.inc(1);
-                                
+
                                 // Check if this is a policy denial
                                 let error_msg = if e.to_string().contains("execution denied by policy") {
-                                    println!("{} Tool '{}' was denied by policy. You can change this with :policy commands.", 
+                                    println!("{} Tool '{}' was denied by policy. You can change this with :policy commands.",
                                         style("[DENIED]").yellow().bold(), tool_name);
                                     format!("Tool '{}' execution was denied by policy. You can change this with :policy commands.", tool_name)
                                 } else {
@@ -985,11 +1068,19 @@ async fn handle_single_agent_chat(
                                         .await
                                     {
                                         Ok(result) => {
+                                            // Check if this is a PTY tool result and render it appropriately
+                                            if is_pty_tool_result(&result) {
+                                                // Render PTY output with proper formatting
+                                                if let Err(e) = render_pty_output(&result, &tool_call.function.name, &tool_call.function.arguments) {
+                                                    eprintln!("{} Failed to render PTY output: {}", 
+                                                        style("[ERROR]").red().bold(), e);
+                                                }
+                                            }
+
                                             // Add tool result to conversation
                                             conversation_history.push(Message {
                                                 role: MessageRole::Tool,
-                                                content: serde_json::to_string(&result)
-                                                    .unwrap_or_default(),
+                                                content: serde_json::to_string(&result).unwrap_or_default(),
                                                 tool_calls: None,
                                                 tool_call_id: Some(tool_call.id.clone()),
                                             });
@@ -1005,7 +1096,7 @@ async fn handle_single_agent_chat(
                                         Err(e) => {
                                             // Check if this is a policy denial
                                             let error_msg = if e.to_string().contains("execution denied by policy") {
-                                                println!("{} Tool '{}' was denied by policy. You can change this with :policy commands.", 
+                                                println!("{} Tool '{}' was denied by policy. You can change this with :policy commands.",
                                                     style("[DENIED]").yellow().bold(), tool_name);
                                                 format!("Tool '{}' execution was denied by policy. You can change this with :policy commands.", tool_name)
                                             } else {
@@ -1291,7 +1382,7 @@ async fn handle_multi_agent_chat(
             Ok(task_result) => {
                 // Display the cohesive final summary
                 println!("{}", task_result.final_summary);
-                
+
                 // Also show a success message
                 println!("\n{}", style("[SUCCESS] Task completed successfully!").green().bold());
             }

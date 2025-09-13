@@ -96,13 +96,74 @@ impl SearchTool {
 
     /// Execute fuzzy search mode
     async fn execute_fuzzy(&self, args: Value) -> Result<Value> {
-        // For now, use exact search with fuzzy indication
-        let mut result = self.execute_exact(args).await?;
-        if let Some(obj) = result.as_object_mut() {
-            obj.insert("mode".to_string(), json!("fuzzy"));
-            obj.insert("fuzzy_enabled".to_string(), json!(true));
+        let pattern = args
+            .get("pattern")
+            .and_then(|p| p.as_str())
+            .ok_or_else(|| anyhow!("Error: Missing 'pattern'. Example: grep_search({{\"mode\": \"fuzzy\", \"pattern\": \"todo\", \"path\": \"src\"}})"))?;
+
+        let input = GrepSearchInput {
+            pattern: pattern.to_string(),
+            path: args
+                .get("path")
+                .and_then(|p| p.as_str())
+                .unwrap_or(".")
+                .to_string(),
+            max_results: Some(
+                args.get("max_results")
+                    .and_then(|m| m.as_u64())
+                    .unwrap_or(100) as usize,
+            ),
+            case_sensitive: Some(
+                args.get("case_sensitive")
+                    .and_then(|c| c.as_bool())
+                    .unwrap_or(false), // Default to case-insensitive for fuzzy search
+            ),
+            literal: Some(false),
+            glob_pattern: None,
+            context_lines: Some(0),
+            include_hidden: Some(false),
+        };
+
+        let result = self.grep_search.perform_search(input.clone()).await?;
+
+        // Response formatting
+        let concise = args
+            .get("response_format")
+            .and_then(|v| v.as_str())
+            .map(|s| s.eq_ignore_ascii_case("concise"))
+            .unwrap_or(true);
+
+        let mut body = if concise {
+            let concise_matches = transform_matches_to_concise(&result.matches);
+            json!({
+                "success": true,
+                "matches": concise_matches,
+                "mode": "fuzzy",
+                "case_sensitive": false,
+                "response_format": "concise"
+            })
+        } else {
+            json!({
+                "success": true,
+                "matches": result.matches,
+                "mode": "fuzzy",
+                "case_sensitive": false,
+                "response_format": "detailed"
+            })
+        };
+
+        if let Some(max) = input.max_results {
+            // Heuristic: if we hit the cap, hint pagination/filtering
+            if let Some(arr) = body.get("matches").and_then(|m| m.as_array()) {
+                if arr.len() >= max {
+                    body["message"] = json!(format!(
+                        "Showing {} results (limit). Narrow your query or use more specific patterns to reduce tokens.",
+                        max
+                    ));
+                }
+            }
         }
-        Ok(result)
+        Ok(body)
     }
 
     /// Execute multi-pattern search mode

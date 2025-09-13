@@ -82,6 +82,11 @@ impl CommandTool {
         // Set timeout
         let timeout_ms = input.timeout_secs.unwrap_or(30) * 1000;
 
+        // Show command execution start for shell-like experience
+        if input.mode.as_deref() == Some("streaming") {
+            println!("$ {}", full_command);
+        }
+
         // Execute command in PTY
         let mut pty_session = spawn(&full_command, Some(timeout_ms))
             .map_err(|e| anyhow!("Failed to spawn PTY session: {}", e))?;
@@ -90,6 +95,11 @@ impl CommandTool {
         pty_session
             .send_line(&format!("cd {}", work_dir.display()))
             .map_err(|e| anyhow!("Failed to change directory: {}", e))?;
+
+        // For streaming mode, show a progress indicator while waiting
+        if input.mode.as_deref() == Some("streaming") {
+            println!("Executing command in PTY session...");
+        }
 
         // Wait for command to complete and capture output
         let output = pty_session
@@ -102,7 +112,10 @@ impl CommandTool {
             "stdout": output,
             "stderr": "",
             "mode": "pty",
-            "pty_enabled": true
+            "pty_enabled": true,
+            "streaming": input.mode.as_deref() == Some("streaming"),
+            "shell_rendered": true,
+            "command": full_command
         }))
     }
 

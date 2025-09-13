@@ -3,7 +3,6 @@
 //! This module implements modern coding agent capabilities including:
 //! - Context-aware code understanding
 //! - Intelligent code completion
-//! - Semantic code search
 //! - Learning and adaptation systems
 
 use crate::core::agent::compaction::{CompactionConfig, CompactionEngine};

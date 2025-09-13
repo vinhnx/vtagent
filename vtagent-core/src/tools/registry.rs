@@ -2,7 +2,6 @@
 
 use super::bash_tool::BashTool;
 use super::cache::FILE_CACHE;
-use super::ck_tool::CkTool;
 use super::command::CommandTool;
 use super::file_ops::FileOpsTool;
 use super::search::SearchTool;
@@ -30,7 +29,6 @@ pub struct ToolRegistry {
     bash_tool: BashTool,
     file_ops_tool: FileOpsTool,
     command_tool: CommandTool,
-    ck_tool: CkTool,
     grep_search: Arc<GrepSearchManager>,
     ast_grep_engine: Option<Arc<AstGrepEngine>>,
     tool_policy: ToolPolicyManager,
@@ -53,7 +51,6 @@ impl ToolRegistry {
         let bash_tool = BashTool::new(workspace_root.clone());
         let file_ops_tool = FileOpsTool::new(workspace_root.clone(), grep_search.clone());
         let command_tool = CommandTool::new(workspace_root.clone());
-        let ck_tool = CkTool::new(workspace_root.clone());
 
         // Initialize AST-grep engine
         let ast_grep_engine = match AstGrepEngine::new() {
@@ -80,7 +77,6 @@ impl ToolRegistry {
             tools::READ_FILE.to_string(),
             tools::WRITE_FILE.to_string(),
             tools::EDIT_FILE.to_string(),
-            tools::CK_SEMANTIC_SEARCH.to_string(),
             tools::BASH.to_string(),
         ];
 
@@ -100,7 +96,6 @@ impl ToolRegistry {
             bash_tool,
             file_ops_tool,
             command_tool,
-            ck_tool,
             grep_search,
             ast_grep_engine,
             tool_policy: policy_manager,
@@ -148,7 +143,6 @@ impl ToolRegistry {
             tools::WRITE_FILE => self.file_ops_tool.write_file(args).await,
             tools::EDIT_FILE => self.edit_file(args).await,
             tools::AST_GREP_SEARCH => self.execute_ast_grep(args).await,
-            tools::CK_SEMANTIC_SEARCH => self.ck_tool.execute(args).await,
             tools::SIMPLE_SEARCH => self.simple_search_tool.execute(args).await,
             tools::BASH => self.bash_tool.execute(args).await,
             _ => Err(anyhow!("Unknown tool: {}", name)),
@@ -171,7 +165,6 @@ impl ToolRegistry {
             tools::READ_FILE.to_string(),
             tools::WRITE_FILE.to_string(),
             tools::EDIT_FILE.to_string(),
-            tools::CK_SEMANTIC_SEARCH.to_string(),
             "simple_search".to_string(),
             "bash".to_string(),
         ];
@@ -193,7 +186,6 @@ impl ToolRegistry {
             | tools::READ_FILE
             | tools::WRITE_FILE => true,
             tools::AST_GREP_SEARCH => self.ast_grep_engine.is_some(),
-            tools::CK_SEMANTIC_SEARCH => true,
             tools::SIMPLE_SEARCH | tools::BASH => true,
             _ => false,
         }
@@ -748,32 +740,6 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
                     "severity_filter": {"type": "string", "description": "Filter lint results by severity"}
                 },
                 "required": ["pattern", "path"]
-            }),
-        },
-
-        // Ck semantic search tool
-        FunctionDeclaration {
-            name: tools::CK_SEMANTIC_SEARCH.to_string(),
-            description: "Semantic code search using ck tool - find code by meaning, not just keywords. Supports semantic search, hybrid search, regex search, indexing, index status, and integrated analysis with AST-grep.".to_string(),
-            parameters: json!({
-                "type": "object",
-                "properties": {
-                    "operation": {"type": "string", "description": "Operation type: 'semantic_search' (default), 'hybrid_search', 'regex_search', 'index_workspace', 'index_status', 'analyze_and_search'", "default": "semantic_search"},
-                    "query": {"type": "string", "description": "Natural language query for semantic/hybrid search (e.g., 'error handling', 'authentication logic')"},
-                    "pattern": {"type": "string", "description": "Regex pattern for regex_search operation"},
-                    "path": {"type": "string", "description": "File or directory path to search in", "default": "."},
-                    "threshold": {"type": "number", "description": "Relevance threshold for semantic results (0.0-1.0)", "default": 0.0},
-                    "top_k": {"type": "integer", "description": "Maximum number of results to return"},
-                    "full_section": {"type": "boolean", "description": "Return complete code sections instead of snippets", "default": false},
-                    "scores": {"type": "boolean", "description": "Include relevance scores in results", "default": false},
-                    "case_insensitive": {"type": "boolean", "description": "Case insensitive regex search", "default": false},
-                    "line_numbers": {"type": "boolean", "description": "Show line numbers in regex results", "default": true},
-                    "context_lines": {"type": "integer", "description": "Number of context lines for regex results"},
-                    "exclude_patterns": {"type": "array", "items": {"type": "string"}, "description": "Patterns to exclude during indexing"},
-                    "ast_grep_pattern": {"type": "string", "description": "AST-grep pattern for integrated analysis in analyze_and_search operation"},
-                    "max_results": {"type": "integer", "description": "Maximum number of results for integrated analysis", "default": 10}
-                },
-                "required": []
             }),
         },
 

@@ -48,43 +48,6 @@ Your implementations should demonstrate:
 ### Understanding Your Role
 You cannot access the context store directly. The Orchestrator provides you with selected contexts through your initial task description, and the contexts you create in your report will be stored by the Orchestrator for future use.
 
-## Advanced Code Analysis Tools
-
-### CK Semantic Search Integration
-As a Coder agent, you have access to VTAgent's powerful **ck semantic search tool** for intelligent code discovery and analysis:
-
-**Strategic Usage Guidelines:**
-- **Pre-Implementation Research**: Use ck semantic search to understand existing patterns before implementing new features
-- **Code Discovery**: Find related functionality using natural language queries
-- **Architecture Analysis**: Identify design patterns and architectural decisions
-- **Refactoring Preparation**: Discover code that needs to be refactored or updated
-
-**Implementation Workflow:**
-1. **Discovery Phase**: Use ck semantic search to find relevant existing code
-   ```json
-   {"operation": "semantic_search", "query": "similar functionality", "path": "src/"}
-   ```
-
-2. **Pattern Analysis**: Use AST-grep to analyze code structure and patterns
-   ```json
-   {"operation": "search", "pattern": "impl.*Trait", "path": "src/"}
-   ```
-
-3. **Implementation**: Write new code following discovered patterns
-4. **Integration**: Use AST-grep to safely modify existing code
-5. **Validation**: Test and verify the implementation
-
-**Tool Selection Strategy:**
-- **CK Semantic Search**: When you need to understand "what this codebase does" or find conceptually related code
-- **AST-grep**: When you need to understand "how this code is structured" or make precise modifications
-- **Ripgrep**: When you need fast text search for specific patterns or keywords
-
-**Best Practices:**
-- Always start with semantic search to understand the codebase context
-- Use hybrid search for combining semantic understanding with keyword precision
-- Extract complete code sections when analyzing complex functionality
-- Leverage JSONL output for structured analysis of search results
-
 ## Available Tools
 
 ### File Operations

@@ -187,7 +187,6 @@ pub mod tools {
     pub const DELETE_FILE: &str = "delete_file";
     pub const CREATE_FILE: &str = "create_file";
     pub const AST_GREP_SEARCH: &str = "ast_grep_search";
-    pub const CK_SEMANTIC_SEARCH: &str = "ck_semantic_search";
     pub const SIMPLE_SEARCH: &str = "simple_search";
     pub const BASH: &str = "bash";
 

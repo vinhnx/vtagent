@@ -1,5 +1,6 @@
 use crate::config::constants::{model_helpers, models};
 use crate::llm::client::LLMClient;
+use crate::llm::error_display;
 use crate::llm::provider::{
     FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
 };
@@ -40,27 +41,39 @@ impl LLMProvider for AnthropicProvider {
             .post(&url)
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
-            .header("content-type", "application/json")
             .json(&anthropic_request)
             .send()
             .await
-            .map_err(|e| LLMError::Network(e.to_string()))?;
+            .map_err(|e| {
+                let formatted_error = error_display::format_llm_error(
+                    "Anthropic",
+                    &format!("Network error: {}", e)
+                );
+                LLMError::Network(formatted_error)
+            })?;
 
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            return Err(LLMError::Provider(format!(
-                "HTTP {}: {}",
-                status, error_text
-            )));
+            let formatted_error = error_display::format_llm_error(
+                "Anthropic",
+                &format!("HTTP {}: {}", status, error_text)
+            );
+            return Err(LLMError::Provider(formatted_error));
         }
 
-        let response_json: Value = response
+        let anthropic_response: Value = response
             .json()
             .await
-            .map_err(|e| LLMError::Provider(format!("Failed to parse response: {}", e)))?;
+            .map_err(|e| {
+                let formatted_error = error_display::format_llm_error(
+                    "Anthropic",
+                    &format!("Failed to parse response: {}", e)
+                );
+                LLMError::Provider(formatted_error)
+            })?;
 
-        self.parse_anthropic_response(response_json)
+        self.parse_anthropic_response(anthropic_response)
     }
 
     fn supported_models(&self) -> Vec<String> {

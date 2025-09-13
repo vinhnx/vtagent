@@ -1,118 +1,116 @@
 //! Color utilities for the VT Agent
 //!
-//! This module provides advanced color manipulation capabilities using the colored crate,
-//! building on top of the existing console and owo-colors functionality.
+//! This module provides color manipulation capabilities using the colored crate,
+//! which offers a simpler and more robust API for terminal color styling.
 
 use colored::*;
 
-/// Convert RGB values to an ANSI color that works in terminals
-pub fn rgb_to_ansi(r: u8, g: u8, b: u8) -> u8 {
-    // The colored crate doesn't directly expose ANSI conversion,
-    // but we can create a Color and use its ANSI code
-    let color = Color::TrueColor { r, g, b };
-    // For 256-color mode, we need to approximate
-    // We'll use a simple approximation for now
-    // In practice, this would use a more sophisticated algorithm
-    if r == 255 && g == 0 && b == 0 {
-        196 // Standard red
-    } else if r == 0 && g == 255 && b == 0 {
-        46 // Standard green
-    } else if r == 0 && g == 0 && b == 255 {
-        21 // Standard blue
-    } else {
-        // Fallback to a simple approximation
-        let gray = (r as f32 * 0.299 + g as f32 * 0.587 + b as f32 * 0.114) as u8;
-        if gray < 128 {
-            0 // Black
-        } else {
-            15 // White
-        }
+/// Apply red color to text
+pub fn red(text: &str) -> ColoredString {
+    text.red()
+}
+
+/// Apply green color to text
+pub fn green(text: &str) -> ColoredString {
+    text.green()
+}
+
+/// Apply blue color to text
+pub fn blue(text: &str) -> ColoredString {
+    text.blue()
+}
+
+/// Apply yellow color to text
+pub fn yellow(text: &str) -> ColoredString {
+    text.yellow()
+}
+
+/// Apply purple color to text
+pub fn purple(text: &str) -> ColoredString {
+    text.purple()
+}
+
+/// Apply cyan color to text
+pub fn cyan(text: &str) -> ColoredString {
+    text.cyan()
+}
+
+/// Apply white color to text
+pub fn white(text: &str) -> ColoredString {
+    text.white()
+}
+
+/// Apply black color to text
+pub fn black(text: &str) -> ColoredString {
+    text.black()
+}
+
+/// Apply bold styling to text
+pub fn bold(text: &str) -> ColoredString {
+    text.bold()
+}
+
+/// Apply italic styling to text
+pub fn italic(text: &str) -> ColoredString {
+    text.italic()
+}
+
+/// Apply underline styling to text
+pub fn underline(text: &str) -> ColoredString {
+    text.underline()
+}
+
+/// Apply dimmed styling to text
+pub fn dimmed(text: &str) -> ColoredString {
+    text.dimmed()
+}
+
+/// Apply blinking styling to text
+pub fn blink(text: &str) -> ColoredString {
+    text.blink()
+}
+
+/// Apply reversed styling to text
+pub fn reversed(text: &str) -> ColoredString {
+    text.reversed()
+}
+
+/// Apply strikethrough styling to text
+pub fn strikethrough(text: &str) -> ColoredString {
+    text.strikethrough()
+}
+
+/// Apply custom RGB color to text
+pub fn rgb(text: &str, r: u8, g: u8, b: u8) -> ColoredString {
+    text.truecolor(r, g, b)
+}
+
+/// Combine multiple color and style operations
+pub fn custom_style(text: &str, styles: &[&str]) -> ColoredString {
+    let mut colored_text = ColoredString::from(text);
+    
+    for style in styles {
+        colored_text = match *style {
+            "red" => colored_text.red(),
+            "green" => colored_text.green(),
+            "blue" => colored_text.blue(),
+            "yellow" => colored_text.yellow(),
+            "purple" => colored_text.purple(),
+            "cyan" => colored_text.cyan(),
+            "white" => colored_text.white(),
+            "black" => colored_text.black(),
+            "bold" => colored_text.bold(),
+            "italic" => colored_text.italic(),
+            "underline" => colored_text.underline(),
+            "dimmed" => colored_text.dimmed(),
+            "blink" => colored_text.blink(),
+            "reversed" => colored_text.reversed(),
+            "strikethrough" => colored_text.strikethrough(),
+            _ => colored_text, // Ignore unknown styles
+        };
     }
-}
-
-/// Create a colored Style from RGB values
-pub fn style_from_rgb(r: u8, g: u8, b: u8) -> ColoredString {
-    // The colored crate works differently - it applies colors directly to strings
-    // We'll return a dummy string with the color applied for compatibility
-    "".truecolor(r, g, b)
-}
-
-/// Create a colored Style from HSL values
-/// Note: colored crate doesn't directly support HSL, so we convert to RGB first
-pub fn style_from_hsl(h: f32, s: f32, l: f32) -> ColoredString {
-    // Convert HSL to RGB (simplified implementation)
-    let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
-    let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
-    let m = l - c / 2.0;
     
-    let (r, g, b) = if h < 60.0 {
-        (c, x, 0.0)
-    } else if h < 120.0 {
-        (x, c, 0.0)
-    } else if h < 180.0 {
-        (0.0, c, x)
-    } else if h < 240.0 {
-        (0.0, x, c)
-    } else if h < 300.0 {
-        (x, 0.0, c)
-    } else {
-        (c, 0.0, x)
-    };
-    
-    let r = ((r + m) * 255.0) as u8;
-    let g = ((g + m) * 255.0) as u8;
-    let b = ((b + m) * 255.0) as u8;
-    
-    style_from_rgb(r, g, b)
-}
-
-/// Generate a harmonious color scheme with a base color
-/// Returns a vector of RGB values that work well together
-pub fn generate_harmonious_scheme(r: u8, g: u8, b: u8, count: usize) -> Vec<(u8, u8, u8)> {
-    let mut scheme = Vec::with_capacity(count);
-    scheme.push((r, g, b));
-    
-    // Generate complementary and analogous colors
-    for i in 1..count {
-        let hue_shift = (i as f32) * (360.0 / (count as f32));
-        // Simplified hue shifting
-        let new_r = ((r as f32 + hue_shift) % 255.0) as u8;
-        let new_g = ((g as f32 + hue_shift * 0.7) % 255.0) as u8;
-        let new_b = ((b as f32 + hue_shift * 0.3) % 255.0) as u8;
-        scheme.push((new_r, new_g, new_b));
-    }
-    
-    scheme
-}
-
-/// Lighten a color by a given percentage
-pub fn lighten_color(r: u8, g: u8, b: u8, percentage: f32) -> (u8, u8, u8) {
-    let factor = 1.0 + percentage;
-    let new_r = ((r as f32 * factor).min(255.0)) as u8;
-    let new_g = ((g as f32 * factor).min(255.0)) as u8;
-    let new_b = ((b as f32 * factor).min(255.0)) as u8;
-    (new_r, new_g, new_b)
-}
-
-/// Darken a color by a given percentage
-pub fn darken_color(r: u8, g: u8, b: u8, percentage: f32) -> (u8, u8, u8) {
-    let factor = 1.0 - percentage;
-    let new_r = ((r as f32 * factor).max(0.0)) as u8;
-    let new_g = ((g as f32 * factor).max(0.0)) as u8;
-    let new_b = ((b as f32 * factor).max(0.0)) as u8;
-    (new_r, new_g, new_b)
-}
-
-/// Blend two colors with a given ratio (0.0 to 1.0)
-pub fn blend_colors(
-    r1: u8, g1: u8, b1: u8,
-    r2: u8, g2: u8, b2: u8,
-    ratio: f32
-) -> (u8, u8, u8) {
-    let new_r = (r1 as f32 * (1.0 - ratio) + r2 as f32 * ratio) as u8;
-    let new_g = (g1 as f32 * (1.0 - ratio) + g2 as f32 * ratio) as u8;
-    let new_b = (b1 as f32 * (1.0 - ratio) + b2 as f32 * ratio) as u8;
-    (new_r, new_g, new_b)
+    colored_text
 }
 
 #[cfg(test)]
@@ -120,37 +118,32 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_rgb_to_ansi() {
-        let ansi = rgb_to_ansi(255, 0, 0); // Red
-        // We're using simplified logic, so we check it returns a reasonable value
-        assert!(ansi == 196 || ansi == 0 || ansi == 15);
+    fn test_basic_colors() {
+        let red_text = red("Hello");
+        assert!(red_text.to_string().contains("Hello"));
+        
+        let green_text = green("World");
+        assert!(green_text.to_string().contains("World"));
     }
 
     #[test]
-    fn test_generate_harmonious_scheme() {
-        let scheme = generate_harmonious_scheme(255, 0, 0, 3);
-        assert_eq!(scheme.len(), 3);
+    fn test_styles() {
+        let bold_text = bold("Bold");
+        assert!(bold_text.to_string().contains("Bold"));
+        
+        let italic_text = italic("Italic");
+        assert!(italic_text.to_string().contains("Italic"));
     }
 
     #[test]
-    fn test_lighten_color() {
-        let (r, g, b) = lighten_color(128, 128, 128, 0.5);
-        // Lightened gray should be brighter
-        assert!(r >= 128 && g >= 128 && b >= 128);
+    fn test_rgb() {
+        let rgb_text = rgb("RGB Color", 255, 128, 64);
+        assert!(rgb_text.to_string().contains("RGB Color"));
     }
 
     #[test]
-    fn test_darken_color() {
-        let (r, g, b) = darken_color(128, 128, 128, 0.5);
-        // Darkened gray should be darker
-        assert!(r <= 128 && g <= 128 && b <= 128);
-    }
-
-    #[test]
-    fn test_blend_colors() {
-        // Blend red and blue to get purple
-        let (r, g, b) = blend_colors(255, 0, 0, 0, 0, 255, 0.5);
-        // Should be purple (red + blue)
-        assert!(r > 100 && b > 100 && g < 50);
+    fn test_custom_style() {
+        let styled_text = custom_style("Styled", &["red", "bold"]);
+        assert!(styled_text.to_string().contains("Styled"));
     }
 }

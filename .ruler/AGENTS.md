@@ -124,7 +124,6 @@ if is_valid && is_allowed && is_secure {
 - **Library Code**: `vtagent-core/src/`
 - **Binary Entry**: `src/main.rs`
 - **Documentation**: `./docs/` folder only
-- **Examples**: `examples/` directory
 - **Benchmarks**: `benches/` directory
 
 ## Security & Safety
@@ -167,7 +166,6 @@ if is_valid && is_allowed && is_secure {
 - Keep modules focused and cohesive
 - Use `src/lib.rs` for library code and `src/main.rs` for binary entry point
 - Place CLI-specific code in the `cli/` directory
-- Keep examples in the `examples/` directory
 - Place benchmarks in the `benches/` directory
 
 ### Dependencies
@@ -264,3 +262,4 @@ if is_valid && is_allowed && is_secure {
 - You should always use Context7 for fetching documentation from MCP. THIS IS IMPORTANT!
 - For testing echo, make sure not to use "!" this will cause shell escaping issue. for example Use "echo test" instead of "echo test!" THIS IS IMPORTANT!
 - Reference ANSI color code when you want to print colored text in terminal. THIS IS IMPORTANT! https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit
+- Don't create examples, make tests instead. THIS IS IMPORTANT!

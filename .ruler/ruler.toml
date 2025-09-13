@@ -11,9 +11,12 @@ default_agents = [
     "agentsmd",
     "qwen",
     "gemini",
-    "kiro",
-    "warp",
+    "kiro"
 ]
+
+[agents.copilot]
+enabled = true
+output_path = "AGENTS.md"
 
 [mcp]
 # Enable/disable MCP propagation globally (default: true)

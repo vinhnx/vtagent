@@ -16,12 +16,12 @@ use vtagent_core::config::constants::models;
 use vtagent_core::config::models::{ModelId, Provider};
 use vtagent_core::config::multi_agent::MultiAgentSystemConfig;
 use vtagent_core::config::{ConfigManager, VTAgentConfig};
+use vtagent_core::constants::{prompts, tools};
 use vtagent_core::core::agent::integration::MultiAgentSystem;
 use vtagent_core::core::agent::multi_agent::AgentType;
 use vtagent_core::llm::factory::create_provider_with_config;
 use vtagent_core::llm::provider::{LLMProvider, LLMRequest, Message, MessageRole};
 use vtagent_core::llm::{AnyClient, make_client};
-use vtagent_core::constants::{tools, prompts};
 use vtagent_core::ui::spinner;
 
 /// Load project-specific context for better agent performance
@@ -32,7 +32,10 @@ async fn load_project_context(
     let mut context_items = Vec::new();
 
     // Load project metadata
-    eprintln!("DEBUG: Loading project context for project: {}", project_name);
+    eprintln!(
+        "DEBUG: Loading project context for project: {}",
+        project_name
+    );
     match project_manager.load_project(project_name) {
         Ok(project_data) => {
             context_items.push(format!("Project: {}", project_data.name));
@@ -303,13 +306,6 @@ async fn handle_chat_command(args: &Cli, vtagent_config: &VTAgentConfig) -> Resu
     let mut model_str = vtagent_config.agent.default_model.clone();
     let provider = &vtagent_config.agent.provider;
 
-    // For LMStudio, use the configured single agent model
-    if provider.eq_ignore_ascii_case("lmstudio") {
-        if model_str == models::LMSTUDIO_LOCAL || model_str.is_empty() {
-            model_str = vtagent_config.lmstudio.single_agent_model.clone();
-        }
-    }
-
     // Validate configuration
     if model_str.is_empty() {
         bail!("No model configured. Please set a model in your vtagent.toml configuration file.");
@@ -383,76 +379,37 @@ async fn handle_single_agent_chat(
         );
     }
 
-    // For LMStudio, use the correct model name
-    let model_str =
-        if provider.eq_ignore_ascii_case("lmstudio") && model_str == models::LMSTUDIO_LOCAL {
-            models::LMSTUDIO_QWEN_30B_A3B_2507
-        } else {
-            model_str
-        };
-
     // Get API key from environment
-    let api_key = if config.agent.provider.eq_ignore_ascii_case("lmstudio") {
-        // For LMStudio, check for LMSTUDIO_API_KEY first, then fall back to no key
-        std::env::var("LMSTUDIO_API_KEY")
-            .or_else(|_| {
-                eprintln!("Info: No LMSTUDIO_API_KEY found. Using LMStudio without authentication.");
-                eprintln!("If LMStudio requires authentication, set LMSTUDIO_API_KEY environment variable.");
-                Ok::<String, std::env::VarError>(String::new())
-            })
-            .unwrap_or_default()
-    } else {
-        std::env::var(&config.agent.api_key_env).unwrap_or_else(|_| {
-            eprintln!(
-                "Warning: {} environment variable not set",
-                config.agent.api_key_env
-            );
-            String::new()
-        })
-    };
+    let api_key = std::env::var(&config.agent.api_key_env).unwrap_or_else(|_| {
+        eprintln!(
+            "Warning: {} environment variable not set",
+            config.agent.api_key_env
+        );
+        String::new()
+    });
 
     // Create client based on provider
-    let client: Box<dyn LLMProvider> = if provider.eq_ignore_ascii_case("lmstudio") {
-        // For LMStudio, use the correct model name
-        let actual_model = if model_str == models::LMSTUDIO_LOCAL {
-            models::LMSTUDIO_QWEN_30B_A3B_2507.to_string()
-        } else {
-            model_str.to_string()
-        };
-
+    let client: Box<dyn LLMProvider> = if provider.eq_ignore_ascii_case("gemini") {
+        // Create Gemini client
         let client_result = create_provider_with_config(
-            "lmstudio",
+            "gemini",
             Some(api_key),
-            Some(config.lmstudio.base_url.clone()),
-            Some(actual_model),
+            None, // Gemini doesn't need a base URL
+            Some(model_str.to_string()),
         )
-        .context("Failed to create LMStudio provider")?;
-
+        .context("Failed to create Gemini provider")?;
         client_result
     } else {
-        // For Gemini and other providers, create the appropriate client
-        if provider.eq_ignore_ascii_case("gemini") {
-            // Create Gemini client
-            let client_result = create_provider_with_config(
-                "gemini",
-                Some(api_key),
-                None, // Gemini doesn't need a base URL
-                Some(model_str.to_string()),
-            )
-            .context("Failed to create Gemini provider")?;
-            client_result
-        } else {
-            // For other providers, we use the model-based approach
-            let model_id = model_str
-                .parse::<ModelId>()
-                .map_err(|_| anyhow::anyhow!("Invalid model: {}", model_str))?;
-            let any_client: AnyClient = make_client(api_key, model_id);
-            // We'll use the simple prompt-based approach for other providers for now
-            // In a full implementation, we'd want to handle each provider properly
-            return handle_simple_prompt_chat(any_client)
-                .await
-                .context("Simple prompt chat failed");
-        }
+        // For other providers, we use the model-based approach
+        let model_id = model_str
+            .parse::<ModelId>()
+            .map_err(|_| anyhow::anyhow!("Invalid model: {}", model_str))?;
+        let any_client: AnyClient = make_client(api_key, model_id);
+        // We'll use the simple prompt-based approach for other providers for now
+        // In a full implementation, we'd want to handle each provider properly
+        return handle_simple_prompt_chat(any_client)
+            .await
+            .context("Simple prompt chat failed");
     };
 
     // Load system prompt from configuration or default path
@@ -467,7 +424,10 @@ async fn handle_single_agent_chat(
     }];
 
     // Welcome message with guidance
-    println!("{}", style("Welcome to VTAgent! Type your questions or commands below.").cyan());
+    println!(
+        "{}",
+        style("Welcome to VTAgent! Type your questions or commands below.").cyan()
+    );
     println!();
 
     loop {
@@ -546,17 +506,33 @@ async fn handle_single_agent_chat(
                 let action = parts[1].to_lowercase();
                 let tool_name = parts[2];
                 let res = match action.as_str() {
-                    "allow" => tool_registry.set_tool_policy(tool_name, vtagent_core::tool_policy::ToolPolicy::Allow),
-                    "deny" => tool_registry.set_tool_policy(tool_name, vtagent_core::tool_policy::ToolPolicy::Deny),
-                    "prompt" => tool_registry.set_tool_policy(tool_name, vtagent_core::tool_policy::ToolPolicy::Prompt),
+                    "allow" => tool_registry
+                        .set_tool_policy(tool_name, vtagent_core::tool_policy::ToolPolicy::Allow),
+                    "deny" => tool_registry
+                        .set_tool_policy(tool_name, vtagent_core::tool_policy::ToolPolicy::Deny),
+                    "prompt" => tool_registry
+                        .set_tool_policy(tool_name, vtagent_core::tool_policy::ToolPolicy::Prompt),
                     _ => {
-                        println!("{} Unknown policy action: {}", style("[ERROR]").red().bold(), action);
+                        println!(
+                            "{} Unknown policy action: {}",
+                            style("[ERROR]").red().bold(),
+                            action
+                        );
                         continue;
                     }
                 };
                 match res {
-                    Ok(_) => println!("{} Set '{}' to {}", style("[POLICY]").cyan().bold(), tool_name, action),
-                    Err(e) => println!("{} Failed to set policy: {}", style("[ERROR]").red().bold(), e),
+                    Ok(_) => println!(
+                        "{} Set '{}' to {}",
+                        style("[POLICY]").cyan().bold(),
+                        tool_name,
+                        action
+                    ),
+                    Err(e) => println!(
+                        "{} Failed to set policy: {}",
+                        style("[ERROR]").red().bold(),
+                        e
+                    ),
                 }
                 continue;
             }
@@ -568,18 +544,28 @@ async fn handle_single_agent_chat(
                     "deny-all" => tool_registry.deny_all_tools(),
                     "prompt-all" => tool_registry.reset_tool_policies(),
                     _ => {
-                        println!("{} Usage:\n  :policy status\n  :policy allow|deny|prompt <tool>\n  :policy allow-all|deny-all|prompt-all", style("[USAGE]").yellow());
+                        println!(
+                            "{} Usage:\n  :policy status\n  :policy allow|deny|prompt <tool>\n  :policy allow-all|deny-all|prompt-all",
+                            style("[USAGE]").yellow()
+                        );
                         continue;
                     }
                 };
                 match res {
                     Ok(_) => println!("{} Applied {}", style("[POLICY]").cyan().bold(), action),
-                    Err(e) => println!("{} Failed to update policies: {}", style("[ERROR]").red().bold(), e),
+                    Err(e) => println!(
+                        "{} Failed to update policies: {}",
+                        style("[ERROR]").red().bold(),
+                        e
+                    ),
                 }
                 continue;
             }
 
-            println!("{} Usage:\n  :policy status\n  :policy allow|deny|prompt <tool>\n  :policy allow-all|deny-all|prompt-all", style("[USAGE]").yellow());
+            println!(
+                "{} Usage:\n  :policy status\n  :policy allow|deny|prompt <tool>\n  :policy allow-all|deny-all|prompt-all",
+                style("[USAGE]").yellow()
+            );
             continue;
         }
 
@@ -759,7 +745,8 @@ async fn handle_single_agent_chat(
                     for (tool_call_index, tool_call) in tool_calls.iter().enumerate() {
                         println!(
                             "{} {} {}",
-                            style(format!("  [{}/{}]", tool_call_index + 1, tool_calls.len())).dim(),
+                            style(format!("  [{}/{}]", tool_call_index + 1, tool_calls.len()))
+                                .dim(),
                             style(&tool_call.function.name).cyan().bold(),
                             style(&tool_call.function.arguments).dim()
                         );
@@ -767,10 +754,17 @@ async fn handle_single_agent_chat(
                         // Human-in-the-loop: policy prompt for Prompt or Deny
                         let tool_name = &tool_call.function.name;
                         let prev_policy = tool_registry.get_tool_policy(tool_name);
-                        let mut restore_policy: Option<vtagent_core::tool_policy::ToolPolicy> = None;
-                        if matches!(prev_policy, vtagent_core::tool_policy::ToolPolicy::Prompt | vtagent_core::tool_policy::ToolPolicy::Deny) {
+                        let mut restore_policy: Option<vtagent_core::tool_policy::ToolPolicy> =
+                            None;
+                        if matches!(
+                            prev_policy,
+                            vtagent_core::tool_policy::ToolPolicy::Prompt
+                                | vtagent_core::tool_policy::ToolPolicy::Deny
+                        ) {
                             println!("Tool Permission Request: {}", tool_name);
-                            println!("Allow this tool? [y]es / [n]o / [a]lways / [d]eny-always (default n): ");
+                            println!(
+                                "Allow this tool? [y]es / [n]o / [a]lways / [d]eny-always (default n): "
+                            );
                             io::stdout().flush().ok();
                             let mut answer = String::new();
                             io::stdin().read_line(&mut answer).ok();
@@ -778,13 +772,22 @@ async fn handle_single_agent_chat(
                             match ans.as_str() {
                                 "y" | "yes" => {
                                     restore_policy = Some(prev_policy);
-                                    let _ = tool_registry.set_tool_policy(tool_name, vtagent_core::tool_policy::ToolPolicy::Allow);
+                                    let _ = tool_registry.set_tool_policy(
+                                        tool_name,
+                                        vtagent_core::tool_policy::ToolPolicy::Allow,
+                                    );
                                 }
                                 "a" | "always" => {
-                                    let _ = tool_registry.set_tool_policy(tool_name, vtagent_core::tool_policy::ToolPolicy::Allow);
+                                    let _ = tool_registry.set_tool_policy(
+                                        tool_name,
+                                        vtagent_core::tool_policy::ToolPolicy::Allow,
+                                    );
                                 }
                                 "d" | "deny" => {
-                                    let _ = tool_registry.set_tool_policy(tool_name, vtagent_core::tool_policy::ToolPolicy::Deny);
+                                    let _ = tool_registry.set_tool_policy(
+                                        tool_name,
+                                        vtagent_core::tool_policy::ToolPolicy::Deny,
+                                    );
                                     // Add user-denied response and continue to next tool
                                     conversation_history.push(Message {
                                         role: MessageRole::Tool,
@@ -810,9 +813,8 @@ async fn handle_single_agent_chat(
                         }
 
                         // Create spinner for tool execution - only show when actually executing
-                        let tool_spinner = spinner::start_loading_spinner(
-                            &format!("Executing {}...", tool_name)
-                        );
+                        let tool_spinner =
+                            spinner::start_loading_spinner(&format!("Executing {}...", tool_name));
 
                         // Execute the tool
                         let result = tool_registry
@@ -839,11 +841,7 @@ async fn handle_single_agent_chat(
                             Err(e) => {
                                 tool_spinner.finish_and_clear();
                                 progress.inc(1);
-                                println!(
-                                    "{} {}",
-                                    style("[ERROR]").red().bold(),
-                                    style(&e).red()
-                                );
+                                println!("{} {}", style("[ERROR]").red().bold(), style(&e).red());
 
                                 // Add error result to conversation
                                 conversation_history.push(Message {
@@ -880,7 +878,8 @@ async fn handle_single_agent_chat(
                         reasoning_effort: Some(config.agent.reasoning_effort.clone()),
                     };
 
-                    let follow_up_spinner = spinner::start_loading_spinner("Generating final response...");
+                    let follow_up_spinner =
+                        spinner::start_loading_spinner("Generating final response...");
 
                     match client.generate(follow_up_request).await {
                         Ok(final_response) => {
@@ -909,10 +908,18 @@ async fn handle_single_agent_chat(
                                     // Human-in-the-loop: policy prompt for Prompt or Deny
                                     let tool_name = &tool_call.function.name;
                                     let prev_policy = tool_registry.get_tool_policy(tool_name);
-                                    let mut restore_policy: Option<vtagent_core::tool_policy::ToolPolicy> = None;
-                                    if matches!(prev_policy, vtagent_core::tool_policy::ToolPolicy::Prompt | vtagent_core::tool_policy::ToolPolicy::Deny) {
+                                    let mut restore_policy: Option<
+                                        vtagent_core::tool_policy::ToolPolicy,
+                                    > = None;
+                                    if matches!(
+                                        prev_policy,
+                                        vtagent_core::tool_policy::ToolPolicy::Prompt
+                                            | vtagent_core::tool_policy::ToolPolicy::Deny
+                                    ) {
                                         println!("Tool Permission Request: {}", tool_name);
-                                        println!("Allow this tool? [y]es / [n]o / [a]lways / [d]eny-always (default n): ");
+                                        println!(
+                                            "Allow this tool? [y]es / [n]o / [a]lways / [d]eny-always (default n): "
+                                        );
                                         io::stdout().flush().ok();
                                         let mut answer = String::new();
                                         io::stdin().read_line(&mut answer).ok();
@@ -920,13 +927,22 @@ async fn handle_single_agent_chat(
                                         match ans.as_str() {
                                             "y" | "yes" => {
                                                 restore_policy = Some(prev_policy);
-                                                let _ = tool_registry.set_tool_policy(tool_name, vtagent_core::tool_policy::ToolPolicy::Allow);
+                                                let _ = tool_registry.set_tool_policy(
+                                                    tool_name,
+                                                    vtagent_core::tool_policy::ToolPolicy::Allow,
+                                                );
                                             }
                                             "a" | "always" => {
-                                                let _ = tool_registry.set_tool_policy(tool_name, vtagent_core::tool_policy::ToolPolicy::Allow);
+                                                let _ = tool_registry.set_tool_policy(
+                                                    tool_name,
+                                                    vtagent_core::tool_policy::ToolPolicy::Allow,
+                                                );
                                             }
                                             "d" | "deny" => {
-                                                let _ = tool_registry.set_tool_policy(tool_name, vtagent_core::tool_policy::ToolPolicy::Deny);
+                                                let _ = tool_registry.set_tool_policy(
+                                                    tool_name,
+                                                    vtagent_core::tool_policy::ToolPolicy::Deny,
+                                                );
                                                 // Add user-denied response and continue
                                                 conversation_history.push(Message {
                                                     role: MessageRole::Tool,
@@ -1069,11 +1085,7 @@ async fn handle_single_agent_chat(
                 }
             }
             Err(e) => {
-                eprintln!(
-                    "{}: {:?}",
-                    style("[ERROR]").red().bold().on_bright(),
-                    e
-                );
+                eprintln!("{}: {:?}", style("[ERROR]").red().bold().on_bright(), e);
             }
         }
     }
@@ -1109,7 +1121,7 @@ async fn handle_single_agent_chat(
     Ok(())
 }
 
-/// Handle simple prompt-based chat for non-LMStudio providers
+/// Handle simple prompt-based chat for other providers
 async fn handle_simple_prompt_chat(mut client: AnyClient) -> Result<()> {
     // Load system prompt - we don't have config here, so use a simple fallback
     let system_prompt = std::fs::read_to_string(prompts::DEFAULT_SYSTEM_PROMPT_PATH)
@@ -1185,14 +1197,6 @@ async fn handle_multi_agent_chat(
             config.multi_agent.executor_model.clone()
         };
         (single_model.clone(), single_model)
-    } else if config.agent.provider.eq_ignore_ascii_case("lmstudio") {
-        // LMStudio now supports multi-agent mode with local models
-        eprintln!("Info: Using LMStudio local models for multi-agent system.");
-        // Use configured models from LMStudio config
-        (
-            config.lmstudio.orchestrator_model.clone(),
-            config.lmstudio.subagent_model.clone(),
-        )
     } else {
         // Use configured models from multi_agent config
         (
@@ -1202,54 +1206,26 @@ async fn handle_multi_agent_chat(
     };
 
     // Create multi-agent configuration
-    let system_config = if config.agent.provider.eq_ignore_ascii_case("lmstudio") {
-        // Use LMStudio provider for multi-agent mode
-        MultiAgentSystemConfig {
-            enabled: true,
-            use_single_model: config.multi_agent.use_single_model,
-            provider: Provider::LMStudio,
-            orchestrator_model: orchestrator_model.clone(),
-            executor_model: executor_model.clone(),
-            subagent_model: executor_model.clone(),
-            max_concurrent_subagents: config.multi_agent.max_concurrent_subagents,
-            context_store_enabled: config.multi_agent.context_store_enabled,
-            execution_mode: vtagent_core::config::multi_agent::ExecutionMode::Auto,
-            ..Default::default()
-        }
-    } else {
-        // Use configured models from multi_agent config
-        MultiAgentSystemConfig {
-            enabled: true,
-            use_single_model: config.multi_agent.use_single_model,
-            orchestrator_model,
-            executor_model: executor_model.clone(),
-            subagent_model: executor_model,
-            max_concurrent_subagents: config.multi_agent.max_concurrent_subagents,
-            context_store_enabled: config.multi_agent.context_store_enabled,
-            execution_mode: vtagent_core::config::multi_agent::ExecutionMode::Auto,
-            ..Default::default()
-        }
+    let system_config = MultiAgentSystemConfig {
+        enabled: true,
+        use_single_model: config.multi_agent.use_single_model,
+        orchestrator_model,
+        executor_model: executor_model.clone(),
+        subagent_model: executor_model,
+        max_concurrent_subagents: config.multi_agent.max_concurrent_subagents,
+        context_store_enabled: config.multi_agent.context_store_enabled,
+        execution_mode: vtagent_core::config::multi_agent::ExecutionMode::Auto,
+        ..Default::default()
     };
 
     // Get API key from environment
-    let api_key = if config.agent.provider.eq_ignore_ascii_case("lmstudio") {
-        // For LMStudio, check for LMSTUDIO_API_KEY first, then fall back to no key
-        std::env::var("LMSTUDIO_API_KEY")
-            .or_else(|_| {
-                eprintln!("Info: No LMSTUDIO_API_KEY found. Using LMStudio without authentication.");
-                eprintln!("If LMStudio requires authentication, set LMSTUDIO_API_KEY environment variable.");
-                Ok::<String, std::env::VarError>(String::new())
-            })
-            .unwrap_or_default()
-    } else {
-        std::env::var(&config.agent.api_key_env).unwrap_or_else(|_| {
-            eprintln!(
-                "Warning: {} environment variable not set",
-                config.agent.api_key_env
-            );
-            String::new()
-        })
-    };
+    let api_key = std::env::var(&config.agent.api_key_env).unwrap_or_else(|_| {
+        eprintln!(
+            "Warning: {} environment variable not set",
+            config.agent.api_key_env
+        );
+        String::new()
+    });
 
     // Create multi-agent system
     let mut system = MultiAgentSystem::new(

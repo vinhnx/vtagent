@@ -54,42 +54,6 @@ impl ProviderRegistry {
             base_url: "https://api.anthropic.com/v1".to_string(),
             is_local: false,
         });
-
-        registry.register_provider(ProviderConfig {
-            name: "lmstudio".to_string(),
-            api_key_env: "LMSTUDIO_API_KEY".to_string(),
-            base_url: urls::LMSTUDIO_DEFAULT_BASE_URL.to_string(),
-            is_local: true,
-        });
-
-        registry.register_provider(ProviderConfig {
-            name: "ollama".to_string(),
-            api_key_env: "OLLAMA_API_KEY".to_string(),
-            base_url: "http://localhost:11434/api".to_string(),
-            is_local: true,
-        });
-
-        registry.register_provider(ProviderConfig {
-            name: "openrouter".to_string(),
-            api_key_env: "OPENROUTER_API_KEY".to_string(),
-            base_url: "https://openrouter.ai/api/v1".to_string(),
-            is_local: false,
-        });
-
-        registry.register_provider(ProviderConfig {
-            name: "groq".to_string(),
-            api_key_env: "GROQ_API_KEY".to_string(),
-            base_url: "https://api.groq.com/openai/v1".to_string(),
-            is_local: false,
-        });
-
-        registry.register_provider(ProviderConfig {
-            name: "deepseek".to_string(),
-            api_key_env: "DEEPSEEK_API_KEY".to_string(),
-            base_url: "https://api.deepseek.com/v1".to_string(),
-            is_local: false,
-        });
-
         registry
     }
 
@@ -123,7 +87,6 @@ impl ProviderRegistry {
                     Provider::Anthropic => "https://api.anthropic.com/v1".to_string(),
                     Provider::LMStudio => urls::LMSTUDIO_DEFAULT_BASE_URL.to_string(),
                     Provider::Ollama => "http://localhost:11434/api".to_string(),
-                    Provider::OpenRouter => "https://openrouter.ai/api/v1".to_string(),
                     Provider::Groq => "https://api.groq.com/openai/v1".to_string(),
                     Provider::DeepSeek => "https://api.deepseek.com/v1".to_string(),
                 }
@@ -172,7 +135,6 @@ impl StandardModel {
                     Provider::Anthropic => ModelId::ClaudeSonnet4, // Anthropic doesn't have a "fast" variant
                     Provider::LMStudio => ModelId::LMStudioLocal,
                     Provider::Ollama => ModelId::OllamaLocal,
-                    Provider::OpenRouter => ModelId::OpenRouterModel,
                     Provider::Groq => ModelId::GroqModel,
                     Provider::DeepSeek => ModelId::DeepSeekChat,
                 }
@@ -184,7 +146,6 @@ impl StandardModel {
                     Provider::Anthropic => ModelId::ClaudeOpus41,
                     Provider::LMStudio => ModelId::LMStudioLocal,
                     Provider::Ollama => ModelId::OllamaLocal,
-                    Provider::OpenRouter => ModelId::OpenRouterModel,
                     Provider::Groq => ModelId::GroqModel,
                     Provider::DeepSeek => ModelId::DeepSeekReasoner,
                 }
@@ -196,7 +157,6 @@ impl StandardModel {
                     Provider::Anthropic => ModelId::ClaudeOpus41,
                     Provider::LMStudio => ModelId::LMStudioLocal,
                     Provider::Ollama => ModelId::OllamaLocal,
-                    Provider::OpenRouter => ModelId::OpenRouterModel,
                     Provider::Groq => ModelId::GroqModel,
                     Provider::DeepSeek => ModelId::DeepSeekReasoner,
                 }
@@ -208,7 +168,6 @@ impl StandardModel {
                     Provider::Anthropic => ModelId::ClaudeSonnet4,
                     Provider::LMStudio => ModelId::LMStudioLocal,
                     Provider::Ollama => ModelId::OllamaLocal,
-                    Provider::OpenRouter => ModelId::OpenRouterModel,
                     Provider::Groq => ModelId::GroqModel,
                     Provider::DeepSeek => ModelId::DeepSeekChat,
                 }

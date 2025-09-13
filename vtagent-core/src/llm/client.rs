@@ -1,5 +1,5 @@
 use super::provider::LLMError;
-use super::providers::{AnthropicProvider, GeminiProvider, LMStudioProvider, OpenAIProvider};
+use super::providers::{AnthropicProvider, GeminiProvider, OpenAIProvider};
 use super::types::{BackendKind, LLMResponse};
 use crate::config::models::{ModelId, Provider};
 use async_trait::async_trait;
@@ -24,9 +24,5 @@ pub fn make_client(api_key: String, model: ModelId) -> AnyClient {
         )),
         Provider::OpenAI => Box::new(OpenAIProvider::new(api_key)),
         Provider::Anthropic => Box::new(AnthropicProvider::new(api_key)),
-        Provider::LMStudio => Box::new(LMStudioProvider::new(
-            None,
-            Some(crate::config::constants::urls::LMSTUDIO_DEFAULT_BASE_URL.to_string()),
-        )),
     }
 }

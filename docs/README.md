@@ -7,7 +7,7 @@ Welcome to the comprehensive documentation for **VTAgent**, a Rust-based termina
 VTAgent represents a modern approach to AI-powered software development, featuring:
 
 - **Multi-Agent Architecture** - Orchestrator, Explorer, and Coder agents for specialized tasks
-- **Multi-Provider LLM Support** - Gemini, OpenAI, Anthropic, and LMStudio integration
+- **Multi-Provider LLM Support** - Gemini, OpenAI, Anthropic integration
 - **Advanced Code Intelligence** - Tree-sitter parsers for 6+ programming languages
 - **Enterprise-Grade Safety** - Comprehensive security controls and path validation
 - **Flexible Configuration** - TOML-based configuration with granular policies

@@ -14,66 +14,6 @@ use serde_json::Value;
 use std::path::PathBuf;
 use std::time::Duration;
 
-/// Wrapper for LMStudio provider to implement LLMClient trait
-struct LMStudioClientWrapper {
-    provider: Box<dyn crate::llm::provider::LLMProvider>,
-    model: String,
-}
-
-#[async_trait::async_trait]
-impl crate::llm::client::LLMClient for LMStudioClientWrapper {
-    async fn generate(
-        &mut self,
-        prompt: &str,
-    ) -> Result<crate::llm::types::LLMResponse, crate::llm::provider::LLMError> {
-        // Try to parse as LLMRequest JSON, otherwise treat as plain text
-        let request: crate::llm::provider::LLMRequest = match serde_json::from_str(prompt) {
-            Ok(req) => req,
-            Err(_) => {
-                // Fallback to simple text prompt
-                crate::llm::provider::LLMRequest {
-                    messages: vec![crate::llm::provider::Message {
-                        role: crate::llm::provider::MessageRole::User,
-                        content: prompt.to_string(),
-                        tool_calls: None,
-                        tool_call_id: None,
-                    }],
-                    system_prompt: None,
-                    tools: None,
-                    model: self.model.clone(),
-                    max_tokens: Some(1000),
-                    temperature: Some(0.7),
-                    stream: false,
-                    tool_choice: None,
-                    parallel_tool_calls: None,
-                    reasoning_effort: None,
-                }
-            }
-        };
-
-        // Convert LLMRequest to the format expected by the provider
-        let response = self.provider.generate(request).await?;
-
-        Ok(crate::llm::types::LLMResponse {
-            content: response.content.unwrap_or_default(),
-            model: self.model.clone(),
-            usage: response.usage.map(|u| crate::llm::types::Usage {
-                prompt_tokens: u.prompt_tokens as usize,
-                completion_tokens: u.completion_tokens as usize,
-                total_tokens: u.total_tokens as usize,
-            }),
-        })
-    }
-
-    fn backend_kind(&self) -> crate::llm::types::BackendKind {
-        crate::llm::types::BackendKind::OpenAI
-    }
-
-    fn model_id(&self) -> &str {
-        &self.model
-    }
-}
-
 /// Individual agent runner for executing specialized agent tasks
 pub struct AgentRunner {
     /// Agent type and configuration
@@ -159,14 +99,8 @@ impl AgentRunner {
         session_id: String,
         reasoning_effort: Option<String>,
     ) -> Result<Self> {
-        // Create client based on model - if it's an LMStudio model, create the provider directly
-        let client: AnyClient = if model.as_str().starts_with("lmstudio/") {
-            // For LMStudio models, create the provider directly
-            make_client(api_key, model.clone())
-        } else {
-            // For other models, use the standard approach
-            make_client(api_key, model.clone())
-        };
+        // Create client based on model
+        let client: AnyClient = make_client(api_key, model.clone());
 
         // Create system prompt based on agent type
         let system_prompt = match agent_type {

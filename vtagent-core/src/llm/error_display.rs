@@ -38,10 +38,6 @@ pub fn style_provider_name(provider: &str) -> String {
             // Anthropic's brand purple (using magenta as approximation)
             style(provider).magenta()
         }
-        "lmstudio" => {
-            // LMStudio's brand color (using cyan as approximation)
-            style(provider).cyan()
-        }
         _ => {
             // Default styling for other providers
             style(provider).cyan()
@@ -95,7 +91,7 @@ mod tests {
 
     #[test]
     fn test_style_provider_name() {
-        let providers = vec!["gemini", "openai", "anthropic", "lmstudio", "unknown"];
+        let providers = vec!["gemini", "openai", "anthropic", "unknown"];
         for provider in providers {
             let result = style_provider_name(provider);
             assert!(!result.is_empty());

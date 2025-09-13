@@ -49,7 +49,6 @@ pub mod tool_policy;
 pub mod tools;
 pub mod types;
 pub mod ui;
-pub mod user_confirmation;
 pub mod utils;
 
 // Re-exports for convenience

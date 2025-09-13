@@ -954,7 +954,7 @@ Commands:
   list          **List all available providers and models**\n\n**Shows:**\n• Available providers\n• Supported models per provider\n• Current configuration\n• Provider status\n\n**Usage:** vtagent models list
   set-provider  **Set the default provider**\n\n**Example:** vtagent models set-provider openai
   set-model     **Set the default model**\n\n**Example:** vtagent models set-model gpt-5
-  config        **Configure provider settings**\n\n**Examples:**\n  vtagent models config openai --api-key YOUR_KEY\n  vtagent models config lmstudio --base-url http://localhost:1234/v1
+  config        **Configure provider settings**\n\n**Examples:**\n  vtagent models config openai --api-key YOUR_KEY\n  vtagent models config gemini --api-key YOUR_KEY
   test          **Test provider connectivity**\n\n**Example:** vtagent models test openai
   help          Print this message or the help of the given subcommand(s)
 
@@ -989,7 +989,7 @@ fix lmstuio error
 2025-09-13 07:38:14  [INFO]
  [LM STUDIO SERVER] Running chat completion on conversation with 2 messages.
 2025-09-13 07:38:14 [DEBUG]
- [lmstudio-llama-cpp] Error in predictTokens: The number of tokens to keep from the initial prompt is greater than the context length. Try to load the model with a larger context length, or provide a shorter input
+
 2025-09-13 07:38:14 [DEBUG]
  1 Error predicting: _0x1b4354 [Error]: The number of tokens to keep from the initial prompt is greater than the context length. Try to load the model with a larger context length, or provide a shorter input
     at _0x329081.<computed>.predictTokens (/Applications/LM Studio.app/Contents/Resources/app/.webpack/lib/llmworker.js:85:29574)
@@ -2266,7 +2266,7 @@ The good description clearly explains what the tool does, when to use it, what d
 
 --
 
-https://deepwiki.com/rust-cli/anstyle/tree/main/crates/anstyle-git apply this render git diff style in agent chat
+https://deepwiki.com/rust-cli/anstyle apply
 
 ---
 

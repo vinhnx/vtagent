@@ -7,7 +7,7 @@ Welcome to VTAgent! This guide will help you get up and running with this Rust-b
 VTAgent represents a modern approach to AI-powered software development, featuring:
 
 - **Multi-Agent Architecture** - Orchestrator, Explorer, and Coder agents for specialized tasks
-- **Multi-Provider LLM Support** - Gemini, OpenAI, Anthropic, and LMStudio integration
+- **Multi-Provider LLM Support** - Gemini, OpenAI, Anthropic integration
 - **Advanced Code Intelligence** - Tree-sitter parsers for 6+ programming languages
 - **Enterprise-Grade Safety** - Comprehensive security controls and path validation
 - **Flexible Configuration** - TOML-based configuration with granular policies
@@ -35,9 +35,6 @@ Choose one of the supported LLM providers:
 
 - **Anthropic**: `export ANTHROPIC_API_KEY=your_key_here`
   - Get from [Anthropic Console](https://console.anthropic.com/)
-
-- **LMStudio**: Local LLM support (no API key required)
-  - Run LMStudio locally with compatible models
 
 ## Installation
 

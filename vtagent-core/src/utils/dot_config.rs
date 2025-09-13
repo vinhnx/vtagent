@@ -33,8 +33,6 @@ pub struct ProviderConfigs {
     pub openai: Option<ProviderConfig>,
     pub anthropic: Option<ProviderConfig>,
     pub gemini: Option<ProviderConfig>,
-    pub openrouter: Option<ProviderConfig>,
-    pub lmstudio: Option<ProviderConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -100,8 +98,6 @@ impl Default for ProviderConfigs {
             openai: None,
             anthropic: None,
             gemini: None,
-            openrouter: None,
-            lmstudio: None,
         }
     }
 }

@@ -45,10 +45,8 @@ impl LLMProvider for AnthropicProvider {
             .send()
             .await
             .map_err(|e| {
-                let formatted_error = error_display::format_llm_error(
-                    "Anthropic",
-                    &format!("Network error: {}", e)
-                );
+                let formatted_error =
+                    error_display::format_llm_error("Anthropic", &format!("Network error: {}", e));
                 LLMError::Network(formatted_error)
             })?;
 
@@ -57,21 +55,18 @@ impl LLMProvider for AnthropicProvider {
             let error_text = response.text().await.unwrap_or_default();
             let formatted_error = error_display::format_llm_error(
                 "Anthropic",
-                &format!("HTTP {}: {}", status, error_text)
+                &format!("HTTP {}: {}", status, error_text),
             );
             return Err(LLMError::Provider(formatted_error));
         }
 
-        let anthropic_response: Value = response
-            .json()
-            .await
-            .map_err(|e| {
-                let formatted_error = error_display::format_llm_error(
-                    "Anthropic",
-                    &format!("Failed to parse response: {}", e)
-                );
-                LLMError::Provider(formatted_error)
-            })?;
+        let anthropic_response: Value = response.json().await.map_err(|e| {
+            let formatted_error = error_display::format_llm_error(
+                "Anthropic",
+                &format!("Failed to parse response: {}", e),
+            );
+            LLMError::Provider(formatted_error)
+        })?;
 
         self.parse_anthropic_response(anthropic_response)
     }

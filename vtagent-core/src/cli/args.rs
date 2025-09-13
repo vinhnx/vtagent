@@ -9,18 +9,18 @@ use std::path::PathBuf;
 #[command(
     name = "vtagent",
     version,
-    about = "Advanced coding agent with multi-agent architecture\n\n**Features:**\n• Multi-agent coordination (Orchestrator, Explorer, Coder)\n• Tree-sitter powered code analysis (Rust, Python, JavaScript, TypeScript, Go, Java)\n• Multi-provider LLM support (Gemini, OpenAI, Anthropic, DeepSeek, xAI)\n• Real-time performance monitoring and benchmarking\n• Enhanced security with tool policies and sandboxing\n• Research-preview context management and conversation compression\n\n**Quick Start:**\n  export GEMINI_API_KEY=\"your_key\"\n  vtagent chat\n\n**Multi-Agent Mode:**\n  vtagent chat --force-multi-agent"
+    about = "Advanced coding agent with multi-agent architecture\n\n**Features:**\n• Multi-agent coordination (Orchestrator, Explorer, Coder)\n• Tree-sitter powered code analysis (Rust, Python, JavaScript, TypeScript, Go, Java)\n• Multi-provider LLM support (Gemini, OpenAI, Anthropic, DeepSeek)\n• Real-time performance monitoring and benchmarking\n• Enhanced security with tool policies and sandboxing\n• Research-preview context management and conversation compression\n\n**Quick Start:**\n  export GEMINI_API_KEY=\"your_key\"\n  vtagent chat\n\n**Multi-Agent Mode:**\n  vtagent chat --force-multi-agent"
 )]
 pub struct Cli {
-    /// **LLM Model ID** with latest model support\n\n**Available providers & models:**\n• `gemini-2.5-flash-lite` - Fastest, most cost-effective (default)\n• `gemini-2.5-flash` - Fast, cost-effective\n• `gemini-2.5-pro` - Latest, most capable\n• `gpt-5` - OpenAI's latest\n• `claude-sonnet-4-20250514` - Anthropic's latest\n• `qwen/qwen3-4b-2507` - Qwen3 local model\n• `deepseek-reasoner` - DeepSeek reasoning model\n• `grok-3-mini-fast-latest` - xAI Grok model
+    /// **LLM Model ID** with latest model support\n\n**Available providers & models:**\n• `gemini-2.5-flash-lite` - Fastest, most cost-effective (default)\n• `gemini-2.5-flash` - Fast, cost-effective\n• `gemini-2.5-pro` - Latest, most capable\n• `gpt-5` - OpenAI's latest\n• `claude-sonnet-4-20250514` - Anthropic's latest\n• `qwen/qwen3-4b-2507` - Qwen3 local model\n• `deepseek-reasoner` - DeepSeek reasoning model
     #[arg(long, global = true)]
     pub model: Option<String>,
 
-    /// **LLM Provider** with expanded support\n\n**Available providers:**\n• `gemini` - Google Gemini (default)\n• `openai` - OpenAI GPT models\n• `anthropic` - Anthropic Claude models\n• `openrouter` - OpenRouter (multi-provider)\n• `lmstudio` - Local LMStudio models\n• `deepseek` - DeepSeek models\n• `xai` - xAI Grok models\n\n**Example:** --provider deepseek
+    /// **LLM Provider** with expanded support\n\n**Available providers:**\n• `gemini` - Google Gemini (default)\n• `openai` - OpenAI GPT models\n• `anthropic` - Anthropic Claude models\n• `deepseek` - DeepSeek models\n\n**Example:** --provider deepseek
     #[arg(long, global = true)]
     pub provider: Option<String>,
 
-    /// **API key environment variable**\n\n**Auto-detects based on provider:**\n• Gemini: `GEMINI_API_KEY`\n• OpenAI: `OPENAI_API_KEY`\n• Anthropic: `ANTHROPIC_API_KEY`\n• DeepSeek: `DEEPSEEK_API_KEY`\n• xAI: `XAI_API_KEY`\n\n**Override:** --api-key-env CUSTOM_KEY
+    /// **API key environment variable**\n\n**Auto-detects based on provider:**\n• Gemini: `GEMINI_API_KEY`\n• OpenAI: `OPENAI_API_KEY`\n• Anthropic: `ANTHROPIC_API_KEY`\n• DeepSeek: `DEEPSEEK_API_KEY`\n\n**Override:** --api-key-env CUSTOM_KEY
     #[arg(long, global = true, default_value = crate::config::constants::defaults::DEFAULT_API_KEY_ENV)]
     pub api_key_env: String,
 
@@ -209,7 +209,7 @@ pub enum Commands {
         command: crate::cli::tool_policy_commands::ToolPolicyCommands,
     },
 
-    /// **Manage models and providers** - configure and switch between LLM providers\n\n**Features:**\n• Support for latest models (DeepSeek, xAI, etc.)\n• Provider configuration and testing\n• Model performance comparison\n• API key management\n\n**Examples:**\n  vtagent models list\n  vtagent models set-provider deepseek\n  vtagent models set-model deepseek-reasoner\n  vtagent models test xai
+    /// **Manage models and providers** - configure and switch between LLM providers\n\n**Features:**\n• Support for latest models (DeepSeek, etc.)\n• Provider configuration and testing\n• Model performance comparison\n• API key management\n\n**Examples:**\n  vtagent models list\n  vtagent models set-provider deepseek\n  vtagent models set-model deepseek-reasoner
     Models {
         #[command(subcommand)]
         command: ModelCommands,
@@ -229,7 +229,7 @@ pub enum ModelCommands {
     /// List all providers and models with status indicators
     List,
 
-    /// Set default provider (gemini, openai, anthropic, deepseek, xai, openrouter, lmstudio)
+    /// Set default provider (gemini, openai, anthropic, deepseek)
     #[command(name = "set-provider")]
     SetProvider {
         /// Provider name to set as default
@@ -252,7 +252,7 @@ pub enum ModelCommands {
         #[arg(long)]
         api_key: Option<String>,
 
-        /// Base URL for local providers (LMStudio)
+        /// Base URL for local providers
         #[arg(long)]
         base_url: Option<String>,
 

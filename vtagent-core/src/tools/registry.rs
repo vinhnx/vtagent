@@ -1,5 +1,6 @@
 //! Tool registry and function declarations
 
+use super::apply_patch::Patch;
 use super::bash_tool::BashTool;
 use super::cache::FILE_CACHE;
 use super::command::CommandTool;
@@ -7,7 +8,6 @@ use super::file_ops::FileOpsTool;
 use super::search::SearchTool;
 use super::simple_search::SimpleSearchTool;
 use super::traits::Tool;
-use super::apply_patch::Patch;
 use crate::config::PtyConfig;
 use crate::config::constants::tools;
 use crate::config::types::CapabilityLevel;
@@ -758,13 +758,29 @@ impl ToolRegistry {
                     }
                     if line.is_none() {
                         line = item
-                            .get("range").and_then(|r| r.get("start")).and_then(|s| s.get("line")).and_then(|l| l.as_u64())
-                            .or(item.get("start").and_then(|s| s.get("line")).and_then(|l| l.as_u64()));
+                            .get("range")
+                            .and_then(|r| r.get("start"))
+                            .and_then(|s| s.get("line"))
+                            .and_then(|l| l.as_u64())
+                            .or(item
+                                .get("start")
+                                .and_then(|s| s.get("line"))
+                                .and_then(|l| l.as_u64()));
                     }
                     if text.is_none() {
-                        text = item.get("text").and_then(|t| t.as_str()).map(|s| s.to_string())
-                            .or(item.get("lines").and_then(|l| l.get("text")).and_then(|t| t.as_str()).map(|s| s.to_string()))
-                            .or(item.get("matched").and_then(|t| t.as_str()).map(|s| s.to_string()));
+                        text = item
+                            .get("text")
+                            .and_then(|t| t.as_str())
+                            .map(|s| s.to_string())
+                            .or(item
+                                .get("lines")
+                                .and_then(|l| l.get("text"))
+                                .and_then(|t| t.as_str())
+                                .map(|s| s.to_string()))
+                            .or(item
+                                .get("matched")
+                                .and_then(|t| t.as_str())
+                                .map(|s| s.to_string()));
                     }
 
                     out.push(json!({
@@ -792,17 +808,28 @@ impl ToolRegistry {
                         .unwrap_or("")
                         .to_string();
                     let line = item
-                        .get("range").and_then(|r| r.get("start")).and_then(|s| s.get("line")).and_then(|l| l.as_u64())
-                        .or(item.get("start").and_then(|s| s.get("line")).and_then(|l| l.as_u64()))
+                        .get("range")
+                        .and_then(|r| r.get("start"))
+                        .and_then(|s| s.get("line"))
+                        .and_then(|l| l.as_u64())
+                        .or(item
+                            .get("start")
+                            .and_then(|s| s.get("line"))
+                            .and_then(|l| l.as_u64()))
                         .or(item.get("line").and_then(|l| l.as_u64()))
                         .unwrap_or(0);
                     let message = item
-                        .get("message").and_then(|m| m.as_str())
+                        .get("message")
+                        .and_then(|m| m.as_str())
                         .or(item.get("text").and_then(|t| t.as_str()))
                         .unwrap_or("")
                         .to_string();
                     let severity = item.get("severity").and_then(|s| s.as_str()).unwrap_or("");
-                    let rule = item.get("rule").or_else(|| item.get("rule_id")).and_then(|r| r.as_str()).unwrap_or("");
+                    let rule = item
+                        .get("rule")
+                        .or_else(|| item.get("rule_id"))
+                        .and_then(|r| r.as_str())
+                        .unwrap_or("");
                     out.push(json!({
                         "path": path,
                         "line_number": line,
@@ -830,16 +857,26 @@ impl ToolRegistry {
                         .unwrap_or("")
                         .to_string();
                     let line = item
-                        .get("range").and_then(|r| r.get("start")).and_then(|s| s.get("line")).and_then(|l| l.as_u64())
-                        .or(item.get("start").and_then(|s| s.get("line")).and_then(|l| l.as_u64()))
+                        .get("range")
+                        .and_then(|r| r.get("start"))
+                        .and_then(|s| s.get("line"))
+                        .and_then(|l| l.as_u64())
+                        .or(item
+                            .get("start")
+                            .and_then(|s| s.get("line"))
+                            .and_then(|l| l.as_u64()))
                         .or(item.get("line").and_then(|l| l.as_u64()))
                         .unwrap_or(0);
                     // Try different fields to summarize change
-                    let before = item.get("text").and_then(|t| t.as_str())
+                    let before = item
+                        .get("text")
+                        .and_then(|t| t.as_str())
                         .or(item.get("matched").and_then(|t| t.as_str()))
                         .or(item.get("before").and_then(|t| t.as_str()))
                         .unwrap_or("");
-                    let after = item.get("replacement").and_then(|t| t.as_str())
+                    let after = item
+                        .get("replacement")
+                        .and_then(|t| t.as_str())
                         .or(item.get("after").and_then(|t| t.as_str()))
                         .unwrap_or("");
                     let note = if !after.is_empty() {
@@ -861,10 +898,14 @@ impl ToolRegistry {
 }
 
 fn truncate(s: &str, max: usize) -> String {
-    if s.chars().count() <= max { return s.to_string(); }
+    if s.chars().count() <= max {
+        return s.to_string();
+    }
     let mut out = String::new();
     for (i, ch) in s.chars().enumerate() {
-        if i >= max { break; }
+        if i >= max {
+            break;
+        }
         out.push(ch);
     }
     out.push_str("…");

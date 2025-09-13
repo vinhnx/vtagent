@@ -2,7 +2,7 @@ use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
 use tempfile::tempdir;
-use vtagent_core::{ToolRegistry};
+use vtagent_core::ToolRegistry;
 use vtagent_core::config::constants::tools;
 
 #[tokio::test]
@@ -49,7 +49,11 @@ async fn list_files_pagination_and_default_response_format() {
 #[tokio::test]
 async fn grep_search_default_concise_and_cap() {
     // Skip if ripgrep is not available
-    if std::process::Command::new("rg").arg("--version").output().is_err() {
+    if std::process::Command::new("rg")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
         eprintln!("skipping grep_search_default_concise_and_cap: ripgrep not installed");
         return;
     }

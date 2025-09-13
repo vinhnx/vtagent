@@ -209,7 +209,7 @@ The system prompt dynamically incorporates configuration from `vtagent.toml`:
 - **Command permissions**: Unix command allow/deny lists
 
 ### Model Configuration
-- **Provider selection**: Gemini, OpenAI, Anthropic, LMStudio support
+- **Provider selection**: Gemini, OpenAI, Anthropic support
 - **Model preferences**: Default models for different providers
 - **API key management**: Secure environment variable handling
 - **Rate limiting**: Configurable request limits and timeouts

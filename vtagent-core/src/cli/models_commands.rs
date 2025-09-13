@@ -120,18 +120,6 @@ fn is_provider_configured(config: &DotConfig, provider: &str) -> bool {
             .as_ref()
             .map(|p| p.enabled)
             .unwrap_or(false),
-        "openrouter" => config
-            .providers
-            .openrouter
-            .as_ref()
-            .map(|p| p.enabled)
-            .unwrap_or(false),
-        "lmstudio" => config
-            .providers
-            .lmstudio
-            .as_ref()
-            .map(|p| p.enabled)
-            .unwrap_or(false),
         _ => false,
     }
 }
@@ -191,11 +179,8 @@ async fn handle_config_provider(
     let mut config = manager.load_config()?;
 
     match provider {
-        "openai" | "anthropic" | "gemini" | "openrouter" => {
+        "openai" | "anthropic" | "gemini" => {
             configure_standard_provider(&mut config, provider, api_key, model)?;
-        }
-        "lmstudio" => {
-            configure_lmstudio_provider(&mut config, api_key, base_url, model)?;
         }
         _ => return Err(anyhow!("Unsupported provider: {}", provider)),
     }
@@ -231,10 +216,6 @@ fn configure_standard_provider(
             .anthropic
             .get_or_insert_with(Default::default),
         "gemini" => config.providers.gemini.get_or_insert_with(Default::default),
-        "openrouter" => config
-            .providers
-            .openrouter
-            .get_or_insert_with(Default::default),
         _ => return Err(anyhow!("Unknown provider: {}", provider)),
     };
 
@@ -245,32 +226,6 @@ fn configure_standard_provider(
         provider_config.model = Some(m.to_string());
     }
     provider_config.enabled = api_key.is_some() || provider_config.api_key.is_some();
-
-    Ok(())
-}
-
-/// Configure LMStudio provider
-fn configure_lmstudio_provider(
-    config: &mut DotConfig,
-    api_key: Option<&str>,
-    base_url: Option<&str>,
-    model: Option<&str>,
-) -> Result<()> {
-    let provider_config = config
-        .providers
-        .lmstudio
-        .get_or_insert_with(Default::default);
-
-    if let Some(key) = api_key {
-        provider_config.api_key = Some(key.to_string());
-    }
-    if let Some(url) = base_url {
-        provider_config.base_url = Some(url.to_string());
-    }
-    if let Some(m) = model {
-        provider_config.model = Some(m.to_string());
-    }
-    provider_config.enabled = true;
 
     Ok(())
 }
@@ -347,8 +302,6 @@ fn get_provider_credentials(
         "openai" => Ok(get_config(config.providers.openai.as_ref())),
         "anthropic" => Ok(get_config(config.providers.anthropic.as_ref())),
         "gemini" => Ok(get_config(config.providers.gemini.as_ref())),
-        "openrouter" => Ok(get_config(config.providers.openrouter.as_ref())),
-        "lmstudio" => Ok(get_config(config.providers.lmstudio.as_ref())),
         _ => Err(anyhow!("Unknown provider: {}", provider)),
     }
 }
@@ -392,10 +345,6 @@ fn infer_provider_from_model(model: &str) -> &'static str {
         "Google Gemini"
     } else if model.starts_with("deepseek-") {
         "DeepSeek"
-    } else if model.starts_with("grok-") {
-        "xAI"
-    } else if model.contains("qwen") {
-        "LMStudio/Qwen"
     } else {
         "Unknown"
     }

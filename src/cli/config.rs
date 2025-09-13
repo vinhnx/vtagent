@@ -16,7 +16,7 @@ pub async fn handle_config_command(output: Option<&Path>, use_home_dir: bool) ->
             true, // force overwrite
             true  // use home directory
         )?;
-        
+
         if !created_files.is_empty() {
             println!("Configuration files created in user home directory:");
             for file in created_files {
@@ -68,8 +68,8 @@ fn generate_default_config() -> String {
 [agent]
 # Default model to use
 default_model = "qwen/qwen3-4b-2507"
-# AI provider (gemini, openai, anthropic, lmstudio)
-provider = "lmstudio"
+# AI provider (gemini, openai, anthropic)
+provider = "gemini"
 # Maximum conversation turns
 max_conversation_turns = 150
 # Reasoning effort level for models that support it (low, medium, high)
@@ -94,20 +94,6 @@ max_concurrent_subagents = 3
 context_sharing_enabled = true
 # Task execution timeout in seconds
 task_timeout_seconds = 300
-
-[lmstudio]
-# LMStudio-specific configuration
-base_url = "http://localhost:1234/v1"
-# Model to use for single-agent mode
-single_agent_model = "qwen/qwen3-4b-2507"
-# Model to use for multi-agent orchestrator
-orchestrator_model = "qwen/qwen3-4b-2507"
-# Model to use for multi-agent subagents
-subagent_model = "qwen/qwen3-4b-2507"
-# Enable LMStudio for multi-agent mode
-enable_multi_agent = true
-# Connection timeout in seconds
-connection_timeout_seconds = 30
 
 [tools]
 # Default tool execution policy

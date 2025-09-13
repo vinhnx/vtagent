@@ -648,12 +648,6 @@ impl MultiAgentSystem {
         Ok(results)
     }
 
-    /// Execute a task with a specific agent
-    async fn execute_task_with_agent(&self, task: &Task, agent: &SubAgent) -> Result<TaskResults> {
-        self.execute_task_with_agent_id(task, &agent.id, agent.agent_type)
-            .await
-    }
-
     /// Update agent status
     async fn update_agent_status(&mut self, agent_id: &str, status: AgentStatus) -> Result<()> {
         for agents in self.subagents.values_mut() {

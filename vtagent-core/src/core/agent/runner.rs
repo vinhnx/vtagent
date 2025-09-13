@@ -1,6 +1,7 @@
 //! Agent runner for executing individual agent instances
 
 use crate::config::constants::tools;
+use crate::config::loader::ConfigManager;
 use crate::config::models::ModelId;
 use crate::core::agent::multi_agent::*;
 use crate::gemini::{Content, Part, Tool};
@@ -13,6 +14,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use serde_json::Value;
 use std::path::PathBuf;
 use std::time::Duration;
+use tracing::info;
 
 /// Individual agent runner for executing specialized agent tasks
 pub struct AgentRunner {
@@ -25,9 +27,9 @@ pub struct AgentRunner {
     /// System prompt content
     system_prompt: String,
     /// Session information
-    session_id: String,
+    _session_id: String,
     /// Workspace path
-    workspace: PathBuf,
+    _workspace: PathBuf,
     /// Model identifier
     model: String,
     /// Reasoning effort level for models that support it
@@ -119,8 +121,8 @@ impl AgentRunner {
             client,
             tool_registry: ToolRegistry::new(workspace.clone()),
             system_prompt,
-            session_id,
-            workspace,
+            _session_id: session_id,
+            _workspace: workspace,
             model: model.as_str().to_string(),
             reasoning_effort,
         })
@@ -816,24 +818,79 @@ impl AgentRunner {
 
     /// Execute a tool by name with given arguments
     async fn execute_tool(&self, tool_name: &str, args: &Value) -> Result<Value> {
+        // Enforce per-agent shell policies for RUN_TERMINAL_CMD/BASH
+        let is_shell = tool_name == tools::RUN_TERMINAL_CMD || tool_name == tools::BASH;
+        if is_shell {
+            let cfg = ConfigManager::load()
+                .or_else(|_| ConfigManager::load_from_workspace("."))
+                .or_else(|_| ConfigManager::load_from_file("vtagent.toml"))
+                .map(|cm| cm.config().clone())
+                .unwrap_or_default();
+
+            let cmd_text = if let Some(cmd_val) = args.get("command") {
+                if cmd_val.is_array() {
+                    cmd_val
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .filter_map(|v| v.as_str())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                } else {
+                    cmd_val.as_str().unwrap_or("").to_string()
+                }
+            } else {
+                String::new()
+            };
+
+            // For now, use the global allow/deny lists (per-agent overrides can be added similarly)
+            for pat in &cfg.commands.deny_regex {
+                if regex::Regex::new(pat)
+                    .ok()
+                    .map(|re| re.is_match(&cmd_text))
+                    .unwrap_or(false)
+                {
+                    return Err(anyhow!("Shell command denied by regex: {}", pat));
+                }
+            }
+            for pat in &cfg.commands.deny_glob {
+                let re = format!("^{}$", regex::escape(pat).replace(r"\*", ".*"));
+                if regex::Regex::new(&re)
+                    .ok()
+                    .map(|re| re.is_match(&cmd_text))
+                    .unwrap_or(false)
+                {
+                    return Err(anyhow!("Shell command denied by glob: {}", pat));
+                }
+            }
+            info!(target = "policy", agent = ?self.agent_type, tool = tool_name, cmd = %cmd_text, "shell_policy_checked");
+        }
         // Clone the tool registry for this execution
         let mut registry = self.tool_registry.clone();
 
         // Initialize async components
         registry.initialize_async().await?;
 
-        // Try to execute the tool
-        match registry.execute_tool(tool_name, args.clone()).await {
-            Ok(result) => Ok(result),
-            Err(e) => {
-                // If the tool doesn't exist in the registry, return an error
-                Err(anyhow!(
-                    "Tool '{}' not found or failed to execute: {}",
-                    tool_name,
-                    e
-                ))
+        // Try with simple adaptive retry (up to 2 retries)
+        let mut delay = std::time::Duration::from_millis(200);
+        for attempt in 0..3 {
+            match registry.execute_tool(tool_name, args.clone()).await {
+                Ok(result) => return Ok(result),
+                Err(_e) if attempt < 2 => {
+                    tokio::time::sleep(delay).await;
+                    delay = delay.saturating_mul(2);
+                    continue;
+                }
+                Err(e) => {
+                    return Err(anyhow!(
+                        "Tool '{}' not found or failed to execute: {}",
+                        tool_name,
+                        e
+                    ));
+                }
             }
         }
+        unreachable!()
     }
 
     /// Generate a meaningful summary of the task execution

@@ -63,6 +63,7 @@ dotenvy = "0.15"
 dirs = "5.0"
 # YAML support
 serde_yaml = "0.9"
+tracing = "0.1"
 
 [features]
 default = []

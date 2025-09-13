@@ -4,6 +4,7 @@
 //! It provides a centralized way to manage agent policies, tool permissions, and
 //! command allow lists.
 
+pub mod api_keys;
 pub mod constants;
 pub mod core;
 pub mod defaults;

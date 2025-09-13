@@ -14,6 +14,22 @@ pub struct CommandsConfig {
     /// Dangerous patterns that require extra confirmation
     #[serde(default)]
     pub dangerous_patterns: Vec<String>,
+
+    /// Glob patterns allowed for shell commands (applies to run_terminal_cmd/Bash)
+    #[serde(default)]
+    pub allow_glob: Vec<String>,
+
+    /// Glob patterns denied for shell commands
+    #[serde(default)]
+    pub deny_glob: Vec<String>,
+
+    /// Regex allow patterns for shell commands
+    #[serde(default)]
+    pub allow_regex: Vec<String>,
+
+    /// Regex deny patterns for shell commands
+    #[serde(default)]
+    pub deny_regex: Vec<String>,
 }
 
 impl Default for CommandsConfig {
@@ -38,6 +54,10 @@ impl Default for CommandsConfig {
                 "git reset --hard".to_string(),
                 "pip install".to_string(),
             ],
+            allow_glob: vec![],
+            deny_glob: vec!["rm *".to_string(), "sudo *".to_string()],
+            allow_regex: vec![],
+            deny_regex: vec![r"rm\s+-rf\b".to_string()],
         }
     }
 }

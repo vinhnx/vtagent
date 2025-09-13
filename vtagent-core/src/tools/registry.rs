@@ -10,12 +10,14 @@ use super::simple_search::SimpleSearchTool;
 use super::traits::Tool;
 use crate::config::PtyConfig;
 use crate::config::constants::tools;
+use crate::config::loader::ConfigManager;
 use crate::config::types::CapabilityLevel;
 use crate::gemini::FunctionDeclaration;
 use crate::tool_policy::{ToolPolicy, ToolPolicyManager};
 use crate::tools::ast_grep::AstGrepEngine;
 use crate::tools::grep_search::GrepSearchManager;
 use anyhow::{Context, Result, anyhow};
+use regex::Regex;
 use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -487,6 +489,107 @@ impl ToolRegistry {
     }
 
     pub async fn run_terminal_cmd(&mut self, args: Value) -> Result<Value> {
+        // Enforce command policies before delegating
+        let cfg = ConfigManager::load()
+            .or_else(|_| ConfigManager::load_from_workspace("."))
+            .or_else(|_| ConfigManager::load_from_file("vtagent.toml"))
+            .map(|cm| cm.config().clone())
+            .unwrap_or_default();
+
+        let mut args = args;
+        // Try to extract the command text for policy checking
+        let cmd_text = if let Some(cmd_val) = args.get("command") {
+            if cmd_val.is_array() {
+                cmd_val
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter_map(|v| v.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            } else {
+                cmd_val.as_str().unwrap_or("").to_string()
+            }
+        } else {
+            String::new()
+        };
+
+        // Deny regex
+        for pat in &cfg.commands.deny_regex {
+            if Regex::new(pat)
+                .ok()
+                .map(|re| re.is_match(&cmd_text))
+                .unwrap_or(false)
+            {
+                return Err(anyhow!("Command denied by regex policy: {}", pat));
+            }
+        }
+        // Deny glob (convert basic * to .*)
+        for pat in &cfg.commands.deny_glob {
+            let re = format!("^{}$", regex::escape(pat).replace(r"\*", ".*"));
+            if Regex::new(&re)
+                .ok()
+                .map(|re| re.is_match(&cmd_text))
+                .unwrap_or(false)
+            {
+                return Err(anyhow!("Command denied by glob policy: {}", pat));
+            }
+        }
+        // Exact deny list
+        for d in &cfg.commands.deny_list {
+            if cmd_text.starts_with(d) {
+                return Err(anyhow!("Command denied by policy: {}", d));
+            }
+        }
+
+        // Allow: if allow_regex/glob present, require one match
+        let mut allow_ok =
+            cfg.commands.allow_regex.is_empty() && cfg.commands.allow_glob.is_empty();
+        if !allow_ok {
+            if cfg.commands.allow_regex.iter().any(|pat| {
+                Regex::new(pat)
+                    .ok()
+                    .map(|re| re.is_match(&cmd_text))
+                    .unwrap_or(false)
+            }) {
+                allow_ok = true;
+            }
+            if !allow_ok
+                && cfg.commands.allow_glob.iter().any(|pat| {
+                    let re = format!("^{}$", regex::escape(pat).replace(r"\*", ".*"));
+                    Regex::new(&re)
+                        .ok()
+                        .map(|re| re.is_match(&cmd_text))
+                        .unwrap_or(false)
+                })
+            {
+                allow_ok = true;
+            }
+        }
+        if !allow_ok {
+            // Fall back to exact allow_list if provided
+            if !cfg.commands.allow_list.is_empty() {
+                allow_ok = cfg
+                    .commands
+                    .allow_list
+                    .iter()
+                    .any(|p| cmd_text.starts_with(p));
+            }
+        }
+        if !allow_ok {
+            return Err(anyhow!("Command not allowed by policy"));
+        }
+
+        // Clamp working dir by injecting cwd if not set
+        if args.get("cwd").is_none() {
+            args.as_object_mut().map(|m| {
+                m.insert(
+                    "cwd".to_string(),
+                    json!(self.workspace_root.display().to_string()),
+                );
+            });
+        }
+
         self.execute_tool(tools::RUN_TERMINAL_CMD, args).await
     }
 

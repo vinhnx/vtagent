@@ -1,10 +1,18 @@
-# VTAgent - Terminal Coding Agent
-
-VTAgent is a Rust-based terminal coding agent with modular architecture supporting multiple LLM providers (Gemini, OpenAI, Anthropic) and tree-sitter parsers for 6+ languages. It provides a reliable, context-aware coding experience through intelligent tool integration and sophisticated prompt engineering.
-
 <div align="center">
-  <img src="screenshots/vtagent.png" alt="VTAgent screenshot" width="800">
+
+<h1>VTAgent</h1>
+
+<img src="screenshots/vtagent.png" alt="VTAgent screenshot" width="800">
+
+<h6>VTAgent is a Rust-based terminal coding agent</h6>
+
 </div>
+
+---
+
+VT Agent is built with modular architecture supporting multiple LLM providers (Gemini, OpenAI, Anthropic) and tree-sitter parsers for 6+ languages.It provides a reliable, context-aware coding experience through intelligent tool integration and sophisticated prompt engineering.
+
+<a href="https://deepwiki.com/vinhnx/vtagent"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
 
 ## Features
 

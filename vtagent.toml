@@ -10,6 +10,8 @@ reasoning_effort = "medium"
 
 [security]
 human_in_the_loop = true
+require_write_tool_for_claims = true
+auto_apply_detected_patches = true
 
 [multi_agent]
 # Enable multi-agent mode (default: false)

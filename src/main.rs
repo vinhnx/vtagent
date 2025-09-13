@@ -3,6 +3,7 @@
 //! This is the main binary entry point for vtagent.
 
 use anyhow::{Context, Result, bail};
+// mod cli; // disabled: legacy chat handler in this file is used
 use clap::Parser;
 use colored::*;
 use console::style;
@@ -10,6 +11,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use std::io::{self, Write};
 use std::path::PathBuf;
 use vtagent_core::cli::args::{Cli, Commands};
+// use of internal CLI submodules disabled for now; using legacy chat handler in this file
 use vtagent_core::config::constants::models;
 use vtagent_core::config::models::{ModelId, Provider};
 use vtagent_core::config::multi_agent::MultiAgentSystemConfig;
@@ -466,7 +468,6 @@ async fn handle_single_agent_chat(
 
     // Welcome message with guidance
     println!("{}", style("Welcome to VTAgent! Type your questions or commands below.").cyan());
-    println!("{}", style("Tip: Try asking 'read the main.rs and show me what it about'").dim());
     println!();
 
     loop {
@@ -515,6 +516,71 @@ async fn handle_single_agent_chat(
                     .bold()
             );
             break;
+        }
+
+        // In-REPL tool policy commands
+        // Commands:
+        //   :policy status
+        //   :policy allow <tool>
+        //   :policy deny <tool>
+        //   :policy prompt <tool>
+        //   :policy allow-all | deny-all | prompt-all
+        if input.starts_with(":policy") {
+            let parts: Vec<&str> = input.split_whitespace().collect();
+            if parts.len() == 2 && parts[1].eq_ignore_ascii_case("status") {
+                // Show status
+                let summary = tool_registry.policy_manager().get_policy_summary();
+                println!("{} Tool Policy Status:", style("[POLICY]").cyan().bold());
+                for (tool, pol) in summary {
+                    let s = match pol {
+                        vtagent_core::tool_policy::ToolPolicy::Allow => style("ALLOW").green(),
+                        vtagent_core::tool_policy::ToolPolicy::Prompt => style("PROMPT").yellow(),
+                        vtagent_core::tool_policy::ToolPolicy::Deny => style("DENY").red(),
+                    };
+                    println!("  {:20} {}", style(tool).white(), s);
+                }
+                continue;
+            }
+
+            if parts.len() == 3 {
+                let action = parts[1].to_lowercase();
+                let tool_name = parts[2];
+                let res = match action.as_str() {
+                    "allow" => tool_registry.set_tool_policy(tool_name, vtagent_core::tool_policy::ToolPolicy::Allow),
+                    "deny" => tool_registry.set_tool_policy(tool_name, vtagent_core::tool_policy::ToolPolicy::Deny),
+                    "prompt" => tool_registry.set_tool_policy(tool_name, vtagent_core::tool_policy::ToolPolicy::Prompt),
+                    _ => {
+                        println!("{} Unknown policy action: {}", style("[ERROR]").red().bold(), action);
+                        continue;
+                    }
+                };
+                match res {
+                    Ok(_) => println!("{} Set '{}' to {}", style("[POLICY]").cyan().bold(), tool_name, action),
+                    Err(e) => println!("{} Failed to set policy: {}", style("[ERROR]").red().bold(), e),
+                }
+                continue;
+            }
+
+            if parts.len() == 2 {
+                let action = parts[1].to_lowercase();
+                let res = match action.as_str() {
+                    "allow-all" => tool_registry.allow_all_tools(),
+                    "deny-all" => tool_registry.deny_all_tools(),
+                    "prompt-all" => tool_registry.reset_tool_policies(),
+                    _ => {
+                        println!("{} Usage:\n  :policy status\n  :policy allow|deny|prompt <tool>\n  :policy allow-all|deny-all|prompt-all", style("[USAGE]").yellow());
+                        continue;
+                    }
+                };
+                match res {
+                    Ok(_) => println!("{} Applied {}", style("[POLICY]").cyan().bold(), action),
+                    Err(e) => println!("{} Failed to update policies: {}", style("[ERROR]").red().bold(), e),
+                }
+                continue;
+            }
+
+            println!("{} Usage:\n  :policy status\n  :policy allow|deny|prompt <tool>\n  :policy allow-all|deny-all|prompt-all", style("[USAGE]").yellow());
+            continue;
         }
 
         if input.is_empty() {
@@ -698,15 +764,60 @@ async fn handle_single_agent_chat(
                             style(&tool_call.function.arguments).dim()
                         );
 
+                        // Human-in-the-loop: policy prompt for Prompt or Deny
+                        let tool_name = &tool_call.function.name;
+                        let prev_policy = tool_registry.get_tool_policy(tool_name);
+                        let mut restore_policy: Option<vtagent_core::tool_policy::ToolPolicy> = None;
+                        if matches!(prev_policy, vtagent_core::tool_policy::ToolPolicy::Prompt | vtagent_core::tool_policy::ToolPolicy::Deny) {
+                            println!("Tool Permission Request: {}", tool_name);
+                            println!("Allow this tool? [y]es / [n]o / [a]lways / [d]eny-always (default n): ");
+                            io::stdout().flush().ok();
+                            let mut answer = String::new();
+                            io::stdin().read_line(&mut answer).ok();
+                            let ans = answer.trim().to_lowercase();
+                            match ans.as_str() {
+                                "y" | "yes" => {
+                                    restore_policy = Some(prev_policy);
+                                    let _ = tool_registry.set_tool_policy(tool_name, vtagent_core::tool_policy::ToolPolicy::Allow);
+                                }
+                                "a" | "always" => {
+                                    let _ = tool_registry.set_tool_policy(tool_name, vtagent_core::tool_policy::ToolPolicy::Allow);
+                                }
+                                "d" | "deny" => {
+                                    let _ = tool_registry.set_tool_policy(tool_name, vtagent_core::tool_policy::ToolPolicy::Deny);
+                                    // Add user-denied response and continue to next tool
+                                    conversation_history.push(Message {
+                                        role: MessageRole::Tool,
+                                        content: format!("User denied '{}'", tool_name),
+                                        tool_calls: None,
+                                        tool_call_id: Some(tool_call.id.clone()),
+                                    });
+                                    progress.inc(1);
+                                    continue;
+                                }
+                                _ => {
+                                    // Default deny this call
+                                    conversation_history.push(Message {
+                                        role: MessageRole::Tool,
+                                        content: format!("User denied '{}'", tool_name),
+                                        tool_calls: None,
+                                        tool_call_id: Some(tool_call.id.clone()),
+                                    });
+                                    progress.inc(1);
+                                    continue;
+                                }
+                            }
+                        }
+
                         // Create spinner for tool execution - only show when actually executing
                         let tool_spinner = spinner::start_loading_spinner(
-                            &format!("Executing {}...", tool_call.function.name)
+                            &format!("Executing {}...", tool_name)
                         );
 
                         // Execute the tool
                         let result = tool_registry
                             .execute_tool(
-                                &tool_call.function.name,
+                                tool_name,
                                 serde_json::from_str(&tool_call.function.arguments)
                                     .unwrap_or(serde_json::Value::Null),
                             )
@@ -745,6 +856,11 @@ async fn handle_single_agent_chat(
                                     tool_call_id: Some(tool_call.id.clone()),
                                 });
                             }
+                        }
+
+                        // Restore previous policy if this was a one-time allow
+                        if let Some(prev) = restore_policy.take() {
+                            let _ = tool_registry.set_tool_policy(tool_name, prev);
                         }
                     }
 
@@ -790,10 +906,52 @@ async fn handle_single_agent_chat(
                                         style(&tool_call.function.arguments).dim()
                                     );
 
+                                    // Human-in-the-loop: policy prompt for Prompt or Deny
+                                    let tool_name = &tool_call.function.name;
+                                    let prev_policy = tool_registry.get_tool_policy(tool_name);
+                                    let mut restore_policy: Option<vtagent_core::tool_policy::ToolPolicy> = None;
+                                    if matches!(prev_policy, vtagent_core::tool_policy::ToolPolicy::Prompt | vtagent_core::tool_policy::ToolPolicy::Deny) {
+                                        println!("Tool Permission Request: {}", tool_name);
+                                        println!("Allow this tool? [y]es / [n]o / [a]lways / [d]eny-always (default n): ");
+                                        io::stdout().flush().ok();
+                                        let mut answer = String::new();
+                                        io::stdin().read_line(&mut answer).ok();
+                                        let ans = answer.trim().to_lowercase();
+                                        match ans.as_str() {
+                                            "y" | "yes" => {
+                                                restore_policy = Some(prev_policy);
+                                                let _ = tool_registry.set_tool_policy(tool_name, vtagent_core::tool_policy::ToolPolicy::Allow);
+                                            }
+                                            "a" | "always" => {
+                                                let _ = tool_registry.set_tool_policy(tool_name, vtagent_core::tool_policy::ToolPolicy::Allow);
+                                            }
+                                            "d" | "deny" => {
+                                                let _ = tool_registry.set_tool_policy(tool_name, vtagent_core::tool_policy::ToolPolicy::Deny);
+                                                // Add user-denied response and continue
+                                                conversation_history.push(Message {
+                                                    role: MessageRole::Tool,
+                                                    content: format!("User denied '{}'", tool_name),
+                                                    tool_calls: None,
+                                                    tool_call_id: Some(tool_call.id.clone()),
+                                                });
+                                                continue;
+                                            }
+                                            _ => {
+                                                conversation_history.push(Message {
+                                                    role: MessageRole::Tool,
+                                                    content: format!("User denied '{}'", tool_name),
+                                                    tool_calls: None,
+                                                    tool_call_id: Some(tool_call.id.clone()),
+                                                });
+                                                continue;
+                                            }
+                                        }
+                                    }
+
                                     // Execute the tool
                                     match tool_registry
                                         .execute_tool(
-                                            &tool_call.function.name,
+                                            tool_name,
                                             serde_json::from_str(&tool_call.function.arguments)
                                                 .unwrap_or(serde_json::Value::Null),
                                         )
@@ -821,7 +979,7 @@ async fn handle_single_agent_chat(
                                             println!(
                                                 "{}: Tool {} failed: {}",
                                                 style("(ERROR)").red().bold().on_bright(),
-                                                tool_call.function.name,
+                                                tool_name,
                                                 e
                                             );
 
@@ -836,6 +994,11 @@ async fn handle_single_agent_chat(
                                                 tool_call_id: Some(tool_call.id.clone()),
                                             });
                                         }
+                                    }
+
+                                    // Restore previous policy if this was a one-time allow
+                                    if let Some(prev) = restore_policy.take() {
+                                        let _ = tool_registry.set_tool_policy(tool_name, prev);
                                     }
                                 }
 

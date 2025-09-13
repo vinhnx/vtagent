@@ -3,7 +3,7 @@
 use anyhow::Result;
 use console::style;
 use std::path::Path;
-use vtagent_core::project::{ProjectManager, ProjectMetadata};
+use vtagent_core::{SimpleProjectManager, ProjectData};
 
 /// Handle the init-project command
 pub async fn handle_init_project_command(
@@ -14,7 +14,8 @@ pub async fn handle_init_project_command(
     println!("{}", style("Initialize project with dot-folder structure").blue().bold());
 
     // Initialize project manager
-    let project_manager = ProjectManager::new()?;
+    let project_manager = SimpleProjectManager::new(std::env::current_dir()?);
+    project_manager.init()?;
 
     // Determine project name
     let project_name = if let Some(name) = name {
@@ -32,7 +33,7 @@ pub async fn handle_init_project_command(
     println!("Project name: {}", project_name);
 
     // Check if project already exists
-    let project_dir = project_manager.project_dir(&project_name);
+    let project_dir = project_manager.project_data_dir(&project_name);
     if project_dir.exists() && !force {
         println!("{} Project directory already exists: {}", style("Warning").yellow(), project_dir.display());
         println!("Use --force to overwrite existing project structure.");
@@ -40,15 +41,14 @@ pub async fn handle_init_project_command(
     }
 
     // Create project structure
-    project_manager.create_project_structure(&project_name)?;
+    project_manager.create_project(&project_name, Some("VTAgent project"))?;
     println!("{} Created project structure in: {}", style("Success").green(), project_dir.display());
 
     // Create or update project metadata
     let current_dir = std::env::current_dir()?;
-    let mut metadata = ProjectMetadata::new(project_name.clone(), current_dir.display().to_string());
+    let mut metadata = ProjectData::new(&project_name);
     metadata.description = Some("VTAgent project".to_string());
-
-    project_manager.save_project_metadata(&project_name, &metadata)?;
+    project_manager.update_project(&metadata)?;
     println!("{} Created project metadata", style("Success").green());
 
     // Migrate existing files if requested
@@ -66,7 +66,7 @@ pub async fn handle_init_project_command(
 
 /// Migrate existing config/cache files to the new project structure
 async fn migrate_existing_files(
-    project_manager: &ProjectManager,
+    project_manager: &SimpleProjectManager,
     project_name: &str,
     current_dir: &Path,
 ) -> Result<()> {

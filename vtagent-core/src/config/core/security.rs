@@ -22,6 +22,17 @@ pub struct SecurityConfig {
     /// Allowed file extensions
     #[serde(default)]
     pub allowed_file_extensions: Vec<String>,
+
+    /// Require a successful write tool before accepting claims like
+    /// "I've updated the file" as applied. When true, such claims are
+    /// treated as proposals unless a write tool executed successfully.
+    #[serde(default = "default_true")]
+    pub require_write_tool_for_claims: bool,
+
+    /// Automatically apply detected patch blocks in assistant replies
+    /// when no write tool was executed. Defaults to false for safety.
+    #[serde(default)]
+    pub auto_apply_detected_patches: bool,
 }
 
 impl Default for SecurityConfig {
@@ -40,6 +51,8 @@ impl Default for SecurityConfig {
                 ".yaml".to_string(),
                 ".yml".to_string(),
             ],
+            require_write_tool_for_claims: default_true(),
+            auto_apply_detected_patches: false,
         }
     }
 }

@@ -1,5 +1,7 @@
 # VTAgent - minimal coding agent
 
+[![tool-eval](https://github.com/vinhnx/vtagent/actions/workflows/tool-eval.yml/badge.svg)](https://github.com/vinhnx/vtagent/actions/workflows/tool-eval.yml)
+
 VTAgent is a Rust-based terminal coding agent with modular architecture supporting multiple LLM providers (Gemini, OpenAI, Anthropic) and tree-sitter parsers for 6+ languages. It provides a reliable, context-aware coding experience through intelligent tool integration and sophisticated prompt engineering.
 
 <div align="center">
@@ -75,6 +77,7 @@ cargo run -- chat
 - **`src/`**: Binary crate with CLI interface
 - **`prompts/`**: System prompts for different agent types
 - **`docs/`**: Comprehensive documentation
+- **Tool specs**: see `docs/tools/TOOL_SPECS.md` for schemas, examples, and limits
 - **`examples/`**: Usage examples and demonstrations
 
 ### Agent Types

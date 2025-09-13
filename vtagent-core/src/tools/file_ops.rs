@@ -15,15 +15,12 @@ use walkdir::WalkDir;
 #[derive(Clone)]
 pub struct FileOpsTool {
     workspace_root: PathBuf,
-    grep_search: Arc<GrepSearchManager>,
 }
 
 impl FileOpsTool {
-    pub fn new(workspace_root: PathBuf, grep_search: Arc<GrepSearchManager>) -> Self {
-        Self {
-            workspace_root,
-            grep_search,
-        }
+    pub fn new(workspace_root: PathBuf, _grep_search: Arc<GrepSearchManager>) -> Self {
+        // grep_search was unused; keep param to avoid broad call-site churn
+        Self { workspace_root }
     }
 
     /// Execute basic directory listing
@@ -37,26 +34,19 @@ impl FileOpsTool {
             ));
         }
 
-        let mut items = Vec::new();
-        let mut count = 0;
-
+        let mut all_items = Vec::new();
         if base.is_file() {
             let metadata = tokio::fs::metadata(&base).await?;
-            items.push(json!({
+            all_items.push(json!({
                 "name": base.file_name().unwrap().to_string_lossy(),
                 "path": input.path,
                 "type": "file",
                 "size": metadata.len(),
                 "modified": metadata.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs())
             }));
-            count = 1;
         } else if base.is_dir() {
             let mut entries = tokio::fs::read_dir(&base).await?;
             while let Some(entry) = entries.next_entry().await? {
-                if count >= input.max_items {
-                    break;
-                }
-
                 let path = entry.path();
                 let name = entry.file_name().to_string_lossy().to_string();
 
@@ -68,23 +58,65 @@ impl FileOpsTool {
                 }
 
                 let metadata = entry.metadata().await?;
-                items.push(json!({
+                all_items.push(json!({
                     "name": name,
                     "path": path.strip_prefix(&self.workspace_root).unwrap_or(&path).to_string_lossy(),
                     "type": if metadata.is_dir() { "directory" } else { "file" },
                     "size": metadata.len(),
                     "modified": metadata.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs())
                 }));
-                count += 1;
             }
         }
 
-        Ok(json!({
+        // Apply max_items cap first for token efficiency
+        let capped_total = all_items.len().min(input.max_items);
+        let (page, per_page) = (
+            input.page.unwrap_or(1).max(1),
+            input.per_page.unwrap_or(100).max(1),
+        );
+        let start = (page - 1).saturating_mul(per_page);
+        let end = (start + per_page).min(capped_total);
+        let has_more = end < capped_total;
+
+        let mut page_items = if start < end { all_items[start..end].to_vec() } else { vec![] };
+
+        // Respect response_format
+        let concise = input
+            .response_format
+            .as_deref()
+            .map(|s| s.eq_ignore_ascii_case("concise"))
+            .unwrap_or(true);
+        if concise {
+            for obj in page_items.iter_mut() {
+                if let Some(map) = obj.as_object_mut() {
+                    map.remove("modified");
+                }
+            }
+        }
+
+        let guidance = if has_more || capped_total < all_items.len() {
+            Some(format!(
+                "Showing {} of {} items (page {}, per_page {}). Use 'page' and 'per_page' to page through results.",
+                page_items.len(), capped_total, page, per_page
+            ))
+        } else {
+            None
+        };
+
+        let mut out = json!({
             "success": true,
-            "items": items,
-            "count": count,
-            "mode": "list"
-        }))
+            "items": page_items,
+            "count": page_items.len(),
+            "total": capped_total,
+            "page": page,
+            "per_page": per_page,
+            "has_more": has_more,
+            "mode": "list",
+            "response_format": if concise { "concise" } else { "detailed" }
+        });
+
+        if let Some(msg) = guidance { out["message"] = json!(msg); }
+        Ok(out)
     }
 
     /// Execute recursive file search
@@ -92,16 +124,14 @@ impl FileOpsTool {
         let pattern = input
             .name_pattern
             .as_ref()
-            .ok_or_else(|| anyhow!("name_pattern required for recursive mode"))?;
+            .ok_or_else(|| anyhow!("Error: Missing 'name_pattern'. Example: list_files(path='.', mode='recursive', name_pattern='*.rs')"))?;
         let search_path = self.workspace_root.join(&input.path);
 
         let mut items = Vec::new();
         let mut count = 0;
 
         for entry in WalkDir::new(&search_path).max_depth(10) {
-            if count >= input.max_items {
-                break;
-            }
+            if count >= input.max_items { break; }
 
             let entry = entry.map_err(|e| anyhow!("Walk error: {}", e))?;
             let path = entry.path();
@@ -148,13 +178,7 @@ impl FileOpsTool {
             }
         }
 
-        Ok(json!({
-            "success": true,
-            "items": items,
-            "count": count,
-            "mode": "recursive",
-            "pattern": pattern
-        }))
+        Ok(self.paginate_and_format(items, count, input, "recursive", Some(pattern)))
     }
 
     /// Execute find by exact name
@@ -162,7 +186,7 @@ impl FileOpsTool {
         let file_name = input
             .name_pattern
             .as_ref()
-            .ok_or_else(|| anyhow!("name_pattern required for find_name mode"))?;
+            .ok_or_else(|| anyhow!("Error: Missing 'name_pattern'. Example: list_files(path='.', mode='find_name', name_pattern='Cargo.toml')"))?;
         let search_path = self.workspace_root.join(&input.path);
 
         for entry in WalkDir::new(&search_path).max_depth(10) {
@@ -200,7 +224,8 @@ impl FileOpsTool {
             "success": true,
             "found": false,
             "mode": "find_name",
-            "searched_for": file_name
+            "searched_for": file_name,
+            "message": "Not found. Consider using mode='recursive' if searching in subdirectories."
         }))
     }
 
@@ -209,7 +234,7 @@ impl FileOpsTool {
         let content_pattern = input
             .content_pattern
             .as_ref()
-            .ok_or_else(|| anyhow!("content_pattern required for find_content mode"))?;
+            .ok_or_else(|| anyhow!("Error: Missing 'content_pattern'. Example: list_files(path='src', mode='find_content', content_pattern='fn main')"))?;
 
         // Simple content search implementation
         let search_path = self.workspace_root.join(&input.path);
@@ -253,18 +278,13 @@ impl FileOpsTool {
             }
         }
 
-        Ok(json!({
-            "success": true,
-            "items": items,
-            "count": count,
-            "mode": "find_content",
-            "pattern": content_pattern
-        }))
+        Ok(self.paginate_and_format(items, count, input, "find_content", Some(content_pattern)))
     }
 
     /// Read file with intelligent path resolution
     pub async fn read_file(&self, args: Value) -> Result<Value> {
-        let input: Input = serde_json::from_value(args).context("invalid read_file args")?;
+        let input: Input = serde_json::from_value(args)
+            .context("Error: Invalid 'read_file' arguments. Required: {{ path: string }}. Optional: {{ max_bytes: number }}. Example: read_file({{\"path\": \"src/main.rs\", \"max_bytes\": 20000}})")?;
 
         // Try to resolve the file path
         let potential_paths = self.resolve_file_path(&input.path)?;
@@ -294,12 +314,16 @@ impl FileOpsTool {
             }
         }
 
-        Err(anyhow!("File not found: {}", input.path))
+        Err(anyhow!(
+            "Error: File not found: {}. Example: read_file({{\"path\": \"src/main.rs\"}})",
+            input.path
+        ))
     }
 
     /// Write file with various modes
     pub async fn write_file(&self, args: Value) -> Result<Value> {
-        let input: WriteInput = serde_json::from_value(args).context("invalid write_file args")?;
+        let input: WriteInput = serde_json::from_value(args)
+            .context("Error: Invalid 'write_file' arguments. Required: {{ path: string, content: string }}. Optional: {{ mode: 'overwrite'|'append'|'skip_if_exists' }}. Example: write_file({{\"path\": \"README.md\", \"content\": \"Hello\", \"mode\": \"overwrite\"}})")?;
         let file_path = self.workspace_root.join(&input.path);
 
         // Create parent directories if needed
@@ -330,7 +354,10 @@ impl FileOpsTool {
                 }
                 tokio::fs::write(&file_path, &input.content).await?;
             }
-            _ => return Err(anyhow!("Unsupported write mode: {}", input.mode)),
+            _ => return Err(anyhow!(format!(
+                "Error: Unsupported write mode '{}'. Allowed: overwrite, append, skip_if_exists.",
+                input.mode
+            ))),
         }
 
         Ok(json!({
@@ -362,7 +389,9 @@ impl FileOpsTool {
 #[async_trait]
 impl Tool for FileOpsTool {
     async fn execute(&self, args: Value) -> Result<Value> {
-        let input: ListInput = serde_json::from_value(args).context("invalid list_files args")?;
+        let input: ListInput = serde_json::from_value(args).context(
+            "Error: Invalid 'list_files' arguments. Required: {{ path: string }}. Optional: {{ mode, max_items, page, per_page, include_hidden, response_format }}. Example: list_files({{\"path\": \"src\", \"page\": 1, \"per_page\": 50, \"response_format\": \"concise\"}})",
+        )?;
 
         let mode_clone = input.mode.clone();
         let mode = mode_clone.as_deref().unwrap_or("list");
@@ -426,5 +455,56 @@ impl CacheableTool for FileOpsTool {
 
     fn cache_ttl(&self) -> u64 {
         60 // 1 minute for file listings
+    }
+}
+
+impl FileOpsTool {
+    fn paginate_and_format(
+        &self,
+        items: Vec<Value>,
+        total_count: usize,
+        input: &ListInput,
+        mode: &str,
+        pattern: Option<&String>,
+    ) -> Value {
+        let (page, per_page) = (
+            input.page.unwrap_or(1).max(1),
+            input.per_page.unwrap_or(100).max(1),
+        );
+        let total_capped = total_count.min(input.max_items);
+        let start = (page - 1).saturating_mul(per_page);
+        let end = (start + per_page).min(total_capped);
+        let has_more = end < total_capped;
+        let mut page_items = if start < end { items[start..end].to_vec() } else { vec![] };
+
+        let concise = input
+            .response_format
+            .as_deref()
+            .map(|s| s.eq_ignore_ascii_case("concise"))
+            .unwrap_or(true);
+        if concise {
+            for obj in page_items.iter_mut() {
+                if let Some(map) = obj.as_object_mut() {
+                    map.remove("modified");
+                }
+            }
+        }
+
+        let mut out = json!({
+            "success": true,
+            "items": page_items,
+            "count": page_items.len(),
+            "total": total_capped,
+            "page": page,
+            "per_page": per_page,
+            "has_more": has_more,
+            "mode": mode,
+            "response_format": if concise { "concise" } else { "detailed" }
+        });
+        if let Some(p) = pattern { out["pattern"] = json!(p); }
+        if has_more {
+            out["message"] = json!(format!("Showing {} of {} results. Use 'page' to continue.", out["count"].as_u64().unwrap_or(0), total_capped));
+        }
+        out
     }
 }

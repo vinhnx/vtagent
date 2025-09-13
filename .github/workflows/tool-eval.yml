@@ -1,0 +1,34 @@
+name: tool-eval
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ripgrep (for grep_search)
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build
+        run: cargo build --workspace --quiet
+
+      - name: Run tool eval harness
+        run: |
+          cargo run --bin eval-tools | tee tool-eval.log || true
+
+      - name: Upload eval artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tool-eval-artifacts
+          path: |
+            tool-eval.log
+            tool-eval.json
+

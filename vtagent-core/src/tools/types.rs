@@ -99,6 +99,15 @@ pub struct ListInput {
     pub path: String,
     #[serde(default = "default_max_items")]
     pub max_items: usize,
+    /// Optional page number for pagination (1-based)
+    #[serde(default)]
+    pub page: Option<usize>,
+    /// Optional page size for pagination
+    #[serde(default)]
+    pub per_page: Option<usize>,
+    /// Controls verbosity of tool output: "concise" (default) or "detailed"
+    #[serde(default)]
+    pub response_format: Option<String>,
     #[serde(default)]
     pub include_hidden: bool,
     #[serde(default)]
@@ -125,6 +134,9 @@ pub struct EnhancedTerminalInput {
     pub timeout_secs: Option<u64>,
     #[serde(default)]
     pub mode: Option<String>, // "terminal", "pty", "streaming"
+    /// Controls verbosity of tool output: "concise" (default) or "detailed"
+    #[serde(default)]
+    pub response_format: Option<String>,
 }
 
 /// PTY Session structure for managing interactive terminal sessions

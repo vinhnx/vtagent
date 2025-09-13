@@ -13,7 +13,6 @@ use std::sync::Arc;
 /// Enhanced search tool with advanced case-insensitive features
 pub struct AdvancedSearchTool {
     workspace_root: PathBuf,
-    grep_search: Arc<GrepSearchManager>,
 }
 
 #[derive(Debug, Clone)]
@@ -44,11 +43,9 @@ impl Default for SearchOptions {
 }
 
 impl AdvancedSearchTool {
-    pub fn new(workspace_root: PathBuf, grep_search: Arc<GrepSearchManager>) -> Self {
-        Self {
-            workspace_root,
-            grep_search,
-        }
+    pub fn new(workspace_root: PathBuf, _grep_search: Arc<GrepSearchManager>) -> Self {
+        // grep_search was unused; keep constructor signature for compatibility but drop the field
+        Self { workspace_root }
     }
 
     /// Perform advanced search with multiple options

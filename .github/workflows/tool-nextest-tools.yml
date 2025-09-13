@@ -1,0 +1,29 @@
+name: tool-nextest-tools
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tool-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ripgrep (for grep_search)
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install nextest
+        run: cargo install cargo-nextest --locked
+
+      - name: Build tests
+        run: cargo nextest list -p vtagent-core --lib || true
+
+      - name: Run tool-only tests (quarantined)
+        run: |
+          cargo nextest run -p vtagent-core --lib -E "test(.*tools_anthropic_alignment.*|.*transform_matches_to_concise.*)"
+

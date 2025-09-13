@@ -5,7 +5,7 @@
 use anyhow::{Context, Result, bail};
 use clap::Parser;
 use console::style;
-use owo_colors::OwoColorize;
+use indicatif::{ProgressBar, ProgressStyle};
 use std::io::{self, Write};
 use std::path::PathBuf;
 use vtagent_core::cli::args::{Cli, Commands};
@@ -18,6 +18,7 @@ use vtagent_core::core::agent::multi_agent::{AgentType, MultiAgentConfig};
 use vtagent_core::llm::factory::create_provider_with_config;
 use vtagent_core::llm::provider::{LLMProvider, LLMRequest, Message, MessageRole};
 use vtagent_core::llm::{AnyClient, make_client};
+use vtagent_core::constants::{tools, prompts};
 
 /// Load project-specific context for better agent performance
 async fn load_project_context(
@@ -631,7 +632,7 @@ async fn handle_single_agent_chat(
         let llm_spinner = ProgressBar::new_spinner();
         llm_spinner.set_style(
             ProgressStyle::default_spinner()
-                .tick_strings(&["🤔", "💭", "🧠", "💡", "✨"])
+                .tick_strings(&["|", "/", "-", "\\", "|"])
                 .template("{spinner:.yellow} {msg}")
                 .unwrap()
         );
@@ -676,7 +677,7 @@ async fn handle_single_agent_chat(
                     // Assistant message already added above, proceed with tool execution
                     println!(
                         "\n{} {} tool call(s) to execute",
-                        style("🔧").blue(),
+                        style("[TOOL]").blue(),
                         style(tool_calls.len()).bold()
                     );
 
@@ -773,7 +774,7 @@ async fn handle_single_agent_chat(
                     let follow_up_spinner = ProgressBar::new_spinner();
                     follow_up_spinner.set_style(
                         ProgressStyle::default_spinner()
-                            .tick_strings(&["🔄", "⏳", "📝", "✏️", "📋"])
+                            .tick_strings(&[".", "..", "...", "....", "....."])
                             .template("{spinner:.cyan} {msg}")
                             .unwrap()
                     );
@@ -832,7 +833,7 @@ async fn handle_single_agent_chat(
                                         Err(e) => {
                                             println!(
                                                 "{}: Tool {} failed: {}",
-                                                style("(ERROR)").red().bold().on_bright_black(),
+                                                style("(ERROR)").red().bold().on_bright(),
                                                 tool_call.function.name,
                                                 e
                                             );
@@ -881,7 +882,7 @@ async fn handle_single_agent_chat(
                                     Err(e) => {
                                         eprintln!(
                                             "{}: Error in ultimate follow-up request: {:?}",
-                                            style("[ERROR]").red().bold().on_bright_black(),
+                                            style("[ERROR]").red().bold().on_bright(),
                                             e
                                         );
                                     }
@@ -901,7 +902,7 @@ async fn handle_single_agent_chat(
                         Err(e) => {
                             eprintln!(
                                 "{}: Error in follow-up request: {:?}",
-                                style("[ERROR]").red().bold().on_bright_black(),
+                                style("[ERROR]").red().bold().on_bright(),
                                 e
                             );
                         }
@@ -920,7 +921,7 @@ async fn handle_single_agent_chat(
             Err(e) => {
                 eprintln!(
                     "{}: {:?}",
-                    style("[ERROR]").red().bold().on_bright_black(),
+                    style("[ERROR]").red().bold().on_bright(),
                     e
                 );
             }
@@ -942,7 +943,7 @@ async fn handle_single_agent_chat(
         if tool_calls > 0 {
             println!(
                 "{} {} tool call(s) executed",
-                style("🔧").blue(),
+                style("[TOOL]").blue(),
                 style(tool_calls).bold()
             );
         }

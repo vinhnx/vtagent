@@ -12,3 +12,26 @@ pub mod user_confirmation;
 pub use markdown::*;
 pub use spinner::*;
 pub use terminal::*;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_render_markdown() {
+        let markdown_text = r#"
+# Welcome to VTAgent
+
+This is a **bold** statement and this is *italic*.
+
+## Features
+
+- Advanced code analysis
+- Multi-language support
+- Real-time collaboration
+"#;
+
+        // This should not panic
+        render_markdown(markdown_text);
+    }
+}

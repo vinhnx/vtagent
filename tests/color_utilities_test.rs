@@ -1,35 +1,31 @@
 use vtagent_core::utils::colors::*;
 
 #[test]
-fn test_rgb_to_ansi() {
-    let ansi = rgb_to_ansi(255, 0, 0); // Red
-    assert_eq!(ansi, 196); // Standard red in 256-color mode
+fn test_basic_colors() {
+    let red_text = red("Hello");
+    assert!(red_text.to_string().contains("Hello"));
+    
+    let green_text = green("World");
+    assert!(green_text.to_string().contains("World"));
 }
 
 #[test]
-fn test_generate_harmonious_scheme() {
-    let scheme = generate_harmonious_scheme(255, 0, 0, 3);
-    assert_eq!(scheme.len(), 3);
+fn test_styles() {
+    let bold_text = bold("Bold");
+    assert!(bold_text.to_string().contains("Bold"));
+    
+    let italic_text = italic("Italic");
+    assert!(italic_text.to_string().contains("Italic"));
 }
 
 #[test]
-fn test_lighten_color() {
-    let (r, g, b) = lighten_color(128, 128, 128, 0.5);
-    // Lightened gray should be brighter
-    assert!(r > 128 && g > 128 && b > 128);
+fn test_rgb() {
+    let rgb_text = rgb("RGB Color", 255, 128, 64);
+    assert!(rgb_text.to_string().contains("RGB Color"));
 }
 
 #[test]
-fn test_darken_color() {
-    let (r, g, b) = darken_color(128, 128, 128, 0.5);
-    // Darkened gray should be darker
-    assert!(r < 128 && g < 128 && b < 128);
-}
-
-#[test]
-fn test_blend_colors() {
-    // Blend red and blue to get purple
-    let (r, g, b) = blend_colors(255, 0, 0, 0, 0, 255, 0.5);
-    // Should be purple (red + blue)
-    assert!(r > 100 && b > 100 && g < 50);
+fn test_custom_style() {
+    let styled_text = custom_style("Styled", &["red", "bold"]);
+    assert!(styled_text.to_string().contains("Styled"));
 }

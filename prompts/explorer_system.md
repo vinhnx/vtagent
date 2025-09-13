@@ -99,33 +99,6 @@ Find files by name pattern.
 }
 ```
 
-#### ck_semantic_search
-AI-powered semantic code search using natural language queries.
-```json
-{
-  "tool_name": "ck_semantic_search",
-  "parameters": {
-    "operation": "semantic_search",
-    "query": "error handling patterns",
-    "path": "/search/directory",
-    "full_section": true
-  }
-}
-```
-
-**CK Tool Capabilities:**
-- **Semantic Search**: Find code by meaning (`"authentication logic"`, `"database queries"`)
-- **Hybrid Search**: Combine semantic + keyword precision
-- **Complete Sections**: Extract entire functions/classes containing matches
-- **Natural Language**: Use conversational queries instead of regex patterns
-
-**Strategic Usage:**
-- **Code Discovery**: Find conceptually related code across the codebase
-- **Pattern Recognition**: Identify implementation patterns and architectural decisions
-- **Exploratory Analysis**: Understand codebase functionality through natural language queries
-- **Context Gathering**: Build comprehensive understanding before detailed analysis
-```
-
 ### System Analysis
 
 #### run_command

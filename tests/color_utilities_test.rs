@@ -7,12 +7,6 @@ fn test_rgb_to_ansi() {
 }
 
 #[test]
-fn test_hsl_to_ansi() {
-    let ansi = hsl_to_ansi(0.0, 1.0, 0.5); // Red in HSL
-    assert_eq!(ansi, 196); // Should convert to same red
-}
-
-#[test]
 fn test_generate_harmonious_scheme() {
     let scheme = generate_harmonious_scheme(255, 0, 0, 3);
     assert_eq!(scheme.len(), 3);

@@ -4,10 +4,14 @@
 //! with provider-specific implementations.
 
 pub mod client;
+pub mod error_display;
 pub mod factory;
 pub mod provider;
 pub mod providers;
 pub mod types;
+
+#[cfg(test)]
+mod error_display_test;
 
 // Re-export main types for backward compatibility
 pub use client::{AnyClient, make_client};

@@ -1,5 +1,6 @@
 use crate::config::constants::models;
 use crate::llm::client::LLMClient;
+use crate::llm::error_display;
 use crate::llm::provider::{
     FinishReason, FunctionCall, LLMError, LLMProvider, LLMRequest, LLMResponse, Message,
     MessageRole, ToolCall,
@@ -51,21 +52,34 @@ impl LLMProvider for GeminiProvider {
             .json(&gemini_request)
             .send()
             .await
-            .map_err(|e| LLMError::Network(e.to_string()))?;
+            .map_err(|e| {
+                let formatted_error = error_display::format_llm_error(
+                    "Gemini",
+                    &format!("Network error: {}", e)
+                );
+                LLMError::Network(formatted_error)
+            })?;
 
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            return Err(LLMError::Provider(format!(
-                "HTTP {}: {}",
-                status, error_text
-            )));
+            let formatted_error = error_display::format_llm_error(
+                "Gemini", 
+                &format!("HTTP {}: {}", status, error_text)
+            );
+            return Err(LLMError::Provider(formatted_error));
         }
 
         let gemini_response: Value = response
             .json()
             .await
-            .map_err(|e| LLMError::Provider(e.to_string()))?;
+            .map_err(|e| {
+                let formatted_error = error_display::format_llm_error(
+                    "Gemini",
+                    &format!("Failed to parse response: {}", e)
+                );
+                LLMError::Provider(formatted_error)
+            })?;
 
         self.convert_from_gemini_format(gemini_response)
     }
@@ -80,10 +94,11 @@ impl LLMProvider for GeminiProvider {
 
     fn validate_request(&self, request: &LLMRequest) -> Result<(), LLMError> {
         if !self.supported_models().contains(&request.model) {
-            return Err(LLMError::InvalidRequest(format!(
-                "Unsupported model: {}",
-                request.model
-            )));
+            let formatted_error = error_display::format_llm_error(
+                "Gemini",
+                &format!("Unsupported model: {}", request.model)
+            );
+            return Err(LLMError::InvalidRequest(formatted_error));
         }
         Ok(())
     }
@@ -112,10 +127,13 @@ impl GeminiProvider {
             if message.role == MessageRole::Assistant {
                 if let Some(tool_calls) = &message.tool_calls {
                     for tool_call in tool_calls {
+                        // Parse the arguments string to JSON object for Gemini
+                        let args: Value = serde_json::from_str(&tool_call.function.arguments)
+                            .unwrap_or(json!({}));
                         parts.push(json!({
                             "functionCall": {
                                 "name": tool_call.function.name,
-                                "args": tool_call.function.arguments
+                                "args": args
                             }
                         }));
                     }
@@ -189,11 +207,23 @@ impl GeminiProvider {
     fn convert_from_gemini_format(&self, response: Value) -> Result<LLMResponse, LLMError> {
         let candidates = response["candidates"]
             .as_array()
-            .ok_or_else(|| LLMError::Provider("No candidates in response".to_string()))?;
+            .ok_or_else(|| {
+                let formatted_error = error_display::format_llm_error(
+                    "Gemini",
+                    "No candidates in response"
+                );
+                LLMError::Provider(formatted_error)
+            })?;
 
         let candidate = candidates
             .first()
-            .ok_or_else(|| LLMError::Provider("No candidate in response".to_string()))?;
+            .ok_or_else(|| {
+                let formatted_error = error_display::format_llm_error(
+                    "Gemini",
+                    "No candidate in response"
+                );
+                LLMError::Provider(formatted_error)
+            })?;
 
         // Check if content exists and has parts
         if let Some(content) = candidate.get("content") {

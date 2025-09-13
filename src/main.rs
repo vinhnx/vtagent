@@ -9,7 +9,7 @@ use owo_colors::OwoColorize;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use vtagent_core::cli::args::{Cli, Commands};
-use vtagent_core::config::constants::{models, prompts, tools};
+use vtagent_core::config::constants::models;
 use vtagent_core::config::models::{ModelId, Provider};
 use vtagent_core::config::multi_agent::MultiAgentSystemConfig;
 use vtagent_core::config::{ConfigManager, VTAgentConfig};
@@ -27,6 +27,7 @@ async fn load_project_context(
     let mut context_items = Vec::new();
 
     // Load project metadata
+    eprintln!("DEBUG: Loading project context for project: {}", project_name);
     match project_manager.load_project(project_name) {
         Ok(project_data) => {
             context_items.push(format!("Project: {}", project_data.name));
@@ -627,8 +628,20 @@ async fn handle_single_agent_chat(
         };
 
         // Get response from AI
+        let llm_spinner = ProgressBar::new_spinner();
+        llm_spinner.set_style(
+            ProgressStyle::default_spinner()
+                .tick_strings(&["🤔", "💭", "🧠", "💡", "✨"])
+                .template("{spinner:.yellow} {msg}")
+                .unwrap()
+        );
+        llm_spinner.set_message("AI is thinking...");
+        llm_spinner.enable_steady_tick(std::time::Duration::from_millis(200));
+
         match client.generate(request).await {
             Ok(response) => {
+                llm_spinner.finish_with_message("AI response received");
+
                 // Debug the response structure
                 if debug_enabled {
                     println!(
@@ -667,6 +680,16 @@ async fn handle_single_agent_chat(
                         style(tool_calls.len()).bold()
                     );
 
+                    // Create progress bar for overall tool execution
+                    let progress = ProgressBar::new(tool_calls.len() as u64);
+                    progress.set_style(
+                        ProgressStyle::default_bar()
+                            .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} ({eta})")
+                            .unwrap()
+                            .progress_chars("#>-")
+                    );
+                    progress.set_message("Executing tools...");
+
                     for (tool_call_index, tool_call) in tool_calls.iter().enumerate() {
                         println!(
                             "{} {} {}",
@@ -675,21 +698,30 @@ async fn handle_single_agent_chat(
                             style(&tool_call.function.arguments).dim()
                         );
 
+                        // Create spinner for tool execution
+                        let spinner = ProgressBar::new_spinner();
+                        spinner.set_style(
+                            ProgressStyle::default_spinner()
+                                .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+                                .template("{spinner:.blue} {msg}")
+                                .unwrap()
+                        );
+                        spinner.set_message(format!("Executing {}...", tool_call.function.name));
+                        spinner.enable_steady_tick(std::time::Duration::from_millis(100));
+
                         // Execute the tool
-                        match tool_registry
+                        let result = tool_registry
                             .execute_tool(
                                 &tool_call.function.name,
                                 serde_json::from_str(&tool_call.function.arguments)
                                     .unwrap_or(serde_json::Value::Null),
                             )
-                            .await
-                        {
+                            .await;
+
+                        match result {
                             Ok(result) => {
-                                println!(
-                                    "{} {} executed successfully",
-                                    style("[SUCCESS]").green(),
-                                    style(&tool_call.function.name).cyan().bold()
-                                );
+                                spinner.finish_with_message(format!("✅ {} completed", tool_call.function.name));
+                                progress.inc(1);
 
                                 // Add tool result to conversation
                                 conversation_history.push(Message {
@@ -698,21 +730,13 @@ async fn handle_single_agent_chat(
                                     tool_calls: None,
                                     tool_call_id: Some(tool_call.id.clone()),
                                 });
-
-                                // If this is the last tool call, show completion message
-                                if tool_call_index == tool_calls.len() - 1 {
-                                    println!(
-                                        "\n{} {} All operations completed successfully!",
-                                        style("SUCCESS").yellow().bold(),
-                                        style("[COMPLETED]").green().bold().on_bright_black()
-                                    );
-                                }
                             }
                             Err(e) => {
+                                spinner.finish_with_message(format!("❌ {} failed", tool_call.function.name));
+                                progress.inc(1);
                                 println!(
-                                    "{} {} failed: {}",
+                                    "{} {}",
                                     style("[ERROR]").red(),
-                                    style(&tool_call.function.name).cyan().bold(),
                                     style(&e).red()
                                 );
 
@@ -730,6 +754,8 @@ async fn handle_single_agent_chat(
                         }
                     }
 
+                    progress.finish_with_message("All tools executed");
+
                     // After executing tools, send another request to get the final response
                     let follow_up_request = LLMRequest {
                         messages: conversation_history.clone(),
@@ -744,8 +770,20 @@ async fn handle_single_agent_chat(
                         reasoning_effort: Some(config.agent.reasoning_effort.clone()),
                     };
 
+                    let follow_up_spinner = ProgressBar::new_spinner();
+                    follow_up_spinner.set_style(
+                        ProgressStyle::default_spinner()
+                            .tick_strings(&["🔄", "⏳", "📝", "✏️", "📋"])
+                            .template("{spinner:.cyan} {msg}")
+                            .unwrap()
+                    );
+                    follow_up_spinner.set_message("Generating final response...");
+                    follow_up_spinner.enable_steady_tick(std::time::Duration::from_millis(150));
+
                     match client.generate(follow_up_request).await {
                         Ok(final_response) => {
+                            follow_up_spinner.finish_with_message("Final response ready");
+
                             // Check if the final response also contains tool calls
                             if let Some(final_tool_calls) = &final_response.tool_calls {
                                 println!(
@@ -774,12 +812,6 @@ async fn handle_single_agent_chat(
                                         .await
                                     {
                                         Ok(result) => {
-                                            println!(
-                                                "{}: Tool {} executed successfully",
-                                                style("(SUCCESS)").green().bold(),
-                                                tool_call.function.name
-                                            );
-
                                             // Add tool result to conversation
                                             conversation_history.push(Message {
                                                 role: MessageRole::Tool,

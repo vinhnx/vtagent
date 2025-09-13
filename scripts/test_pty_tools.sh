@@ -52,28 +52,22 @@ run_test "PTY Library in Dependencies" "grep rexpect vtagent-core/Cargo.toml" "r
 echo -e "\n🧪 Testing Tool Functionality"
 echo "============================"
 
-# Test 5: CK semantic search
-run_test "CK Semantic Search" "ck --sem 'error handling' --jsonl --topk 1 | head -1" '"score"'
-
-# Test 6: CK regex search
-run_test "CK Regex Search" "ck -n 'TODO|FIXME' | head -1" "TODO"
-
-# Test 7: Ripgrep functionality
+# Test 5: Ripgrep functionality
 run_test "Ripgrep Functionality" "echo 'test content' > /tmp/vtagent_test.txt && rg 'test' /tmp/vtagent_test.txt && rm /tmp/vtagent_test.txt" "test content"
 
-# Test 8: AST-grep functionality
+# Test 6: AST-grep functionality
 run_test "AST Grep Functionality" "echo 'fn test() {}' > /tmp/vtagent_test.rs && ast-grep --lang rust --pattern 'fn \$A() {}' /tmp/vtagent_test.rs && rm /tmp/vtagent_test.rs" "fn test()"
 
 echo -e "\nTesting Code Structure"
 echo "========================="
 
-# Test 9: Check if PTY methods exist in tools
+# Test 7: Check if PTY methods exist in tools
 run_test "BashTool PTY Methods" "grep 'execute_pty_command' vtagent-core/src/tools/bash_tool.rs" "execute_pty_command"
 
-# Test 10: Check if SimpleSearchTool PTY methods exist
+# Test 8: Check if SimpleSearchTool PTY methods exist
 run_test "SimpleSearchTool PTY Methods" "grep 'execute_pty_command' vtagent-core/src/tools/simple_search.rs" "execute_pty_command"
 
-# Test 11: Check if rexpect is imported
+# Test 9: Check if rexpect is imported
 run_test "PTY Imports" "grep 'rexpect::spawn' vtagent-core/src/tools/bash_tool.rs" "rexpect::spawn"
 
 echo -e "\n📊 Test Results"

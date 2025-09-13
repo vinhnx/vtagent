@@ -7,19 +7,17 @@
     "read_file",
     "write_file",
     "edit_file",
-    "ck_semantic_search",
     "bash",
     "ast_grep_search"
   ],
   "policies": {
     "bash": "prompt",
-    "read_file": "allow",
-    "write_file": "allow",
-    "ck_semantic_search": "prompt",
-    "ast_grep_search": "prompt",
-    "grep_search": "prompt",
     "list_files": "allow",
+    "read_file": "allow",
+    "run_terminal_cmd": "allow",
+    "grep_search": "prompt",
     "edit_file": "allow",
-    "run_terminal_cmd": "allow"
+    "write_file": "allow",
+    "ast_grep_search": "prompt"
   }
 }

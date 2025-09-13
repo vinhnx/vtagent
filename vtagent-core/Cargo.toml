@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0"
 clap = { version = "4.5", features = ["derive"] }
-clap-help = "0.1"
+clap-help = "1.5"
 reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -27,7 +27,7 @@ thiserror = "1.0"
 console = "0.15"
 dialoguer = "0.11"
 owo-colors = "4.0"
-termimad = "0.31"
+termimad = "0.34"
 regex = "1.10"
 tree-sitter = "0.23"
 tree-sitter-rust = "0.23"
@@ -64,8 +64,6 @@ dotenvy = "0.15"
 dirs = "5.0"
 # YAML support
 serde_yaml = "0.9"
-# Color utilities
-coolor = "1.1.0"
 
 [features]
 default = []

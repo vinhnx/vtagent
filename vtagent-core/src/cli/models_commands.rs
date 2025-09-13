@@ -4,7 +4,7 @@ use super::args::{Cli, ModelCommands};
 use crate::llm::factory::{create_provider_with_config, get_factory};
 use crate::utils::dot_config::{DotConfig, get_dot_manager, load_user_config};
 use anyhow::{Result, anyhow};
-use owo_colors::*;
+use colored::*;
 
 /// Handle model management commands with concise output
 pub async fn handle_models_command(cli: &Cli, command: &ModelCommands) -> Result<()> {

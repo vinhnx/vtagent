@@ -15,14 +15,12 @@ This example shows how to use VTAgent for code analysis and tool execution.
 ## Available Tools:
 - simple_search: File search and operations
 - bash: Bash-like commands with PTY support
-- ck_semantic_search: AI-powered code search
 - run_terminal_cmd: Terminal command execution
 
 ## Example Workflow:
-1. Use ck_semantic_search to find relevant code
-2. Use simple_search for file operations
-3. Use bash for system operations
-4. Use run_terminal_cmd for complex terminal tasks
+1. Use simple_search for file operations
+2. Use bash for system operations
+3. Use run_terminal_cmd for complex terminal tasks
 "#
     }
 
@@ -38,7 +36,6 @@ This example shows how to use VTAgent for code analysis and tool execution.
 
 ## Tool Integration:
 - All tools now support PTY for terminal emulation
-- Semantic search with AI-powered code understanding
 - AST-based code analysis and transformation
 "#
     }

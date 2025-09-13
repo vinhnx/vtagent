@@ -432,7 +432,10 @@ async fn handle_compare_models(_cli: &Cli) -> Result<()> {
 
 /// Show detailed information about a specific model
 async fn handle_model_info(_cli: &Cli, model: &str) -> Result<()> {
-    println!("{}", format!("Model Information: {}", model).bold().underline());
+    println!(
+        "{}",
+        format!("Model Information: {}", model).bold().underline()
+    );
     println!();
 
     // This would ideally read from docs/models.json

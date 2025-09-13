@@ -8,25 +8,27 @@
     "write_file",
     "edit_file",
     "bash",
+    "apply_patch",
     "ast_grep_search"
   ],
   "policies": {
-    "edit_file": "allow",
-    "bash": "allow",
-    "grep_search": "allow",
+    "apply_patch": "prompt",
     "ast_grep_search": "allow",
-    "read_file": "allow",
+    "edit_file": "allow",
+    "run_terminal_cmd": "allow",
     "list_files": "allow",
+    "read_file": "allow",
+    "bash": "allow",
     "write_file": "allow",
-    "run_terminal_cmd": "allow"
+    "grep_search": "allow"
   },
   "constraints": {
-    "read_file": {
+    "list_files": {
       "allowed_modes": null,
       "max_results_per_call": null,
-      "max_items_per_call": null,
-      "default_response_format": null,
-      "max_bytes_per_read": 200000
+      "max_items_per_call": 500,
+      "default_response_format": "concise",
+      "max_bytes_per_read": null
     },
     "grep_search": {
       "allowed_modes": null,
@@ -35,19 +37,19 @@
       "default_response_format": "concise",
       "max_bytes_per_read": null
     },
+    "read_file": {
+      "allowed_modes": null,
+      "max_results_per_call": null,
+      "max_items_per_call": null,
+      "default_response_format": null,
+      "max_bytes_per_read": 200000
+    },
     "run_terminal_cmd": {
       "allowed_modes": [
         "terminal"
       ],
       "max_results_per_call": null,
       "max_items_per_call": null,
-      "default_response_format": "concise",
-      "max_bytes_per_read": null
-    },
-    "list_files": {
-      "allowed_modes": null,
-      "max_results_per_call": null,
-      "max_items_per_call": 500,
       "default_response_format": "concise",
       "max_bytes_per_read": null
     }

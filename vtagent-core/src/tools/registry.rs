@@ -7,6 +7,7 @@ use super::file_ops::FileOpsTool;
 use super::search::SearchTool;
 use super::simple_search::SimpleSearchTool;
 use super::traits::Tool;
+use super::apply_patch::Patch;
 use crate::config::PtyConfig;
 use crate::config::constants::tools;
 use crate::config::types::CapabilityLevel;
@@ -78,6 +79,7 @@ impl ToolRegistry {
             tools::WRITE_FILE.to_string(),
             tools::EDIT_FILE.to_string(),
             tools::BASH.to_string(),
+            "apply_patch".to_string(),
         ];
 
         // Add AST-grep tool if available
@@ -147,6 +149,7 @@ impl ToolRegistry {
             tools::AST_GREP_SEARCH => self.execute_ast_grep(args).await,
             tools::SIMPLE_SEARCH => self.simple_search_tool.execute(args).await,
             tools::BASH => self.bash_tool.execute(args).await,
+            "apply_patch" => self.execute_apply_patch(args).await,
             _ => Err(anyhow!("Unknown tool: {}", name)),
         };
 
@@ -156,6 +159,19 @@ impl ToolRegistry {
         }
 
         result
+    }
+
+    async fn execute_apply_patch(&self, args: Value) -> Result<Value> {
+        let input = args
+            .get("input")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("Error: Missing 'input' string with patch content. Example: apply_patch({{ input: '*** Begin Patch...*** End Patch' }})"))?;
+        let patch = Patch::parse(input)?;
+        let results = patch.apply(&self.workspace_root).await?;
+        Ok(json!({
+            "success": true,
+            "applied": results,
+        }))
     }
 
     /// Apply optional scoped constraints from tool policy to arguments to improve safety
@@ -1039,6 +1055,19 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
                     "args": {"type": "array", "items": {"type": "string"}, "description": "Arguments for command execution"}
                 },
                 "required": []
+            }),
+        },
+
+        // Apply patch tool (Codex patch format)
+        FunctionDeclaration {
+            name: "apply_patch".to_string(),
+            description: "fs_patch: Apply a Codex-style patch block (*** Begin Patch ... *** End Patch) to the workspace. Use when the assistant provides a patch instead of calling write_file.".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "input": {"type": "string", "description": "Patch content in Codex patch format"}
+                },
+                "required": ["input"]
             }),
         },
     ]

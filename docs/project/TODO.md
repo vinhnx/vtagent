@@ -1,3 +1,97 @@
+if the tools is deny or prompt from tool policy. make sure human in the loop is working on chat mode so that user can approve or deny the tool use. agent should continue the chat loop after user approve or deny the tool use.
+
+--
+[ERROR] Error: File not found: docs/todo.md. Example: read_file({"path": "src/main.rs"})
+I am sorry, I cannot find the file `docs/todo.md`. Please check the file path and try again.
+-> implement case sensitivity option for grep_search tool and for this example. shoudn't the agent use file search instead because the query of user could be vauge
+
+--
+
+add `Chat Command Flowchart` flow chart
+
+graph TD
+A[Start: CLI command 'chat'] --> B[Load Config & Workspace]
+B --> C{Multi-Agent Enabled?}
+
+%% Multi-Agent Path
+C -->|Yes| D[Initialize Multi-Agent System]
+D --> E[Enter Multi-Agent REPL Loop]
+E --> F[Display Prompt '>']
+F --> G[Read User Input]
+G --> H{Input is 'exit' or 'quit'?}
+H -->|Yes| I[Shutdown Multi-Agent System]
+H -->|No| J[Execute Task via Multi-Agent System]
+J --> K[Display Task Result Summary or Error]
+K --> F
+
+%% Single Agent Path
+C -->|No| L[Initialize Single Agent & Tools]
+L --> M[Load System Prompt]
+M --> N[Initialize Conversation History]
+N --> O[Enter Single Agent REPL Loop]
+O --> P["Display Prompt: [AGENT] vtagent >"]
+P --> Q[Read User Input]
+Q --> R{Input is 'exit' or 'quit'?}
+R -->|Yes| S[Print Session Summary]
+R -->|No| T{Is Input a Project Question?}
+
+%% Input Processing
+T -->|Yes| U[Gather Project Context<br/>README, file list]
+T -->|No| V[Add User Input to History]
+U --> W[Add User Input + Context to History]
+W --> X[Construct LLM Request]
+V --> X
+
+%% LLM Processing
+X --> Y[Spinner: Thinking...]
+Y --> Z[Call LLM Client 'generate']
+Z --> AA{LLM Response OK?}
+AA -->|Error| BB[Display LLM Error]
+BB --> O
+
+%% Tool Call Processing
+AA -->|Success| CC{Response includes Tool Calls?}
+CC -->|No| DD[Add Assistant Message with content]
+DD --> EE[Display LLM Response Content]
+EE --> FF[Add Assistant Response to History]
+FF --> O
+
+%% Initial Tool Execution
+CC -->|Yes| GG[Add Assistant Message empty content]
+GG --> HH[Spinner: Executing Tools...]
+HH --> II[Execute Tool Calls Sequentially]
+II --> JJ[Spinner: Generating Final Response...]
+JJ --> KK[Make Follow-up LLM Request]
+
+%% Follow-up Processing
+KK --> LL{Follow-up includes Tool Calls?}
+LL -->|Yes| MM[Execute Follow-up Tool Calls]
+MM --> NN[Add Tool Results to History]
+NN --> OO[Make Ultimate LLM Request]
+OO --> PP[Get Ultimate LLM Response]
+PP --> QQ[Display Ultimate Response]
+QQ --> RR[Add Ultimate Response to History]
+RR --> O
+
+LL -->|No| SS[Display Final LLM Response]
+SS --> TT[Add Final Response to History]
+TT --> O
+
+%% End States
+I --> END[End]
+S --> END
+
+%% Styling
+classDef startEnd fill:#e1f5fe
+classDef decision fill:#fff3e0
+classDef process fill:#f3e5f5
+classDef error fill:#ffebee
+
+class A,END startEnd
+class C,H,R,T,AA,CC,LL decision
+class BB error
+
+--
 [DEBUG] Input: 'tell me the core function flow in chat.rs', Is project question: false
 | AI response received                                                                                            I can't directly access or analyze the contents of specific Rust files like `chat.rs` within the project structure. My capabilities are limited to the information provided in the text snippets, such as README files and file listings.
 
@@ -35,7 +129,8 @@ the agent loop was working on main branch. we did have a major refactor now. mak
 
 ---
 
-apply for agent
+apply for agent prompt optimizer given a user prompt, the agent should be able to optimize the prompt for better result. for example if user ask for "fix bug in chat.rs" the agent should be able to optimize the prompt to best suit the context of the project.
+
 https://deepwiki.com/krypticmouse/DSRs/tree/main
 https://deepwiki.com/krypticmouse/DSRs/tree/main/crates/dspy-rs/examples
 
@@ -2171,7 +2266,7 @@ The good description clearly explains what the tool does, when to use it, what d
 
 --
 
-https://deepwiki.com/rust-cli/anstyle/tree/main/crates/anstyle-git
+https://deepwiki.com/rust-cli/anstyle/tree/main/crates/anstyle-git apply this render git diff style in agent chat
 
 ---
 
@@ -2313,5 +2408,5 @@ enhance vtagent-core/src/tools/cache.rs with https://deepwiki.com/arthurprs/quic
 
 --
 
-https://deepwiki.com/ratatui/ratatui integrate and port cli to tui.
+https://deepwiki.com/ratatui/ratatui integrate and port cli to tui. from src/cli/chat.rs
 

@@ -4,6 +4,7 @@
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
+use colored::*;
 use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::io::{self, Write};
@@ -14,11 +15,12 @@ use vtagent_core::config::models::{ModelId, Provider};
 use vtagent_core::config::multi_agent::MultiAgentSystemConfig;
 use vtagent_core::config::{ConfigManager, VTAgentConfig};
 use vtagent_core::core::agent::integration::MultiAgentSystem;
-use vtagent_core::core::agent::multi_agent::{AgentType, MultiAgentConfig};
+use vtagent_core::core::agent::multi_agent::AgentType;
 use vtagent_core::llm::factory::create_provider_with_config;
 use vtagent_core::llm::provider::{LLMProvider, LLMRequest, Message, MessageRole};
 use vtagent_core::llm::{AnyClient, make_client};
 use vtagent_core::constants::{tools, prompts};
+use vtagent_core::ui::spinner;
 
 /// Load project-specific context for better agent performance
 async fn load_project_context(
@@ -468,7 +470,7 @@ async fn handle_single_agent_chat(
             println!("DEBUG: About to show prompt");
         }
 
-        // Enhanced REPL prompt with better formatting
+        // Enhanced REPL prompt with better formatting - no period at the end
         print!("{}", style("[AGENT] vtagent").cyan().bold());
         print!("{}", style(" ❯ ").white().bold());
         let flush_result = io::stdout().flush();
@@ -628,20 +630,13 @@ async fn handle_single_agent_chat(
             reasoning_effort: Some(config.agent.reasoning_effort.clone()),
         };
 
-        // Get response from AI
-        let llm_spinner = ProgressBar::new_spinner();
-        llm_spinner.set_style(
-            ProgressStyle::default_spinner()
-                .tick_strings(&["|", "/", "-", "\\", "|"])
-                .template("{spinner:.yellow} {msg}")
-                .unwrap()
-        );
-        llm_spinner.set_message("AI is thinking...");
-        llm_spinner.enable_steady_tick(std::time::Duration::from_millis(200));
+        // Get response from AI - only show spinner when actually making the request
+        let llm_spinner = spinner::start_loading_spinner("Thinking...");
 
         match client.generate(request).await {
             Ok(response) => {
-                llm_spinner.finish_with_message("AI response received");
+                // Hide the spinner completely when response is received
+                llm_spinner.finish_and_clear();
 
                 // Debug the response structure
                 if debug_enabled {
@@ -677,38 +672,32 @@ async fn handle_single_agent_chat(
                     // Assistant message already added above, proceed with tool execution
                     println!(
                         "\n{} {} tool call(s) to execute",
-                        style("[TOOL]").blue(),
-                        style(tool_calls.len()).bold()
+                        style("[TOOL]").blue().bold(),
+                        style(tool_calls.len()).yellow().bold()
                     );
 
                     // Create progress bar for overall tool execution
                     let progress = ProgressBar::new(tool_calls.len() as u64);
                     progress.set_style(
                         ProgressStyle::default_bar()
-                            .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} ({eta})")
+                            .template("{spinner:.blue} {msg} [{elapsed_precise}] {wide_bar:.cyan/blue} {pos}/{len} ({percent}%)")
                             .unwrap()
-                            .progress_chars("#>-")
+                            .progress_chars("█▉▊▋▌▍▎▏  ")
                     );
-                    progress.set_message("Executing tools...");
+                    progress.set_message("Executing tools");
 
                     for (tool_call_index, tool_call) in tool_calls.iter().enumerate() {
                         println!(
                             "{} {} {}",
-                            style(format!("  {}.", tool_call_index + 1)).dim(),
+                            style(format!("  [{}/{}]", tool_call_index + 1, tool_calls.len())).dim(),
                             style(&tool_call.function.name).cyan().bold(),
                             style(&tool_call.function.arguments).dim()
                         );
 
-                        // Create spinner for tool execution
-                        let spinner = ProgressBar::new_spinner();
-                        spinner.set_style(
-                            ProgressStyle::default_spinner()
-                                .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
-                                .template("{spinner:.blue} {msg}")
-                                .unwrap()
+                        // Create spinner for tool execution - only show when actually executing
+                        let tool_spinner = spinner::start_loading_spinner(
+                            &format!("Executing {}...", tool_call.function.name)
                         );
-                        spinner.set_message(format!("Executing {}...", tool_call.function.name));
-                        spinner.enable_steady_tick(std::time::Duration::from_millis(100));
 
                         // Execute the tool
                         let result = tool_registry
@@ -721,7 +710,7 @@ async fn handle_single_agent_chat(
 
                         match result {
                             Ok(result) => {
-                                spinner.finish_with_message(format!("✅ {} completed", tool_call.function.name));
+                                tool_spinner.finish_and_clear();
                                 progress.inc(1);
 
                                 // Add tool result to conversation
@@ -733,11 +722,11 @@ async fn handle_single_agent_chat(
                                 });
                             }
                             Err(e) => {
-                                spinner.finish_with_message(format!("❌ {} failed", tool_call.function.name));
+                                tool_spinner.finish_and_clear();
                                 progress.inc(1);
                                 println!(
                                     "{} {}",
-                                    style("[ERROR]").red(),
+                                    style("[ERROR]").red().bold(),
                                     style(&e).red()
                                 );
 
@@ -771,19 +760,12 @@ async fn handle_single_agent_chat(
                         reasoning_effort: Some(config.agent.reasoning_effort.clone()),
                     };
 
-                    let follow_up_spinner = ProgressBar::new_spinner();
-                    follow_up_spinner.set_style(
-                        ProgressStyle::default_spinner()
-                            .tick_strings(&[".", "..", "...", "....", "....."])
-                            .template("{spinner:.cyan} {msg}")
-                            .unwrap()
-                    );
-                    follow_up_spinner.set_message("Generating final response...");
-                    follow_up_spinner.enable_steady_tick(std::time::Duration::from_millis(150));
+                    let follow_up_spinner = spinner::start_loading_spinner("Generating final response...");
 
                     match client.generate(follow_up_request).await {
                         Ok(final_response) => {
-                            follow_up_spinner.finish_with_message("Final response ready");
+                            // Hide the spinner completely when final response is ready
+                            follow_up_spinner.finish_and_clear();
 
                             // Check if the final response also contains tool calls
                             if let Some(final_tool_calls) = &final_response.tool_calls {
@@ -797,10 +779,11 @@ async fn handle_single_agent_chat(
                                     final_tool_calls.iter().enumerate()
                                 {
                                     println!(
-                                        "{}: Calling tool: {} with args: {}",
-                                        style("[TOOL_CALL]").cyan().bold().on_black(),
-                                        tool_call.function.name,
-                                        tool_call.function.arguments
+                                        "{}: Calling tool [{}] {} with args: {}",
+                                        style("[TOOL_CALL]").cyan().bold(),
+                                        style(tool_call_index + 1).yellow(),
+                                        style(&tool_call.function.name).cyan().bold(),
+                                        style(&tool_call.function.arguments).dim()
                                     );
 
                                     // Execute the tool
@@ -826,7 +809,7 @@ async fn handle_single_agent_chat(
                                             if tool_call_index == final_tool_calls.len() - 1 {
                                                 println!(
                                                     "{}: All follow-up tool calls completed. Ready for next command.",
-                                                    style("[STATUS]").blue().bold()
+                                                    style("[STATUS]").green().bold()
                                                 );
                                             }
                                         }
@@ -869,7 +852,7 @@ async fn handle_single_agent_chat(
                                 match client.generate(final_follow_up_request).await {
                                     Ok(ultimate_response) => {
                                         if let Some(content) = ultimate_response.content {
-                                            println!("{}", content);
+                                            println!("{}", content.blue().bold());
                                             // Add final AI response to history
                                             conversation_history.push(Message {
                                                 role: MessageRole::Assistant,
@@ -888,8 +871,8 @@ async fn handle_single_agent_chat(
                                     }
                                 }
                             } else if let Some(content) = final_response.content {
-                                // No additional tool calls, just print the response
-                                println!("{}", content);
+                                // No additional tool calls, just print the response with styling
+                                println!("{}", content.blue().bold());
                                 // Add final AI response to history
                                 conversation_history.push(Message {
                                     role: MessageRole::Assistant,
@@ -908,8 +891,8 @@ async fn handle_single_agent_chat(
                         }
                     }
                 } else if let Some(content) = response.content {
-                    // No tool calls, just print the response
-                    println!("{}", content);
+                    // No tool calls, just print the response with styling
+                    println!("{}", content.blue().bold());
                     // Assistant message already added above
                 } else {
                     eprintln!(
@@ -1007,7 +990,7 @@ async fn handle_simple_prompt_chat(mut client: AnyClient) -> Result<()> {
         // Get response from AI
         match client.generate(&prompt).await {
             Ok(response) => {
-                println!("{}", response.content);
+                println!("{}", response.content.blue().bold());
                 // Add AI response to history
                 conversation_history.push(response.content.clone());
             }

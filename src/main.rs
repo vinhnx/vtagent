@@ -14,7 +14,7 @@ use vtagent_core::config::models::{ModelId, Provider};
 use vtagent_core::config::multi_agent::MultiAgentSystemConfig;
 use vtagent_core::config::{ConfigManager, VTAgentConfig};
 use vtagent_core::core::agent::integration::MultiAgentSystem;
-use vtagent_core::core::agent::multi_agent::{AgentType, MultiAgentConfig};
+use vtagent_core::core::agent::multi_agent::AgentType;
 use vtagent_core::llm::factory::create_provider_with_config;
 use vtagent_core::llm::provider::{LLMProvider, LLMRequest, Message, MessageRole};
 use vtagent_core::llm::{AnyClient, make_client};

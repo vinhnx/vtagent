@@ -1,10 +1,10 @@
 //! Agent runner for executing individual agent instances
 
 use crate::config::models::ModelId;
-use crate::config::constants::{tools, urls};
+use crate::config::constants::tools;
 use crate::core::agent::multi_agent::*;
-use crate::gemini::{Content, GenerateContentRequest, Part, Tool, ToolConfig};
-use crate::llm::{AnyClient, create_provider_with_config, make_client};
+use crate::gemini::{Content, Part, Tool};
+use crate::llm::{AnyClient, make_client};
 use crate::llm::provider::{LLMRequest, Message, MessageRole, ToolDefinition, FunctionDefinition};
 use crate::tools::{ToolRegistry, build_function_declarations};
 use anyhow::{Result, anyhow};
@@ -158,23 +158,12 @@ impl AgentRunner {
     ) -> Result<Self> {
         // Create client based on model - if it's an LMStudio model, create the provider directly
         let client: AnyClient =
-            if model.as_str().contains("lmstudio") || model.as_str().contains("qwen") {
-                // For LMStudio models, we create the provider directly
-                let provider = create_provider_with_config(
-                    "lmstudio",
-                    Some(api_key.clone()),
-                    Some(urls::LMSTUDIO_DEFAULT_BASE_URL.to_string()),
-                    Some(model.as_str().to_string()),
-                )
-                .map_err(|e| anyhow::anyhow!("Failed to create LMStudio provider: {}", e))?;
-                // Wrap the provider in a client that implements the LLMClient trait
-                Box::new(LMStudioClientWrapper {
-                    provider,
-                    model: model.as_str().to_string(),
-                })
+            if model.as_str().starts_with("lmstudio/") {
+                // For LMStudio models, create the provider directly
+                make_client(api_key, model.clone())
             } else {
                 // For other models, use the standard approach
-                make_client(api_key, model)
+                make_client(api_key, model.clone())
             };
 
         // Create system prompt based on agent type
@@ -310,7 +299,7 @@ impl AgentRunner {
                     }
                 }).collect(),
                 system_prompt: None,
-                tools: Some(tools),
+                tools: Some(tools.clone()),
                 model: self.model.clone(),
                 max_tokens: Some(2000),
                 temperature: Some(0.7),

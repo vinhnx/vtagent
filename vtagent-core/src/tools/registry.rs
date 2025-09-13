@@ -8,7 +8,6 @@ use super::simple_search::SimpleSearchTool;
 use super::bash_tool::BashTool;
 use super::ck_tool::CkTool;
 use super::traits::Tool;
-use super::ast_grep_tool::AstGrepTool;
 use crate::config::types::CapabilityLevel;
 use crate::config::constants::tools;
 use crate::config::PtyConfig;
@@ -130,7 +129,7 @@ impl ToolRegistry {
     /// Execute a tool by name with policy checking
     pub async fn execute_tool(&mut self, name: &str, args: Value) -> Result<Value> {
         // Check tool policy before execution
-        if !self.policy_manager().should_execute_tool(name)? {
+        if !self.policy_manager_mut().should_execute_tool(name)? {
             return Err(anyhow!("Tool '{}' execution denied by policy", name));
         }
 

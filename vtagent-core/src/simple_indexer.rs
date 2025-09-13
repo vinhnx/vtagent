@@ -4,13 +4,13 @@
 //! using regex patterns and markdown files for storage. No complex embeddings
 //! or databases - just direct file operations like a human using bash.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
 
 /// Simple file index entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,6 +67,11 @@ impl SimpleIndexer {
         Ok(())
     }
 
+    /// Get the workspace root path
+    pub fn workspace_root(&self) -> &Path {
+        &self.workspace_root
+    }
+
     /// Index a single file
     pub fn index_file(&mut self, file_path: &Path) -> Result<()> {
         if !file_path.exists() || !file_path.is_file() {
@@ -98,9 +103,20 @@ impl SimpleIndexer {
 
     /// Index all files in directory recursively
     pub fn index_directory(&mut self, dir_path: &Path) -> Result<()> {
+        let mut file_paths = Vec::new();
+
+        // First pass: collect all file paths
         self.walk_directory(dir_path, &mut |file_path| {
-            self.index_file(file_path)
-        })
+            file_paths.push(file_path.to_path_buf());
+            Ok(())
+        })?;
+
+        // Second pass: index each file
+        for file_path in file_paths {
+            self.index_file(&file_path)?;
+        }
+
+        Ok(())
     }
 
     /// Search files using regex pattern
@@ -225,7 +241,7 @@ impl SimpleIndexer {
 
     // Helper methods
 
-    fn walk_directory<F>(&self, dir_path: &Path, callback: &mut F) -> Result<()>
+    fn walk_directory<F>(&mut self, dir_path: &Path, callback: &mut F) -> Result<()>
     where
         F: FnMut(&Path) -> Result<()>,
     {

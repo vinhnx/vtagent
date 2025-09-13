@@ -193,9 +193,9 @@ impl ConfigManager {
         let workspace = workspace.as_ref();
 
         // Initialize project manager
-        let project_manager = SimpleProjectManager::new(workspace.to_path_buf()).ok();
+        let project_manager = Some(SimpleProjectManager::new(workspace.to_path_buf()));
         let project_name = project_manager.as_ref()
-            .and_then(|pm| pm.identify_project(workspace).ok());
+            .and_then(|pm| pm.identify_current_project().ok());
 
         // Try vtagent.toml in workspace root first
         let config_path = workspace.join("vtagent.toml");
@@ -236,7 +236,7 @@ impl ConfigManager {
         }
 
         // Try project-specific configuration
-        if let (Some(ref pm), Some(ref pname)) = (&project_manager, &project_name) {
+        if let (Some(pm), Some(pname)) = (&project_manager, &project_name) {
             let project_config_path = pm.config_dir(pname).join("vtagent.toml");
             if project_config_path.exists() {
                 let config = Self::load_from_file(&project_config_path)?;
@@ -271,7 +271,7 @@ impl ConfigManager {
         // Use current directory as workspace root for file-based loading
         let project_manager = std::env::current_dir()
             .ok()
-            .and_then(|cwd| SimpleProjectManager::new(cwd).ok());
+            .map(|cwd| SimpleProjectManager::new(cwd));
 
         Ok(Self {
             config,

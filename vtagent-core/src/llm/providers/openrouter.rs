@@ -1,5 +1,5 @@
 use crate::llm::provider::{
-    FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, MessageRole, ToolCall, Usage,
+    FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, ToolCall, Usage,
 };
 use async_trait::async_trait;
 use reqwest::Client as HttpClient;

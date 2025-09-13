@@ -2,7 +2,7 @@ use crate::config::constants::models;
 use crate::llm::client::LLMClient;
 use crate::llm::provider::{
     FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
-    ToolDefinition, Usage, FunctionCall,
+    FunctionCall,
 };
 use crate::llm::types as llm_types;
 use async_trait::async_trait;
@@ -270,28 +270,9 @@ impl GeminiProvider {
 impl LLMClient for GeminiProvider {
     async fn generate(&mut self, prompt: &str) -> Result<llm_types::LLMResponse, LLMError> {
         // Check if the prompt is a serialized GenerateContentRequest
-        let request = if prompt.len() == 1 && prompt[0].role == MessageRole::User {
-            // Regular prompt
-            LLMRequest {
-                messages: vec![Message {
-                    role: MessageRole::User,
-                    content: prompt[0].content.clone(),
-                    tool_calls: None,
-                    tool_call_id: None,
-                }],
-                system_prompt: None,
-                tools: None,
-                model: self.model.clone(),
-                max_tokens: None,
-                temperature: None,
-                stream: false,
-                tool_choice: None,
-                parallel_tool_calls: None,
-                reasoning_effort: None,
-            }
-        } else {
+        let request = if prompt.starts_with('{') && prompt.contains("\"contents\"") {
             // Try to parse as JSON GenerateContentRequest
-            match serde_json::from_value::<crate::gemini::GenerateContentRequest>(serde_json::to_value(prompt.clone()).unwrap()) {
+            match serde_json::from_str::<crate::gemini::GenerateContentRequest>(prompt) {
                 Ok(gemini_request) => {
                     // Convert GenerateContentRequest to LLMRequest
                     let mut messages = Vec::new();
@@ -410,7 +391,7 @@ impl LLMClient for GeminiProvider {
                     LLMRequest {
                         messages: vec![Message {
                             role: MessageRole::User,
-                            content: prompt[0].content.clone(),
+                            content: prompt.to_string(),
                             tool_calls: None,
                             tool_call_id: None,
                         }],
@@ -425,6 +406,25 @@ impl LLMClient for GeminiProvider {
                         reasoning_effort: None,
                     }
                 }
+            }
+        } else {
+            // Fallback: treat as regular prompt
+            LLMRequest {
+                messages: vec![Message {
+                    role: MessageRole::User,
+                    content: prompt.to_string(),
+                    tool_calls: None,
+                    tool_call_id: None,
+                }],
+                system_prompt: None,
+                tools: None,
+                model: self.model.clone(),
+                max_tokens: None,
+                temperature: None,
+                stream: false,
+                tool_choice: None,
+                parallel_tool_calls: None,
+                reasoning_effort: None,
             }
         };
 

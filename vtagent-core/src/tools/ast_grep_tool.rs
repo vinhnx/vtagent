@@ -8,7 +8,7 @@ use super::traits::Tool;
 use crate::config::constants::tools;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use serde_json::{Value, json};
+use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::Arc;
 

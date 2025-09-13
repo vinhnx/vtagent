@@ -8,9 +8,10 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// Simple markdown storage manager
+#[derive(Clone)]
 pub struct MarkdownStorage {
     storage_dir: PathBuf,
 }
@@ -114,7 +115,7 @@ impl MarkdownStorage {
         Err(anyhow::anyhow!("No valid JSON or YAML found in markdown"))
     }
 
-    fn extract_code_block(&self, content: &str, language: &str) -> Option<&str> {
+    fn extract_code_block<'a>(&self, content: &'a str, language: &str) -> Option<&'a str> {
         let start_pattern = format!("```{}", language);
         let end_pattern = "```";
 
@@ -214,6 +215,7 @@ impl ProjectData {
 }
 
 /// Project storage using markdown
+#[derive(Clone)]
 pub struct ProjectStorage {
     storage: MarkdownStorage,
 }

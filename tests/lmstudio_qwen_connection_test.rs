@@ -63,7 +63,10 @@ async fn test_lmstudio_qwen_connection() -> Result<(), Box<dyn std::error::Error
         .unwrap_or("");
 
     assert!(!response_content.is_empty(), "Response content is empty");
-    println!("[SUCCESS] Received non-empty response: {}", response_content);
+    println!(
+        "[SUCCESS] Received non-empty response: {}",
+        response_content
+    );
 
     println!("[SUCCESS] All LMStudio/Qwen connection tests passed!");
     Ok(())

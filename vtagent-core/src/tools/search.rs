@@ -1,8 +1,8 @@
 //! Search tool implementation with multiple modes
 
 use super::traits::{CacheableTool, ModeTool, Tool};
-use crate::tools::grep_search::{GrepSearchInput, GrepSearchManager};
 use crate::config::constants::tools;
+use crate::tools::grep_search::{GrepSearchInput, GrepSearchManager};
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use serde_json::{Value, json};

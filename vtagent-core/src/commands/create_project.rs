@@ -1,7 +1,7 @@
 //! Create project command implementation
 
-use crate::config::types::AgentConfig;
 use crate::config::constants::tools;
+use crate::config::types::AgentConfig;
 use crate::tools::ToolRegistry;
 use anyhow::{Result, anyhow};
 use console::style;

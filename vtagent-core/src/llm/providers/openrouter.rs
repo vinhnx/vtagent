@@ -155,7 +155,8 @@ impl OpenRouterProvider {
                                     .get("function")
                                     .and_then(|f| f.get("arguments"))
                                     .and_then(|args| args.as_str())
-                                    .unwrap_or("{}").to_string(),
+                                    .unwrap_or("{}")
+                                    .to_string(),
                             },
                         })
                     })

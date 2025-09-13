@@ -45,7 +45,8 @@ pub fn read_system_prompt_from_md() -> Result<String, std::io::Error> {
                     let prompt_content = &after_start[..end].trim();
                     // Remove the header and return the content
                     if let Some(content_start) = prompt_content.find("```rust\nr#\"") {
-                        if let Some(content_end) = prompt_content[content_start..].find("\"#\n```") {
+                        if let Some(content_end) = prompt_content[content_start..].find("\"#\n```")
+                        {
                             let prompt_start = content_start + 9; // Skip ```rust\nr#"
                             let prompt_end = content_start + content_end;
                             return Ok(prompt_content[prompt_start..prompt_end].to_string());

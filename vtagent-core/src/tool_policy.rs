@@ -308,11 +308,7 @@ impl ToolPolicyManager {
                 // Handle non-interactive environments
                 println!(
                     "{}",
-                    style(format!(
-                        "Non-interactive environment detected: {}",
-                        e
-                    ))
-                    .yellow()
+                    style(format!("Non-interactive environment detected: {}", e)).yellow()
                 );
                 println!(
                     "Since we can't prompt you interactively, '{}' tool will be denied for security.",

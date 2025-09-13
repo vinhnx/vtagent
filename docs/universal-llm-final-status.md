@@ -52,7 +52,7 @@ let response = client.generate(messages, system_prompt).await?;
 ### **2. Provider Auto-Detection**
 ```rust
 // Intelligent model → provider mapping
-"gpt-4o" → "openai"
+"gpt-5" → "openai"
 "claude-3-5-sonnet" → "anthropic"
 "gemini-2.5-flash" → "gemini"
 ```

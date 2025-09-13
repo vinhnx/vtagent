@@ -2,8 +2,8 @@ use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use serde_json::json;
 use std::env;
 use tempfile::TempDir;
-use vtagent_core::tools::ToolRegistry;
 use vtagent_core::config::constants::tools;
+use vtagent_core::tools::ToolRegistry;
 
 /// Benchmark search performance across different file sizes and patterns
 fn benchmark_search_performance(c: &mut Criterion) {

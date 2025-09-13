@@ -3,7 +3,7 @@
 //! This module provides simple project management capabilities using
 //! markdown files for storage instead of complex database systems.
 
-use crate::markdown_storage::{ProjectStorage, ProjectData};
+use crate::markdown_storage::{ProjectData, ProjectStorage};
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 
@@ -64,7 +64,10 @@ impl SimpleProjectManager {
 
     /// Get project data directory
     pub fn project_data_dir(&self, project_name: &str) -> PathBuf {
-        self.workspace_root.join(".vtagent").join("projects").join(project_name)
+        self.workspace_root
+            .join(".vtagent")
+            .join("projects")
+            .join(project_name)
     }
 
     /// Get project config directory
@@ -84,7 +87,8 @@ impl SimpleProjectManager {
 
     /// Check if project exists
     pub fn project_exists(&self, name: &str) -> bool {
-        self.storage.list_projects()
+        self.storage
+            .list_projects()
             .map(|projects| projects.contains(&name.to_string()))
             .unwrap_or(false)
     }
@@ -162,8 +166,7 @@ impl SimpleCache {
     /// Load data from cache
     pub fn load(&self, key: &str) -> Result<String> {
         let file_path = self.cache_dir.join(format!("{}.txt", key));
-        std::fs::read_to_string(file_path)
-            .with_context(|| format!("Cache key '{}' not found", key))
+        std::fs::read_to_string(file_path).with_context(|| format!("Cache key '{}' not found", key))
     }
 
     /// Check if cache entry exists

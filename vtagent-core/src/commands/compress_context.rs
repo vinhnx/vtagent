@@ -1,10 +1,10 @@
 //! Compress context command implementation
 
-use crate::config::models::ModelId;
 use crate::config::constants::tools;
+use crate::config::models::ModelId;
 use crate::config::types::AgentConfig;
-use crate::gemini::{Content, FunctionResponse, GenerateContentRequest, Part};
 use crate::gemini::models::SystemInstruction;
+use crate::gemini::{Content, FunctionResponse, GenerateContentRequest, Part};
 use crate::llm::make_client;
 use anyhow::Result;
 use console::style;

@@ -25,9 +25,16 @@ impl BashTool {
     }
 
     /// Execute command using PTY for terminal emulation
-    async fn execute_pty_command(&self, command: &str, args: Vec<String>, timeout_secs: Option<u64>) -> Result<Value> {
+    async fn execute_pty_command(
+        &self,
+        command: &str,
+        args: Vec<String>,
+        timeout_secs: Option<u64>,
+    ) -> Result<Value> {
         // Validate command for security before execution
-        let full_command_parts = std::iter::once(command.to_string()).chain(args.clone()).collect::<Vec<String>>();
+        let full_command_parts = std::iter::once(command.to_string())
+            .chain(args.clone())
+            .collect::<Vec<String>>();
         self.validate_command(&full_command_parts)?;
 
         let full_command = if args.is_empty() {
@@ -79,18 +86,57 @@ impl BashTool {
 
         // Basic security checks - dangerous commands that should be blocked
         let dangerous_commands = [
-            "rm", "rmdir", "del", "format", "fdisk", "mkfs",
-            "dd", "shred", "wipe", "srm", "unlink",
-            "chmod", "chown", "passwd", "usermod", "userdel",
-            "systemctl", "service", "kill", "killall", "pkill",
-            "reboot", "shutdown", "halt", "poweroff",
-            "sudo", "su", "doas", "runas",
-            "curl", "wget", "ftp", "scp", "rsync", // Network commands
-            "ssh", "telnet", "nc", "ncat", "socat", // Remote access
-            "mount", "umount", "fsck", "tune2fs", // Filesystem operations
-            "iptables", "ufw", "firewalld", // Firewall
-            "crontab", "at", // Scheduling
-            "docker", "podman", "kubectl", // Container/orchestration
+            "rm",
+            "rmdir",
+            "del",
+            "format",
+            "fdisk",
+            "mkfs",
+            "dd",
+            "shred",
+            "wipe",
+            "srm",
+            "unlink",
+            "chmod",
+            "chown",
+            "passwd",
+            "usermod",
+            "userdel",
+            "systemctl",
+            "service",
+            "kill",
+            "killall",
+            "pkill",
+            "reboot",
+            "shutdown",
+            "halt",
+            "poweroff",
+            "sudo",
+            "su",
+            "doas",
+            "runas",
+            "curl",
+            "wget",
+            "ftp",
+            "scp",
+            "rsync", // Network commands
+            "ssh",
+            "telnet",
+            "nc",
+            "ncat",
+            "socat", // Remote access
+            "mount",
+            "umount",
+            "fsck",
+            "tune2fs", // Filesystem operations
+            "iptables",
+            "ufw",
+            "firewalld", // Firewall
+            "crontab",
+            "at", // Scheduling
+            "docker",
+            "podman",
+            "kubectl", // Container/orchestration
         ];
 
         if dangerous_commands.contains(&program.as_str()) {
@@ -105,9 +151,12 @@ impl BashTool {
         let full_command = command_parts.join(" ");
 
         // Block recursive delete operations
-        if full_command.contains("rm -rf") ||
-           full_command.contains("rm -r") && (full_command.contains(" /") || full_command.contains(" ~")) ||
-           full_command.contains("rmdir") && (full_command.contains(" /") || full_command.contains(" ~")) {
+        if full_command.contains("rm -rf")
+            || full_command.contains("rm -r")
+                && (full_command.contains(" /") || full_command.contains(" ~"))
+            || full_command.contains("rmdir")
+                && (full_command.contains(" /") || full_command.contains(" ~"))
+        {
             return Err(anyhow::anyhow!(
                 "Potentially dangerous recursive delete operation detected. \
                  Use file operation tools for safe file management."
@@ -115,10 +164,11 @@ impl BashTool {
         }
 
         // Block privilege escalation attempts
-        if full_command.contains("sudo ") ||
-           full_command.contains("su ") ||
-           full_command.contains("doas ") ||
-           full_command.contains("runas ") {
+        if full_command.contains("sudo ")
+            || full_command.contains("su ")
+            || full_command.contains("doas ")
+            || full_command.contains("runas ")
+        {
             return Err(anyhow::anyhow!(
                 "Privilege escalation commands are not allowed. \
                  All operations run with current user privileges."
@@ -126,9 +176,11 @@ impl BashTool {
         }
 
         // Block network operations that could exfiltrate data
-        if (full_command.contains("curl ") || full_command.contains("wget ")) &&
-           (full_command.contains("http://") || full_command.contains("https://") ||
-            full_command.contains("ftp://")) {
+        if (full_command.contains("curl ") || full_command.contains("wget "))
+            && (full_command.contains("http://")
+                || full_command.contains("https://")
+                || full_command.contains("ftp://"))
+        {
             return Err(anyhow::anyhow!(
                 "Network download commands are restricted. \
                  Use local file operations only."
@@ -136,12 +188,13 @@ impl BashTool {
         }
 
         // Block commands that modify system configuration
-        if full_command.contains(" > /etc/") ||
-           full_command.contains(" >> /etc/") ||
-           full_command.contains(" > /usr/") ||
-           full_command.contains(" >> /usr/") ||
-           full_command.contains(" > /var/") ||
-           full_command.contains(" >> /var/") {
+        if full_command.contains(" > /etc/")
+            || full_command.contains(" >> /etc/")
+            || full_command.contains(" > /usr/")
+            || full_command.contains(" >> /usr/")
+            || full_command.contains(" > /var/")
+            || full_command.contains(" >> /var/")
+        {
             return Err(anyhow::anyhow!(
                 "System configuration file modifications are not allowed. \
                  Use user-specific configuration files only."
@@ -149,15 +202,17 @@ impl BashTool {
         }
 
         // Block commands that access sensitive directories
-        let sensitive_paths = ["/etc/", "/usr/", "/var/", "/root/", "/boot/", "/sys/", "/proc/"];
+        let sensitive_paths = [
+            "/etc/", "/usr/", "/var/", "/root/", "/boot/", "/sys/", "/proc/",
+        ];
         for path in &sensitive_paths {
-            if full_command.contains(path) && (
-                full_command.contains("rm ") ||
-                full_command.contains("mv ") ||
-                full_command.contains("cp ") ||
-                full_command.contains("chmod ") ||
-                full_command.contains("chown ")
-            ) {
+            if full_command.contains(path)
+                && (full_command.contains("rm ")
+                    || full_command.contains("mv ")
+                    || full_command.contains("cp ")
+                    || full_command.contains("chmod ")
+                    || full_command.contains("chown "))
+            {
                 return Err(anyhow::anyhow!(
                     "Operations on system directories '{}' are not allowed. \
                      Work within your project workspace only.",
@@ -168,22 +223,17 @@ impl BashTool {
 
         // Allow only safe commands that are commonly needed for development
         let allowed_commands = [
-            "ls", "pwd", "cat", "head", "tail", "grep", "find",
-            "wc", "sort", "uniq", "cut", "awk", "sed",
-            "echo", "printf", "seq", "basename", "dirname",
-            "date", "cal", "bc", "expr", "test", "[", "]",
-            "true", "false", "sleep", "which", "type",
-            "file", "stat", "du", "df", "ps", "top", "htop",
-            "tree", "less", "more", "tac", "rev", "tr",
-            "fold", "paste", "join", "comm", "diff", "patch",
-            "gzip", "gunzip", "bzip2", "bunzip2", "xz", "unxz",
-            "tar", "zip", "unzip", "gzip", "bzip2",
-            "git", "hg", "svn", // Version control (read-only operations)
+            "ls", "pwd", "cat", "head", "tail", "grep", "find", "wc", "sort", "uniq", "cut", "awk",
+            "sed", "echo", "printf", "seq", "basename", "dirname", "date", "cal", "bc", "expr",
+            "test", "[", "]", "true", "false", "sleep", "which", "type", "file", "stat", "du",
+            "df", "ps", "top", "htop", "tree", "less", "more", "tac", "rev", "tr", "fold", "paste",
+            "join", "comm", "diff", "patch", "gzip", "gunzip", "bzip2", "bunzip2", "xz", "unxz",
+            "tar", "zip", "unzip", "gzip", "bzip2", "git", "hg",
+            "svn", // Version control (read-only operations)
             "make", "cmake", "ninja", // Build systems
             "cargo", "npm", "yarn", "pnpm", // Package managers
-            "python", "python3", "node", "ruby", "perl", "php",
-            "java", "javac", "scala", "kotlin", "go", "rustc",
-            "gcc", "g++", "clang", "clang++", // Compilers
+            "python", "python3", "node", "ruby", "perl", "php", "java", "javac", "scala", "kotlin",
+            "go", "rustc", "gcc", "g++", "clang", "clang++", // Compilers
         ];
 
         if !allowed_commands.contains(&program.as_str()) {
@@ -201,7 +251,10 @@ impl BashTool {
     /// Execute ls command with PTY
     async fn execute_ls(&self, args: Value) -> Result<Value> {
         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
-        let show_hidden = args.get("show_hidden").and_then(|v| v.as_bool()).unwrap_or(false);
+        let show_hidden = args
+            .get("show_hidden")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
 
         let mut cmd_args = vec![path.to_string()];
         if show_hidden {
@@ -220,12 +273,16 @@ impl BashTool {
 
     /// Execute grep command with PTY
     async fn execute_grep(&self, args: Value) -> Result<Value> {
-        let pattern = args.get("pattern")
+        let pattern = args
+            .get("pattern")
             .and_then(|v| v.as_str())
             .context("pattern is required for grep")?;
 
         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
-        let recursive = args.get("recursive").and_then(|v| v.as_bool()).unwrap_or(false);
+        let recursive = args
+            .get("recursive")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
 
         let mut cmd_args = vec![pattern.to_string(), path.to_string()];
         if recursive {
@@ -256,7 +313,8 @@ impl BashTool {
 
     /// Execute cat command with PTY
     async fn execute_cat(&self, args: Value) -> Result<Value> {
-        let path = args.get("path")
+        let path = args
+            .get("path")
             .and_then(|v| v.as_str())
             .context("path is required for cat")?;
 
@@ -266,7 +324,9 @@ impl BashTool {
         if let (Some(start), Some(end)) = (start_line, end_line) {
             // Use sed to extract line range
             let sed_cmd = format!("sed -n '{}','{}'p {}", start, end, path);
-            return self.execute_pty_command("sh", vec!["-c".to_string(), sed_cmd], Some(10)).await;
+            return self
+                .execute_pty_command("sh", vec!["-c".to_string(), sed_cmd], Some(10))
+                .await;
         }
 
         let cmd_args = vec![path.to_string()];
@@ -276,7 +336,8 @@ impl BashTool {
 
     /// Execute head command with PTY
     async fn execute_head(&self, args: Value) -> Result<Value> {
-        let path = args.get("path")
+        let path = args
+            .get("path")
             .and_then(|v| v.as_str())
             .context("path is required for head")?;
 
@@ -289,7 +350,8 @@ impl BashTool {
 
     /// Execute tail command with PTY
     async fn execute_tail(&self, args: Value) -> Result<Value> {
-        let path = args.get("path")
+        let path = args
+            .get("path")
             .and_then(|v| v.as_str())
             .context("path is required for tail")?;
 
@@ -302,11 +364,15 @@ impl BashTool {
 
     /// Execute mkdir command with PTY
     async fn execute_mkdir(&self, args: Value) -> Result<Value> {
-        let path = args.get("path")
+        let path = args
+            .get("path")
             .and_then(|v| v.as_str())
             .context("path is required for mkdir")?;
 
-        let parents = args.get("parents").and_then(|v| v.as_bool()).unwrap_or(false);
+        let parents = args
+            .get("parents")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
 
         let mut cmd_args = vec![path.to_string()];
         if parents {
@@ -318,11 +384,15 @@ impl BashTool {
 
     /// Execute rm command with PTY
     async fn execute_rm(&self, args: Value) -> Result<Value> {
-        let path = args.get("path")
+        let path = args
+            .get("path")
             .and_then(|v| v.as_str())
             .context("path is required for rm")?;
 
-        let recursive = args.get("recursive").and_then(|v| v.as_bool()).unwrap_or(false);
+        let recursive = args
+            .get("recursive")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         let force = args.get("force").and_then(|v| v.as_bool()).unwrap_or(false);
 
         let mut cmd_args = vec![];
@@ -339,15 +409,20 @@ impl BashTool {
 
     /// Execute cp command with PTY
     async fn execute_cp(&self, args: Value) -> Result<Value> {
-        let source = args.get("source")
+        let source = args
+            .get("source")
             .and_then(|v| v.as_str())
             .context("source is required for cp")?;
 
-        let dest = args.get("dest")
+        let dest = args
+            .get("dest")
             .and_then(|v| v.as_str())
             .context("dest is required for cp")?;
 
-        let recursive = args.get("recursive").and_then(|v| v.as_bool()).unwrap_or(false);
+        let recursive = args
+            .get("recursive")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
 
         let mut cmd_args = vec![];
         if recursive {
@@ -361,11 +436,13 @@ impl BashTool {
 
     /// Execute mv command with PTY
     async fn execute_mv(&self, args: Value) -> Result<Value> {
-        let source = args.get("source")
+        let source = args
+            .get("source")
             .and_then(|v| v.as_str())
             .context("source is required for mv")?;
 
-        let dest = args.get("dest")
+        let dest = args
+            .get("dest")
             .and_then(|v| v.as_str())
             .context("dest is required for mv")?;
 
@@ -376,7 +453,8 @@ impl BashTool {
 
     /// Execute stat command with PTY
     async fn execute_stat(&self, args: Value) -> Result<Value> {
-        let path = args.get("path")
+        let path = args
+            .get("path")
             .and_then(|v| v.as_str())
             .context("path is required for stat")?;
 
@@ -387,13 +465,20 @@ impl BashTool {
 
     /// Execute arbitrary command with PTY
     async fn execute_run(&self, args: Value) -> Result<Value> {
-        let command = args.get("command")
+        let command = args
+            .get("command")
             .and_then(|v| v.as_str())
             .context("command is required for run")?;
 
-        let cmd_args = args.get("args")
+        let cmd_args = args
+            .get("args")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str()).map(|s| s.to_string()).collect::<Vec<String>>())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>()
+            })
             .unwrap_or_default();
 
         self.execute_pty_command(command, cmd_args, Some(30)).await
@@ -403,7 +488,8 @@ impl BashTool {
 #[async_trait]
 impl Tool for BashTool {
     async fn execute(&self, args: Value) -> Result<Value> {
-        let command = args.get("bash_command")
+        let command = args
+            .get("bash_command")
             .and_then(|v| v.as_str())
             .unwrap_or("ls");
 

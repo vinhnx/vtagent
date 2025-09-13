@@ -26,11 +26,7 @@ pub mod models {
     // OpenAI models (from docs/models.json)
     pub mod openai {
         pub const DEFAULT_MODEL: &str = "gpt-5";
-        pub const SUPPORTED_MODELS: &[&str] = &[
-            "gpt-4.1",
-            "gpt-5",
-            "gpt-5-mini"
-        ];
+        pub const SUPPORTED_MODELS: &[&str] = &["gpt-4.1", "gpt-5", "gpt-5-mini"];
 
         // Convenience constants for commonly used models
         pub const GPT_5: &str = "gpt-5";
@@ -41,10 +37,8 @@ pub mod models {
     // Anthropic models (from docs/models.json)
     pub mod anthropic {
         pub const DEFAULT_MODEL: &str = "claude-sonnet-4-20250514";
-        pub const SUPPORTED_MODELS: &[&str] = &[
-            "claude-opus-4-1-20250805",
-            "claude-sonnet-4-20250514",
-        ];
+        pub const SUPPORTED_MODELS: &[&str] =
+            &["claude-opus-4-1-20250805", "claude-sonnet-4-20250514"];
 
         // Convenience constants for commonly used models
         pub const CLAUDE_SONNET_4_20250514: &str = "claude-sonnet-4-20250514";

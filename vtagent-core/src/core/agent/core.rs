@@ -441,11 +441,11 @@ impl Agent {
                 println!("  {} summaries generated", style(summaries.len()).cyan());
                 if let Some(latest) = self.summarizer.get_latest_summary() {
                     println!(
-                    "  {} Latest summary: {} turns, {:.1}% compression",
-                    style("(SUMMARY)").dim(),
-                    latest.total_turns,
-                    latest.compression_ratio * 100.0
-                );
+                        "  {} Latest summary: {} turns, {:.1}% compression",
+                        style("(SUMMARY)").dim(),
+                        latest.total_turns,
+                        latest.compression_ratio * 100.0
+                    );
                 }
             }
         } else {

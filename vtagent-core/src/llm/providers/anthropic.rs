@@ -205,7 +205,8 @@ impl AnthropicProvider {
                             call_type: "function".to_string(),
                             function: crate::llm::provider::FunctionCall {
                                 name,
-                                arguments: serde_json::to_string(&input).unwrap_or("{}".to_string()),
+                                arguments: serde_json::to_string(&input)
+                                    .unwrap_or("{}".to_string()),
                             },
                         })
                     })

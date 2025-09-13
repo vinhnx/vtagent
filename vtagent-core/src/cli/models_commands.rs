@@ -34,10 +34,7 @@ pub async fn handle_models_command(cli: &Cli, command: &ModelCommands) -> Result
 
 /// List all available providers and models
 async fn handle_list_models(_cli: &Cli) -> Result<()> {
-    println!(
-        "{}",
-        "Available LLM Providers & Models".bold().underline()
-    );
+    println!("{}", "Available LLM Providers & Models".bold().underline());
     println!();
 
     let factory = get_factory().lock().unwrap();
@@ -179,7 +176,10 @@ async fn handle_set_provider(_cli: &Cli, provider: &str) -> Result<()> {
         config.preferences.default_provider = provider.to_string();
     })?;
 
-    println!("[SUCCESS] Default provider set to: {}", provider.bold().green());
+    println!(
+        "[SUCCESS] Default provider set to: {}",
+        provider.bold().green()
+    );
     println!("[INFO] You may need to configure API keys for this provider using:");
     println!(
         "   vtagent models config {} --api-key YOUR_API_KEY",
@@ -386,7 +386,10 @@ async fn handle_test_provider(_cli: &Cli, provider: &str) -> Result<()> {
                 .map(|c| c.to_lowercase().contains("ok"))
                 .unwrap_or(false)
             {
-                println!("[SUCCESS] {} provider test successful!", provider.bold().green());
+                println!(
+                    "[SUCCESS] {} provider test successful!",
+                    provider.bold().green()
+                );
                 println!(
                     "   Response: {}",
                     response.content.unwrap_or_default().trim()

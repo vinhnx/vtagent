@@ -14,6 +14,7 @@ pub use config::SystemPromptConfig;
 pub use context::PromptContext;
 pub use generator::{SystemPromptGenerator, generate_system_instruction_with_config};
 pub use system::{
-    generate_lightweight_instruction, generate_specialized_instruction, generate_system_instruction, read_system_prompt_from_md,
+    generate_lightweight_instruction, generate_specialized_instruction,
+    generate_system_instruction, read_system_prompt_from_md,
 };
 pub use templates::PromptTemplates;

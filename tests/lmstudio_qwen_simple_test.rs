@@ -87,7 +87,10 @@ async fn test_lmstudio_qwen_connection() -> Result<(), Box<dyn std::error::Error
 
     let completion_response = completion_response?;
     assert!(completion_response.status().is_success());
-    println!("[SUCCESS] Got successful response from Qwen model: {}", qwen_model);
+    println!(
+        "[SUCCESS] Got successful response from Qwen model: {}",
+        qwen_model
+    );
 
     // Test 4: Verify response content
     let completion_json: serde_json::Value = completion_response.json().await?;

@@ -1,11 +1,11 @@
 //! Agent runner for executing individual agent instances
 
-use crate::config::models::ModelId;
 use crate::config::constants::tools;
+use crate::config::models::ModelId;
 use crate::core::agent::multi_agent::*;
 use crate::gemini::{Content, Part, Tool};
+use crate::llm::provider::{FunctionDefinition, LLMRequest, Message, MessageRole, ToolDefinition};
 use crate::llm::{AnyClient, make_client};
-use crate::llm::provider::{LLMRequest, Message, MessageRole, ToolDefinition, FunctionDefinition};
 use crate::tools::{ToolRegistry, build_function_declarations};
 use anyhow::{Result, anyhow};
 use console::style;
@@ -106,35 +106,38 @@ impl AgentRunner {
                 } else {
                     "Executing tool to gather information".to_string()
                 }
-            },
+            }
             "file_read" => {
                 if let Some(file) = details {
                     format!("Reading {} to understand structure", file)
                 } else {
                     "Reading file to analyze content".to_string()
                 }
-            },
+            }
             "file_write" => {
                 if let Some(file) = details {
                     format!("Writing changes to {}", file)
                 } else {
                     "Writing file with requested changes".to_string()
                 }
-            },
+            }
             "search" => {
                 if let Some(pattern) = details {
                     format!("Searching codebase for '{}'", pattern)
                 } else {
                     "Searching codebase for relevant information".to_string()
                 }
-            },
+            }
             "terminal" => {
                 if let Some(cmd) = details {
-                    format!("Running terminal command: {}", cmd.split(' ').next().unwrap_or(cmd))
+                    format!(
+                        "Running terminal command: {}",
+                        cmd.split(' ').next().unwrap_or(cmd)
+                    )
                 } else {
                     "Executing terminal command".to_string()
                 }
-            },
+            }
             "completed" => "Task completed successfully!".to_string(),
             "error" => {
                 if let Some(err) = details {
@@ -142,8 +145,8 @@ impl AgentRunner {
                 } else {
                     "An error occurred during execution".to_string()
                 }
-            },
-            _ => format!("{}...", operation)
+            }
+            _ => format!("{}...", operation),
         }
     }
 
@@ -157,14 +160,13 @@ impl AgentRunner {
         reasoning_effort: Option<String>,
     ) -> Result<Self> {
         // Create client based on model - if it's an LMStudio model, create the provider directly
-        let client: AnyClient =
-            if model.as_str().starts_with("lmstudio/") {
-                // For LMStudio models, create the provider directly
-                make_client(api_key, model.clone())
-            } else {
-                // For other models, use the standard approach
-                make_client(api_key, model.clone())
-            };
+        let client: AnyClient = if model.as_str().starts_with("lmstudio/") {
+            // For LMStudio models, create the provider directly
+            make_client(api_key, model.clone())
+        } else {
+            // For other models, use the standard approach
+            make_client(api_key, model.clone())
+        };
 
         // Create system prompt based on agent type
         let system_prompt = match agent_type {
@@ -277,27 +279,32 @@ impl AgentRunner {
             ));
 
             let request = LLMRequest {
-                messages: conversation.iter().map(|content| {
-                    // Convert Gemini Content to LLM Message
-                    let role = match content.role.as_str() {
-                        "user" => MessageRole::User,
-                        "model" => MessageRole::Assistant,
-                        _ => MessageRole::User,
-                    };
-                    let content_text = content.parts.iter()
-                        .filter_map(|part| match part {
-                            crate::gemini::Part::Text { text } => Some(text.clone()),
-                            _ => None,
-                        })
-                        .collect::<Vec<_>>()
-                        .join("\n");
-                    Message {
-                        role,
-                        content: content_text,
-                        tool_calls: None,
-                        tool_call_id: None,
-                    }
-                }).collect(),
+                messages: conversation
+                    .iter()
+                    .map(|content| {
+                        // Convert Gemini Content to LLM Message
+                        let role = match content.role.as_str() {
+                            "user" => MessageRole::User,
+                            "model" => MessageRole::Assistant,
+                            _ => MessageRole::User,
+                        };
+                        let content_text = content
+                            .parts
+                            .iter()
+                            .filter_map(|part| match part {
+                                crate::gemini::Part::Text { text } => Some(text.clone()),
+                                _ => None,
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        Message {
+                            role,
+                            content: content_text,
+                            tool_calls: None,
+                            tool_call_id: None,
+                        }
+                    })
+                    .collect(),
                 system_prompt: None,
                 tools: Some(tools.clone()),
                 model: self.model.clone(),
@@ -314,7 +321,10 @@ impl AgentRunner {
                 .generate(&serde_json::to_string(&request)?)
                 .await
                 .map_err(|e| {
-                    pb.finish_with_message(format!("{} Failed", style("(ERROR)").red().bold().on_black()));
+                    pb.finish_with_message(format!(
+                        "{} Failed",
+                        style("(ERROR)").red().bold().on_black()
+                    ));
                     anyhow!(
                         "Agent {} execution failed at turn {}: {}",
                         self.agent_type,
@@ -362,10 +372,10 @@ impl AgentRunner {
                                     match self.execute_tool(name, &arguments.clone()).await {
                                         Ok(result) => {
                                             pb.set_message(format!(
-                                        "{} {} tool executed successfully",
-                                        style("(OK)").green(),
-                                        name
-                                    ));
+                                                "{} {} tool executed successfully",
+                                                style("(OK)").green(),
+                                                name
+                                            ));
 
                                             // Add tool result to conversation
                                             let tool_result = serde_json::to_string(&result)?;
@@ -430,20 +440,17 @@ impl AgentRunner {
                             match self.execute_tool(name, args).await {
                                 Ok(result) => {
                                     pb.set_message(format!(
-                                "{} {} tool executed successfully",
-                                style("(OK)").green(),
-                                name
-                            ));
+                                        "{} {} tool executed successfully",
+                                        style("(OK)").green(),
+                                        name
+                                    ));
 
                                     // Add tool result to conversation
                                     let tool_result = serde_json::to_string(&result)?;
                                     conversation.push(Content {
                                         role: "user".to_string(), // Gemini API only accepts "user" and "model"
                                         parts: vec![Part::Text {
-                                            text: format!(
-                                                "Tool {} result: {}",
-                                                name, tool_result
-                                            ),
+                                            text: format!("Tool {} result: {}", name, tool_result),
                                         }],
                                     });
 
@@ -509,10 +516,10 @@ impl AgentRunner {
                                     match self.execute_tool(&func_name, &arguments).await {
                                         Ok(result) => {
                                             pb.set_message(format!(
-                                        "{} {} tool executed successfully",
-                                        style("(OK)").green(),
-                                        func_name
-                                    ));
+                                                "{} {} tool executed successfully",
+                                                style("(OK)").green(),
+                                                func_name
+                                            ));
 
                                             // Add tool result to conversation
                                             let tool_result = serde_json::to_string(&result)?;
@@ -682,11 +689,22 @@ impl AgentRunner {
 
                     // More comprehensive completion detection
                     let completion_indicators = [
-                        "task completed", "task done", "finished", "complete", "summary",
-                        "i have successfully", "i've completed", "i have finished",
-                        "task accomplished", "mission accomplished", "objective achieved",
-                        "work is done", "all done", "completed successfully",
-                        "task execution complete", "operation finished"
+                        "task completed",
+                        "task done",
+                        "finished",
+                        "complete",
+                        "summary",
+                        "i have successfully",
+                        "i've completed",
+                        "i have finished",
+                        "task accomplished",
+                        "mission accomplished",
+                        "objective achieved",
+                        "work is done",
+                        "all done",
+                        "completed successfully",
+                        "task execution complete",
+                        "operation finished",
                     ];
 
                     // Check if any completion indicator is present
@@ -695,11 +713,11 @@ impl AgentRunner {
                         .any(|&indicator| response_lower.contains(indicator));
 
                     // Also check for explicit completion statements
-                    let has_explicit_completion = response_lower.contains("the task is complete") ||
-                                                 response_lower.contains("task has been completed") ||
-                                                 response_lower.contains("i am done") ||
-                                                 response_lower.contains("that's all") ||
-                                                 response_lower.contains("no more actions needed");
+                    let has_explicit_completion = response_lower.contains("the task is complete")
+                        || response_lower.contains("task has been completed")
+                        || response_lower.contains("i am done")
+                        || response_lower.contains("that's all")
+                        || response_lower.contains("no more actions needed");
 
                     if is_completed || has_explicit_completion {
                         has_completed = true;
@@ -769,7 +787,12 @@ impl AgentRunner {
         pb.finish_with_message("Done");
 
         // Generate meaningful summary based on agent actions
-        let summary = self.generate_task_summary(&modified_files, &executed_commands, &warnings, &conversation);
+        let summary = self.generate_task_summary(
+            &modified_files,
+            &executed_commands,
+            &warnings,
+            &conversation,
+        );
 
         // Return task results
         Ok(TaskResults {
@@ -824,7 +847,10 @@ impl AgentRunner {
                 // Coder agents can use file operations and command execution
                 matches!(
                     tool_name,
-                    tools::READ_FILE | tools::WRITE_FILE | tools::LIST_FILES | tools::RUN_TERMINAL_CMD
+                    tools::READ_FILE
+                        | tools::WRITE_FILE
+                        | tools::LIST_FILES
+                        | tools::RUN_TERMINAL_CMD
                 )
             }
             AgentType::Explorer => {
@@ -887,7 +913,14 @@ impl AgentRunner {
         let mut summary = vec![];
 
         // Add task title and agent type
-        summary.push(format!("Task: {}", conversation.get(0).and_then(|c| c.parts.get(0)).and_then(|p| p.as_text()).unwrap_or(&"".to_string())));
+        summary.push(format!(
+            "Task: {}",
+            conversation
+                .get(0)
+                .and_then(|c| c.parts.get(0))
+                .and_then(|p| p.as_text())
+                .unwrap_or(&"".to_string())
+        ));
         summary.push(format!("Agent Type: {:?}", self.agent_type));
 
         // Add executed commands
@@ -915,7 +948,14 @@ impl AgentRunner {
         }
 
         // Add final status
-        let final_status = if conversation.last().map_or(false, |c| c.role == "model" && c.parts.iter().any(|p| p.as_text().map_or(false, |t| t.contains("completed") || t.contains("done") || t.contains("finished")))) {
+        let final_status = if conversation.last().map_or(false, |c| {
+            c.role == "model"
+                && c.parts.iter().any(|p| {
+                    p.as_text().map_or(false, |t| {
+                        t.contains("completed") || t.contains("done") || t.contains("finished")
+                    })
+                })
+        }) {
             "Task completed successfully".to_string()
         } else {
             "Task did not complete as expected".to_string()

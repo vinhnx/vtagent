@@ -1,8 +1,8 @@
+use crate::SimpleProjectManager;
+use crate::config::LMStudioConfig;
 use crate::config::PtyConfig;
 use crate::config::core::{AgentConfig, CommandsConfig, SecurityConfig, ToolsConfig};
 use crate::config::multi_agent::MultiAgentSystemConfig;
-use crate::config::LMStudioConfig;
-use crate::SimpleProjectManager;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -64,7 +64,7 @@ impl VTAgentConfig {
     pub fn bootstrap_project_with_options<P: AsRef<Path>>(
         workspace: P,
         force: bool,
-        use_home_dir: bool
+        use_home_dir: bool,
     ) -> Result<Vec<String>> {
         let workspace = workspace.as_ref();
         let mut created_files = Vec::new();
@@ -80,7 +80,10 @@ impl VTAgentConfig {
                         format!("Failed to create directory: {}", vtagent_dir.display())
                     })?;
                 }
-                (vtagent_dir.join("vtagent.toml"), vtagent_dir.join(".vtagentgitignore"))
+                (
+                    vtagent_dir.join("vtagent.toml"),
+                    vtagent_dir.join(".vtagentgitignore"),
+                )
             } else {
                 // Fallback to workspace if home directory cannot be determined
                 let config_path = workspace.join("vtagent.toml");
@@ -194,7 +197,8 @@ impl ConfigManager {
 
         // Initialize project manager
         let project_manager = Some(SimpleProjectManager::new(workspace.to_path_buf()));
-        let project_name = project_manager.as_ref()
+        let project_name = project_manager
+            .as_ref()
             .and_then(|pm| pm.identify_current_project().ok());
 
         // Try vtagent.toml in workspace root first

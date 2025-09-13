@@ -1,8 +1,8 @@
 use crate::config::constants::models;
 use crate::llm::client::LLMClient;
 use crate::llm::provider::{
-    FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
-    FunctionCall,
+    FinishReason, FunctionCall, LLMError, LLMProvider, LLMRequest, LLMResponse, Message,
+    MessageRole, ToolCall,
 };
 use crate::llm::types as llm_types;
 use async_trait::async_trait;
@@ -168,11 +168,13 @@ impl GeminiProvider {
         if let Some(tools) = &request.tools {
             let gemini_tools: Vec<Value> = tools
                 .iter()
-                .map(|tool| json!({
-                                "name": tool.function.name,
-                                "description": tool.function.description,
-                                "parameters": tool.function.parameters
-                            }))
+                .map(|tool| {
+                    json!({
+                        "name": tool.function.name,
+                        "description": tool.function.description,
+                        "parameters": tool.function.parameters
+                    })
+                })
                 .collect();
             gemini_request["tools"] = json!(gemini_tools);
         }
@@ -181,13 +183,13 @@ impl GeminiProvider {
     }
 
     fn convert_from_gemini_format(&self, response: Value) -> Result<LLMResponse, LLMError> {
-        let candidates = response["candidates"].as_array().ok_or_else(|| {
-            LLMError::Provider("No candidates in response".to_string())
-        })?;
+        let candidates = response["candidates"]
+            .as_array()
+            .ok_or_else(|| LLMError::Provider("No candidates in response".to_string()))?;
 
-        let candidate = candidates.first().ok_or_else(|| {
-            LLMError::Provider("No candidate in response".to_string())
-        })?;
+        let candidate = candidates
+            .first()
+            .ok_or_else(|| LLMError::Provider("No candidate in response".to_string()))?;
 
         // Check if content exists and has parts
         if let Some(content) = candidate.get("content") {

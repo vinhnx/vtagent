@@ -191,8 +191,9 @@ impl OpenAIProvider {
 
         // Add reasoning_effort for models that support it (GPT-5 etc.)
         if let Some(reasoning_effort) = &request.reasoning_effort {
-            if request.model.contains(models::openai::GPT_5) ||
-               request.model.contains(models::openai::GPT_5_MINI) {
+            if request.model.contains(models::openai::GPT_5)
+                || request.model.contains(models::openai::GPT_5_MINI)
+            {
                 openai_request["reasoning_effort"] = json!(reasoning_effort);
             }
         }
@@ -239,7 +240,8 @@ impl OpenAIProvider {
                                     .get("function")
                                     .and_then(|f| f.get("arguments"))
                                     .and_then(|args| args.as_str())
-                                    .unwrap_or("{}").to_string(),
+                                    .unwrap_or("{}")
+                                    .to_string(),
                             },
                         })
                     })

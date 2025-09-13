@@ -57,9 +57,9 @@ impl LLMFactory {
         factory.register_provider(
             "lmstudio",
             Box::new(|config: ProviderConfig| {
-                let base_url = config
-                    .base_url
-                    .unwrap_or_else(|| crate::config::constants::urls::LMSTUDIO_DEFAULT_BASE_URL.to_string());
+                let base_url = config.base_url.unwrap_or_else(|| {
+                    crate::config::constants::urls::LMSTUDIO_DEFAULT_BASE_URL.to_string()
+                });
                 let api_key = config.api_key;
                 Box::new(LMStudioProvider::new(api_key, Some(base_url))) as Box<dyn LLMProvider>
             }),

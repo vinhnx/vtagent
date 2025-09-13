@@ -4,31 +4,55 @@ use crate::config::models::ModelId;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
-/// Main CLI structure for vtagent with advanced features
+/// Main CLI structure for vtagent with advanced features and multi-agent support
 #[derive(Parser, Debug)]
 #[command(
     name = "vtagent",
     version,
-    about = "**Research-preview Rust coding agent** powered by Gemini with Anthropic-inspired architecture\n\n**Features:**\n• Interactive AI coding assistant with Research-preview tool-calling\n• Multi-language support (Rust, Python, JavaScript, TypeScript, Go, Java)\n• Real-time diff rendering and async file operations\n• Rate limiting and tool call management\n• Markdown rendering for chat responses\n\n**Quick Start:**\n  export GEMINI_API_KEY=\"your_key\"\n  vtagent chat"
+    about = "Advanced coding agent with multi-agent architecture\n\n**Features:**\n• Multi-agent coordination (Orchestrator, Explorer, Coder)\n• Tree-sitter powered code analysis (Rust, Python, JavaScript, TypeScript, Go, Java)\n• Multi-provider LLM support (Gemini, OpenAI, Anthropic, DeepSeek, xAI)\n• Real-time performance monitoring and benchmarking\n• Enhanced security with tool policies and sandboxing\n• Research-preview context management and conversation compression\n\n**Quick Start:**\n  export GEMINI_API_KEY=\"your_key\"\n  vtagent chat\n\n**Multi-Agent Mode:**\n  vtagent chat --force-multi-agent"
 )]
 pub struct Cli {
-    /// **Gemini model ID** (e.g., `gemini-2.5-flash-lite`, `gemini-2.5-flash`)\n\n**Available models:**\n• `gemini-2.5-flash-lite` - Fastest, most cost-effective\n• `gemini-2.5-flash` - Fast, cost-effective\n• `gemini-2.5-pro` - Latest, most capable
+    /// **LLM Model ID** with latest model support\n\n**Available providers & models:**\n• `gemini-2.5-flash-lite` - Fastest, most cost-effective (default)\n• `gemini-2.5-flash` - Fast, cost-effective\n• `gemini-2.5-pro` - Latest, most capable\n• `gpt-5` - OpenAI's latest\n• `claude-sonnet-4-20250514` - Anthropic's latest\n• `qwen/qwen3-4b-2507` - Qwen3 local model\n• `deepseek-reasoner` - DeepSeek reasoning model\n• `grok-3-mini-fast-latest` - xAI Grok model
     #[arg(long, global = true)]
     pub model: Option<String>,
 
-    /// **LLM Provider** to use for requests\n\n**Available providers:**\n• `gemini` - Google Gemini (default)\n• `openai` - OpenAI GPT models\n• `anthropic` - Anthropic Claude models\n• `openrouter` - OpenRouter (multi-provider)\n• `lmstudio` - Local LMStudio models\n\n**Example:** --provider openai
+    /// **LLM Provider** with expanded support\n\n**Available providers:**\n• `gemini` - Google Gemini (default)\n• `openai` - OpenAI GPT models\n• `anthropic` - Anthropic Claude models\n• `openrouter` - OpenRouter (multi-provider)\n• `lmstudio` - Local LMStudio models\n• `deepseek` - DeepSeek models\n• `xai` - xAI Grok models\n\n**Example:** --provider deepseek
     #[arg(long, global = true)]
     pub provider: Option<String>,
 
-    /// **API key environment variable** to read\n\n**Checks in order:**\n1. Specified env var\n2. `GOOGLE_API_KEY`\n\n**Setup:** `export GEMINI_API_KEY="your_key"`
+    /// **API key environment variable**\n\n**Auto-detects based on provider:**\n• Gemini: `GEMINI_API_KEY`\n• OpenAI: `OPENAI_API_KEY`\n• Anthropic: `ANTHROPIC_API_KEY`\n• DeepSeek: `DEEPSEEK_API_KEY`\n• xAI: `XAI_API_KEY`\n\n**Override:** --api-key-env CUSTOM_KEY
     #[arg(long, global = true, default_value = crate::config::constants::defaults::DEFAULT_API_KEY_ENV)]
     pub api_key_env: String,
 
-    /// **Workspace root directory** for file operations\n\n**Defaults to:** Current directory\n**All file operations** are restricted to this path
+    /// **Workspace root directory** for file operations\n\n**Security:** All file operations restricted to this path\n**Default:** Current directory
     #[arg(long, global = true)]
     pub workspace: Option<PathBuf>,
 
-    /// **Enable async file operations** for non-blocking writes\n\n**Benefits:**\n• Non-blocking file I/O\n• Better performance\n• Concurrent operations\n• Real-time feedback
+    /// **Enable multi-agent mode** for complex tasks\n\n**Agents:**\n• Orchestrator - Strategic planning and delegation\n• Explorer - Read-only investigation and analysis\n• Coder - Implementation and code modification\n\n**Benefits:** Better task decomposition, parallel execution
+    #[arg(long, global = true)]
+    pub force_multi_agent: bool,
+
+    /// **Agent type** when using multi-agent mode\n\n**Options:**\n• `orchestrator` - Strategic coordinator (default)\n• `explorer` - Read-only investigator\n• `coder` - Implementation specialist\n• `single` - Traditional single-agent mode
+    #[arg(long, global = true, default_value = "single")]
+    pub agent_type: String,
+
+    /// **Enable tree-sitter code analysis**\n\n**Features:**\n• AST-based code parsing\n• Symbol extraction and navigation\n• Intelligent refactoring suggestions\n• Multi-language support (Rust, Python, JS, TS, Go, Java)
+    #[arg(long, global = true)]
+    pub enable_tree_sitter: bool,
+
+    /// **Enable performance monitoring**\n\n**Tracks:**\n• Token usage and API costs\n• Response times and latency\n• Tool execution metrics\n• Memory usage patterns
+    #[arg(long, global = true)]
+    pub performance_monitoring: bool,
+
+    /// **Enable research-preview features**\n\n**Includes:**\n• Advanced context compression\n• Conversation summarization\n• Enhanced error recovery\n• Decision transparency tracking
+    #[arg(long, global = true)]
+    pub research_preview: bool,
+
+    /// **Security level** for tool execution\n\n**Options:**\n• `strict` - Maximum security, prompt for all tools\n• `moderate` - Balance security and usability\n• `permissive` - Minimal restrictions (not recommended)
+    #[arg(long, global = true, default_value = "moderate")]
+    pub security_level: String,
+
+    /// **Enable async file operations** for non-blocking I/O\n\n**Benefits:**\n• Non-blocking file operations\n• Better performance\n• Concurrent processing\n• Real-time feedback
     #[arg(long, global = true)]
     pub async_file_ops: bool,
 
@@ -36,43 +60,39 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub show_file_diffs: bool,
 
-    /// **Maximum concurrent async file operations**\n\n**Default:** 5\n**Higher values:** Better performance but more resource usage
+    /// **Maximum concurrent async operations**\n\n**Default:** 5\n**Higher values:** Better performance but more resource usage
     #[arg(long, global = true, default_value_t = 5)]
     pub max_concurrent_ops: usize,
 
-    /// **Maximum API requests per minute** to prevent rate limiting\n\n**Default:** 30\n**Lower values:** More conservative, fewer errors\n**Higher values:** Better performance, risk of rate limits
+    /// **Maximum API requests per minute**\n\n**Default:** 30\n**Purpose:** Prevents rate limiting
     #[arg(long, global = true, default_value_t = 30)]
     pub api_rate_limit: usize,
 
-    /// **Maximum tool calls per chat run** to prevent runaway execution\n\n**Default:** 10\n**Purpose:** Prevents infinite loops and excessive API usage
+    /// **Maximum tool calls per session**\n\n**Default:** 10\n**Purpose:** Prevents runaway execution
     #[arg(long, global = true, default_value_t = 10)]
     pub max_tool_calls: usize,
 
-    /// **Enable debug output** for troubleshooting and development\n\n**Shows:**\n• Tool call details\n• API request/response info\n• Internal agent state\n• Performance metrics\n\n**Use for:** Debugging issues, understanding agent behavior
+    /// **Enable debug output** for troubleshooting\n\n**Shows:**\n• Tool call details\n• API request/response\n• Internal agent state\n• Performance metrics
     #[arg(long, global = true)]
     pub debug: bool,
 
-    /// Enable verbose logging and transparency features
+    /// **Enable verbose logging**\n\n**Includes:**\n• Detailed operation logs\n• Context management info\n• Agent coordination details
     #[arg(long, global = true)]
     pub verbose: bool,
 
-    /// Configuration file path
+    /// **Configuration file path**\n\n**Supported formats:** TOML\n**Default locations:** ./vtagent.toml, ~/.vtagent/vtagent.toml
     #[arg(long, global = true)]
     pub config: Option<PathBuf>,
 
-    /// Log level (error, warn, info, debug, trace)
+    /// **Log level** (error, warn, info, debug, trace)\n\n**Default:** info
     #[arg(long, global = true, default_value = "info")]
     pub log_level: String,
 
-    /// Disable color output
+    /// **Disable color output**\n\n**Useful for:** Log files, CI/CD pipelines
     #[arg(long, global = true)]
     pub no_color: bool,
 
-    /// Force use of multi-agent mode (requires confirmation for safety)
-    #[arg(long, global = true)]
-    pub force_multi_agent: bool,
-
-    /// Skip safety confirmations (use with caution)
+    /// **Skip safety confirmations**\n\n**Warning:** Reduces security, use with caution
     #[arg(long, global = true)]
     pub skip_confirmations: bool,
 
@@ -80,33 +100,32 @@ pub struct Cli {
     pub command: Option<Commands>,
 }
 
-/// Available commands with comprehensive features
+/// Available commands with comprehensive features and multi-agent support
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    /// **Interactive AI coding assistant** with Research-preview tool-calling capabilities\n\n**Features:**\n• Real-time code generation and editing\n• Multi-language support\n• File system operations\n• Async processing\n\n**Usage:** vtagent chat
+    /// **Interactive AI coding assistant** with multi-agent capabilities\n\n**Features:**\n• Multi-agent coordination for complex tasks\n• Real-time code generation and editing\n• Tree-sitter powered analysis\n• Research-preview context management\n\n**Usage:** vtagent chat
     Chat,
 
     /// **Single prompt mode** - prints model reply without tools\n\n**Perfect for:**\n• Quick questions\n• Code explanations\n• Simple queries\n\n**Example:** vtagent ask "Explain Rust ownership"
     Ask { prompt: Vec<String> },
 
-    /// **Verbose interactive chat** with enhanced transparency features\n\n**Shows:**\n• Tool execution details\n• API request/response\n• Internal reasoning\n• Performance metrics\n\n**Usage:** vtagent chat-verbose
+    /// **Verbose interactive chat** with enhanced transparency\n\n**Shows:**\n• Tool execution details\n• API request/response\n• Agent coordination (in multi-agent mode)\n• Performance metrics\n\n**Usage:** vtagent chat-verbose
     ChatVerbose,
 
-    /// **Analyze workspace** and provide comprehensive project overview\n\n**Provides:**\n• Project structure analysis\n• Language detection\n• File type statistics\n• Dependency insights\n\n**Usage:** vtagent analyze
+    /// **Analyze workspace** with tree-sitter integration\n\n**Provides:**\n• Project structure analysis\n• Language detection\n• Code complexity metrics\n• Dependency insights\n• Symbol extraction\n\n**Usage:** vtagent analyze
     Analyze,
 
-    /// **Display performance metrics** and system status\n\n**Shows:**\n• Memory usage\n• API call statistics\n• Response times\n• Cache performance\n• System health\n\n**Usage:** vtagent performance
+    /// **Display performance metrics** and system status\n\n**Shows:**\n• Token usage and API costs\n• Response times and latency\n• Tool execution statistics\n• Memory usage patterns\n• Agent performance (in multi-agent mode)\n\n**Usage:** vtagent performance
     Performance,
 
-    /// **Create complete Rust project** with specified features\n\n**Features:**\n• Web frameworks (Axum, Rocket, Warp)\n• Database integration\n• Authentication systems\n• Testing setup\n\n**Example:** vtagent create-project myapp web,auth,db
+    /// **Benchmark against SWE-bench** evaluation framework\n\n**Features:**\n• Automated performance testing\n• Comparative analysis across models\n• Benchmark scoring and metrics\n• Optimization insights\n\n**Usage:** vtagent benchmark
+    Benchmark,
+
+    /// **Create complete Rust project** with advanced features\n\n**Features:**\n• Web frameworks (Axum, Rocket, Warp)\n• Database integration\n• Authentication systems\n• Testing setup\n• Tree-sitter integration\n\n**Example:** vtagent create-project myapp web,auth,db
     CreateProject { name: String, features: Vec<String> },
 
     /// **Compress conversation context** for long-running sessions\n\n**Benefits:**\n• Reduced token usage\n• Faster responses\n• Memory optimization\n• Context preservation\n\n**Usage:** vtagent compress-context
     CompressContext,
-
-    /// **Demo async file operations** and diff rendering\n\n**Demonstrates:**\n• Non-blocking file I/O\n• Real-time diff generation\n• Concurrent operations\n• Performance monitoring\n\n**Usage:** vtagent demo-async
-    #[command(name = "demo-async")]
-    DemoAsync,
 
     /// **Revert agent to a previous snapshot**\n\n**Features:**\n• Revert to any previous turn\n• Partial reverts (memory, context, full)\n• Safe rollback with validation\n\n**Examples:**\n  vtagent revert --turn 5\n  vtagent revert --turn 3 --partial memory
     Revert {
@@ -130,7 +149,7 @@ pub enum Commands {
         max: usize,
     },
 
-    /// **Usage:** vtagent init
+    /// **Initialize project** with enhanced dot-folder structure\n\n**Features:**\n• Creates project directory structure\n• Sets up config, cache, embeddings directories\n• Creates .project metadata file\n• Tree-sitter parser setup\n• Multi-agent context stores\n\n**Usage:** vtagent init
     Init,
 
     /// **Initialize project with dot-folder structure** - sets up ~/.vtagent/projects/<project-name> structure
@@ -150,11 +169,11 @@ pub enum Commands {
         /// **Project name** - defaults to current directory name
         #[arg(long)]
         name: Option<String>,
-        
+
         /// **Force initialization** - overwrite existing project structure
         #[arg(long)]
         force: bool,
-        
+
         /// **Migrate existing files** - move existing config/cache files to new structure
         #[arg(long)]
         migrate: bool,
@@ -166,6 +185,8 @@ pub enum Commands {
     /// • Generate default configuration
     /// • Support for global (home directory) and local configuration
     /// • TOML format with comprehensive settings
+    /// • Multi-agent configuration options
+    /// • Tree-sitter and performance monitoring settings
 
     /// **Examples:**
     ///   vtagent config
@@ -175,47 +196,54 @@ pub enum Commands {
         /// **Output file path** - where to save the configuration file
         #[arg(long)]
         output: Option<std::path::PathBuf>,
-        
+
         /// **Create in user home directory** - creates ~/.vtagent/vtagent.toml
         #[arg(long)]
         global: bool,
     },
 
-    /// **Manage tool execution policies** - control which tools the agent can use
+    /// **Manage tool execution policies** - control which tools the agent can use\n\n**Features:**\n• Granular tool permissions\n• Security level presets\n• Audit logging\n• Safe tool execution\n\n**Examples:**\n  vtagent tool-policy status\n  vtagent tool-policy allow file-write\n  vtagent tool-policy deny shell-exec
     #[command(name = "tool-policy")]
     ToolPolicy {
         #[command(subcommand)]
         command: crate::cli::tool_policy_commands::ToolPolicyCommands,
     },
 
-    /// **Manage models and providers** - configure and switch between different LLM providers\n\n**Features:**\n• List available providers and models\n• Configure API keys and settings\n• Switch between providers\n• Test provider connectivity\n\n**Examples:**\n  vtagent models list\n  vtagent models set-provider openai\n  vtagent models set-model gpt-4o\n  vtagent models test openai
+    /// **Manage models and providers** - configure and switch between LLM providers\n\n**Features:**\n• Support for latest models (DeepSeek, xAI, etc.)\n• Provider configuration and testing\n• Model performance comparison\n• API key management\n\n**Examples:**\n  vtagent models list\n  vtagent models set-provider deepseek\n  vtagent models set-model deepseek-reasoner\n  vtagent models test xai
     Models {
         #[command(subcommand)]
         command: ModelCommands,
     },
+
+    /// **Security and safety management**\n\n**Features:**\n• Security scanning and vulnerability detection\n• Audit logging and monitoring\n• Access control management\n• Privacy protection settings\n\n**Usage:** vtagent security
+    Security,
+
+    /// **Tree-sitter code analysis tools**\n\n**Features:**\n• AST-based code parsing\n• Symbol extraction and navigation\n• Code complexity analysis\n• Multi-language refactoring\n\n**Usage:** vtagent tree-sitter
+    #[command(name = "tree-sitter")]
+    TreeSitter,
 }
 
-/// Model management commands
+/// Model management commands with latest model support
 #[derive(Subcommand, Debug)]
 pub enum ModelCommands {
-    /// **List all available providers and models**\n\n**Shows:**\n• Available providers\n• Supported models per provider\n• Current configuration\n• Provider status\n\n**Usage:** vtagent models list
+    /// **List all available providers and models**\n\n**Shows:**\n• Available providers (Gemini, OpenAI, Anthropic, DeepSeek, xAI, etc.)\n• Supported models per provider\n• Current configuration\n• Provider status and connectivity\n\n**Usage:** vtagent models list
     List,
 
-    /// **Set the default provider**\n\n**Example:** vtagent models set-provider openai
+    /// **Set the default provider**\n\n**Available providers:**\n• `gemini` - Google Gemini\n• `openai` - OpenAI GPT models\n• `anthropic` - Anthropic Claude models\n• `deepseek` - DeepSeek models\n• `xai` - xAI Grok models\n• `openrouter` - OpenRouter (multi-provider)\n• `lmstudio` - Local LMStudio models\n\n**Example:** vtagent models set-provider deepseek
     #[command(name = "set-provider")]
     SetProvider {
-        /// **Provider name** to set as default\n\n**Options:** gemini, openai, anthropic, openrouter, lmstudio
+        /// **Provider name** to set as default
         provider: String,
     },
 
-    /// **Set the default model**\n\n**Example:** vtagent models set-model gpt-4o
+    /// **Set the default model**\n\n**Latest models by provider:**\n• Gemini: `gemini-2.5-flash-lite`, `gemini-2.5-flash`, `gemini-2.5-pro`\n• OpenAI: `gpt-5`, `gpt-5-mini`, `gpt-4.1`\n• Anthropic: `claude-sonnet-4-20250514`, `claude-opus-4-1-20250805`\n• DeepSeek: `deepseek-reasoner`, `deepseek-chat`\n• xAI: `grok-3-mini-fast-latest`\n• LMStudio: `qwen/qwen3-4b-2507`, `qwen/qwen3-30b-a3b-2507`\n\n**Example:** vtagent models set-model deepseek-reasoner
     #[command(name = "set-model")]
     SetModel {
         /// **Model name** to set as default
         model: String,
     },
 
-    /// **Configure provider settings**\n\n**Examples:**\n  vtagent models config openai --api-key YOUR_KEY\n  vtagent models config lmstudio --base-url http://localhost:1234/v1
+    /// **Configure provider settings**\n\n**Examples:**\n  vtagent models config openai --api-key YOUR_KEY\n  vtagent models config deepseek --api-key YOUR_KEY\n  vtagent models config lmstudio --base-url http://localhost:1234/v1\n  vtagent models config xai --api-key YOUR_KEY
     Config {
         /// **Provider name** to configure
         provider: String,
@@ -233,14 +261,23 @@ pub enum ModelCommands {
         model: Option<String>,
     },
 
-    /// **Test provider connectivity**\n\n**Example:** vtagent models test openai
+    /// **Test provider connectivity**\n\n**Tests:**\n• API key validation\n• Network connectivity\n• Model availability\n• Rate limit status\n\n**Example:** vtagent models test deepseek
     Test {
         /// **Provider name** to test
         provider: String,
     },
+
+    /// **Compare model performance**\n\n**Compares:**\n• Response times\n• Token usage\n• Cost efficiency\n• Quality metrics\n\n**Usage:** vtagent models compare
+    Compare,
+
+    /// **Show model information and capabilities**\n\n**Shows:**\n• Model specifications\n• Pricing information\n• Context limits\n• Supported features\n\n**Example:** vtagent models info deepseek-reasoner
+    Info {
+        /// **Model name** to get information about
+        model: String,
+    },
 }
 
-/// Configuration file structure
+/// Configuration file structure with latest features
 #[derive(Debug)]
 pub struct ConfigFile {
     pub model: Option<String>,
@@ -252,6 +289,10 @@ pub struct ConfigFile {
     pub tools: Option<ToolConfig>,
     pub context: Option<ContextConfig>,
     pub logging: Option<LoggingConfig>,
+    pub multi_agent: Option<MultiAgentConfig>,
+    pub tree_sitter: Option<TreeSitterConfig>,
+    pub performance: Option<PerformanceConfig>,
+    pub security: Option<SecurityConfig>,
 }
 
 /// Tool configuration from config file
@@ -280,6 +321,49 @@ pub struct LoggingConfig {
     pub max_log_size_mb: Option<usize>,
 }
 
+/// Multi-agent configuration
+#[derive(Debug, serde::Deserialize)]
+pub struct MultiAgentConfig {
+    pub enabled: Option<bool>,
+    pub use_single_model: Option<bool>,
+    pub orchestrator_model: Option<String>,
+    pub executor_model: Option<String>,
+    pub max_concurrent_subagents: Option<usize>,
+    pub context_sharing_enabled: Option<bool>,
+    pub task_timeout_seconds: Option<u64>,
+}
+
+/// Tree-sitter configuration
+#[derive(Debug, serde::Deserialize)]
+pub struct TreeSitterConfig {
+    pub enabled: Option<bool>,
+    pub supported_languages: Option<Vec<String>>,
+    pub max_file_size_kb: Option<usize>,
+    pub enable_symbol_extraction: Option<bool>,
+    pub enable_complexity_analysis: Option<bool>,
+}
+
+/// Performance monitoring configuration
+#[derive(Debug, serde::Deserialize)]
+pub struct PerformanceConfig {
+    pub enabled: Option<bool>,
+    pub track_token_usage: Option<bool>,
+    pub track_api_costs: Option<bool>,
+    pub track_response_times: Option<bool>,
+    pub enable_benchmarking: Option<bool>,
+    pub metrics_retention_days: Option<usize>,
+}
+
+/// Security configuration
+#[derive(Debug, serde::Deserialize)]
+pub struct SecurityConfig {
+    pub level: Option<String>,
+    pub enable_audit_logging: Option<bool>,
+    pub enable_vulnerability_scanning: Option<bool>,
+    pub allow_external_urls: Option<bool>,
+    pub max_file_access_depth: Option<usize>,
+}
+
 impl Default for Cli {
     fn default() -> Self {
         Self {
@@ -287,6 +371,12 @@ impl Default for Cli {
             provider: Some("gemini".to_string()),
             api_key_env: "GEMINI_API_KEY".to_string(),
             workspace: None,
+            force_multi_agent: false,
+            agent_type: "single".to_string(),
+            enable_tree_sitter: false,
+            performance_monitoring: false,
+            research_preview: false,
+            security_level: "moderate".to_string(),
             async_file_ops: false,
             show_file_diffs: false,
             max_concurrent_ops: 5,
@@ -296,7 +386,6 @@ impl Default for Cli {
             config: None,
             log_level: "info".to_string(),
             no_color: false,
-            force_multi_agent: false,
             skip_confirmations: false,
             debug: false,
             command: Some(Commands::Chat),
@@ -348,6 +437,10 @@ impl Cli {
                     tools: None,
                     context: None,
                     logging: None,
+                    multi_agent: None,
+                    tree_sitter: None,
+                    performance: None,
+                    security: None,
                 });
             }
         };
@@ -365,6 +458,10 @@ impl Cli {
             tools: None,
             context: None,
             logging: None,
+            multi_agent: None,
+            tree_sitter: None,
+            performance: None,
+            security: None,
         };
 
         for raw_line in text.lines() {

@@ -1,7 +1,7 @@
 //! Analyze command implementation - workspace analysis
 
-use crate::config::types::{AgentConfig, AnalysisDepth, OutputFormat};
 use crate::config::constants::tools;
+use crate::config::types::{AgentConfig, AnalysisDepth, OutputFormat};
 use crate::tools::ToolRegistry;
 use crate::tools::tree_sitter::{CodeAnalyzer, TreeSitterAnalyzer};
 use anyhow::Result;
@@ -70,7 +70,10 @@ pub async fn handle_analyze_command(
 
     for file in important_files {
         let check_file = registry
-            .execute_tool(tools::LIST_FILES, json!({"path": ".", "include_hidden": false}))
+            .execute_tool(
+                tools::LIST_FILES,
+                json!({"path": ".", "include_hidden": false}),
+            )
             .await;
         if let Ok(result) = check_file {
             if let Some(files) = result.get("files") {
@@ -94,7 +97,10 @@ pub async fn handle_analyze_command(
 
     for config_file in config_files {
         let read_result = registry
-            .execute_tool(tools::READ_FILE, json!({"path": config_file, "max_bytes": 2000}))
+            .execute_tool(
+                tools::READ_FILE,
+                json!({"path": config_file, "max_bytes": 2000}),
+            )
             .await;
         match read_result {
             Ok(result) => {
@@ -119,7 +125,10 @@ pub async fn handle_analyze_command(
     let src_dirs = vec!["src", "lib", "pkg", "internal", "cmd"];
     for dir in src_dirs {
         let check_dir = registry
-            .execute_tool(tools::LIST_FILES, json!({"path": ".", "include_hidden": false}))
+            .execute_tool(
+                tools::LIST_FILES,
+                json!({"path": ".", "include_hidden": false}),
+            )
             .await;
         if let Ok(result) = check_dir {
             if let Some(files) = result.get("files") {

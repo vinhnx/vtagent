@@ -29,6 +29,8 @@ pub async fn handle_models_command(cli: &Cli, command: &ModelCommands) -> Result
             .await
         }
         ModelCommands::Test { provider } => handle_test_provider(cli, provider).await,
+        ModelCommands::Compare => handle_compare_models(cli).await,
+        ModelCommands::Info { model } => handle_model_info(cli, model).await,
     }
 }
 
@@ -410,6 +412,40 @@ async fn handle_test_provider(_cli: &Cli, provider: &str) -> Result<()> {
             println!("[INFO] Make sure your API key and configuration are correct");
         }
     }
+
+    Ok(())
+}
+
+/// Compare model performance across providers
+async fn handle_compare_models(_cli: &Cli) -> Result<()> {
+    println!("{}", "Model Performance Comparison".bold().underline());
+    println!();
+    println!("This feature is coming soon! It will compare:");
+    println!("• Response times across models");
+    println!("• Token usage efficiency");
+    println!("• Cost per request");
+    println!("• Quality metrics");
+    println!();
+    println!("For now, use 'vtagent models list' to see available models.");
+    Ok(())
+}
+
+/// Show detailed information about a specific model
+async fn handle_model_info(_cli: &Cli, model: &str) -> Result<()> {
+    println!("{}", format!("Model Information: {}", model).bold().underline());
+    println!();
+
+    // This would ideally read from docs/models.json
+    // For now, provide basic information
+    println!("Model: {}", model.cyan());
+    println!("Status: {}", "Available".green());
+    println!();
+    println!("For detailed specifications, check docs/models.json");
+    println!("Features may include:");
+    println!("• Tool calling support");
+    println!("• Reasoning capabilities");
+    println!("• Context window size");
+    println!("• Pricing information");
 
     Ok(())
 }

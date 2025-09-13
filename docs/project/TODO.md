@@ -1,15 +1,3 @@
-make sure multi agents final summary works as like single agent summary. when multiple agents work on a task, the final summary should cohesively integrate their findings into a clear and concise overview, similar to how a single agent would summarize its work. check system prompt and make sure it reflect this requirement.
-
---
-
-[DEBUG] Input: 'tell me the core function flow in chat.rs', Is project question: false
-| AI response received                                                                                            I can't directly access or analyze the contents of specific Rust files like `chat.rs` within the project structure. My capabilities are limited to the information provided in the text snippets, such as README files and file listings.
-
-However, based on the `README.md` description of the `chat` command, I can infer the general flow as described previously: user input, agent orchestration (Orchestrator, Explorer, Coder), tool usage, and response generation, all managed within the context of the conversation.
-
--> why is this? vtagent should be able to analyze the prompt and analyze the whole codebase and could do file search and semeantic search, use tools like ast-grep, ripgrep or use terminmal command to search the codebase. so it should be able to analyze chat.rs file and tell me the core function flow in chat.rs
-
---
 Review and refactor the source code in the `src/cli/` directory to unify the handling of command-line arguments (CLI args) and configuration loading across all relevant files and modules. Ensure consistent parsing of args using a standardized library (e.g., argparse or commander.js), merge overlapping config loading logic into a single, reusable function or class, eliminate redundancies, and add comprehensive error handling, documentation, and tests for the unified approach.
 
 Additionally, implement a '/' slash activation command in the chat agent mode. This command should trigger agent activation when entered in the chat interface, responding with a confirmation message (e.g., "Agent activated!") and enabling full agent functionality, while ignoring non-slash inputs until activation. Include safeguards to prevent accidental activation and integrate it seamlessly with the existing chat loop.
@@ -1706,7 +1694,7 @@ When you receive a tool use response for a client tool, you should:
   ```json
   {"role": "user", "content": [
     {"type": "tool_result", "tool_use_id": "toolu_01", ...},
-    {"type": "text", "text": "What should I do next?"}  // ✅ Text after tool_result
+    {"type": "text", "text": "What should I do next?"}  // ✓ Text after tool_result
   ]}
   ```
 
@@ -2028,7 +2016,7 @@ There are a few different types of errors that can occur when using tools with C
     Specifically for parallel tool use:
 
     * ❌ **Wrong**: Sending separate user messages for each tool result
-    * ✅ **Correct**: All tool results must be in a single user message
+    * ✓ **Correct**: All tool results must be in a single user message
 
     ```json
     // ❌ This reduces parallel tool use
@@ -2038,7 +2026,7 @@ There are a few different types of errors that can occur when using tools with C
       {"role": "user", "content": [tool_result_2]}  // Separate message
     ]
 
-    // ✅ This maintains parallel tool use
+    // ✓ This maintains parallel tool use
     [
       {"role": "assistant", "content": [tool_use_1, tool_use_2]},
       {"role": "user", "content": [tool_result_1, tool_result_2]}  // Single message

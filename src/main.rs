@@ -488,17 +488,8 @@ async fn handle_single_agent_chat(
         if input.starts_with(":policy") {
             let parts: Vec<&str> = input.split_whitespace().collect();
             if parts.len() == 2 && parts[1].eq_ignore_ascii_case("status") {
-                // Show status
-                let summary = tool_registry.policy_manager().get_policy_summary();
-                println!("{} Tool Policy Status:", style("[POLICY]").cyan().bold());
-                for (tool, pol) in summary {
-                    let s = match pol {
-                        vtagent_core::tool_policy::ToolPolicy::Allow => style("ALLOW").green(),
-                        vtagent_core::tool_policy::ToolPolicy::Prompt => style("PROMPT").yellow(),
-                        vtagent_core::tool_policy::ToolPolicy::Deny => style("DENY").red(),
-                    };
-                    println!("  {:20} {}", style(tool).white(), s);
-                }
+                // Show status using the built-in method
+                tool_registry.print_tool_policy_status();
                 continue;
             }
 
@@ -522,12 +513,22 @@ async fn handle_single_agent_chat(
                     }
                 };
                 match res {
-                    Ok(_) => println!(
-                        "{} Set '{}' to {}",
-                        style("[POLICY]").cyan().bold(),
-                        tool_name,
-                        action
-                    ),
+                    Ok(_) => {
+                        println!(
+                            "{} Set '{}' to {}",
+                            style("[POLICY]").cyan().bold(),
+                            tool_name,
+                            action.to_uppercase()
+                        );
+                        // Show updated status for this tool
+                        let policy = tool_registry.get_tool_policy(tool_name);
+                        let s = match policy {
+                            vtagent_core::tool_policy::ToolPolicy::Allow => style("ALLOW").green(),
+                            vtagent_core::tool_policy::ToolPolicy::Prompt => style("PROMPT").yellow(),
+                            vtagent_core::tool_policy::ToolPolicy::Deny => style("DENY").red(),
+                        };
+                        println!("  {:20} {}", style(tool_name).white(), s);
+                    },
                     Err(e) => println!(
                         "{} Failed to set policy: {}",
                         style("[ERROR]").red().bold(),
@@ -552,7 +553,11 @@ async fn handle_single_agent_chat(
                     }
                 };
                 match res {
-                    Ok(_) => println!("{} Applied {}", style("[POLICY]").cyan().bold(), action),
+                    Ok(_) => {
+                        println!("{} Applied {}", style("[POLICY]").cyan().bold(), action);
+                        // Show updated status using the built-in method
+                        tool_registry.print_tool_policy_status();
+                    },
                     Err(e) => println!(
                         "{} Failed to update policies: {}",
                         style("[ERROR]").red().bold(),
@@ -841,15 +846,21 @@ async fn handle_single_agent_chat(
                             Err(e) => {
                                 tool_spinner.finish_and_clear();
                                 progress.inc(1);
-                                println!("{} {}", style("[ERROR]").red().bold(), style(&e).red());
+                                
+                                // Check if this is a policy denial
+                                let error_msg = if e.to_string().contains("execution denied by policy") {
+                                    println!("{} Tool '{}' was denied by policy. You can change this with :policy commands.", 
+                                        style("[DENIED]").yellow().bold(), tool_name);
+                                    format!("Tool '{}' execution was denied by policy. You can change this with :policy commands.", tool_name)
+                                } else {
+                                    println!("{} {}", style("[ERROR]").red().bold(), style(&e).red());
+                                    format!("Tool {} failed: {}", tool_call.function.name, e)
+                                };
 
                                 // Add error result to conversation
                                 conversation_history.push(Message {
                                     role: MessageRole::Tool,
-                                    content: format!(
-                                        "Tool {} failed: {}",
-                                        tool_call.function.name, e
-                                    ),
+                                    content: error_msg,
                                     tool_calls: None,
                                     tool_call_id: Some(tool_call.id.clone()),
                                 });
@@ -992,20 +1003,25 @@ async fn handle_single_agent_chat(
                                             }
                                         }
                                         Err(e) => {
-                                            println!(
-                                                "{}: Tool {} failed: {}",
-                                                style("(ERROR)").red().bold().on_bright(),
-                                                tool_name,
-                                                e
-                                            );
+                                            // Check if this is a policy denial
+                                            let error_msg = if e.to_string().contains("execution denied by policy") {
+                                                println!("{} Tool '{}' was denied by policy. You can change this with :policy commands.", 
+                                                    style("[DENIED]").yellow().bold(), tool_name);
+                                                format!("Tool '{}' execution was denied by policy. You can change this with :policy commands.", tool_name)
+                                            } else {
+                                                println!(
+                                                    "{}: Tool {} failed: {}",
+                                                    style("(ERROR)").red().bold().on_bright(),
+                                                    tool_name,
+                                                    e
+                                                );
+                                                format!("Tool {} failed: {}", tool_call.function.name, e)
+                                            };
 
                                             // Add error result to conversation
                                             conversation_history.push(Message {
                                                 role: MessageRole::Tool,
-                                                content: format!(
-                                                    "Tool {} failed: {}",
-                                                    tool_call.function.name, e
-                                                ),
+                                                content: error_msg,
                                                 tool_calls: None,
                                                 tool_call_id: Some(tool_call.id.clone()),
                                             });

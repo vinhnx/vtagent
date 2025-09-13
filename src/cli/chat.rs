@@ -166,31 +166,8 @@ pub async fn handle_chat_command(config: &CoreAgentConfig, force_multi_agent: bo
                 let args = call.args.clone();
                 eprintln!("[TOOL] {} {}", name, args);
 
-                // Human-in-the-loop confirmation inside REPL, not via dialoguer
-                // If current policy is Prompt, ask here and set policy accordingly
-                let current_policy = tool_registry.get_tool_policy(name);
-                if matches!(current_policy, vtagent_core::tool_policy::ToolPolicy::Prompt) {
-                    println!("Tool Permission Request: {}", name);
-                    println!("Allow this tool? [y]es / [n]o / [a]lways / [d]eny-always (default n): ");
-                    io::stdout().flush().ok();
-                    let mut answer = String::new();
-                    io::stdin().read_line(&mut answer).ok();
-                    let ans = answer.trim().to_lowercase();
-                    let (allow_now, remember_allow, remember_deny) = match ans.as_str() {
-                        "y" | "yes" => (true, false, false),
-                        "a" | "always" => (true, true, false),
-                        "d" | "deny" => (false, false, true),
-                        _ => (false, false, false),
-                    };
-                    if remember_allow { let _ = tool_registry.set_tool_policy(name, vtagent_core::tool_policy::ToolPolicy::Allow); }
-                    if remember_deny { let _ = tool_registry.set_tool_policy(name, vtagent_core::tool_policy::ToolPolicy::Deny); }
-                    if !allow_now && !remember_allow {
-                        let err = json!({ "error": format!("User denied '{}'", name) });
-                        let fr = FunctionResponse { name: call.name.clone(), response: err };
-                        working_history.push(Content::user_parts(vec![Part::FunctionResponse { function_response: fr }]));
-                        continue;
-                    }
-                }
+                // Use the ToolRegistry's execute_tool method which handles policy checking
+                // This will properly handle the human-in-the-loop confirmation when policy is Prompt
                 match tool_registry.execute_tool(name, args).await {
                     Ok(tool_output) => {
                         // Heuristic: mark write effects for write/edit/create/delete
@@ -202,6 +179,13 @@ pub async fn handle_chat_command(config: &CoreAgentConfig, force_multi_agent: bo
                         working_history.push(Content::user_parts(vec![Part::FunctionResponse { function_response: fr }]));
                     }
                     Err(e) => {
+                        // Check if the error is due to policy denial
+                        if e.to_string().contains("execution denied by policy") {
+                            println!("{} Tool '{}' was denied by policy. You can change this with :policy commands in chat mode.", 
+                                style("[DENIED]").yellow().bold(), name);
+                        } else {
+                            eprintln!("{} Tool '{}' failed: {}", style("[ERROR]").red().bold(), name, e);
+                        }
                         let err = json!({ "error": e.to_string() });
                         let fr = FunctionResponse { name: call.name.clone(), response: err };
                         working_history.push(Content::user_parts(vec![Part::FunctionResponse { function_response: fr }]));

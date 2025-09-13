@@ -540,4 +540,39 @@ impl Cli {
     pub fn is_verbose(&self) -> bool {
         self.verbose
     }
+
+    /// Check if multi-agent mode is enabled
+    pub fn is_multi_agent(&self) -> bool {
+        self.force_multi_agent || self.agent_type != "single"
+    }
+
+    /// Get the agent type for multi-agent mode
+    pub fn get_agent_type(&self) -> &str {
+        &self.agent_type
+    }
+
+    /// Check if tree-sitter analysis is enabled
+    pub fn is_tree_sitter_enabled(&self) -> bool {
+        self.enable_tree_sitter
+    }
+
+    /// Check if performance monitoring is enabled
+    pub fn is_performance_monitoring_enabled(&self) -> bool {
+        self.performance_monitoring
+    }
+
+    /// Check if research-preview features are enabled
+    pub fn is_research_preview_enabled(&self) -> bool {
+        self.research_preview
+    }
+
+    /// Get the security level
+    pub fn get_security_level(&self) -> &str {
+        &self.security_level
+    }
+
+    /// Check if debug mode is enabled (includes verbose)
+    pub fn is_debug_mode(&self) -> bool {
+        self.debug || self.verbose
+    }
 }

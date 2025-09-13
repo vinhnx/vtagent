@@ -1289,7 +1289,11 @@ async fn handle_multi_agent_chat(
             .await
         {
             Ok(task_result) => {
-                println!("{}", task_result.results.summary);
+                // Display the cohesive final summary
+                println!("{}", task_result.final_summary);
+                
+                // Also show a success message
+                println!("\n{}", style("[SUCCESS] Task completed successfully!").green().bold());
             }
             Err(e) => {
                 eprintln!("{}: {}", style("[ERROR]").red().bold().on_black(), e);

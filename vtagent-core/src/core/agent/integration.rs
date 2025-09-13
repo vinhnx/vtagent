@@ -384,7 +384,7 @@ impl MultiAgentSystem {
         let (_agent, agent_info) = {
             let agent = self
                 .get_agent_by_id(&agent_id)
-                .ok_or_else(|| anyhow!("Agent {} not found", agent_id))?;
+                .ok_or_else(|| anyhow!( "Agent {} not found", agent_id))?;
             (agent, (agent.id.clone(), agent.agent_type))
         };
 
@@ -467,7 +467,7 @@ impl MultiAgentSystem {
 
                 // Move to completed tasks
                 self.session.task_history.push(CompletedTaskInfo {
-                    task,
+                    task: task.clone(),
                     results: results.clone(),
                     verification: Some(verification_result.clone()),
                     completed_at: SystemTime::now(),
@@ -480,6 +480,9 @@ impl MultiAgentSystem {
                     active_tasks.remove(&task_id);
                 }
 
+                // Generate a cohesive final summary that integrates findings from all subagents
+                let final_summary = self.generate_cohesive_summary(&task, &results, &verification_result).await;
+
                 Ok(OptimizedTaskResult {
                     task_id,
                     results,
@@ -487,6 +490,7 @@ impl MultiAgentSystem {
                     execution_time: start_time.elapsed(),
                     agent_used: agent_id,
                     performance_metrics: self.performance.get_metrics().await,
+                    final_summary,
                 })
             }
             Err(e) => {
@@ -515,7 +519,32 @@ impl MultiAgentSystem {
                 self.update_agent_stats(&agent_id, start_time.elapsed(), false)
                     .await?;
 
-                Err(e)
+                // Generate a final summary even for failed tasks
+                let final_summary = format!("Task '{}' failed with error: {}", task_title, e);
+
+                Ok(OptimizedTaskResult {
+                    task_id,
+                    results: TaskResults {
+                        created_contexts: vec![],
+                        modified_files: vec![],
+                        executed_commands: vec![],
+                        summary: final_summary.clone(),
+                        warnings: vec![e.to_string()],
+                    },
+                    verification: crate::core::agent::verification::VerificationResult {
+                        passed: false,
+                        confidence: 0.0,
+                        completeness: 0.0,
+                        errors: 1,
+                        findings: vec![],
+                        duration: Duration::from_secs(0),
+                        recommendations: vec![format!("Task execution failed: {}", e)],
+                    },
+                    execution_time: start_time.elapsed(),
+                    agent_used: agent_id,
+                    performance_metrics: self.performance.get_metrics().await,
+                    final_summary,
+                })
             }
         }
     }
@@ -698,6 +727,92 @@ impl MultiAgentSystem {
         Err(anyhow!("Agent not found: {}", agent_id))
     }
 
+    /// Generate a cohesive final summary that integrates findings from all subagents
+    async fn generate_cohesive_summary(
+        &self,
+        task: &Task,
+        results: &TaskResults,
+        verification_result: &crate::core::agent::verification::VerificationResult,
+    ) -> String {
+        // Start with the task title and description
+        let mut summary_parts = vec![
+            format!("# Task Summary: {}", task.title),
+            format!("**Description**: {}", task.description),
+        ];
+
+        // Add the subagent's summary
+        if !results.summary.is_empty() {
+            summary_parts.push("## Implementation Details".to_string());
+            summary_parts.push(results.summary.clone());
+        }
+
+        // Add information about modified files
+        if !results.modified_files.is_empty() {
+            summary_parts.push("## Files Modified".to_string());
+            for file in &results.modified_files {
+                summary_parts.push(format!("- {}", file));
+            }
+        }
+
+        // Add information about executed commands
+        if !results.executed_commands.is_empty() {
+            summary_parts.push("## Commands Executed".to_string());
+            for command in &results.executed_commands {
+                summary_parts.push(format!("- `{}`", command));
+            }
+        }
+
+        // Add verification results
+        summary_parts.push("## Verification Results".to_string());
+        summary_parts.push(format!(
+            "- **Status**: {}",
+            if verification_result.passed {
+                "✅ Passed"
+            } else {
+                "❌ Failed"
+            }
+        ));
+        summary_parts.push(format!(
+            "- **Confidence**: {:.1}%",
+            verification_result.confidence * 100.0
+        ));
+        
+        // Add findings if any
+        if !verification_result.findings.is_empty() {
+            summary_parts.push("- **Findings**:".to_string());
+            for finding in &verification_result.findings {
+                summary_parts.push(format!("  - {:?}: {}", finding.finding_type, finding.description));
+            }
+        }
+        
+        // Add recommendations if any
+        if !verification_result.recommendations.is_empty() {
+            summary_parts.push("- **Recommendations**:".to_string());
+            for recommendation in &verification_result.recommendations {
+                summary_parts.push(format!("  - {}", recommendation));
+            }
+        }
+
+        // Add any warnings
+        if !results.warnings.is_empty() {
+            summary_parts.push("## Warnings".to_string());
+            for warning in &results.warnings {
+                summary_parts.push(format!("- ⚠️  {}", warning));
+            }
+        }
+
+        // Add a conclusion
+        let conclusion = if verification_result.passed {
+            "The task has been successfully completed and verified.".to_string()
+        } else {
+            "The task was executed but verification failed. Please review the details above.".to_string()
+        };
+        summary_parts.push("## Conclusion".to_string());
+        summary_parts.push(conclusion);
+
+        summary_parts.join("\n\n")
+    }
+
     /// Get system status report
     pub async fn get_status_report(&self) -> SystemStatusReport {
         let active_tasks = self.session.active_tasks.read().await;
@@ -779,6 +894,8 @@ pub struct OptimizedTaskResult {
     pub agent_used: String,
     /// Performance metrics snapshot
     pub performance_metrics: crate::core::agent::optimization::PerformanceMetrics,
+    /// Cohesive final summary that integrates findings from all subagents
+    pub final_summary: String,
 }
 
 /// System status report

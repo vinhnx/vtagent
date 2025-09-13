@@ -2392,7 +2392,16 @@ https://deepwiki.com/crate-ci/cargo-release
 
 --
 
-integrate as vtagent pty https://deepwiki.com/rust-cli/rexpect
+integrate as vtagent pty as shell render https://deepwiki.com/rust-cli/rexpect
+
+
+❯ run cargo fmt
+[DEBUG] Input: 'run cargo fmt', Is project question: false
+
+[TOOL] 1 tool call(s) to execute
+[1/1] run_terminal_cmd {"command":["cargo","fmt"]}
+
+^ this should also show the pty command shell pseudo terminaml
 
 --
 
@@ -2400,12 +2409,21 @@ https://deepwiki.com/indexmap-rs/indexmap
 
 --
 
-enhance vtagent-core/src/markdown_storage.rs with https://deepwiki.com/arthurprs/canopydb. Use canopydb to store and query markdown files more efficiently. Update the system prompt to reflect this new capability. Test the integration thoroughly to ensure it works as expected. Update the tools policy and tool registry accordingly. Write end-to-end tests for this new integration in vtagent core's read and write commands.
+enhance vtagent-core/src/markdown_storage.rs with https://deepwiki.com/arthurprs/canopydb. Use canopydb to store and query markdown files more efficiently. Update the system prompt to reflect this new capability. Test the integration thoroughly to ensure it works as expected. Update the tools policy and tool registry accordingly. Write end-to-end tests for this new integration in vtagent core's read and write commands. make sure to regular update the project context on each chat turn session or via command
 
 ---
 
 enhance vtagent-core/src/tools/cache.rs with https://deepwiki.com/arthurprs/quick-cache. Use quick-cache to improve caching performance and efficiency. Update the system prompt to reflect this new capability. Test the integration thoroughly to ensure it works as expected. Update the tools policy and tool registry accordingly. Write end-to-end tests for this new integration in vtagent core's read and write commands.
 
 --
+fetch
+https://deepwiki.com/ratatui/ratatui integrate and port chat repl
 
-https://deepwiki.com/ratatui/ratatui integrate and port cli to tui. from src/cli/chat.rs
+--
+
+remove this when runnning a task tool
+Executing tools[00:00:00]              0/1 (0%)
+
+--
+
+fix https://github.com/vinhnx/vtagent/actions/runs/17695441283

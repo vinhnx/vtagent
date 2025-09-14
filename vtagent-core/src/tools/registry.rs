@@ -18,10 +18,165 @@ use crate::tools::ast_grep::AstGrepEngine;
 use crate::tools::grep_search::GrepSearchManager;
 use anyhow::{Context, Result, anyhow};
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+
+/// Enhanced error handling for tool execution following Anthropic's best practices
+/// Provides detailed error information and recovery suggestions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolExecutionError {
+    /// The tool that failed
+    pub tool_name: String,
+    /// Error type classification
+    pub error_type: ToolErrorType,
+    /// Human-readable error message
+    pub message: String,
+    /// Whether this is a recoverable error
+    pub is_recoverable: bool,
+    /// Suggested recovery actions
+    pub recovery_suggestions: Vec<String>,
+    /// Original error details for debugging
+    pub original_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ToolErrorType {
+    /// Invalid parameters or arguments
+    InvalidParameters,
+    /// Tool not found or not available
+    ToolNotFound,
+    /// Permission or access denied
+    PermissionDenied,
+    /// File or resource not found
+    ResourceNotFound,
+    /// Network or external service error
+    NetworkError,
+    /// Timeout or execution took too long
+    Timeout,
+    /// Internal tool execution error
+    ExecutionError,
+    /// Policy violation
+    PolicyViolation,
+}
+
+impl ToolExecutionError {
+    /// Create a new tool execution error
+    pub fn new(
+        tool_name: String,
+        error_type: ToolErrorType,
+        message: String,
+    ) -> Self {
+        let (is_recoverable, recovery_suggestions) = Self::generate_recovery_info(&error_type);
+
+        Self {
+            tool_name,
+            error_type,
+            message,
+            is_recoverable,
+            recovery_suggestions,
+            original_error: None,
+        }
+    }
+
+    /// Create error with original error details
+    pub fn with_original_error(
+        tool_name: String,
+        error_type: ToolErrorType,
+        message: String,
+        original_error: String,
+    ) -> Self {
+        let mut error = Self::new(tool_name, error_type, message);
+        error.original_error = Some(original_error);
+        error
+    }
+
+    /// Generate recovery information based on error type
+    fn generate_recovery_info(error_type: &ToolErrorType) -> (bool, Vec<String>) {
+        match error_type {
+            ToolErrorType::InvalidParameters => (
+                true,
+                vec![
+                    "Check parameter names and types against the tool schema".to_string(),
+                    "Ensure required parameters are provided".to_string(),
+                    "Verify parameter values are within acceptable ranges".to_string(),
+                ]
+            ),
+            ToolErrorType::ToolNotFound => (
+                false,
+                vec![
+                    "Verify the tool name is spelled correctly".to_string(),
+                    "Check if the tool is available in the current context".to_string(),
+                    "Contact administrator if tool should be available".to_string(),
+                ]
+            ),
+            ToolErrorType::PermissionDenied => (
+                true,
+                vec![
+                    "Check file permissions and access rights".to_string(),
+                    "Ensure workspace boundaries are respected".to_string(),
+                    "Try running with appropriate permissions".to_string(),
+                ]
+            ),
+            ToolErrorType::ResourceNotFound => (
+                true,
+                vec![
+                    "Verify file paths and resource locations".to_string(),
+                    "Check if files exist and are accessible".to_string(),
+                    "Use list_dir to explore available resources".to_string(),
+                ]
+            ),
+            ToolErrorType::NetworkError => (
+                true,
+                vec![
+                    "Check network connectivity".to_string(),
+                    "Retry the operation after a brief delay".to_string(),
+                    "Verify external service availability".to_string(),
+                ]
+            ),
+            ToolErrorType::Timeout => (
+                true,
+                vec![
+                    "Increase timeout values if appropriate".to_string(),
+                    "Break large operations into smaller chunks".to_string(),
+                    "Check system resources and performance".to_string(),
+                ]
+            ),
+            ToolErrorType::ExecutionError => (
+                false,
+                vec![
+                    "Review error details for specific issues".to_string(),
+                    "Check tool documentation for known limitations".to_string(),
+                    "Report the issue if it appears to be a bug".to_string(),
+                ]
+            ),
+            ToolErrorType::PolicyViolation => (
+                false,
+                vec![
+                    "Review workspace policies and restrictions".to_string(),
+                    "Contact administrator for policy changes".to_string(),
+                    "Use alternative tools that comply with policies".to_string(),
+                ]
+            ),
+        }
+    }
+
+    /// Convert to JSON value for tool result formatting
+    pub fn to_json_value(&self) -> Value {
+        json!({
+            "error": {
+                "tool_name": self.tool_name,
+                "error_type": format!("{:?}", self.error_type),
+                "message": self.message,
+                "is_recoverable": self.is_recoverable,
+                "recovery_suggestions": self.recovery_suggestions,
+                "original_error": self.original_error
+            }
+        })
+    }
+}
 
 /// Main tool registry that coordinates all tools
 #[derive(Clone)]
@@ -129,16 +284,40 @@ impl ToolRegistry {
     pub async fn execute_tool(&mut self, name: &str, args: Value) -> Result<Value> {
         // Check tool policy before execution
         if !self.policy_manager_mut().should_execute_tool(name)? {
-            return Err(anyhow!("Tool '{}' execution denied by policy", name));
+            let error = ToolExecutionError::new(
+                name.to_string(),
+                ToolErrorType::PolicyViolation,
+                format!("Tool '{}' execution denied by policy", name),
+            );
+            return Ok(error.to_json_value());
         }
 
         // Apply optional scoped constraints from policy
-        let args = self.apply_policy_constraints(name, args)?;
+        let args = match self.apply_policy_constraints(name, args) {
+            Ok(args) => args,
+            Err(e) => {
+                let error = ToolExecutionError::with_original_error(
+                    name.to_string(),
+                    ToolErrorType::InvalidParameters,
+                    "Failed to apply policy constraints".to_string(),
+                    e.to_string(),
+                );
+                return Ok(error.to_json_value());
+            }
+        };
 
         // Check PTY session limits for PTY-based tools
         let is_pty_tool = matches!(name, tools::RUN_TERMINAL_CMD | tools::BASH);
         if is_pty_tool {
-            self.start_pty_session()?;
+            if let Err(e) = self.start_pty_session() {
+                let error = ToolExecutionError::with_original_error(
+                    name.to_string(),
+                    ToolErrorType::ExecutionError,
+                    "Failed to start PTY session".to_string(),
+                    e.to_string(),
+                );
+                return Ok(error.to_json_value());
+            }
         }
 
         let result = match name {
@@ -152,7 +331,14 @@ impl ToolRegistry {
             tools::SIMPLE_SEARCH => self.simple_search_tool.execute(args).await,
             tools::BASH => self.bash_tool.execute(args).await,
             "apply_patch" => self.execute_apply_patch(args).await,
-            _ => Err(anyhow!("Unknown tool: {}", name)),
+            _ => {
+                let error = ToolExecutionError::new(
+                    name.to_string(),
+                    ToolErrorType::ToolNotFound,
+                    format!("Unknown tool: {}", name),
+                );
+                return Ok(error.to_json_value());
+            }
         };
 
         // Decrement session count if this was a PTY tool
@@ -160,7 +346,20 @@ impl ToolRegistry {
             self.end_pty_session();
         }
 
-        result
+        // Handle execution errors with detailed error information
+        match result {
+            Ok(value) => Ok(value),
+            Err(e) => {
+                let error_type = self.classify_error(&e, name);
+                let error = ToolExecutionError::with_original_error(
+                    name.to_string(),
+                    error_type,
+                    format!("Tool execution failed: {}", e),
+                    e.to_string(),
+                );
+                Ok(error.to_json_value())
+            }
+        }
     }
 
     async fn execute_apply_patch(&self, args: Value) -> Result<Value> {
@@ -996,6 +1195,28 @@ impl ToolRegistry {
             other => other,
         }
     }
+
+    /// Classify an error to determine the appropriate error type
+    #[allow(unused_variables)]
+    pub fn classify_error(&self, error: &anyhow::Error, tool_name: &str) -> ToolErrorType {
+        let error_msg = error.to_string().to_lowercase();
+
+        if error_msg.contains("permission") || error_msg.contains("access denied") {
+            ToolErrorType::PermissionDenied
+        } else if error_msg.contains("not found") || error_msg.contains("no such file") {
+            ToolErrorType::ResourceNotFound
+        } else if error_msg.contains("timeout") || error_msg.contains("timed out") {
+            ToolErrorType::Timeout
+        } else if error_msg.contains("network") || error_msg.contains("connection") {
+            ToolErrorType::NetworkError
+        } else if error_msg.contains("invalid") || error_msg.contains("malformed") {
+            ToolErrorType::InvalidParameters
+        } else if error_msg.contains("policy") || error_msg.contains("denied") {
+            ToolErrorType::PolicyViolation
+        } else {
+            ToolErrorType::ExecutionError
+        }
+    }
 }
 
 fn truncate(s: &str, max: usize) -> String {
@@ -1019,7 +1240,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // Ripgrep search tool
         FunctionDeclaration {
             name: tools::GREP_SEARCH.to_string(),
-            description: "Performs advanced code search across the workspace using ripgrep, supporting multiple search modes and patterns. This tool is ideal for finding specific code patterns, function definitions, variable usages, or text matches across multiple files. It should be used when you need to locate code elements, search for TODO comments, find function calls, or identify patterns in the codebase. Do not use this tool for simple file listing or when you already know the exact file location. The tool supports exact matching, fuzzy search, multi-pattern searches with AND/OR logic, and similarity-based searches. Results can be returned in concise format (recommended for most cases) or detailed raw ripgrep JSON format. Always specify a reasonable max_results limit to prevent token overflow.".to_string(),
+            description: "Performs advanced code search across the workspace using ripgrep, supporting multiple search modes and patterns. This tool is ideal for finding specific code patterns, function definitions, variable usages, or text matches across multiple files. It should be used when you need to locate code elements, search for TODO comments, find function calls, or identify patterns in the codebase. The tool supports exact matching, fuzzy search, multi-pattern searches with AND/OR logic, and similarity-based searches. Results can be returned in concise format (recommended for most cases) or detailed raw ripgrep JSON format. Always specify a reasonable max_results limit to prevent token overflow.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {

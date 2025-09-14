@@ -284,21 +284,22 @@ impl LLMClient for AnthropicProvider {
         }
 
         let request = LLMRequest {
-            model: model.clone(),
             messages: vec![Message {
                 role: MessageRole::User,
                 content: prompt.to_string(),
                 tool_calls: None,
                 tool_call_id: None,
             }],
+            system_prompt: None,
+            tools: None,
+            model: model.clone(),
             max_tokens: None,
             temperature: None,
             stream: false,
             tool_choice: None,
             parallel_tool_calls: None,
+            parallel_tool_config: None,
             reasoning_effort: None,
-            system_prompt: None,
-            tools: None,
         };
 
         let response = LLMProvider::generate(self, request.clone()).await?;

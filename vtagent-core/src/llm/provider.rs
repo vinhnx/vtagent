@@ -68,6 +68,9 @@ pub struct LLMRequest {
     /// Whether to enable parallel tool calls (OpenAI specific)
     pub parallel_tool_calls: Option<bool>,
 
+    /// Parallel tool use configuration following Anthropic best practices
+    pub parallel_tool_config: Option<ParallelToolConfig>,
+
     /// Reasoning effort level for models that support it (low, medium, high)
     /// Applies to: Claude, GPT-5, Gemini, Qwen3, DeepSeek with reasoning capability
     pub reasoning_effort: Option<String>,
@@ -75,19 +78,24 @@ pub struct LLMRequest {
 
 /// Tool choice configuration that works across different providers
 /// Based on OpenAI, Anthropic, and Gemini API specifications
+/// Follows Anthropic's tool use best practices for optimal performance
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ToolChoice {
     /// Let the model decide whether to call tools ("auto")
+    /// Default behavior - allows model to use tools when appropriate
     Auto,
 
     /// Force the model to not call any tools ("none")
+    /// Useful for pure conversational responses without tool usage
     None,
 
     /// Force the model to call at least one tool ("any")
+    /// Ensures tool usage even when model might prefer direct response
     Any,
 
     /// Force the model to call a specific tool
+    /// Useful for directing model to use particular functionality
     Specific(SpecificToolChoice),
 }
 
@@ -130,6 +138,31 @@ impl ToolChoice {
         })
     }
 
+    /// Check if this tool choice allows parallel tool use
+    /// Based on Anthropic's parallel tool use guidelines
+    pub fn allows_parallel_tools(&self) -> bool {
+        match self {
+            // Auto allows parallel tools by default
+            Self::Auto => true,
+            // Any forces at least one tool, may allow parallel
+            Self::Any => true,
+            // Specific forces one particular tool, typically no parallel
+            Self::Specific(_) => false,
+            // None disables tools entirely
+            Self::None => false,
+        }
+    }
+
+    /// Get human-readable description of tool choice behavior
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::Auto => "Model decides when to use tools (allows parallel)",
+            Self::None => "No tools will be used",
+            Self::Any => "At least one tool must be used (allows parallel)",
+            Self::Specific(_) => "Specific tool must be used (no parallel)",
+        }
+    }
+
     /// Convert to provider-specific format
     pub fn to_provider_format(&self, provider: &str) -> Value {
         match (self, provider) {
@@ -159,6 +192,52 @@ impl ToolChoice {
                 Self::Any => json!("required"),
                 Self::Specific(choice) => json!(choice),
             },
+        }
+    }
+}
+
+/// Configuration for parallel tool use behavior
+/// Based on Anthropic's parallel tool use guidelines
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParallelToolConfig {
+    /// Whether to disable parallel tool use
+    /// When true, forces sequential tool execution
+    pub disable_parallel_tool_use: bool,
+
+    /// Maximum number of tools to execute in parallel
+    /// None means no limit (provider default)
+    pub max_parallel_tools: Option<usize>,
+
+    /// Whether to encourage parallel tool use in prompts
+    pub encourage_parallel: bool,
+}
+
+impl Default for ParallelToolConfig {
+    fn default() -> Self {
+        Self {
+            disable_parallel_tool_use: false,
+            max_parallel_tools: Some(5), // Reasonable default
+            encourage_parallel: true,
+        }
+    }
+}
+
+impl ParallelToolConfig {
+    /// Create configuration optimized for Anthropic models
+    pub fn anthropic_optimized() -> Self {
+        Self {
+            disable_parallel_tool_use: false,
+            max_parallel_tools: None, // Let Anthropic decide
+            encourage_parallel: true,
+        }
+    }
+
+    /// Create configuration for sequential tool use
+    pub fn sequential_only() -> Self {
+        Self {
+            disable_parallel_tool_use: true,
+            max_parallel_tools: Some(1),
+            encourage_parallel: false,
         }
     }
 }

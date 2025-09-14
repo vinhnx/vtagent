@@ -93,12 +93,23 @@ run_clippy() {
 # Run tests
 run_tests() {
     print_status "Running tests..."
-    if cargo test --workspace; then
-        print_success "All tests passed!"
-        return 0
+    if command -v cargo-nextest >/dev/null 2>&1; then
+        if cargo nextest run --workspace; then
+            print_success "All tests passed!"
+            return 0
+        else
+            print_error "Some tests failed."
+            return 1
+        fi
     else
-        print_error "Some tests failed."
-        return 1
+        print_warning "cargo-nextest not found, falling back to cargo test"
+        if cargo test --workspace; then
+            print_success "All tests passed!"
+            return 0
+        else
+            print_error "Some tests failed."
+            return 1
+        fi
     fi
 }
 

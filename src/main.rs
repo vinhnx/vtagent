@@ -22,7 +22,7 @@ use vtagent_core::constants::{prompts, tools};
 use vtagent_core::core::agent::integration::MultiAgentSystem;
 use vtagent_core::core::agent::multi_agent::AgentType;
 use vtagent_core::llm::factory::create_provider_with_config;
-use vtagent_core::llm::provider::{LLMProvider, LLMRequest, Message, MessageRole};
+use vtagent_core::llm::provider::{LLMProvider, LLMRequest, Message, MessageRole, ParallelToolConfig};
 use vtagent_core::llm::{AnyClient, make_client};
 use vtagent_core::ui::spinner;
 
@@ -803,6 +803,7 @@ async fn handle_single_agent_chat(
             stream: false,
             tool_choice: None,
             parallel_tool_calls: None,
+            parallel_tool_config: Some(ParallelToolConfig::anthropic_optimized()),
             reasoning_effort: Some(config.agent.reasoning_effort.clone()),
         };
 
@@ -1001,6 +1002,7 @@ async fn handle_single_agent_chat(
                         stream: false,
                         tool_choice: None,
                         parallel_tool_calls: None,
+                        parallel_tool_config: Some(ParallelToolConfig::anthropic_optimized()),
                         reasoning_effort: Some(config.agent.reasoning_effort.clone()),
                     };
 
@@ -1168,6 +1170,7 @@ async fn handle_single_agent_chat(
                                     stream: false,
                                     tool_choice: None,
                                     parallel_tool_calls: None,
+                                    parallel_tool_config: Some(ParallelToolConfig::anthropic_optimized()),
                                     reasoning_effort: Some(config.agent.reasoning_effort.clone()),
                                 };
 

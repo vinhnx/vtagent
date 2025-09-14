@@ -255,6 +255,7 @@ async fn handle_test_provider(_cli: &Cli, provider: &str) -> Result<()> {
         stream: false,
         tool_choice: None,
         parallel_tool_calls: None,
+        parallel_tool_config: None,
         reasoning_effort: None,
     };
 

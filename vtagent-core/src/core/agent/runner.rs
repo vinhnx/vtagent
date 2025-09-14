@@ -249,6 +249,7 @@ impl AgentRunner {
                 stream: false,
                 tool_choice: None,
                 parallel_tool_calls: None,
+                parallel_tool_config: Some(crate::llm::provider::ParallelToolConfig::anthropic_optimized()),
                 reasoning_effort: self.reasoning_effort.clone(),
             };
 

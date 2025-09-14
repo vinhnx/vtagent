@@ -64,11 +64,7 @@ pub enum ToolErrorType {
 
 impl ToolExecutionError {
     /// Create a new tool execution error
-    pub fn new(
-        tool_name: String,
-        error_type: ToolErrorType,
-        message: String,
-    ) -> Self {
+    pub fn new(tool_name: String, error_type: ToolErrorType, message: String) -> Self {
         let (is_recoverable, recovery_suggestions) = Self::generate_recovery_info(&error_type);
 
         Self {
@@ -102,7 +98,7 @@ impl ToolExecutionError {
                     "Check parameter names and types against the tool schema".to_string(),
                     "Ensure required parameters are provided".to_string(),
                     "Verify parameter values are within acceptable ranges".to_string(),
-                ]
+                ],
             ),
             ToolErrorType::ToolNotFound => (
                 false,
@@ -110,7 +106,7 @@ impl ToolExecutionError {
                     "Verify the tool name is spelled correctly".to_string(),
                     "Check if the tool is available in the current context".to_string(),
                     "Contact administrator if tool should be available".to_string(),
-                ]
+                ],
             ),
             ToolErrorType::PermissionDenied => (
                 true,
@@ -118,7 +114,7 @@ impl ToolExecutionError {
                     "Check file permissions and access rights".to_string(),
                     "Ensure workspace boundaries are respected".to_string(),
                     "Try running with appropriate permissions".to_string(),
-                ]
+                ],
             ),
             ToolErrorType::ResourceNotFound => (
                 true,
@@ -126,7 +122,7 @@ impl ToolExecutionError {
                     "Verify file paths and resource locations".to_string(),
                     "Check if files exist and are accessible".to_string(),
                     "Use list_dir to explore available resources".to_string(),
-                ]
+                ],
             ),
             ToolErrorType::NetworkError => (
                 true,
@@ -134,7 +130,7 @@ impl ToolExecutionError {
                     "Check network connectivity".to_string(),
                     "Retry the operation after a brief delay".to_string(),
                     "Verify external service availability".to_string(),
-                ]
+                ],
             ),
             ToolErrorType::Timeout => (
                 true,
@@ -142,7 +138,7 @@ impl ToolExecutionError {
                     "Increase timeout values if appropriate".to_string(),
                     "Break large operations into smaller chunks".to_string(),
                     "Check system resources and performance".to_string(),
-                ]
+                ],
             ),
             ToolErrorType::ExecutionError => (
                 false,
@@ -150,7 +146,7 @@ impl ToolExecutionError {
                     "Review error details for specific issues".to_string(),
                     "Check tool documentation for known limitations".to_string(),
                     "Report the issue if it appears to be a bug".to_string(),
-                ]
+                ],
             ),
             ToolErrorType::PolicyViolation => (
                 false,
@@ -158,7 +154,7 @@ impl ToolExecutionError {
                     "Review workspace policies and restrictions".to_string(),
                     "Contact administrator for policy changes".to_string(),
                     "Use alternative tools that comply with policies".to_string(),
-                ]
+                ],
             ),
         }
     }
@@ -668,9 +664,7 @@ impl ToolRegistry {
         content_lines
             .iter()
             .zip(expected_lines.iter())
-            .all(|(content_line, expected_line)| {
-                content_line.trim() == expected_line.trim()
-            })
+            .all(|(content_line, expected_line)| content_line.trim() == expected_line.trim())
     }
 
     pub async fn delete_file(&mut self, _args: Value) -> Result<Value> {

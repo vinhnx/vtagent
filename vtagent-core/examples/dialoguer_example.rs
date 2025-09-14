@@ -2,10 +2,8 @@
 //
 // This example shows various prompt types available in dialoguer.
 
-use dialoguer::{
-    Confirm, Input, Select, MultiSelect, Password, theme::ColorfulTheme
-};
 use anyhow::Result;
+use dialoguer::{Confirm, Input, MultiSelect, Password, Select, theme::ColorfulTheme};
 
 fn main() -> Result<()> {
     println!("=== dialoguer Example ===");
@@ -38,7 +36,7 @@ fn main() -> Result<()> {
         "Analyze existing code",
         "Generate documentation",
         "Run tests",
-        "Exit"
+        "Exit",
     ];
 
     let selection = Select::with_theme(&theme)
@@ -55,7 +53,7 @@ fn main() -> Result<()> {
         "Syntax highlighting",
         "Error detection",
         "Performance analysis",
-        "Security scanning"
+        "Security scanning",
     ];
 
     let chosen_features: Vec<usize> = MultiSelect::with_theme(&theme)
@@ -70,7 +68,8 @@ fn main() -> Result<()> {
     }
 
     // Password prompt (only if they selected a security-related option)
-    if chosen_features.contains(&4) { // Security scanning
+    if chosen_features.contains(&4) {
+        // Security scanning
         let password = Password::with_theme(&theme)
             .with_prompt("Enter API key for security scanning")
             .validate_with(|input: &String| -> Result<(), &str> {

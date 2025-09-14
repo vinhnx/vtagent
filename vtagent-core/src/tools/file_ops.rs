@@ -328,7 +328,14 @@ impl FileOpsTool {
         Err(anyhow!(
             "Error: File not found: {}. Tried paths: {}. Suggestions: 1) Check the file path and case sensitivity, 2) Use 'list_files' to explore the directory structure, 3) Try case-insensitive search with just the filename. Example: read_file({{\"path\": \"src/main.rs\"}})",
             input.path,
-            potential_paths.iter().map(|p| p.strip_prefix(&self.workspace_root).unwrap_or(p).to_string_lossy()).collect::<Vec<_>>().join(", ")
+            potential_paths
+                .iter()
+                .map(|p| p
+                    .strip_prefix(&self.workspace_root)
+                    .unwrap_or(p)
+                    .to_string_lossy())
+                .collect::<Vec<_>>()
+                .join(", ")
         ))
     }
 
@@ -420,7 +427,10 @@ impl FileOpsTool {
             }
 
             // Also check common subdirectories for case-insensitive matches
-            let common_dirs = ["src", "lib", "bin", "app", "source", "sources", "include", "docs", "doc", "examples", "example", "tests", "test"];
+            let common_dirs = [
+                "src", "lib", "bin", "app", "source", "sources", "include", "docs", "doc",
+                "examples", "example", "tests", "test",
+            ];
             for dir in &common_dirs {
                 if let Ok(entries) = std::fs::read_dir(self.workspace_root.join(dir)) {
                     for entry in entries.flatten() {

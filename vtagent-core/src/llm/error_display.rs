@@ -8,19 +8,34 @@ use crate::ui::styled::*;
 /// Get a styled error message with enhanced coloring
 pub fn style_llm_error(message: &str) -> String {
     // Use a rich red color for LLM errors
-    format!("{}{}{}", Styles::error().render(), message, Styles::error().render_reset())
+    format!(
+        "{}{}{}",
+        Styles::error().render(),
+        message,
+        Styles::error().render_reset()
+    )
 }
 
 /// Get a styled warning message with enhanced coloring
 pub fn style_llm_warning(message: &str) -> String {
     // Use an amber color for LLM warnings
-    format!("{}{}{}", Styles::warning().render(), message, Styles::warning().render_reset())
+    format!(
+        "{}{}{}",
+        Styles::warning().render(),
+        message,
+        Styles::warning().render_reset()
+    )
 }
 
 /// Get a styled success message with enhanced coloring
 pub fn style_llm_success(message: &str) -> String {
     // Use a vibrant green color for LLM success messages
-    format!("{}{}{}", Styles::success().render(), message, Styles::success().render_reset())
+    format!(
+        "{}{}{}",
+        Styles::success().render(),
+        message,
+        Styles::success().render_reset()
+    )
 }
 
 /// Get a styled provider name with enhanced coloring based on provider type
@@ -28,19 +43,39 @@ pub fn style_provider_name(provider: &str) -> String {
     let styled_name = match provider.to_lowercase().as_str() {
         "gemini" => {
             // Deep blue for Gemini
-            format!("{}{}{}", Styles::info().render(), provider, Styles::info().render_reset())
+            format!(
+                "{}{}{}",
+                Styles::info().render(),
+                provider,
+                Styles::info().render_reset()
+            )
         }
         "openai" => {
             // Bright orange for OpenAI (using yellow as approximation)
-            format!("{}{}{}", Styles::warning().render(), provider, Styles::warning().render_reset())
+            format!(
+                "{}{}{}",
+                Styles::warning().render(),
+                provider,
+                Styles::warning().render_reset()
+            )
         }
         "anthropic" => {
             // Anthropic's brand purple (using magenta as approximation)
-            format!("{}{}{}", Styles::code().render(), provider, Styles::code().render_reset())
+            format!(
+                "{}{}{}",
+                Styles::code().render(),
+                provider,
+                Styles::code().render_reset()
+            )
         }
         _ => {
             // Default styling for other providers
-            format!("{}{}{}", Styles::debug().render(), provider, Styles::debug().render_reset())
+            format!(
+                "{}{}{}",
+                Styles::debug().render(),
+                provider,
+                Styles::debug().render_reset()
+            )
         }
     };
     styled_name

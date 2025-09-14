@@ -19,9 +19,7 @@ pub use defaults::{
     ContextStoreDefaults, MultiAgentDefaults, PerformanceDefaults, ScenarioDefaults,
 };
 pub use loader::{ConfigManager, VTAgentConfig};
-pub use multi_agent::{
-    ExecutionMode, MultiAgentSystemConfig,
-};
+pub use multi_agent::{ExecutionMode, MultiAgentSystemConfig};
 
 use serde::{Deserialize, Serialize};
 

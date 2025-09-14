@@ -76,32 +76,62 @@ impl Styles {
 
 /// Print a styled error message
 pub fn error(message: &str) {
-    styled_println!("{}{}{}", Styles::error().render(), message, Styles::error().render_reset());
+    styled_println!(
+        "{}{}{}",
+        Styles::error().render(),
+        message,
+        Styles::error().render_reset()
+    );
 }
 
 /// Print a styled warning message
 pub fn warning(message: &str) {
-    styled_println!("{}{}{}", Styles::warning().render(), message, Styles::warning().render_reset());
+    styled_println!(
+        "{}{}{}",
+        Styles::warning().render(),
+        message,
+        Styles::warning().render_reset()
+    );
 }
 
 /// Print a styled success message
 pub fn success(message: &str) {
-    styled_println!("{}{}{}", Styles::success().render(), message, Styles::success().render_reset());
+    styled_println!(
+        "{}{}{}",
+        Styles::success().render(),
+        message,
+        Styles::success().render_reset()
+    );
 }
 
 /// Print a styled info message
 pub fn info(message: &str) {
-    styled_println!("{}{}{}", Styles::info().render(), message, Styles::info().render_reset());
+    styled_println!(
+        "{}{}{}",
+        Styles::info().render(),
+        message,
+        Styles::info().render_reset()
+    );
 }
 
 /// Print a styled debug message
 pub fn debug(message: &str) {
-    styled_println!("{}{}{}", Styles::debug().render(), message, Styles::debug().render_reset());
+    styled_println!(
+        "{}{}{}",
+        Styles::debug().render(),
+        message,
+        Styles::debug().render_reset()
+    );
 }
 
 /// Print a bold message
 pub fn bold(message: &str) {
-    styled_println!("{}{}{}", Styles::bold().render(), message, Styles::bold().render_reset());
+    styled_println!(
+        "{}{}{}",
+        Styles::bold().render(),
+        message,
+        Styles::bold().render_reset()
+    );
 }
 
 /// Print a message with a custom style

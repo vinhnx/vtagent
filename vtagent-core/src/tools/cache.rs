@@ -1,8 +1,8 @@
 //! Caching system for tool results
 
 use super::types::{EnhancedCacheEntry, EnhancedCacheStats};
-use quick_cache::sync::Cache;
 use once_cell::sync::Lazy;
+use quick_cache::sync::Cache;
 use serde_json::Value;
 use std::sync::Arc;
 use std::time::Duration;
@@ -114,7 +114,7 @@ impl FileCache {
     pub fn capacity(&self) -> (usize, usize) {
         (
             self.file_cache.capacity().try_into().unwrap_or(0),
-            self.directory_cache.capacity().try_into().unwrap_or(0)
+            self.directory_cache.capacity().try_into().unwrap_or(0),
         )
     }
 

@@ -4,7 +4,7 @@
 //! commands and subcommands using the roff-rs library.
 
 use anyhow::{Context, Result, bail};
-use roff::{bold, italic, roman, Roff};
+use roff::{Roff, bold, italic, roman};
 use std::fs;
 use std::path::Path;
 
@@ -241,9 +241,20 @@ impl ManPageGenerator {
     fn generate_analyze_man_page() -> Result<String> {
         let current_date = Self::current_date();
         let page = Roff::new()
-            .control("TH", ["VTAGENT-ANALYZE", "1", &current_date, "VTAgent", "User Commands"])
+            .control(
+                "TH",
+                [
+                    "VTAGENT-ANALYZE",
+                    "1",
+                    &current_date,
+                    "VTAgent",
+                    "User Commands",
+                ],
+            )
             .control("SH", ["NAME"])
-            .text([roman("vtagent-analyze - Analyze workspace with tree-sitter integration")])
+            .text([roman(
+                "vtagent-analyze - Analyze workspace with tree-sitter integration",
+            )])
             .control("SH", ["SYNOPSIS"])
             .text([
                 bold("vtagent"),
@@ -254,12 +265,18 @@ impl ManPageGenerator {
             ])
             .control("SH", ["DESCRIPTION"])
             .text([
-                roman("Analyze the current workspace using tree-sitter integration. Provides project"),
-                roman(" structure analysis, language detection, code complexity metrics, dependency"),
+                roman(
+                    "Analyze the current workspace using tree-sitter integration. Provides project",
+                ),
+                roman(
+                    " structure analysis, language detection, code complexity metrics, dependency",
+                ),
                 roman(" insights, and symbol extraction for supported languages."),
             ])
             .control("SH", ["SUPPORTED LANGUAGES"])
-            .text([roman("• Rust • Python • JavaScript • TypeScript • Go • Java")])
+            .text([roman(
+                "• Rust • Python • JavaScript • TypeScript • Go • Java",
+            )])
             .control("SH", ["FEATURES"])
             .control("TP", [])
             .text([bold("Project Structure")])
@@ -287,9 +304,20 @@ impl ManPageGenerator {
     fn generate_performance_man_page() -> Result<String> {
         let current_date = Self::current_date();
         let page = Roff::new()
-            .control("TH", ["VTAGENT-PERFORMANCE", "1", &current_date, "VTAgent", "User Commands"])
+            .control(
+                "TH",
+                [
+                    "VTAGENT-PERFORMANCE",
+                    "1",
+                    &current_date,
+                    "VTAgent",
+                    "User Commands",
+                ],
+            )
             .control("SH", ["NAME"])
-            .text([roman("vtagent-performance - Display performance metrics and system status")])
+            .text([roman(
+                "vtagent-performance - Display performance metrics and system status",
+            )])
             .control("SH", ["SYNOPSIS"])
             .text([
                 bold("vtagent"),
@@ -324,7 +352,11 @@ impl ManPageGenerator {
             .text([roman("Show performance metrics:")])
             .text([bold("  vtagent performance")])
             .control("SH", ["SEE ALSO"])
-            .text([bold("vtagent(1)"), roman(", "), bold("vtagent-benchmark(1)")])
+            .text([
+                bold("vtagent(1)"),
+                roman(", "),
+                bold("vtagent-benchmark(1)"),
+            ])
             .render();
 
         Ok(page)
@@ -334,9 +366,20 @@ impl ManPageGenerator {
     fn generate_benchmark_man_page() -> Result<String> {
         let current_date = Self::current_date();
         let page = Roff::new()
-            .control("TH", ["VTAGENT-BENCHMARK", "1", &current_date, "VTAgent", "User Commands"])
+            .control(
+                "TH",
+                [
+                    "VTAGENT-BENCHMARK",
+                    "1",
+                    &current_date,
+                    "VTAgent",
+                    "User Commands",
+                ],
+            )
             .control("SH", ["NAME"])
-            .text([roman("vtagent-benchmark - Run SWE-bench evaluation framework")])
+            .text([roman(
+                "vtagent-benchmark - Run SWE-bench evaluation framework",
+            )])
             .control("SH", ["SYNOPSIS"])
             .text([
                 bold("vtagent"),
@@ -347,7 +390,9 @@ impl ManPageGenerator {
             ])
             .control("SH", ["DESCRIPTION"])
             .text([
-                roman("Run automated performance testing against the SWE-bench evaluation framework."),
+                roman(
+                    "Run automated performance testing against the SWE-bench evaluation framework.",
+                ),
                 roman(" Provides comparative analysis across different models, benchmark scoring,"),
                 roman(" and optimization insights for coding tasks."),
             ])
@@ -368,7 +413,11 @@ impl ManPageGenerator {
             .text([roman("Run benchmark suite:")])
             .text([bold("  vtagent benchmark")])
             .control("SH", ["SEE ALSO"])
-            .text([bold("vtagent(1)"), roman(", "), bold("vtagent-performance(1)")])
+            .text([
+                bold("vtagent(1)"),
+                roman(", "),
+                bold("vtagent-performance(1)"),
+            ])
             .render();
 
         Ok(page)
@@ -378,9 +427,20 @@ impl ManPageGenerator {
     fn generate_create_project_man_page() -> Result<String> {
         let current_date = Self::current_date();
         let page = Roff::new()
-            .control("TH", ["VTAGENT-CREATE-PROJECT", "1", &current_date, "VTAgent", "User Commands"])
+            .control(
+                "TH",
+                [
+                    "VTAGENT-CREATE-PROJECT",
+                    "1",
+                    &current_date,
+                    "VTAgent",
+                    "User Commands",
+                ],
+            )
             .control("SH", ["NAME"])
-            .text([roman("vtagent-create-project - Create complete Rust project with features")])
+            .text([roman(
+                "vtagent-create-project - Create complete Rust project with features",
+            )])
             .control("SH", ["SYNOPSIS"])
             .text([
                 bold("vtagent"),

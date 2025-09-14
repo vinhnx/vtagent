@@ -12,7 +12,10 @@ fn test_multi_agent_config_loading() {
     assert_eq!(config.multi_agent.use_single_model, true); // Default should be true
 
     // Test models
-    assert_eq!(config.multi_agent.orchestrator_model, "gemini-2.5-flash-lite");
+    assert_eq!(
+        config.multi_agent.orchestrator_model,
+        "gemini-2.5-flash-lite"
+    );
     assert_eq!(config.multi_agent.executor_model, "");
 
     // Test performance settings

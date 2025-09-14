@@ -441,9 +441,9 @@ pub static TIMEOUT_DETECTOR: Lazy<TimeoutDetector> = Lazy::new(TimeoutDetector::
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
     use tokio::time::sleep;
-    use std::sync::atomic::{AtomicUsize, Ordering};
 
     #[tokio::test]
     async fn test_timeout_detection() {

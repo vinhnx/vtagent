@@ -383,7 +383,7 @@ impl MultiAgentSystem {
         let (_agent, agent_info) = {
             let agent = self
                 .get_agent_by_id(&agent_id)
-                .ok_or_else(|| anyhow!( "Agent {} not found", agent_id))?;
+                .ok_or_else(|| anyhow!("Agent {} not found", agent_id))?;
             (agent, (agent.id.clone(), agent.agent_type))
         };
 
@@ -480,7 +480,9 @@ impl MultiAgentSystem {
                 }
 
                 // Generate a cohesive final summary that integrates findings from all subagents
-                let final_summary = self.generate_cohesive_summary(&task, &results, &verification_result).await;
+                let final_summary = self
+                    .generate_cohesive_summary(&task, &results, &verification_result)
+                    .await;
 
                 Ok(OptimizedTaskResult {
                     task_id,
@@ -567,21 +569,21 @@ fn convert_to_multi_agent_config(system_config: &MultiAgentSystemConfig) -> Mult
         orchestrator_model: system_config.orchestrator_model.clone(),
         subagent_model: system_config.executor_model.clone(), // Use executor_model as subagent_model
         max_concurrent_subagents: system_config.max_concurrent_subagents,
-        context_store_enabled: true, // Default value
+        context_store_enabled: true,  // Default value
         enable_task_management: true, // Default value
         enable_context_sharing: system_config.context_sharing_enabled,
         enable_performance_monitoring: false, // Default value
-        debug_mode: false, // Default value
+        debug_mode: false,                    // Default value
         task_timeout: std::time::Duration::from_secs(system_config.task_timeout_seconds),
         context_window_size: 32768, // Default value
-        max_context_items: 100, // Default value
+        max_context_items: 100,     // Default value
         verification_strategy,
         delegation_strategy,
         context_store: ContextStoreConfig {
-            max_contexts: 100000, // Default value
-            auto_cleanup_days: 7, // Default value
-            enable_persistence: true, // Default value
-            compression_enabled: true, // Default value
+            max_contexts: 100000,                        // Default value
+            auto_cleanup_days: 7,                        // Default value
+            enable_persistence: true,                    // Default value
+            compression_enabled: true,                   // Default value
             storage_dir: ".vtagent/context".to_string(), // Default value
         },
     }
@@ -759,7 +761,10 @@ impl MultiAgentSystem {
         if !verification_result.findings.is_empty() {
             summary_parts.push("- **Findings**:".to_string());
             for finding in &verification_result.findings {
-                summary_parts.push(format!("  - {:?}: {}", finding.finding_type, finding.description));
+                summary_parts.push(format!(
+                    "  - {:?}: {}",
+                    finding.finding_type, finding.description
+                ));
             }
         }
 
@@ -783,7 +788,8 @@ impl MultiAgentSystem {
         let conclusion = if verification_result.passed {
             "The task has been successfully completed and verified.".to_string()
         } else {
-            "The task was executed but verification failed. Please review the details above.".to_string()
+            "The task was executed but verification failed. Please review the details above."
+                .to_string()
         };
         summary_parts.push("## Conclusion".to_string());
         summary_parts.push(conclusion);

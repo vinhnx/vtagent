@@ -321,8 +321,10 @@ pub enum ContextCompressionError {
 
 #[cfg(test)]
 mod tests {
-    use crate::llm::provider::{Message, MessageRole, LLMProvider, LLMRequest, LLMResponse, LLMError, FinishReason};
     use super::*;
+    use crate::llm::provider::{
+        FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole,
+    };
 
     #[test]
     fn test_context_length_calculation() {
@@ -383,11 +385,7 @@ mod tests {
             "mock"
         }
 
-        async fn generate(
-            &self,
-            _request: LLMRequest,
-        ) -> Result<LLMResponse, LLMError>
-        {
+        async fn generate(&self, _request: LLMRequest) -> Result<LLMResponse, LLMError> {
             Ok(LLMResponse {
                 content: Some("Mock summary".to_string()),
                 tool_calls: None,
@@ -400,10 +398,7 @@ mod tests {
             vec!["mock".to_string()]
         }
 
-        fn validate_request(
-            &self,
-            _request: &LLMRequest,
-        ) -> Result<(), LLMError> {
+        fn validate_request(&self, _request: &LLMRequest) -> Result<(), LLMError> {
             Ok(())
         }
     }

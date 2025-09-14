@@ -139,6 +139,7 @@ pub mod tools {
     pub const AST_GREP_SEARCH: &str = "ast_grep_search";
     pub const SIMPLE_SEARCH: &str = "simple_search";
     pub const BASH: &str = "bash";
+    pub const APPLY_PATCH: &str = "apply_patch";
 
     // Multi-agent specific tools
     pub const TASK_CREATE: &str = "task_create";

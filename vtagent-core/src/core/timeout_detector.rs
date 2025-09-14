@@ -443,6 +443,7 @@ mod tests {
     use super::*;
     use std::time::Duration;
     use tokio::time::sleep;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     #[tokio::test]
     async fn test_timeout_detection() {

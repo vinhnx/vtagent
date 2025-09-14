@@ -2199,9 +2199,3 @@ enhance vtagent-core/src/tools/cache.rs with https://deepwiki.com/arthurprs/quic
 --
 fetch
 https://deepwiki.com/ratatui/ratatui integrate and port chat repl
-
---
-
---
-
-fix https://github.com/vinhnx/vtagent/actions/runs/17695441283

@@ -419,8 +419,8 @@ pub enum PromptOptimizationError {
 
 #[cfg(test)]
 mod tests {
-    use super::crate::llm::provider::{
-        FinishReason, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole,
+    use crate::llm::provider::{
+        FinishReason, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, LLMError,
     };
     use super::*;
 
@@ -469,7 +469,7 @@ mod tests {
         async fn generate(
             &self,
             _request: LLMRequest,
-        ) -> Result<LLMResponse, super::crate::llm::provider::LLMError> {
+        ) -> Result<LLMResponse, LLMError> {
             Ok(LLMResponse {
                 content: Some("Optimized prompt".to_string()),
                 tool_calls: None,
@@ -484,8 +484,8 @@ mod tests {
 
         fn validate_request(
             &self,
-            _request: &super::crate::llm::provider::LLMRequest,
-        ) -> Result<(), super::crate::llm::provider::LLMError> {
+            _request: &LLMRequest,
+        ) -> Result<(), LLMError> {
             Ok(())
         }
     }

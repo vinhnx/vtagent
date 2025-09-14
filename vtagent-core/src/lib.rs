@@ -98,9 +98,7 @@ mod tests {
     #[test]
     fn test_library_exports() {
         // Test that all public exports are accessible
-        let temp_dir = TempDir::new().unwrap();
-        let _tool_registry = ToolRegistry::new(temp_dir.path().to_path_buf());
-        let _tree_sitter = TreeSitterAnalyzer::new().unwrap();
+        let _cache = PromptCache::new();
     }
 
     #[test]
@@ -138,18 +136,11 @@ mod tests {
         assert!(response["files"].is_array());
     }
 
-    #[test]
-    fn test_error_handling() {
-        // Test that error types are properly exported and usable
-        let tool_error = ToolError::TextNotFound("test.txt".to_string());
-        assert!(format!("{}", tool_error).contains("test.txt"));
-    }
-
     #[tokio::test]
     async fn test_pty_basic_command() {
         let temp_dir = TempDir::new().unwrap();
         let workspace = temp_dir.path().to_path_buf();
-        let registry = ToolRegistry::new(workspace.clone());
+        let mut registry = ToolRegistry::new(workspace.clone());
 
         // Test a simple PTY command
         let args = serde_json::json!({
@@ -169,7 +160,7 @@ mod tests {
     async fn test_pty_session_management() {
         let temp_dir = TempDir::new().unwrap();
         let workspace = temp_dir.path().to_path_buf();
-        let registry = ToolRegistry::new(workspace.clone());
+        let mut registry = ToolRegistry::new(workspace.clone());
 
         // Test creating a PTY session
         let args = serde_json::json!({

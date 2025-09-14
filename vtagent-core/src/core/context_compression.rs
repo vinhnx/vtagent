@@ -320,7 +320,7 @@ pub enum ContextCompressionError {
 
 #[cfg(test)]
 mod tests {
-    use super::crate::llm::provider::{Message, MessageRole};
+    use crate::llm::provider::{Message, MessageRole, LLMProvider, LLMRequest, LLMResponse, LLMError, FinishReason};
     use super::*;
 
     #[test]
@@ -377,21 +377,21 @@ mod tests {
     }
 
     #[async_trait::async_trait]
-    impl super::crate::llm::provider::LLMProvider for MockProvider {
+    impl LLMProvider for MockProvider {
         fn name(&self) -> &str {
             "mock"
         }
 
         async fn generate(
             &self,
-            _request: super::crate::llm::provider::LLMRequest,
-        ) -> Result<super::crate::llm::provider::LLMResponse, super::crate::llm::provider::LLMError>
+            _request: LLMRequest,
+        ) -> Result<LLMResponse, LLMError>
         {
-            Ok(super::crate::llm::provider::LLMResponse {
+            Ok(LLMResponse {
                 content: Some("Mock summary".to_string()),
                 tool_calls: None,
                 usage: None,
-                finish_reason: super::crate::llm::provider::FinishReason::Stop,
+                finish_reason: FinishReason::Stop,
             })
         }
 
@@ -401,8 +401,8 @@ mod tests {
 
         fn validate_request(
             &self,
-            _request: &super::crate::llm::provider::LLMRequest,
-        ) -> Result<(), super::crate::llm::provider::LLMError> {
+            _request: &LLMRequest,
+        ) -> Result<(), LLMError> {
             Ok(())
         }
     }

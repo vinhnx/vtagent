@@ -217,6 +217,16 @@ pub enum Commands {
     /// **Tree-sitter code analysis tools**\n\n**Features:**\n• AST-based code parsing\n• Symbol extraction and navigation\n• Code complexity analysis\n• Multi-language refactoring\n\n**Usage:** vtagent tree-sitter
     #[command(name = "tree-sitter")]
     TreeSitter,
+
+    /// **Generate or display man pages** for VTAgent commands\n\n**Features:**\n• Generate Unix man pages for all commands\n• Display detailed command documentation\n• Save man pages to files\n• Comprehensive help for all VTAgent features\n\n**Examples:**\n  vtagent man\n  vtagent man chat\n  vtagent man chat --output chat.1
+    Man {
+        /// **Command name** to generate man page for (optional)\n\n**Available commands:**\n• chat, ask, analyze, performance, benchmark\n• create-project, init, man\n\n**If not specified, shows main VTAgent man page**
+        command: Option<String>,
+
+        /// **Output file path** to save man page\n\n**Format:** Standard Unix man page format (.1, .8, etc.)\n**Default:** Display to stdout
+        #[arg(short, long)]
+        output: Option<std::path::PathBuf>,
+    },
 }
 
 /// Model management commands with concise, actionable help

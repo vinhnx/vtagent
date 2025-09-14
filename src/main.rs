@@ -12,6 +12,7 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 use vtagent_core::cli::args::{Cli, Commands};
 // use of internal CLI submodules disabled for now; using legacy chat handler in this file
+use vtagent_core::cli::ManPageGenerator;
 use vtagent_core::config::constants::models;
 use vtagent_core::config::models::{ModelId, Provider};
 use vtagent_core::config::multi_agent::MultiAgentSystemConfig;
@@ -233,6 +234,12 @@ async fn main() -> Result<()> {
         Some(Commands::TreeSitter) => {
             println!("TreeSitter command - Tree-sitter code analysis tools");
         }
+        Some(Commands::Man { command, output }) => {
+            if let Err(e) = handle_man_command(command.as_ref(), output.as_ref()).await {
+                eprintln!("{}: {}", style("Error").red().bold(), e);
+                std::process::exit(1);
+            }
+        }
         None => {
             println!("No command specified. Use --help for usage information.");
         }
@@ -269,6 +276,33 @@ async fn handle_config_command(
     Ok(())
 }
 
+/// Handle the man command
+async fn handle_man_command(
+    command: Option<&String>,
+    output: Option<&std::path::PathBuf>,
+) -> Result<()> {
+    let man_page_content = match command {
+        Some(cmd) => ManPageGenerator::generate_command_man_page(cmd)
+            .with_context(|| format!("Failed to generate man page for command '{}'", cmd))?,
+        None => ManPageGenerator::generate_main_man_page()
+            .context("Failed to generate main VTAgent man page")?,
+    };
+
+    match output {
+        Some(output_path) => {
+            ManPageGenerator::save_man_page(&man_page_content, output_path)
+                .with_context(|| format!("Failed to save man page to {}", output_path.display()))?;
+            println!("Man page saved to: {}", output_path.display());
+        }
+        None => {
+            // Display the man page content directly
+            println!("{}", man_page_content);
+        }
+    }
+
+    Ok(())
+}
+
 /// Check if a tool result is from a PTY-enabled tool
 fn is_pty_tool_result(result: &serde_json::Value) -> bool {
     result.get("pty_enabled").and_then(|v| v.as_bool()).unwrap_or(false) ||
@@ -280,16 +314,16 @@ fn is_pty_tool_result(result: &serde_json::Value) -> bool {
 fn render_pty_output(result: &serde_json::Value, tool_name: &str, arguments: &str) -> Result<()> {
     use console::style;
     use std::io::Write;
-    
+
     // Extract output content
     let output = result.get("stdout").and_then(|v| v.as_str())
         .or_else(|| result.get("output").and_then(|v| v.as_str()))
         .unwrap_or("");
-    
+
     if output.is_empty() {
         return Ok(());
     }
-    
+
     // Extract command for display
     let command_str = result.get("command").and_then(|v| v.as_str())
         .map(|s| s.to_string())
@@ -310,7 +344,7 @@ fn render_pty_output(result: &serde_json::Value, tool_name: &str, arguments: &st
                 None
             }
         });
-    
+
     // Determine title based on tool type
     let title = if tool_name == "run_terminal_cmd" {
         if result.get("mode").and_then(|v| v.as_str()).unwrap_or("") == "streaming" {
@@ -321,30 +355,30 @@ fn render_pty_output(result: &serde_json::Value, tool_name: &str, arguments: &st
     } else {
         "PTY Tool Output"
     };
-    
+
     // Print top border
     println!("{}", style("=".repeat(80)).dim());
-    
+
     // Print title
     println!("{} {}", style("==").blue().bold(), style(title).blue().bold());
-    
+
     // Print command if available
     if let Some(cmd) = &command_str {
         println!("{}", style(format!("> {}", cmd)).dim());
     }
-    
+
     // Print separator
     println!("{}", style("-".repeat(80)).dim());
-    
+
     // Print the output
     print!("{}", output);
     std::io::stdout().flush()?;
-    
+
     // Print bottom border
     println!("{}", style("-".repeat(80)).dim());
     println!("{}", style("==").blue().bold());
     println!("{}", style("=".repeat(80)).dim());
-    
+
     Ok(())
 }
 
@@ -1072,7 +1106,7 @@ async fn handle_single_agent_chat(
                                             if is_pty_tool_result(&result) {
                                                 // Render PTY output with proper formatting
                                                 if let Err(e) = render_pty_output(&result, &tool_call.function.name, &tool_call.function.arguments) {
-                                                    eprintln!("{} Failed to render PTY output: {}", 
+                                                    eprintln!("{} Failed to render PTY output: {}",
                                                         style("[ERROR]").red().bold(), e);
                                                 }
                                             }

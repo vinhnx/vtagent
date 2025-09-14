@@ -466,14 +466,12 @@ impl ToolRegistry {
             return false;
         }
 
-        for (content_line, expected_line) in content_lines.iter().zip(expected_lines.iter()) {
-            // Trim both lines and compare
-            if content_line.trim() != expected_line.trim() {
-                return false;
-            }
-        }
-
-        true
+        content_lines
+            .iter()
+            .zip(expected_lines.iter())
+            .all(|(content_line, expected_line)| {
+                content_line.trim() == expected_line.trim()
+            })
     }
 
     pub async fn delete_file(&mut self, _args: Value) -> Result<Value> {

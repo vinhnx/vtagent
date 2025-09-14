@@ -212,16 +212,14 @@ impl ToolPolicyManager {
             self.config.available_tools.iter().collect();
         let new_tools: std::collections::HashSet<_> = tools.iter().collect();
 
-        // Add new tools as "prompt"
-        for tool in &tools {
-            if !current_tools.contains(tool) {
-                self.config
-                    .policies
-                    .insert(tool.clone(), ToolPolicy::Prompt);
-            }
+        // Add new tools as "prompt" - use itertools to find tools not in current set
+        for tool in tools.iter().filter(|tool| !current_tools.contains(tool)) {
+            self.config
+                .policies
+                .insert(tool.clone(), ToolPolicy::Prompt);
         }
 
-        // Remove deleted tools
+        // Remove deleted tools - use itertools to find tools to remove
         let tools_to_remove: Vec<_> = self
             .config
             .policies

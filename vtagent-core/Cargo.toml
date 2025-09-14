@@ -36,6 +36,8 @@ tree-sitter-typescript = "0.23"
 tree-sitter-go = "0.23"
 tree-sitter-java = "0.23"
 flate2 = "1.0"
+indexmap = { version = "2.2", features = ["serde"] }
+itertools = "0.13"
 pathdiff = "0.2" # For path operations
 tempfile = "3.0"
 rayon = "1.8" # For parallel processing
@@ -72,7 +74,6 @@ anstyle-parse = "0.2"
 anstyle-ls = "1.0"
 anstyle-roff = "0.3"
 quick_cache = "0.6"
-indexmap = "2.2"
 roff = "0.2"
 
 [[example]]

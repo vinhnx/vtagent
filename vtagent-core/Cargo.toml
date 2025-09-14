@@ -64,6 +64,32 @@ dirs = "5.0"
 # YAML support
 serde_yaml = "0.9"
 tracing = "0.1"
+# ANSI styling
+anstyle = "1.0"
+anstyle-query = "1.0"
+anstream = "0.6"
+anstyle-parse = "0.2"
+anstyle-ls = "1.0"
+
+[[example]]
+name = "anstyle_test"
+path = "examples/anstyle_test.rs"
+
+[[example]]
+name = "anstyle_ls_example"
+path = "examples/anstyle_ls_example.rs"
+
+[[example]]
+name = "anstyle_parse_example"
+path = "examples/anstyle_parse_example.rs"
+
+[[example]]
+name = "dialoguer_example"
+path = "examples/dialoguer_example.rs"
+
+[[example]]
+name = "migration_test"
+path = "examples/migration_test.rs"
 
 [features]
 default = []

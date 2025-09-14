@@ -1,3 +1,6 @@
+refactor vtagent-core/src/tools/registry.rs to handle tool output more gracefully.
+
+--
 
 https://deepwiki.com/pawurb/hotpath
  A simple Rust profiler that shows exactly where your code spends time
@@ -5,13 +8,6 @@ https://deepwiki.com/pawurb/hotpath
 --
 
 scan clippy for dead code and review. and fix
-
---
-
-https://docs.rs/console/latest/console/
-
-https://docs.rs/dialoguer/latest/dialoguer/
-
 
 --
 
@@ -2158,9 +2154,6 @@ Copy
 
 The good description clearly explains what the tool does, when to use it, what data it returns, and what the ticker parameter means. The poor description is too brief and leaves Claude with many open questions about the tool’s behavior and usage.
 
---
-
-https://deepwiki.com/rust-cli/anstyle apply
 
 ---
 
@@ -2208,9 +2201,6 @@ fetch
 https://deepwiki.com/ratatui/ratatui integrate and port chat repl
 
 --
-
-remove this when runnning a task tool
-Executing tools[00:00:00]              0/1 (0%)
 
 --
 

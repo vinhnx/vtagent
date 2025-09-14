@@ -5,7 +5,7 @@ edition = "2024"
 default-run = "vtagent"
 
 [workspace]
-members = ["vtagent-core"]
+members = ["vtagent-core", "tools"]
 
 [workspace.lints]
 rust = {}
@@ -43,7 +43,6 @@ termimad = "0.31"
 regex = "1.10"
 tree-sitter = "0.23"
 tree-sitter-rust = "0.23"
-tree-sitter-python = "0.23"
 tree-sitter-javascript = "0.23"
 tree-sitter-typescript = "0.23"
 tree-sitter-go = "0.23"
@@ -66,6 +65,10 @@ rand = "0.8"
 terminal_size = "0.4.3"
 is-terminal = "0.4.16"
 async-trait = "0.1.89"
+# ANSI styling
+anstyle = "1.0"
+anstyle-query = "1.0"
+anstream = "0.6"
 
 [profile.dev]
 split-debuginfo = "unpacked"

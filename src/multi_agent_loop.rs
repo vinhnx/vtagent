@@ -24,12 +24,7 @@ use vtagent_core::types::{AgentConfig as CoreAgentConfig, *};
 
 /// Convert MultiAgentSystemConfig to MultiAgentConfig
 fn convert_multi_agent_config(system_config: &MultiAgentSystemConfig) -> MultiAgentConfig {
-    let execution_mode = match system_config.execution_mode.as_str() {
-        "single" => ExecutionMode::Single,
-        "multi" => ExecutionMode::Multi,
-        "auto" => ExecutionMode::Auto,
-        _ => ExecutionMode::Auto, // Default fallback
-    };
+    let execution_mode = ExecutionMode::Auto; // Default to Auto mode since execution_mode was removed from config
 
     // Parse provider from string
     let provider = system_config
@@ -57,12 +52,12 @@ fn convert_multi_agent_config(system_config: &MultiAgentSystemConfig) -> MultiAg
             system_config.orchestrator_model.clone()
         };
 
-        let subagent_model = if system_config.subagent_model.is_empty() {
+        let subagent_model = if system_config.executor_model.is_empty() {
             ModelId::default_subagent_for_provider(provider.clone())
                 .as_str()
                 .to_string()
         } else {
-            system_config.subagent_model.clone()
+            system_config.executor_model.clone()
         };
         (orchestrator_model, subagent_model)
     };
@@ -74,12 +69,12 @@ fn convert_multi_agent_config(system_config: &MultiAgentSystemConfig) -> MultiAg
         orchestrator_model,
         subagent_model,
         max_concurrent_subagents: system_config.max_concurrent_subagents,
-        context_store_enabled: system_config.context_store_enabled,
+        context_store_enabled: MultiAgentDefaults::CONTEXT_STORE_ENABLED,
         enable_task_management: MultiAgentDefaults::ENABLE_TASK_MANAGEMENT,
         enable_context_sharing: MultiAgentDefaults::ENABLE_CONTEXT_SHARING,
         enable_performance_monitoring: MultiAgentDefaults::ENABLE_PERFORMANCE_MONITORING,
-        debug_mode: system_config.debug_mode,
-        task_timeout: MultiAgentDefaults::task_timeout(),
+        debug_mode: false, // Default value since debug_mode was removed from config
+        task_timeout: std::time::Duration::from_secs(300), // Default 5 minutes since task_timeout was changed to task_timeout_seconds
         context_window_size: MultiAgentDefaults::CONTEXT_WINDOW_SIZE,
         max_context_items: MultiAgentDefaults::MAX_CONTEXT_ITEMS,
         verification_strategy: VerificationStrategy::Always,

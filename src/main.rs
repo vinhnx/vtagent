@@ -25,6 +25,7 @@ use vtagent_core::llm::factory::create_provider_with_config;
 use vtagent_core::llm::provider::{LLMProvider, LLMRequest, Message, MessageRole, ParallelToolConfig};
 use vtagent_core::llm::{AnyClient, make_client};
 use vtagent_core::ui::spinner;
+use vtagent_core::config::defaults::MultiAgentDefaults;
 
 /// Load project-specific context for better agent performance
 async fn load_project_context(
@@ -495,10 +496,16 @@ async fn handle_single_agent_chat(
     }
 
     // Get API key from environment
-    let api_key = std::env::var(&config.agent.api_key_env).unwrap_or_else(|_| {
+    let api_key_env = match config.agent.provider.as_str() {
+        "gemini" => "GEMINI_API_KEY",
+        "openai" => "OPENAI_API_KEY",
+        "anthropic" => "ANTHROPIC_API_KEY",
+        _ => "GEMINI_API_KEY", // Default fallback
+    };
+    let api_key = std::env::var(api_key_env).unwrap_or_else(|_| {
         eprintln!(
             "Warning: {} environment variable not set",
-            config.agent.api_key_env
+            api_key_env
         );
         String::new()
     });
@@ -1353,18 +1360,23 @@ async fn handle_multi_agent_chat(
         use_single_model: config.multi_agent.use_single_model,
         orchestrator_model,
         executor_model: executor_model.clone(),
-        subagent_model: executor_model,
         max_concurrent_subagents: config.multi_agent.max_concurrent_subagents,
-        context_store_enabled: config.multi_agent.context_store_enabled,
-        execution_mode: vtagent_core::config::multi_agent::ExecutionMode::Auto,
+        context_sharing_enabled: config.multi_agent.context_sharing_enabled,
+        task_timeout_seconds: config.multi_agent.task_timeout_seconds,
         ..Default::default()
     };
 
+    let api_key_env = match config.agent.provider.as_str() {
+        "gemini" => "GEMINI_API_KEY",
+        "openai" => "OPENAI_API_KEY",
+        "anthropic" => "ANTHROPIC_API_KEY",
+        _ => "GEMINI_API_KEY", // Default fallback
+    };
     // Get API key from environment
-    let api_key = std::env::var(&config.agent.api_key_env).unwrap_or_else(|_| {
+    let api_key = std::env::var(&api_key_env).unwrap_or_else(|_| {
         eprintln!(
             "Warning: {} environment variable not set",
-            config.agent.api_key_env
+            api_key_env
         );
         String::new()
     });

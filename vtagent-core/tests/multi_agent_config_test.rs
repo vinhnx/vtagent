@@ -8,47 +8,17 @@ fn test_multi_agent_config_loading() {
     let config = VTAgentConfig::default();
 
     // Test basic multi-agent settings
-    assert_eq!(config.multi_agent.enabled, false); // Default should be false
-    assert_eq!(config.multi_agent.max_agents, 5); // Default should be 5
-
-    // Test execution mode
-    match config.multi_agent.execution_mode {
-        vtagent_core::config::multi_agent::ExecutionMode::Auto => {} // Expected default
-        _ => panic!("Default execution mode should be Auto"),
-    }
+    assert_eq!(config.multi_agent.enabled, true); // Default should be true
+    assert_eq!(config.multi_agent.use_single_model, true); // Default should be true
 
     // Test models
-    assert_eq!(config.multi_agent.orchestrator_model, "qwen/qwen3-4b-2507");
-    assert_eq!(config.multi_agent.subagent_model, "qwen/qwen3-4b-2507");
+    assert_eq!(config.multi_agent.orchestrator_model, "gemini-2.5-flash-lite");
+    assert_eq!(config.multi_agent.executor_model, "");
 
     // Test performance settings
     assert_eq!(config.multi_agent.max_concurrent_subagents, 3);
-    assert_eq!(config.multi_agent.context_store_enabled, true);
-
-    // Test strategies
-    match config.multi_agent.verification_strategy {
-        vtagent_core::config::multi_agent::VerificationStrategy::Always => {} // Expected default
-        _ => panic!("Default verification strategy should be Always"),
-    }
-
-    match config.multi_agent.delegation_strategy {
-        vtagent_core::config::multi_agent::DelegationStrategy::Adaptive => {} // Expected default
-        _ => panic!("Default delegation strategy should be Adaptive"),
-    }
-
-    // Test context store configuration
-    assert_eq!(config.multi_agent.context_store.max_context_size, 100000);
-    assert_eq!(config.multi_agent.context_store.compression_enabled, true);
-    assert_eq!(config.multi_agent.context_store.max_contexts, 1000);
-    assert_eq!(config.multi_agent.context_store.auto_cleanup_days, 7);
-    assert_eq!(config.multi_agent.context_store.enable_persistence, true);
-    assert_eq!(
-        config.multi_agent.context_store.storage_dir,
-        ".vtagent/contexts"
-    );
-
-    // Test agent-specific configurations
-    assert!(config.multi_agent.agents.by_type.is_empty()); // Should be empty by default
+    assert_eq!(config.multi_agent.context_sharing_enabled, true);
+    assert_eq!(config.multi_agent.task_timeout_seconds, 300);
 }
 
 #[test]
@@ -58,33 +28,20 @@ fn test_multi_agent_config_with_custom_values() {
 
     // Modify some values
     config.multi_agent.enabled = true;
-    config.multi_agent.execution_mode = vtagent_core::config::multi_agent::ExecutionMode::Multi;
+    config.multi_agent.use_single_model = false;
     config.multi_agent.orchestrator_model = "test/orchestrator-model".to_string();
-    config.multi_agent.subagent_model = "test/subagent-model".to_string();
+    config.multi_agent.executor_model = "test/executor-model".to_string();
     config.multi_agent.max_concurrent_subagents = 5;
-    config.multi_agent.verification_strategy =
-        vtagent_core::config::multi_agent::VerificationStrategy::Never;
-    config.multi_agent.delegation_strategy =
-        vtagent_core::config::multi_agent::DelegationStrategy::Aggressive;
+    config.multi_agent.task_timeout_seconds = 600;
 
     // Verify the changes
     assert_eq!(config.multi_agent.enabled, true);
-    match config.multi_agent.execution_mode {
-        vtagent_core::config::multi_agent::ExecutionMode::Multi => {} // Expected
-        _ => panic!("Execution mode should be Multi"),
-    }
+    assert_eq!(config.multi_agent.use_single_model, false);
     assert_eq!(
         config.multi_agent.orchestrator_model,
         "test/orchestrator-model"
     );
-    assert_eq!(config.multi_agent.subagent_model, "test/subagent-model");
+    assert_eq!(config.multi_agent.executor_model, "test/executor-model");
     assert_eq!(config.multi_agent.max_concurrent_subagents, 5);
-    match config.multi_agent.verification_strategy {
-        vtagent_core::config::multi_agent::VerificationStrategy::Never => {} // Expected
-        _ => panic!("Verification strategy should be Never"),
-    }
-    match config.multi_agent.delegation_strategy {
-        vtagent_core::config::multi_agent::DelegationStrategy::Aggressive => {} // Expected
-        _ => panic!("Delegation strategy should be Aggressive"),
-    }
+    assert_eq!(config.multi_agent.task_timeout_seconds, 600);
 }

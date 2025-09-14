@@ -45,7 +45,7 @@ if [[ "$1" == "debug" ]]; then
     echo "  - Press Ctrl+C to exit"
     echo "  - The agent has access to file operations and coding tools"
     echo ""
-    cargo run -- --async-file-ops --show-file-diffs chat
+    cargo run -- --show-file-diffs chat
 else
     cargo build --release
     echo ""
@@ -58,5 +58,5 @@ else
     echo "  - Press Ctrl+C to exit"
     echo "  - The agent has access to file operations and coding tools"
     echo ""
-    cargo run --release -- --async-file-ops --show-file-diffs chat
+    cargo run --release --  --show-file-diffs chat
 fi

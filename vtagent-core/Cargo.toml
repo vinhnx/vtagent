@@ -71,6 +71,7 @@ anstream = "0.6"
 anstyle-parse = "0.2"
 anstyle-ls = "1.0"
 quick_cache = "0.6"
+indexmap = "2.2"
 
 [[example]]
 name = "anstyle_test"

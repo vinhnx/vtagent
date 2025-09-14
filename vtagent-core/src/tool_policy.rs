@@ -2,13 +2,13 @@
 //!
 //! This module manages user preferences for tool usage, storing choices in
 //! ~/.vtagent/tool-policy.json to minimize repeated prompts while maintaining
-//! user control over which tools the agent can use.
+//! user control overwhich tools the agent can use.
 
 use anyhow::{Context, Result};
 use console::style;
 use dialoguer::Confirm;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -38,10 +38,10 @@ pub struct ToolPolicyConfig {
     /// Available tools at time of last update
     pub available_tools: Vec<String>,
     /// Policy for each tool
-    pub policies: HashMap<String, ToolPolicy>,
+    pub policies: IndexMap<String, ToolPolicy>,
     /// Optional per-tool constraints to scope permissions and enforce safety
     #[serde(default)]
-    pub constraints: HashMap<String, ToolConstraints>,
+    pub constraints: IndexMap<String, ToolConstraints>,
 }
 
 impl Default for ToolPolicyConfig {
@@ -49,8 +49,8 @@ impl Default for ToolPolicyConfig {
         Self {
             version: 1,
             available_tools: Vec::new(),
-            policies: HashMap::new(),
-            constraints: HashMap::new(),
+            policies: IndexMap::new(),
+            constraints: IndexMap::new(),
         }
     }
 }
@@ -63,10 +63,10 @@ pub struct AlternativeToolPolicyConfig {
     /// Default policy settings
     pub default: AlternativeDefaultPolicy,
     /// Tool-specific policies
-    pub tools: HashMap<String, AlternativeToolPolicy>,
+    pub tools: IndexMap<String, AlternativeToolPolicy>,
     /// Optional per-tool constraints (ignored if absent)
     #[serde(default)]
-    pub constraints: HashMap<String, ToolConstraints>,
+    pub constraints: IndexMap<String, ToolConstraints>,
 }
 
 /// Default policy in alternative format
@@ -186,7 +186,7 @@ impl ToolPolicyManager {
 
     /// Convert alternative format to standard format
     fn convert_from_alternative(alt_config: AlternativeToolPolicyConfig) -> ToolPolicyConfig {
-        let mut policies = HashMap::new();
+        let mut policies = IndexMap::new();
 
         // Convert tool policies
         for (tool_name, alt_policy) in alt_config.tools {
@@ -231,7 +231,7 @@ impl ToolPolicyManager {
             .collect();
 
         for tool in tools_to_remove {
-            self.config.policies.remove(&tool);
+            self.config.policies.shift_remove(&tool);
         }
 
         // Update available tools list
@@ -367,7 +367,7 @@ impl ToolPolicyManager {
     }
 
     /// Get summary of current policies
-    pub fn get_policy_summary(&self) -> HashMap<String, ToolPolicy> {
+    pub fn get_policy_summary(&self) -> IndexMap<String, ToolPolicy> {
         self.config.policies.clone()
     }
 

@@ -143,11 +143,6 @@ Within this context, VTAgent refers to the open-source agentic coding interface 
         if cfg.security.human_in_the_loop {
             instruction.push_str("- **Human-in-the-loop**: Required for critical actions\n");
         }
-        if cfg.security.confirm_destructive_actions {
-            instruction.push_str(
-                "- **Destructive action confirmation**: Required for dangerous operations\n",
-            );
-        }
 
         // Add command policy info
         if !cfg.commands.allow_list.is_empty() {

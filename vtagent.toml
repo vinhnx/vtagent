@@ -1,22 +1,14 @@
-# VTAgent Configuration - Comprehensive Setup
-# This file contains all possible configuration options for VTAgent
-# Each section and option is documented with comments explaining its purpose
+# VTAgent Configuration
+# Minimal configuration with only actively used settings
 
 [agent]
 # Provider to use: one of "gemini", "openai", "anthropic"
-# See docs/models.json for supported providers and their models
 provider = "gemini"
-
 # Default model for single-agent/multi-agent modes
-# Always check docs/models.json for latest supported models
-# Use constants from vtagent-core/src/config/constants.rs to avoid hardcoding
 default_model = "gemini-2.5-flash-lite"
-
 # Max conversation turns per session (prevents infinite loops)
 max_conversation_turns = 150
-
 # Reasoning effort for models that support it: "low" | "medium" | "high"
-# Applies to Claude, GPT-5, Gemini, Qwen3, DeepSeek models
 reasoning_effort = "medium"
 
 [security]
@@ -29,14 +21,12 @@ auto_apply_detected_patches = false
 
 [multi_agent]
 # Enable multi-agent mode (experimental feature)
-enabled = false
+enabled = true
 # Use single model for all agents when multi-agent is enabled (recommended for consistency)
 use_single_model = true
 # Main orchestrator agent model (used when multi-agent is enabled)
-# Should be a capable model for task planning and delegation
-orchestrator_model = "gemini-2.5-flash"
+orchestrator_model = "gemini-2.5-flash-lite"
 # Executor agent model (used for single-agent mode and as subagents in multi-agent mode)
-# Can be different from orchestrator for cost optimization
 executor_model = ""
 # Maximum number of concurrent subagents (prevents resource exhaustion)
 max_concurrent_subagents = 3
@@ -44,30 +34,6 @@ max_concurrent_subagents = 3
 context_sharing_enabled = true
 # Task execution timeout in seconds (prevents hanging tasks)
 task_timeout_seconds = 300
-
-[anthropic]
-# Anthropic-specific configuration
-# API key environment variable (should be set externally)
-api_key_env = "ANTHROPIC_API_KEY"
-# Default model for Anthropic provider
-default_model = "claude-sonnet-4-20250514"
-# Maximum tokens for Anthropic models
-max_tokens = 4096
-# Temperature for response randomness (0.0 = deterministic, 1.0 = creative)
-temperature = 0.7
-
-[openai]
-# OpenAI-specific configuration
-# API key environment variable (should be set externally)
-api_key_env = "OPENAI_API_KEY"
-# Default model for OpenAI provider
-default_model = "gpt-5"
-# Organization ID for OpenAI (optional)
-organization_id = ""
-# Maximum tokens for OpenAI models
-max_tokens = 4096
-# Temperature for response randomness
-temperature = 0.7
 
 [tools]
 # Default tool policy for tools not explicitly listed below
@@ -110,7 +76,6 @@ run_vscode_command = "prompt"
 
 [commands]
 # Allow-list commands (exact matches, executed without confirmation)
-# These are considered safe commands that don't modify the system
 allow_list = [
     "ls",
     "pwd",
@@ -131,7 +96,6 @@ allow_list = [
 ]
 
 # Deny-list commands (always blocked, cannot be executed)
-# These are dangerous commands that should never be run
 deny_list = [
     "rm -rf /",
     "rm -rf ~",
@@ -153,7 +117,6 @@ deny_list = [
 ]
 
 # Glob-based allow patterns (commands matching these patterns are allowed)
-# Use glob syntax: * matches any characters, ? matches single character
 allow_glob = [
     "git *",
     "cargo *",
@@ -166,7 +129,6 @@ allow_glob = [
 ]
 
 # Glob-based deny patterns (commands matching these patterns are blocked)
-# These override allow patterns for security
 deny_glob = [
     "rm *",
     "sudo *",
@@ -183,7 +145,6 @@ deny_glob = [
 ]
 
 # Regex-based allow patterns (advanced users only)
-# Commands matching these regex patterns are allowed
 allow_regex = [
     "^(ls|pwd|cat|grep|find|head|tail|wc)\\b",
     "^git (status|diff|log|show|branch)\\b",
@@ -191,7 +152,6 @@ allow_regex = [
 ]
 
 # Regex-based deny patterns (commands matching these patterns are blocked)
-# These provide fine-grained control over dangerous commands
 deny_regex = [
     "rm\\s+(-rf|--force)",
     "sudo\\s+.*",
@@ -211,61 +171,3 @@ default_cols = 80
 max_sessions = 10
 # Command timeout in seconds (prevents hanging commands)
 command_timeout_seconds = 300
-# Enable command logging (logs all PTY commands to file)
-enable_logging = true
-# Log file path for PTY commands
-log_file_path = "logs/pty_commands.log"
-# Buffer size for PTY output (in bytes)
-buffer_size = 65536
-
-[logging]
-# Log level: "error" | "warn" | "info" | "debug" | "trace"
-level = "info"
-# Enable structured logging (JSON format)
-structured = false
-# Log file path (empty string disables file logging)
-file_path = "logs/vtagent.log"
-# Maximum log file size in MB before rotation
-max_file_size_mb = 10
-# Maximum number of rotated log files to keep
-max_rotated_files = 5
-# Enable console logging
-console_enabled = true
-# Log format for console: "compact" | "full" | "json"
-console_format = "compact"
-
-[performance]
-# Enable caching for file operations
-file_cache_enabled = true
-# Cache size in MB for file contents
-file_cache_size_mb = 50
-# Enable caching for tool results
-tool_cache_enabled = true
-# Tool cache size in MB
-tool_cache_size_mb = 25
-# Maximum file size to cache (in MB)
-max_cache_file_size_mb = 5
-# Cache TTL in seconds
-cache_ttl_seconds = 300
-
-[telemetry]
-# Enable telemetry collection (helps improve VTAgent)
-enabled = false
-# Telemetry endpoint URL
-endpoint = "https://telemetry.vtagent.dev"
-# Telemetry collection interval in minutes
-collection_interval_minutes = 60
-# Include system information in telemetry
-include_system_info = false
-# Include usage statistics in telemetry
-include_usage_stats = true
-
-[experimental]
-# Enable experimental features (may be unstable)
-multi_agent_v2 = false
-# Enable tree-sitter v2 features
-tree_sitter_v2 = false
-# Enable MCP (Model Context Protocol) support
-mcp_enabled = false
-# Enable streaming responses
-streaming_responses = false

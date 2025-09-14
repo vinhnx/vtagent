@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use console::style;
 use vtagent_core::{
-    config::ConfigManager,
+    config::{ConfigManager, constants::tools},
     gemini::{Tool, GenerateContentRequest, Content, Part},
     gemini::models::SystemInstruction,
     llm::make_client,
@@ -241,7 +241,7 @@ pub async fn handle_chat_command(config: &CoreAgentConfig, force_multi_agent: bo
                     println!("\nProposed changes (not applied): The assistant reported edits but no write tool ran.");
                     if let Some(patch) = detected_patch {
                         if auto_apply {
-                            match tool_registry.execute_tool("apply_patch", json!({"input": patch})).await {
+                            match tool_registry.execute_tool(tools::APPLY_PATCH, json!({"input": patch})).await {
                                 Ok(out) => println!("Patch applied: {}", out),
                                 Err(e) => eprintln!("Failed to apply patch: {}", e),
                             }
@@ -251,7 +251,7 @@ pub async fn handle_chat_command(config: &CoreAgentConfig, force_multi_agent: bo
                             let mut ans = String::new();
                             io::stdin().read_line(&mut ans).ok();
                             if matches!(ans.trim().to_lowercase().as_str(), "y" | "yes") {
-                                match tool_registry.execute_tool("apply_patch", json!({"input": patch})).await {
+                                match tool_registry.execute_tool(tools::APPLY_PATCH, json!({"input": patch})).await {
                                     Ok(out) => println!("Patch applied: {}", out),
                                     Err(e) => eprintln!("Failed to apply patch: {}", e),
                                 }

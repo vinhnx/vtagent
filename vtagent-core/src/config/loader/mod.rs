@@ -291,7 +291,7 @@ impl ConfigManager {
 
     /// Get session duration from agent config
     pub fn session_duration(&self) -> std::time::Duration {
-        std::time::Duration::from_secs(self.config.agent.max_session_duration_minutes * 60)
+        std::time::Duration::from_secs(60 * 60) // Default 1 hour
     }
 
     /// Get the project manager (if available)

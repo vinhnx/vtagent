@@ -330,7 +330,7 @@ impl ToolRegistry {
             tools::AST_GREP_SEARCH => self.execute_ast_grep(args).await,
             tools::SIMPLE_SEARCH => self.simple_search_tool.execute(args).await,
             tools::BASH => self.bash_tool.execute(args).await,
-            "apply_patch" => self.execute_apply_patch(args).await,
+            tools::APPLY_PATCH => self.execute_apply_patch(args).await,
             _ => {
                 let error = ToolExecutionError::new(
                     name.to_string(),
@@ -1423,7 +1423,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
 
         // Apply patch tool (Codex patch format)
         FunctionDeclaration {
-            name: "apply_patch".to_string(),
+            name: tools::APPLY_PATCH.to_string(),
             description: "Applies Codex-style patch blocks to modify multiple files in the workspace. This tool is specialized for applying structured patches that contain changes to multiple files or complex modifications. Use this tool when you receive patch content in the Codex format (marked with '*** Begin Patch' and '*** End Patch') instead of making individual file edits. The tool parses the patch format, validates the changes, and applies them atomically to prevent partial updates. It is particularly useful for applying code review suggestions, automated refactoring changes, or complex multi-file modifications. The tool provides detailed feedback on which files were modified and any issues encountered during application. Always ensure the patch content is complete and properly formatted before using this tool.".to_string(),
             parameters: json!({
                 "type": "object",

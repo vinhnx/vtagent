@@ -42,4 +42,4 @@ echo "  - The agent has access to file operations and coding tools"
 echo ""
 
 # Run with advanced features enabled by default
-cargo run -- --async-file-ops --show-file-diffs --debug chat
+cargo run --  --show-file-diffs --debug chat

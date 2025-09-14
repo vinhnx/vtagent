@@ -3,7 +3,6 @@
 //! This module provides the main integration point for the multi-agent system,
 //! orchestrating all components including verification workflows and performance optimization.
 
-use crate::config::ContextStoreDefaults;
 use crate::config::constants::models;
 use crate::config::models::ModelId;
 use crate::config::multi_agent::MultiAgentSystemConfig;
@@ -200,10 +199,10 @@ impl MultiAgentSystem {
             } else {
                 config.orchestrator_model.clone()
             };
-            let subagent_model = if config.subagent_model.is_empty() {
+            let subagent_model = if config.executor_model.is_empty() {
                 models::google::GEMINI_2_5_FLASH_LITE.to_string() // Default subagent model
             } else {
-                config.subagent_model.clone()
+                config.executor_model.clone()
             };
             (orchestrator_model, subagent_model)
         };
@@ -556,55 +555,34 @@ fn convert_to_multi_agent_config(system_config: &MultiAgentSystemConfig) -> Mult
         DelegationStrategy, ExecutionMode, VerificationStrategy,
     };
 
-    let execution_mode = match system_config.execution_mode {
-        crate::config::multi_agent::ExecutionMode::Single => ExecutionMode::Single,
-        crate::config::multi_agent::ExecutionMode::Multi => ExecutionMode::Multi,
-        crate::config::multi_agent::ExecutionMode::Auto => ExecutionMode::Auto,
-    };
+    let execution_mode = ExecutionMode::Auto; // Default to Auto mode
 
-    let verification_strategy = match system_config.verification_strategy {
-        crate::config::multi_agent::VerificationStrategy::Always => VerificationStrategy::Always,
-        crate::config::multi_agent::VerificationStrategy::OnLowConfidence => {
-            VerificationStrategy::ComplexOnly
-        }
-        crate::config::multi_agent::VerificationStrategy::Never => VerificationStrategy::Never,
-    };
-
-    let delegation_strategy = match system_config.delegation_strategy {
-        crate::config::multi_agent::DelegationStrategy::ByCapability => {
-            DelegationStrategy::Adaptive
-        }
-        crate::config::multi_agent::DelegationStrategy::RoundRobin => {
-            DelegationStrategy::Conservative
-        }
-        crate::config::multi_agent::DelegationStrategy::BySpecialization => {
-            DelegationStrategy::Aggressive
-        }
-    };
+    let verification_strategy = VerificationStrategy::Always; // Default strategy
+    let delegation_strategy = DelegationStrategy::Adaptive; // Default strategy
 
     MultiAgentConfig {
         enable_multi_agent: system_config.enabled,
         execution_mode,
-        provider: system_config.provider.clone(),
+        provider: crate::config::models::Provider::Gemini, // Default provider
         orchestrator_model: system_config.orchestrator_model.clone(),
-        subagent_model: system_config.subagent_model.clone(),
+        subagent_model: system_config.executor_model.clone(), // Use executor_model as subagent_model
         max_concurrent_subagents: system_config.max_concurrent_subagents,
-        context_store_enabled: system_config.context_store_enabled,
-        enable_task_management: system_config.enable_task_management,
-        enable_context_sharing: system_config.enable_context_sharing,
-        enable_performance_monitoring: system_config.enable_performance_monitoring,
-        debug_mode: system_config.debug_mode,
-        task_timeout: system_config.task_timeout,
-        context_window_size: system_config.context_window_size,
-        max_context_items: system_config.max_context_items,
+        context_store_enabled: true, // Default value
+        enable_task_management: true, // Default value
+        enable_context_sharing: system_config.context_sharing_enabled,
+        enable_performance_monitoring: false, // Default value
+        debug_mode: false, // Default value
+        task_timeout: std::time::Duration::from_secs(system_config.task_timeout_seconds),
+        context_window_size: 32768, // Default value
+        max_context_items: 100, // Default value
         verification_strategy,
         delegation_strategy,
         context_store: ContextStoreConfig {
-            max_contexts: system_config.context_store.max_context_size,
-            auto_cleanup_days: ContextStoreDefaults::AUTO_CLEANUP_DAYS as u64,
-            enable_persistence: ContextStoreDefaults::ENABLE_PERSISTENCE,
-            compression_enabled: system_config.context_store.compression_enabled,
-            storage_dir: ContextStoreDefaults::STORAGE_DIR.to_string(),
+            max_contexts: 100000, // Default value
+            auto_cleanup_days: 7, // Default value
+            enable_persistence: true, // Default value
+            compression_enabled: true, // Default value
+            storage_dir: ".vtagent/context".to_string(), // Default value
         },
     }
 }
@@ -776,7 +754,7 @@ impl MultiAgentSystem {
             "- **Confidence**: {:.1}%",
             verification_result.confidence * 100.0
         ));
-        
+
         // Add findings if any
         if !verification_result.findings.is_empty() {
             summary_parts.push("- **Findings**:".to_string());
@@ -784,7 +762,7 @@ impl MultiAgentSystem {
                 summary_parts.push(format!("  - {:?}: {}", finding.finding_type, finding.description));
             }
         }
-        
+
         // Add recommendations if any
         if !verification_result.recommendations.is_empty() {
             summary_parts.push("- **Recommendations**:".to_string());

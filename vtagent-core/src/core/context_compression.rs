@@ -246,6 +246,7 @@ impl ContextCompressor {
             stream: false,
             tool_choice: None,
             parallel_tool_calls: None,
+            parallel_tool_config: None,
             reasoning_effort: None,
         };
 

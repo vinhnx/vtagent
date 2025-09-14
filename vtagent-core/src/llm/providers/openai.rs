@@ -311,20 +311,16 @@ impl LLMClient for OpenAIProvider {
         }
 
         let request = LLMRequest {
-            model: model.clone(),
-            messages: vec![Message {
-                role: MessageRole::User,
-                content: prompt.to_string(),
-                tool_calls: None,
-                tool_call_id: None,
-            }],
+            messages: vec![Message::user("test".to_string())],
             system_prompt: None,
             tools: None,
-            max_tokens: None,
+            model: "test".to_string(),
+            max_tokens: Some(100),
             temperature: None,
             stream: false,
             tool_choice: None,
             parallel_tool_calls: None,
+            parallel_tool_config: None,
             reasoning_effort: None,
         };
 

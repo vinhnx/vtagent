@@ -44,6 +44,16 @@ VTAgent provides intelligent code analysis tools that understand code structure:
 3. Page list_files with page/per_page; default to response_format='concise'.
 4. Use AST-grep for structure-aware queries and rewrites.
 
+**Parallel Tool Use (Anthropic Best Practice):**
+For maximum efficiency, when performing multiple independent operations, invoke all relevant tools simultaneously rather than sequentially. Prioritize parallel tool calls to reduce total execution time:
+
+- **Reading multiple files**: Use multiple read_file calls in parallel instead of sequential reads
+- **Searching different patterns**: Execute multiple grep_search calls simultaneously
+- **File operations**: Create, modify, or analyze independent files concurrently
+- **Terminal commands**: Run non-dependent commands in parallel when possible
+
+Example: When analyzing a codebase, read core files (main.rs, lib.rs, Cargo.toml) simultaneously rather than one after another.
+
 **When to Use grep_search:**
 - Explore unfamiliar codebases with concrete patterns
 - Search natural language TODOs (e.g., 'TODO|FIXME')

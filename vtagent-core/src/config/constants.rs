@@ -34,15 +34,28 @@ pub mod models {
         pub const GPT_4_1: &str = "gpt-4.1";
     }
 
-    // Anthropic models (from docs/models.json)
+    // Anthropic models (from docs/models.json) - Updated for tool use best practices
     pub mod anthropic {
+        // Standard model for straightforward tools - Sonnet 4 preferred for most use cases
         pub const DEFAULT_MODEL: &str = "claude-sonnet-4-20250514";
-        pub const SUPPORTED_MODELS: &[&str] =
-            &["claude-opus-4-1-20250805", "claude-sonnet-4-20250514"];
+        pub const SUPPORTED_MODELS: &[&str] = &[
+            "claude-sonnet-4-20250514",    // Standard: Sonnet 4 for straightforward tools
+            "claude-opus-4-1-20250805",    // Complex: Opus 4.1 for complex workflows (configurable)
+            "claude-opus-4-20250514",      // Complex: Alternative Opus model
+            "claude-sonnet-3.7-20250219",  // Advanced: Sonnet 3.7 with extended thinking
+            "claude-haiku-3.5-20241022",   // Minimal: Haiku 3.5 for basic tools
+            "claude-sonnet-3.5-20241022",  // Legacy: Sonnet 3.5 (deprecated but still available)
+            "claude-haiku-3-20240307",     // Basic: Haiku 3 for simple tasks
+        ];
 
         // Convenience constants for commonly used models
-        pub const CLAUDE_SONNET_4_20250514: &str = "claude-sonnet-4-20250514";
         pub const CLAUDE_OPUS_4_1_20250805: &str = "claude-opus-4-1-20250805";
+        pub const CLAUDE_OPUS_4_20250514: &str = "claude-opus-4-20250514";
+        pub const CLAUDE_SONNET_4_20250514: &str = "claude-sonnet-4-20250514";
+        pub const CLAUDE_SONNET_3_7_20250219: &str = "claude-sonnet-3.7-20250219";
+        pub const CLAUDE_SONNET_3_5_20241022: &str = "claude-sonnet-3.5-20241022";
+        pub const CLAUDE_HAIKU_3_5_20241022: &str = "claude-haiku-3.5-20241022";
+        pub const CLAUDE_HAIKU_3_20240307: &str = "claude-haiku-3-20240307";
     }
 
     // Backwards compatibility - keep old constants working
@@ -51,8 +64,13 @@ pub mod models {
     pub const GEMINI_2_5_PRO: &str = google::GEMINI_2_5_PRO;
     pub const GPT_5: &str = openai::GPT_5;
     pub const GPT_5_MINI: &str = openai::GPT_5_MINI;
-    pub const CLAUDE_SONNET_4_20250514: &str = anthropic::CLAUDE_SONNET_4_20250514;
     pub const CLAUDE_OPUS_4_1_20250805: &str = anthropic::CLAUDE_OPUS_4_1_20250805;
+    pub const CLAUDE_OPUS_4_20250514: &str = anthropic::CLAUDE_OPUS_4_20250514;
+    pub const CLAUDE_SONNET_4_20250514: &str = anthropic::CLAUDE_SONNET_4_20250514;
+    pub const CLAUDE_SONNET_3_7_20250219: &str = anthropic::CLAUDE_SONNET_3_7_20250219;
+    pub const CLAUDE_SONNET_3_5_20241022: &str = anthropic::CLAUDE_SONNET_3_5_20241022;
+    pub const CLAUDE_HAIKU_3_5_20241022: &str = anthropic::CLAUDE_HAIKU_3_5_20241022;
+    pub const CLAUDE_HAIKU_3_20240307: &str = anthropic::CLAUDE_HAIKU_3_20240307;
 }
 
 /// Model validation and helper functions

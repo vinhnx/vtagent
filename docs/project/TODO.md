@@ -1,34 +1,13 @@
 check git stash "WIP on main: ef7bafe chore: bump version to 0.1.3" and apply session management for vtagent with command. ignore the tui changes
 
 --
+
 https://deepwiki.com/pawurb/hotpath
- A simple Rust profiler that shows exactly where your code spends time
+A simple Rust profiler that shows exactly where your code spends time
 
 --
 
 Use Rust's Clippy linter to thoroughly scan the entire codebase for dead code, unused variables, unreachable code, and similar inefficiencies. Review all warnings and suggestions in detail, prioritizing high-impact issues. Then, systematically fix the identified problems by removing or refactoring the dead code, ensuring the changes maintain functionality, pass all tests, and improve code quality without introducing new issues. Provide a summary of changes made.
-
----
-
-
-<https://deepwiki.com/laude-institute/terminal-bench?tab=readme-ov-file#submit-to-our-leaderboard>
-
-<https://app.primeintellect.ai/dashboard/environments>
-
-
----
-
-https://agentclientprotocol.com/overview/introduction
-
-
-
---
-
-https://aider.chat/docs/leaderboards/edit.html
-
-
---
-Analyze the Rust source file `src/main_modular.rs` for dead code, including but not limited to unused variables, functions, imports, modules, structs, enums, traits, and any unreachable code blocks. Use tools like `cargo clippy` or manual inspection to identify issues. Then, fix them by removing, refactoring, or properly utilizing the dead elements to ensure the code is clean, efficient, and compiles without warnings. Output the full corrected file content, along with a summary of changes made and rationale for each fix. If no dead code is found, confirm that and suggest any potential optimizations.
 
 ---
 
@@ -50,21 +29,16 @@ https://deepwiki.com/alexpovel/srgn/3-language-support
 https://deepwiki.com/alexpovel/srgn/4-text-processing-actions
 to evalure and integrate into vtagent tools, let the llm decide when to use it
 
-
 --
 
 https://deepwiki.com/crate-ci/cargo-release
-
 
 --
 
 fetch
 https://deepwiki.com/ratatui/ratatui integrate and port chat repl
 
-
 ---
-
-[Learn more](/blog/windsurf) about Cognition's acquisition of Windsurf
 
 Frameworks for LLM Agents have been surprisingly disappointing. I want to offer some principles for building agents based on our own trial & error, and explain why some tempting ideas are actually quite bad in practice.
 
@@ -72,8 +46,8 @@ Frameworks for LLM Agents have been surprisingly disappointing. I want to offer 
 
 In this post:Follow us on:
 
-- [Linkedin](https://www.linkedin.com/company/cognition-ai-labs/)
-- [Twitter | x](https://x.com/cognition)
+-   [Linkedin](https://www.linkedin.com/company/cognition-ai-labs/)
+-   [Twitter | x](https://x.com/cognition)
 
 ## Principles of Context Engineering
 
@@ -96,7 +70,7 @@ That said, if you’re new to agent-building, there are lots of resources on how
 
 Let’s start with reliability. When agents have to actually be reliable while running for long periods of time and maintain coherent conversations, there are certain things you must do to contain the potential for compounding errors. Otherwise, if you’re not careful, things fall apart quickly. At the core of reliability is Context Engineering.
 
-*Context Engineering*
+_Context Engineering_
 
 In 2025, the models out there are extremely intelligent. But even the smartest human won’t be able to do their job effectively without the context of what they’re being asked to do. “Prompt engineering” was coined as a term for the effort needing to write your task in the ideal format for a LLM chatbot. “Context engineering” is the next level of this. It is about doing this automatically in a dynamic system. It takes more nuance and is effectively the #1 job of engineers building AI agents.
 
@@ -105,7 +79,7 @@ Take an example of a common type of agent. This agent
 1. breaks its work down into multiple parts
 2. starts subagents to work on those parts
 3. combines those results in the end
-[![](https://cdn.sanity.io/images/2mc9cv2v/production/721e44474051c62156e15b5ffb1a249c996f0607-1404x1228.png)](https://cdn.sanity.io/images/2mc9cv2v/production/721e44474051c62156e15b5ffb1a249c996f0607-1404x1228.png)
+   [![](https://cdn.sanity.io/images/2mc9cv2v/production/721e44474051c62156e15b5ffb1a249c996f0607-1404x1228.png)](https://cdn.sanity.io/images/2mc9cv2v/production/721e44474051c62156e15b5ffb1a249c996f0607-1404x1228.png)
 
 This is a tempting architecture, especially if you work in a domain of tasks with several parallel components to it. However, it is very fragile. The key failure point is this:
 
@@ -115,7 +89,7 @@ This is a tempting architecture, especially if you work in a domain of tasks wit
 
 This may seem contrived, but most real-world tasks have many layers of nuance that all have the potential to be miscommunicated. You might think that a simple solution would be to just copy over the original task as context to the subagents as well. That way, they don’t misunderstand their subtask. But remember that in a real production system, the conversation is most likely multi-turn, the agent probably had to make some tool calls to decide how to break down the task, and any number of details could have consequences on the interpretation of the task.
 
-> *Principle 1*
+> _Principle 1_
 > Share context, and share full agent traces, not just individual messages
 
 Let’s take another revision at our agent, this time making sure each agent has the context of the previous agents.
@@ -126,7 +100,7 @@ Unfortunately, we aren’t quite out of the woods. When you give your agent the 
 
 The actions subagent 1 took and the actions subagent 2 took were based on conflicting assumptions not prescribed upfront.
 
-> *Principle 2*
+> _Principle 2_
 > Actions carry implicit decisions, and conflicting decisions carry bad results
 
 I would argue that Principles 1 & 2 are so critical, and so rarely worth violating, that you should by default rule out any agent architectures that don’t abide by then. You might think this is constraining, but there is actually a wide space of different architectures you could still explore for your agent.
@@ -143,7 +117,7 @@ To be honest, the simple architecture will get you very far, but for those who h
 
 [![](https://cdn.sanity.io/images/2mc9cv2v/production/836a7407ddf3dfacc0715c0502b4f3ffc7388829-1406x1230.png)](https://cdn.sanity.io/images/2mc9cv2v/production/836a7407ddf3dfacc0715c0502b4f3ffc7388829-1406x1230.png)
 
-In this world, we introduce a new LLM model whose key purpose is to compress a history of actions & conversation into key details, events, and decisions. This is *hard to get right.* It takes investment into figuring out what ends up being the key information and creating a system that is good at this. Depending on the domain, you might even consider fine-tuning a smaller model (this is in fact something we’ve done at Cognition).
+In this world, we introduce a new LLM model whose key purpose is to compress a history of actions & conversation into key details, events, and decisions. This is _hard to get right._ It takes investment into figuring out what ends up being the key information and creating a system that is good at this. Depending on the domain, you might even consider fine-tuning a smaller model (this is in fact something we’ve done at Cognition).
 
 The benefit you get is an agent that is effective at longer contexts. You will still eventually hit a limit though. For the avid reader, I encourage you to think of better ways to manage arbitrarily long contexts. It ends up being quite a deep rabbit hole!
 
@@ -156,7 +130,7 @@ As you think about architecting your agents to avoid conflicting decision-making
 *Claude Code Subagents
 *As of June 2025, Claude Code is an example of an agent that spawns subtasks. However, it never does work in parallel with the subtask agent, and the subtask agent is usually only tasked with answering a question, not writing any code. Why? The subtask agent lacks context from the main agent that would otherwise be needed to do anything beyond answering a well-defined question. And if they were to run multiple parallel subagents, they might give conflicting responses, resulting in the reliability issues we saw with our earlier examples of agents. The benefit of having a subagent in this case is that all the subagent’s investigative work does not need to remain in the history of the main agent, allowing for longer traces before running out of context. The designers of Claude Code took a purposefully simple approach.
 
-*Edit Apply Models*
+_Edit Apply Models_
 In 2024, many models were really bad at editing code. A common practice among coding agents, IDEs, app builders, etc. (including Devin) was to use an “edit apply model.” The key idea was that it was actually more reliable to get a small model to rewrite your entire file, given a markdown explanation of the changes you wanted, than to get a large model to output a properly formatted diff. So, builders had the large models output markdown explanations of code edits and then fed these markdown explanations to small models to actually rewrite the files. However, these systems would still be very faulty. Often times, for example, the small model would misinterpret the instructions of the large model and make an incorrect edit due to the most slight ambiguities in the instructions. Today, the edit decision-making and applying are more often done by a single model in one action.
 
 **Multi-Agents**
@@ -170,3 +144,46 @@ Since not long after the launch of ChatGPT, people have been exploring the idea 
 **Toward a More General Theory**
 
 These observations on context engineering are just the start to what we might someday consider the standard principles of building agents. And there are many more challenges and techniques not discussed here. At Cognition, agent building is a key frontier we think about. We build our internal tools and frameworks around these principles we repeatedly find ourselves relearning as a way to enforce these ideas. But our theories are likely not perfect, and we expect things to change as the field advances, so some flexibility and humility is required as well.
+
+---
+
+> yes
+> [TOOL] list_files {"path":"src"}
+> Error: API error 500 Internal Server Error: {
+> "error": {
+
+    "code": 500,
+    "message": "An internal error has occurred. Please retry or report in https://developers.generativeai.google/guide/troubleshooting",
+    "status": "INTERNAL"
+
+}
+}
+--> don't return break the agent chat loop when error happens. instead, return the error message to the user and let them decide what to do next. update the system prompt accordingly. make sure to log the error for debugging purposes. test it out with some error scenarios to ensure it works as expected. update with tools policy accordingly and tool registry. write end to end tests for this new error handling for vtagent core write and edit commands.
+
+---
+
+[TOOL] run_terminal_cmd {"command":["file","./Cargo.toml"]}
+[stdout]
+./Cargo.toml: ASCII text
+[TOOL] run_terminal_cmd {"command":["file","./Cargo.toml"]}
+[stdout]
+./Cargo.toml: ASCII text
+[TOOL] run_terminal_cmd {"command":["file","./Cargo.toml"]}
+[stdout]
+./Cargo.toml: ASCII text
+[TOOL] run_terminal_cmd {"command":["file","./Cargo.toml"]}
+[stdout]
+./Cargo.toml: ASCII text
+[TOOL] run_terminal_cmd {"command":["file","./src/main.rs"]}
+[stdout]
+./src/main.rs: ASCII text
+[TOOL] run_terminal_cmd {"command":["file","./src/lib.rs"]}
+[stdout]
+./src/lib.rs: ASCII text
+Error: API error 500 Internal Server Error: {
+"error": {
+"code": 500,
+"message": "An internal error has occurred. Please retry or report in https://developers.generativeai.google/guide/troubleshooting",
+"status": "INTERNAL"
+}
+}

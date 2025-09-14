@@ -3,24 +3,24 @@
 //! This module provides enhanced error display capabilities for LLM providers
 //! using standard console styling for consistent terminal output.
 
-use console::style;
+use crate::ui::styled::*;
 
 /// Get a styled error message with enhanced coloring
 pub fn style_llm_error(message: &str) -> String {
     // Use a rich red color for LLM errors
-    style(message).red().to_string()
+    format!("{}{}{}", Styles::error().render(), message, Styles::error().render_reset())
 }
 
 /// Get a styled warning message with enhanced coloring
 pub fn style_llm_warning(message: &str) -> String {
     // Use an amber color for LLM warnings
-    style(message).yellow().to_string()
+    format!("{}{}{}", Styles::warning().render(), message, Styles::warning().render_reset())
 }
 
 /// Get a styled success message with enhanced coloring
 pub fn style_llm_success(message: &str) -> String {
     // Use a vibrant green color for LLM success messages
-    style(message).green().to_string()
+    format!("{}{}{}", Styles::success().render(), message, Styles::success().render_reset())
 }
 
 /// Get a styled provider name with enhanced coloring based on provider type
@@ -28,22 +28,22 @@ pub fn style_provider_name(provider: &str) -> String {
     let styled_name = match provider.to_lowercase().as_str() {
         "gemini" => {
             // Deep blue for Gemini
-            style(provider).blue()
+            format!("{}{}{}", Styles::info().render(), provider, Styles::info().render_reset())
         }
         "openai" => {
             // Bright orange for OpenAI (using yellow as approximation)
-            style(provider).yellow()
+            format!("{}{}{}", Styles::warning().render(), provider, Styles::warning().render_reset())
         }
         "anthropic" => {
             // Anthropic's brand purple (using magenta as approximation)
-            style(provider).magenta()
+            format!("{}{}{}", Styles::code().render(), provider, Styles::code().render_reset())
         }
         _ => {
             // Default styling for other providers
-            style(provider).cyan()
+            format!("{}{}{}", Styles::debug().render(), provider, Styles::debug().render_reset())
         }
     };
-    styled_name.to_string()
+    styled_name
 }
 
 /// Format an LLM error for display with enhanced coloring

@@ -73,6 +73,7 @@ anstream = "0.6"
 anstyle-parse = "0.2"
 anstyle-ls = "1.0"
 anstyle-roff = "0.3"
+colorchoice-clap = "1.0"
 quick_cache = "0.6"
 roff = "0.2"
 

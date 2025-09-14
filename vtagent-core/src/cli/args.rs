@@ -1,7 +1,7 @@
 //! CLI argument parsing and configuration
 
 use crate::config::models::ModelId;
-use clap::{Parser, Subcommand};
+use clap::{ColorChoice, Parser, Subcommand};
 use std::path::PathBuf;
 
 /// Main CLI structure for vtagent with advanced features and multi-agent support
@@ -9,14 +9,32 @@ use std::path::PathBuf;
 #[command(
     name = "vtagent",
     version,
-    about = "Advanced coding agent with multi-agent architecture\n\n**Features:**\n• Multi-agent coordination (Orchestrator, Explorer, Coder)\n• Tree-sitter powered code analysis (Rust, Python, JavaScript, TypeScript, Go, Java)\n• Multi-provider LLM support (Gemini, OpenAI, Anthropic, DeepSeek)\n• Real-time performance monitoring and benchmarking\n• Enhanced security with tool policies and sandboxing\n• Research-preview context management and conversation compression\n\n**Quick Start:**\n  export GEMINI_API_KEY=\"your_key\"\n  vtagent chat\n\n**Multi-Agent Mode:**\n  vtagent chat --force-multi-agent"
+    about = "Advanced coding agent with multi-agent architecture\n\nFeatures:\n• Multi-agent coordination (Orchestrator, Explorer, Coder)\n• Tree-sitter powered code analysis (Rust, Python, JavaScript, TypeScript, Go, Java)\n• Multi-provider LLM support (Gemini, OpenAI, Anthropic, DeepSeek)\n• Real-time performance monitoring and benchmarking\n• Enhanced security with tool policies and sandboxing\n• Research-preview context management and conversation compression\n\nQuick Start:\n  export GEMINI_API_KEY=\"your_key\"\n  vtagent chat\n\nMulti-Agent Mode:\n  vtagent chat --force-multi-agent",
+    color = ColorChoice::Auto
 )]
 pub struct Cli {
-    /// **LLM Model ID** with latest model support\n\n**Available providers & models:**\n• `gemini-2.5-flash-lite` - Fastest, most cost-effective (default)\n• `gemini-2.5-flash` - Fast, cost-effective\n• `gemini-2.5-pro` - Latest, most capable\n• `gpt-5` - OpenAI's latest\n• `claude-sonnet-4-20250514` - Anthropic's latest\n• `qwen/qwen3-4b-2507` - Qwen3 local model\n• `deepseek-reasoner` - DeepSeek reasoning model
+    /// LLM Model ID with latest model support
+    ///
+    /// Available providers & models:
+    ///   • gemini-2.5-flash-lite - Fastest, most cost-effective (default)
+    ///   • gemini-2.5-flash - Fast, cost-effective
+    ///   • gemini-2.5-pro - Latest, most capable
+    ///   • gpt-5 - OpenAI's latest
+    ///   • claude-sonnet-4-20250514 - Anthropic's latest
+    ///   • qwen/qwen3-4b-2507 - Qwen3 local model
+    ///   • deepseek-reasoner - DeepSeek reasoning model
     #[arg(long, global = true)]
     pub model: Option<String>,
 
-    /// **LLM Provider** with expanded support\n\n**Available providers:**\n• `gemini` - Google Gemini (default)\n• `openai` - OpenAI GPT models\n• `anthropic` - Anthropic Claude models\n• `deepseek` - DeepSeek models\n\n**Example:** --provider deepseek
+    /// **LLM Provider** with expanded support
+    ///
+    /// Available providers:
+    ///   • gemini - Google Gemini (default)
+    ///   • openai - OpenAI GPT models
+    ///   • anthropic - Anthropic Claude models
+    ///   • deepseek - DeepSeek models
+    ///
+    /// Example: --provider deepseek
     #[arg(long, global = true)]
     pub provider: Option<String>,
 
@@ -24,71 +42,145 @@ pub struct Cli {
     #[arg(long, global = true, default_value = crate::config::constants::defaults::DEFAULT_API_KEY_ENV)]
     pub api_key_env: String,
 
-    /// **Workspace root directory** for file operations\n\n**Security:** All file operations restricted to this path\n**Default:** Current directory
+    /// **Workspace root directory for file operations**
+    ///
+    /// Security: All file operations restricted to this path
+    /// Default: Current directory
     #[arg(long, global = true)]
     pub workspace: Option<PathBuf>,
 
-    /// **Enable multi-agent mode** for complex tasks\n\n**Agents:**\n• Orchestrator - Strategic planning and delegation\n• Explorer - Read-only investigation and analysis\n• Coder - Implementation and code modification\n\n**Benefits:** Better task decomposition, parallel execution
+    /// **Enable multi-agent mode for complex tasks**
+    ///
+    /// Agents:
+    ///   • Orchestrator - Strategic planning and delegation
+    ///   • Explorer - Read-only investigation and analysis
+    ///   • Coder - Implementation and code modification
+    ///
+    /// Benefits: Better task decomposition, parallel execution
     #[arg(long, global = true)]
     pub force_multi_agent: bool,
 
-    /// **Agent type** when using multi-agent mode\n\n**Options:**\n• `orchestrator` - Strategic coordinator (default)\n• `explorer` - Read-only investigator\n• `coder` - Implementation specialist\n• `single` - Traditional single-agent mode
+    /// **Agent type** when using multi-agent mode
+    ///
+    /// Options:
+    ///   • orchestrator - Strategic coordinator (default)
+    ///   • explorer - Read-only investigator
+    ///   • coder - Implementation specialist
+    ///   • single - Traditional single-agent mode
     #[arg(long, global = true, default_value = "single")]
     pub agent_type: String,
 
-    /// **Enable tree-sitter code analysis**\n\n**Features:**\n• AST-based code parsing\n• Symbol extraction and navigation\n• Intelligent refactoring suggestions\n• Multi-language support (Rust, Python, JS, TS, Go, Java)
+    /// **Enable tree-sitter code analysis**
+    ///
+    /// Features:
+    ///   • AST-based code parsing
+    ///   • Symbol extraction and navigation
+    ///   • Intelligent refactoring suggestions
+    ///   • Multi-language support (Rust, Python, JS, TS, Go, Java)
     #[arg(long, global = true)]
     pub enable_tree_sitter: bool,
 
-    /// **Enable performance monitoring**\n\n**Tracks:**\n• Token usage and API costs\n• Response times and latency\n• Tool execution metrics\n• Memory usage patterns
+    /// **Enable performance monitoring**
+    ///
+    /// Tracks:
+    ///   • Token usage and API costs
+    ///   • Response times and latency
+    ///   • Tool execution metrics
+    ///   • Memory usage patterns
     #[arg(long, global = true)]
     pub performance_monitoring: bool,
 
-    /// **Enable research-preview features**\n\n**Includes:**\n• Advanced context compression\n• Conversation summarization\n• Enhanced error recovery\n• Decision transparency tracking
+    /// **Enable research-preview features**
+    ///
+    /// Includes:
+    ///   • Advanced context compression
+    ///   • Conversation summarization
+    ///   • Enhanced error recovery
+    ///   • Decision transparency tracking
     #[arg(long, global = true)]
     pub research_preview: bool,
 
-    /// **Security level** for tool execution\n\n**Options:**\n• `strict` - Maximum security, prompt for all tools\n• `moderate` - Balance security and usability\n• `permissive` - Minimal restrictions (not recommended)
+    /// **Security level** for tool execution
+    ///
+    /// Options:
+    ///   • strict - Maximum security, prompt for all tools
+    ///   • moderate - Balance security and usability
+    ///   • permissive - Minimal restrictions (not recommended)
     #[arg(long, global = true, default_value = "moderate")]
     pub security_level: String,
 
-    /// **Show diffs for file changes** in chat interface\n\n**Features:**\n• Real-time diff rendering\n• Syntax highlighting\n• Line-by-line changes\n• Before/after comparison
+    /// **Show diffs for file changes in chat interface**
+    ///
+    /// Features:
+    ///   • Real-time diff rendering
+    ///   • Syntax highlighting
+    ///   • Line-by-line changes
+    ///   • Before/after comparison
     #[arg(long, global = true)]
     pub show_file_diffs: bool,
 
-    /// **Maximum concurrent async operations**\n\n**Default:** 5\n**Higher values:** Better performance but more resource usage
+    /// **Maximum concurrent async operations**
+    ///
+    /// Default: 5
+    /// Higher values: Better performance but more resource usage
     #[arg(long, global = true, default_value_t = 5)]
     pub max_concurrent_ops: usize,
 
-    /// **Maximum API requests per minute**\n\n**Default:** 30\n**Purpose:** Prevents rate limiting
+    /// **Maximum API requests per minute**
+    ///
+    /// Default: 30
+    /// Purpose: Prevents rate limiting
     #[arg(long, global = true, default_value_t = 30)]
     pub api_rate_limit: usize,
 
-    /// **Maximum tool calls per session**\n\n**Default:** 10\n**Purpose:** Prevents runaway execution
+    /// **Maximum tool calls per session**
+    ///
+    /// Default: 10
+    /// Purpose: Prevents runaway execution
     #[arg(long, global = true, default_value_t = 10)]
     pub max_tool_calls: usize,
 
-    /// **Enable debug output** for troubleshooting\n\n**Shows:**\n• Tool call details\n• API request/response\n• Internal agent state\n• Performance metrics
+    /// **Enable debug output for troubleshooting**
+    ///
+    /// Shows:
+    ///   • Tool call details
+    ///   • API request/response
+    ///   • Internal agent state
+    ///   • Performance metrics
     #[arg(long, global = true)]
     pub debug: bool,
 
-    /// **Enable verbose logging**\n\n**Includes:**\n• Detailed operation logs\n• Context management info\n• Agent coordination details
+    /// **Enable verbose logging**
+    ///
+    /// Includes:
+    ///   • Detailed operation logs
+    ///   • Context management info
+    ///   • Agent coordination details
     #[arg(long, global = true)]
     pub verbose: bool,
 
-    /// **Configuration file path**\n\n**Supported formats:** TOML\n**Default locations:** ./vtagent.toml, ~/.vtagent/vtagent.toml
+    /// **Configuration file path**
+    ///
+    /// Supported formats: TOML
+    /// Default locations: ./vtagent.toml, ~/.vtagent/vtagent.toml
     #[arg(long, global = true)]
     pub config: Option<PathBuf>,
 
-    /// **Log level** (error, warn, info, debug, trace)\n\n**Default:** info
+    /// Log level (error, warn, info, debug, trace)
+    ///
+    /// Default: info
     #[arg(long, global = true, default_value = "info")]
     pub log_level: String,
 
-    /// **Disable color output**\n\n**Useful for:** Log files, CI/CD pipelines
+    /// Disable color output
+    ///
+    /// Useful for: Log files, CI/CD pipelines
     #[arg(long, global = true)]
     pub no_color: bool,
 
-    /// **Skip safety confirmations**\n\n**Warning:** Reduces security, use with caution
+    /// **Skip safety confirmations**
+    ///
+    /// Warning: Reduces security, use with caution
     #[arg(long, global = true)]
     pub skip_confirmations: bool,
 
@@ -99,106 +191,221 @@ pub struct Cli {
 /// Available commands with comprehensive features and multi-agent support
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    /// **Interactive AI coding assistant** with multi-agent capabilities\n\n**Features:**\n• Multi-agent coordination for complex tasks\n• Real-time code generation and editing\n• Tree-sitter powered analysis\n• Research-preview context management\n\n**Usage:** vtagent chat
+    /// **Interactive AI coding assistant** with multi-agent capabilities
+    ///
+    /// Features:
+    ///   • Multi-agent coordination for complex tasks
+    ///   • Real-time code generation and editing
+    ///   • Tree-sitter powered analysis
+    ///   • Research-preview context management
+    ///
+    /// Usage: vtagent chat
     Chat,
 
-    /// **Single prompt mode** - prints model reply without tools\n\n**Perfect for:**\n• Quick questions\n• Code explanations\n• Simple queries\n\n**Example:** vtagent ask "Explain Rust ownership"
-    Ask { prompt: Vec<String> },
+    /// **Single prompt mode** - prints model reply without tools
+    ///
+    /// Perfect for:
+    ///   • Quick questions
+    ///   • Code explanations
+    ///   • Simple queries
+    ///
+    /// Example: vtagent ask "Explain Rust ownership"
+    Ask { prompt: String },
 
-    /// **Verbose interactive chat** with enhanced transparency\n\n**Shows:**\n• Tool execution details\n• API request/response\n• Agent coordination (in multi-agent mode)\n• Performance metrics\n\n**Usage:** vtagent chat-verbose
+    /// **Verbose interactive chat** with enhanced transparency
+    ///
+    /// Shows:
+    ///   • Tool execution details
+    ///   • API request/response
+    ///   • Agent coordination (in multi-agent mode)
+    ///   • Performance metrics
+    ///
+    /// Usage: vtagent chat-verbose
     ChatVerbose,
 
-    /// **Analyze workspace** with tree-sitter integration\n\n**Provides:**\n• Project structure analysis\n• Language detection\n• Code complexity metrics\n• Dependency insights\n• Symbol extraction\n\n**Usage:** vtagent analyze
+    /// **Analyze workspace** with tree-sitter integration
+    ///
+    /// Provides:
+    ///   • Project structure analysis
+    ///   • Language detection
+    ///   • Code complexity metrics
+    ///   • Dependency insights
+    ///   • Symbol extraction
+    ///
+    /// Usage: vtagent analyze
     Analyze,
 
     /// **Display performance metrics** and system status\n\n**Shows:**\n• Token usage and API costs\n• Response times and latency\n• Tool execution statistics\n• Memory usage patterns\n• Agent performance (in multi-agent mode)\n\n**Usage:** vtagent performance
     Performance,
 
-    /// **Benchmark against SWE-bench** evaluation framework\n\n**Features:**\n• Automated performance testing\n• Comparative analysis across models\n• Benchmark scoring and metrics\n• Optimization insights\n\n**Usage:** vtagent benchmark
+    /// **Benchmark against SWE-bench evaluation framework**
+    ///
+    /// Features:
+    ///   • Automated performance testing
+    ///   • Comparative analysis across models
+    ///   • Benchmark scoring and metrics
+    ///   • Optimization insights
+    ///
+    /// Usage: vtagent benchmark
     Benchmark,
 
-    /// **Create complete Rust project** with advanced features\n\n**Features:**\n• Web frameworks (Axum, Rocket, Warp)\n• Database integration\n• Authentication systems\n• Testing setup\n• Tree-sitter integration\n\n**Example:** vtagent create-project myapp web,auth,db
+    /// **Create complete Rust project with advanced features**
+    ///
+    /// Features:
+    ///   • Web frameworks (Axum, Rocket, Warp)
+    ///   • Database integration
+    ///   • Authentication systems
+    ///   • Testing setup
+    ///   • Tree-sitter integration
+    ///
+    /// Example: vtagent create-project myapp web,auth,db
     CreateProject { name: String, features: Vec<String> },
 
-    /// **Compress conversation context** for long-running sessions\n\n**Benefits:**\n• Reduced token usage\n• Faster responses\n• Memory optimization\n• Context preservation\n\n**Usage:** vtagent compress-context
+    /// **Compress conversation context** for long-running sessions
+    ///
+    /// Benefits:
+    ///   • Reduced token usage
+    ///   • Faster responses
+    ///   • Memory optimization
+    ///   • Context preservation
+    ///
+    /// Usage: vtagent compress-context
     CompressContext,
 
-    /// **Revert agent to a previous snapshot**\n\n**Features:**\n• Revert to any previous turn\n• Partial reverts (memory, context, full)\n• Safe rollback with validation\n\n**Examples:**\n  vtagent revert --turn 5\n  vtagent revert --turn 3 --partial memory
+    /// **Revert agent to a previous snapshot
+    ///
+    /// Features:
+    ///   • Revert to any previous turn
+    ///   • Partial reverts (memory, context, full)
+    ///   • Safe rollback with validation
+    ///
+    /// Examples:
+    ///   vtagent revert --turn 5
+    ///   vtagent revert --turn 3 --partial memory
     Revert {
-        /// **Turn number to revert to**\n\n**Required:** Yes\n**Example:** 5
+        /// Turn number to revert to
+        ///
+        /// Required: Yes
+        /// Example: 5
         #[arg(short, long)]
         turn: usize,
 
-        /// **Scope of revert operation**\n\n**Options:** memory, context, full\n**Default:** full\n**Examples:**\n  --partial memory (revert conversation only)\n  --partial context (revert decisions/errors only)
+        /// Scope of revert operation
+        ///
+        /// Options: memory, context, full
+        /// Default: full
+        /// Examples:
+        ///   --partial memory (revert conversation only)
+        ///   --partial context (revert decisions/errors only)
         #[arg(short, long)]
         partial: Option<String>,
     },
 
-    /// **List all available snapshots**\n\n**Shows:**\n• Snapshot ID and turn number\n• Creation timestamp\n• Description\n• File size and compression status\n\n**Usage:** vtagent snapshots
+    /// **List all available snapshots**
+    ///
+    /// Shows:
+    ///   • Snapshot ID and turn number
+    ///   • Creation timestamp
+    ///   • Description
+    ///   • File size and compression status
+    ///
+    /// Usage: vtagent snapshots
     Snapshots,
 
-    /// **Clean up old snapshots**\n\n**Features:**\n• Remove snapshots beyond limit\n• Configurable retention policy\n• Safe deletion with confirmation\n\n**Examples:**\n  vtagent cleanup-snapshots\n  vtagent cleanup-snapshots --max 20
+    /// **Clean up old snapshots**
+    ///
+    /// Features:
+    ///   • Remove snapshots beyond limit
+    ///   • Configurable retention policy
+    ///   • Safe deletion with confirmation
+    ///
+    /// Examples:
+    ///   vtagent cleanup-snapshots
+    ///   vtagent cleanup-snapshots --max 20
     #[command(name = "cleanup-snapshots")]
     CleanupSnapshots {
-        /// **Maximum number of snapshots to keep**\n\n**Default:** 50\n**Example:** --max 20
+        /// Maximum number of snapshots to keep
+        ///
+        /// Default: 50
+        /// Example: --max 20
         #[arg(short, long, default_value_t = 50)]
         max: usize,
     },
 
-    /// **Initialize project** with enhanced dot-folder structure\n\n**Features:**\n• Creates project directory structure\n• Sets up config, cache, embeddings directories\n• Creates .project metadata file\n• Tree-sitter parser setup\n• Multi-agent context stores\n\n**Usage:** vtagent init
+    /// **Initialize project** with enhanced dot-folder structure
+    ///
+    /// Features:
+    ///   • Creates project directory structure
+    ///   • Sets up config, cache, embeddings directories
+    ///   • Creates .project metadata file
+    ///   • Tree-sitter parser setup
+    ///   • Multi-agent context stores
+    ///
+    /// Usage: vtagent init
     Init,
 
     /// **Initialize project with dot-folder structure** - sets up ~/.vtagent/projects/<project-name> structure
-
-    /// **Features:**
-    /// • Creates project directory structure in ~/.vtagent/projects/
-    /// • Sets up config, cache, embeddings, and retrieval directories
-    /// • Creates .project metadata file
-    /// • Migrates existing config/cache files with user confirmation
-
-    /// **Examples:**
+    ///
+    /// Features:
+    ///   • Creates project directory structure in ~/.vtagent/projects/
+    ///   • Sets up config, cache, embeddings, and retrieval directories
+    ///   • Creates .project metadata file
+    ///   • Migrates existing config/cache files with user confirmation
+    ///
+    /// Examples:
     ///   vtagent init-project
     ///   vtagent init-project --name my-project
     ///   vtagent init-project --force
     #[command(name = "init-project")]
     InitProject {
-        /// **Project name** - defaults to current directory name
+        /// Project name - defaults to current directory name
         #[arg(long)]
         name: Option<String>,
 
-        /// **Force initialization** - overwrite existing project structure
+        /// Force initialization - overwrite existing project structure
         #[arg(long)]
         force: bool,
 
-        /// **Migrate existing files** - move existing config/cache files to new structure
+        /// Migrate existing files - move existing config/cache files to new structure
         #[arg(long)]
         migrate: bool,
     },
 
-    /// **Generate configuration file** - creates a vtagent.toml configuration file
-
-    /// **Features:**
-    /// • Generate default configuration
-    /// • Support for global (home directory) and local configuration
-    /// • TOML format with comprehensive settings
-    /// • Multi-agent configuration options
-    /// • Tree-sitter and performance monitoring settings
-
-    /// **Examples:**
+    /// **Generate configuration file - creates a vtagent.toml configuration file
+    ///
+    /// Features:
+    ///   • Generate default configuration
+    ///   • Support for global (home directory) and local configuration
+    ///   • TOML format with comprehensive settings
+    ///   • Multi-agent configuration options
+    ///   • Tree-sitter and performance monitoring settings
+    ///
+    /// Examples:
     ///   vtagent config
     ///   vtagent config --output ./custom-config.toml
     ///   vtagent config --global
     Config {
-        /// **Output file path** - where to save the configuration file
+        /// Output file path - where to save the configuration file
         #[arg(long)]
         output: Option<std::path::PathBuf>,
 
-        /// **Create in user home directory** - creates ~/.vtagent/vtagent.toml
+        /// Create in user home directory - creates ~/.vtagent/vtagent.toml
         #[arg(long)]
         global: bool,
     },
 
-    /// **Manage tool execution policies** - control which tools the agent can use\n\n**Features:**\n• Granular tool permissions\n• Security level presets\n• Audit logging\n• Safe tool execution\n\n**Examples:**\n  vtagent tool-policy status\n  vtagent tool-policy allow file-write\n  vtagent tool-policy deny shell-exec
+    /// **Manage tool execution policies** - control which tools the agent can use
+    ///
+    /// Features:
+    ///   • Granular tool permissions
+    ///   • Security level presets
+    ///   • Audit logging
+    ///   • Safe tool execution
+    ///
+    /// Examples:
+    ///   vtagent tool-policy status
+    ///   vtagent tool-policy allow file-write
+    ///   vtagent tool-policy deny shell-exec
     #[command(name = "tool-policy")]
     ToolPolicy {
         #[command(subcommand)]

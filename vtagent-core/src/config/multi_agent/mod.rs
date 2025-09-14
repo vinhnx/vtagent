@@ -1,6 +1,9 @@
 use crate::config::models::Provider;
+use crate::config::models::ModelId;
+use crate::core::agent::multi_agent::AgentType;
+use anyhow::Result;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::time::Duration;
 
 /// Execution mode for multi-agent system
@@ -181,13 +184,13 @@ impl Default for ContextStoreConfiguration {
 pub struct AgentSpecificConfigs {
     /// Configurations by agent type
     #[serde(default)]
-    pub by_type: HashMap<String, AgentTypeConfig>,
+    pub by_type: IndexMap<String, AgentTypeConfig>,
 }
 
 impl Default for AgentSpecificConfigs {
     fn default() -> Self {
         Self {
-            by_type: HashMap::new(),
+            by_type: IndexMap::new(),
         }
     }
 }

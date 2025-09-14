@@ -1,7 +1,9 @@
+use crate::core::context_compression::ContextCompressor;
 use crate::core::timeout_detector::{OperationType, TIMEOUT_DETECTOR};
+use anyhow::Result;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Represents an error that occurred during execution
@@ -68,7 +70,7 @@ pub enum RecoveryStrategy {
         alternative_tool: String,
     },
     ContextReset {
-        preserved_data: HashMap<String, Value>,
+        preserved_data: IndexMap<String, Value>,
     },
     ManualIntervention,
 }
@@ -76,15 +78,15 @@ pub enum RecoveryStrategy {
 /// Error recovery manager
 pub struct ErrorRecoveryManager {
     errors: Vec<ExecutionError>,
-    recovery_strategies: HashMap<ErrorType, Vec<RecoveryStrategy>>,
+    recovery_strategies: IndexMap<ErrorType, Vec<RecoveryStrategy>>,
     context_compression_threshold: usize,
-    operation_type_mapping: HashMap<ErrorType, OperationType>,
+    operation_type_mapping: IndexMap<ErrorType, OperationType>,
 }
 
 impl ErrorRecoveryManager {
     pub fn new() -> Self {
-        let mut recovery_strategies = HashMap::new();
-        let mut operation_type_mapping = HashMap::new();
+        let mut recovery_strategies = IndexMap::new();
+        let mut operation_type_mapping = IndexMap::new();
 
         // Define recovery strategies for different error types
         recovery_strategies.insert(
@@ -115,7 +117,7 @@ impl ErrorRecoveryManager {
                     compression_ratio: 0.7,
                 },
                 RecoveryStrategy::ContextReset {
-                    preserved_data: HashMap::new(),
+                    preserved_data: IndexMap::new(),
                 },
             ],
         );
@@ -123,7 +125,7 @@ impl ErrorRecoveryManager {
         recovery_strategies.insert(
             ErrorType::ContextCompression,
             vec![RecoveryStrategy::ContextReset {
-                preserved_data: HashMap::new(),
+                preserved_data: IndexMap::new(),
             }],
         );
 
@@ -269,7 +271,7 @@ impl ErrorRecoveryManager {
         let resolved_errors = self.errors.iter().filter(|e| e.resolved).count();
         let unresolved_errors = total_errors - resolved_errors;
 
-        let errors_by_type = self.errors.iter().fold(HashMap::new(), |mut acc, error| {
+        let errors_by_type = self.errors.iter().fold(IndexMap::new(), |mut acc, error| {
             *acc.entry(error.error_type.clone()).or_insert(0) += 1;
             acc
         });
@@ -454,7 +456,7 @@ pub struct ErrorStatistics {
     pub total_errors: usize,
     pub resolved_errors: usize,
     pub unresolved_errors: usize,
-    pub errors_by_type: HashMap<ErrorType, usize>,
+    pub errors_by_type: IndexMap<ErrorType, usize>,
     pub avg_recovery_attempts: f64,
     pub recent_errors: Vec<ExecutionError>,
 }

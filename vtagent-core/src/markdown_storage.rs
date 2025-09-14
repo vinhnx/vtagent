@@ -5,8 +5,8 @@
 //! search results, and other simple data structures.
 
 use anyhow::{Context, Result};
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -172,13 +172,13 @@ impl SimpleKVStorage {
     }
 
     pub fn put(&self, key: &str, value: &str) -> Result<()> {
-        let data = HashMap::from([("value".to_string(), value.to_string())]);
+        let data = IndexMap::from([("value".to_string(), value.to_string())]);
         self.storage
             .store(key, &data, &format!("Key-Value: {}", key))
     }
 
     pub fn get(&self, key: &str) -> Result<String> {
-        let data: HashMap<String, String> = self.storage.load(key)?;
+        let data: IndexMap<String, String> = self.storage.load(key)?;
         data.get("value")
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("Value not found for key: {}", key))
@@ -200,7 +200,7 @@ pub struct ProjectData {
     pub description: Option<String>,
     pub version: String,
     pub tags: Vec<String>,
-    pub metadata: HashMap<String, String>,
+    pub metadata: IndexMap<String, String>,
 }
 
 impl ProjectData {
@@ -210,7 +210,7 @@ impl ProjectData {
             description: None,
             version: "1.0.0".to_string(),
             tags: vec![],
-            metadata: HashMap::new(),
+            metadata: IndexMap::new(),
         }
     }
 }

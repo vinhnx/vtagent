@@ -188,12 +188,12 @@ pub fn extract_readme_excerpt(md: &str, max_len: usize) -> String {
 
 /// Summarize workspace languages
 pub fn summarize_workspace_languages(root: &std::path::Path) -> Option<String> {
-    use std::collections::HashMap;
+    use indexmap::IndexMap;
     let analyzer = match crate::tools::tree_sitter::analyzer::TreeSitterAnalyzer::new() {
         Ok(a) => a,
         Err(_) => return None,
     };
-    let mut counts: HashMap<String, usize> = HashMap::new();
+    let mut counts: IndexMap<String, usize> = IndexMap::new();
     let mut total = 0usize;
     for entry in walkdir::WalkDir::new(root)
         .max_depth(4)

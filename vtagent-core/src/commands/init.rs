@@ -11,8 +11,8 @@ use crate::config::constants::tools;
 use crate::tools::ToolRegistry;
 use anyhow::Result;
 use console::style;
+use indexmap::IndexMap;
 use serde_json::json;
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Project analysis result
@@ -23,7 +23,7 @@ struct ProjectAnalysis {
     languages: Vec<String>,
     frameworks: Vec<String>,
     build_systems: Vec<String>,
-    dependencies: HashMap<String, Vec<String>>,
+    dependencies: IndexMap<String, Vec<String>>,
 
     // Structure analysis
     source_dirs: Vec<String>,
@@ -107,7 +107,7 @@ async fn analyze_project(
         languages: Vec::new(),
         frameworks: Vec::new(),
         build_systems: Vec::new(),
-        dependencies: HashMap::new(),
+        dependencies: IndexMap::new(),
         source_dirs: Vec::new(),
         test_patterns: Vec::new(),
         config_files: Vec::new(),

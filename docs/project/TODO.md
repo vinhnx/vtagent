@@ -2175,18 +2175,11 @@ https://deepwiki.com/alexpovel/srgn/3-language-support
 https://deepwiki.com/alexpovel/srgn/4-text-processing-actions
 to evalure and integrate into vtagent tools, let the llm decide when to use it
 
---
-
-https://docs.rs/itertools/latest/itertools/
 
 --
 
 https://deepwiki.com/crate-ci/cargo-release
 
---
---
-
-https://deepwiki.com/indexmap-rs/indexmap
 
 --
 

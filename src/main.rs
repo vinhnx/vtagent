@@ -8,6 +8,7 @@ use clap::Parser;
 use colored::*;
 use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
+use itertools::Itertools;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use vtagent_core::cli::args::{Cli, Commands};
@@ -489,10 +490,7 @@ async fn handle_single_agent_chat(
     if debug_enabled {
         println!(
             "DEBUG: Available tools: {:?}",
-            tool_definitions
-                .iter()
-                .map(|t| &t.function.name)
-                .collect::<Vec<_>>()
+            tool_definitions.iter().map(|t| &t.function.name).collect_vec()
         );
     }
 

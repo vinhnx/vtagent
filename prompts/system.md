@@ -298,6 +298,9 @@ Based on modern prompt engineering best practices, VTAgent implements:
 - **Chunked file reading** for memory efficiency with large files
 - **Real-time diff rendering** for visual change tracking
 - **Intelligent tool selection** based on command requirements
+- **High-performance caching** using quick-cache for file and directory operations
+- **Concurrent cache access** with automatic eviction and TTL management
+- **Memory-efficient storage** with configurable size limits and statistics tracking
 
 ### Multi-Agent Architecture
 - **Strategic orchestration** through specialized agent roles

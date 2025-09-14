@@ -236,7 +236,7 @@ impl ToolRegistry {
             tools::WRITE_FILE.to_string(),
             tools::EDIT_FILE.to_string(),
             tools::BASH.to_string(),
-            "apply_patch".to_string(),
+            tools::APPLY_PATCH.to_string(),
         ];
 
         // Add AST-grep tool if available

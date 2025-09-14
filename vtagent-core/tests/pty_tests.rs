@@ -9,7 +9,7 @@ use vtagent_core::tools::ToolRegistry;
 async fn test_pty_basic_command() -> Result<()> {
     let temp_dir = TempDir::new()?;
     let workspace = temp_dir.path().to_path_buf();
-    let registry = ToolRegistry::new(workspace.clone());
+    let mut registry = ToolRegistry::new(workspace.clone());
 
     // Test a simple PTY command
     let args = json!({
@@ -29,7 +29,7 @@ async fn test_pty_basic_command() -> Result<()> {
 async fn test_pty_command_with_working_dir() -> Result<()> {
     let temp_dir = TempDir::new()?;
     let workspace = temp_dir.path().to_path_buf();
-    let registry = ToolRegistry::new(workspace.clone());
+    let mut registry = ToolRegistry::new(workspace.clone());
 
     // Create a test file
     std::fs::write(workspace.join("test.txt"), "Hello, PTY!")?;
@@ -52,7 +52,7 @@ async fn test_pty_command_with_working_dir() -> Result<()> {
 async fn test_pty_session_management() -> Result<()> {
     let temp_dir = TempDir::new()?;
     let workspace = temp_dir.path().to_path_buf();
-    let registry = ToolRegistry::new(workspace.clone());
+    let mut registry = ToolRegistry::new(workspace.clone());
 
     // Test creating a PTY session
     let args = json!({

@@ -4,7 +4,7 @@ use vtagent_core::tools::ToolRegistry;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let registry = ToolRegistry::new(PathBuf::from("."));
+    let mut registry = ToolRegistry::new(PathBuf::from("."));
 
     println!("Testing new Codex-inspired tools...\n");
 

@@ -19,6 +19,10 @@ pub struct MultiAgentSystemConfig {
     #[serde(default)]
     pub enabled: bool,
 
+    /// Execution mode for selecting single vs multi-agent
+    #[serde(default)]
+    pub execution_mode: ExecutionMode,
+
     /// Use single model for all agents when multi-agent is enabled (default: true)
     #[serde(default = "default_true")]
     pub use_single_model: bool,
@@ -48,6 +52,7 @@ impl Default for MultiAgentSystemConfig {
     fn default() -> Self {
         Self {
             enabled: true,
+            execution_mode: ExecutionMode::Single,
             use_single_model: default_true(),
             orchestrator_model: "gemini-2.5-flash-lite".to_string(),
             executor_model: String::new(),

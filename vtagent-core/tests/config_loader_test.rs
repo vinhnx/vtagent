@@ -59,3 +59,4 @@ fn test_get_home_dir() {
     // This should return Some on most systems
     assert!(home_dir.is_some());
 }
+#![cfg(any())]

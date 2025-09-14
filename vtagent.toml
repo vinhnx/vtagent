@@ -6,10 +6,20 @@
 provider = "gemini"
 # Default model for single-agent/multi-agent modes
 default_model = "gemini-2.5-flash-lite"
+# Environment variable for API key (important for proper key handling)
+api_key_env = "GEMINI_API_KEY"
 # Max conversation turns per session (prevents infinite loops)
 max_conversation_turns = 150
 # Reasoning effort for models that support it: "low" | "medium" | "high"
 reasoning_effort = "medium"
+# Prompt refinement settings (optimize GPT-5 prompts; can apply to all models)
+refine_prompts_enabled = true
+refine_prompts_max_passes = 1
+refine_prompts_model = ""
+# Enable a self-review refinement pass for final responses
+enable_self_review = false
+# Maximum number of self-review passes (only used if enable_self_review = true)
+max_review_passes = 1
 
 [security]
 # Enable human-in-the-loop mode (requires confirmation for destructive actions)
@@ -21,7 +31,7 @@ auto_apply_detected_patches = false
 
 [multi_agent]
 # Enable multi-agent mode (experimental feature)
-enabled = true
+enabled = false
 # Use single model for all agents when multi-agent is enabled (recommended for consistency)
 use_single_model = true
 # Main orchestrator agent model (used when multi-agent is enabled)
@@ -39,6 +49,10 @@ task_timeout_seconds = 300
 # Default tool policy for tools not explicitly listed below
 # Values: "allow" | "deny" | "prompt" (require confirmation)
 default_policy = "prompt"
+
+# Limit the number of inner tool-call loops per user turn (prevents infinite cycles)
+# Env override: VTAGENT_MAX_TOOL_LOOPS
+max_tool_loops = 100
 
 # Per-tool policy overrides (more specific takes precedence)
 [tools.policies]
@@ -171,3 +185,22 @@ default_cols = 80
 max_sessions = 10
 # Command timeout in seconds (prevents hanging commands)
 command_timeout_seconds = 300
+
+# Dynamic Router: choose model and engine based on task complexity
+[router]
+enabled = true
+heuristic_classification = true
+llm_router_model = ""
+# Switch to multi-agent at or above this complexity
+multi_agent_threshold = "complex" # one of: standard|complex|codegen_heavy|retrieval_heavy
+
+[router.models]
+simple = "gemini-2.5-flash-lite"
+standard = "gemini-2.5-flash"
+complex = "gemini-2.5-pro"
+codegen_heavy = "gemini-2.5-flash"
+retrieval_heavy = "gemini-2.5-flash"
+
+[telemetry]
+# Enable trajectory logging to logs/trajectory.jsonl
+trajectory_enabled = true

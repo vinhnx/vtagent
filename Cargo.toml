@@ -74,7 +74,12 @@ anstream = "0.6"
 anstyle-parse = "0.2"
 anstyle-ls = "1.0"
 anstyle-roff = "0.3"
+anstyle-git = "0.3"
 sysinfo = "0.37.0"
+
+[features]
+default = ["tool-chat"]
+tool-chat = []
 
 [profile.dev]
 split-debuginfo = "unpacked"

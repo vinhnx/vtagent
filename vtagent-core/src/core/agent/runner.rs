@@ -2,9 +2,11 @@
 
 use crate::config::constants::tools;
 use crate::config::loader::ConfigManager;
-use crate::config::models::ModelId;
+use crate::config::models::{ModelId, Provider as ModelProvider};
 use crate::core::agent::multi_agent::*;
 use crate::gemini::{Content, Part, Tool};
+use crate::llm::factory::create_provider_for_model;
+use crate::llm::provider as uni_provider;
 use crate::llm::provider::{FunctionDefinition, LLMRequest, Message, MessageRole, ToolDefinition};
 use crate::llm::{AnyClient, make_client};
 use crate::tools::{ToolRegistry, build_function_declarations};
@@ -22,6 +24,8 @@ pub struct AgentRunner {
     agent_type: AgentType,
     /// LLM client for this agent
     client: AnyClient,
+    /// Unified provider client (OpenAI/Anthropic/Gemini) for tool-calling
+    provider_client: Box<dyn uni_provider::LLMProvider>,
     /// Tool registry with restricted access
     tool_registry: ToolRegistry,
     /// System prompt content
@@ -32,11 +36,38 @@ pub struct AgentRunner {
     _workspace: PathBuf,
     /// Model identifier
     model: String,
+    /// API key (for provider client construction in future flows)
+    _api_key: String,
     /// Reasoning effort level for models that support it
     reasoning_effort: Option<String>,
 }
 
 impl AgentRunner {
+    fn print_compact_response(agent: AgentType, text: &str) {
+        use console::style;
+        const MAX_CHARS: usize = 1200;
+        const HEAD_CHARS: usize = 800;
+        const TAIL_CHARS: usize = 200;
+        let clean = text.trim();
+        if clean.chars().count() <= MAX_CHARS {
+            println!("{} [{}]: {}", style("[RESPONSE]").cyan().bold(), agent, clean);
+            return;
+        }
+        let mut out = String::new();
+        let mut count = 0;
+        for ch in clean.chars() {
+            if count >= HEAD_CHARS { break; }
+            out.push(ch); count += 1;
+        }
+        out.push_str("\n…\n");
+        // tail
+        let total = clean.chars().count();
+        let start_tail = total.saturating_sub(TAIL_CHARS);
+        let tail: String = clean.chars().skip(start_tail).collect();
+        out.push_str(&tail);
+        println!("{} [{}]: {}", style("[RESPONSE]").cyan().bold(), agent, out);
+        println!("{} truncated long response ({} chars).", style("[NOTE]").dim(), total);
+    }
     /// Create informative progress message based on operation type
     fn create_progress_message(&self, operation: &str, details: Option<&str>) -> String {
         match operation {
@@ -102,7 +133,11 @@ impl AgentRunner {
         reasoning_effort: Option<String>,
     ) -> Result<Self> {
         // Create client based on model
-        let client: AnyClient = make_client(api_key, model.clone());
+        let client: AnyClient = make_client(api_key.clone(), model.clone());
+
+        // Create unified provider client for tool calling
+        let provider_client = create_provider_for_model(model.as_str(), api_key.clone())
+            .map_err(|e| anyhow!("Failed to create provider client: {}", e))?;
 
         // Create system prompt based on agent type
         let system_prompt = match agent_type {
@@ -119,11 +154,13 @@ impl AgentRunner {
         Ok(Self {
             agent_type,
             client,
+            provider_client,
             tool_registry: ToolRegistry::new(workspace.clone()),
             system_prompt,
             _session_id: session_id,
             _workspace: workspace,
             model: model.as_str().to_string(),
+            _api_key: api_key,
             reasoning_effort,
         })
     }
@@ -201,8 +238,20 @@ impl AgentRunner {
         let mut warnings = Vec::new();
         let mut has_completed = false;
 
-        // Agent execution loop (max 10 turns to prevent infinite loops)
-        for turn in 0..10 {
+        // Determine max loops: env > config > default(6)
+        let cfg = ConfigManager::load()
+            .or_else(|_| ConfigManager::load_from_workspace("."))
+            .or_else(|_| ConfigManager::load_from_file("vtagent.toml"))
+            .map(|cm| cm.config().clone())
+            .unwrap_or_default();
+        let max_tool_loops = std::env::var("VTAGENT_MAX_TOOL_LOOPS")
+            .ok()
+            .and_then(|s| s.parse::<usize>().ok())
+            .filter(|&n| n > 0)
+            .unwrap_or_else(|| cfg.tools.max_tool_loops.max(1));
+
+        // Agent execution loop uses global tool loop guard
+        for turn in 0..max_tool_loops {
             if has_completed {
                 break;
             }
@@ -255,29 +304,207 @@ impl AgentRunner {
                 reasoning_effort: self.reasoning_effort.clone(),
             };
 
-            let response = self
-                .client
-                .generate(&serde_json::to_string(&request)?)
-                .await
-                .map_err(|e| {
-                    pb.finish_with_message(format!(
-                        "{} Failed",
-                        style("(ERROR)").red().bold().on_black()
-                    ));
-                    anyhow!(
-                        "Agent {} execution failed at turn {}: {}",
-                        self.agent_type,
-                        turn,
-                        e
-                    )
-                })?;
+            // Use provider-specific client for OpenAI/Anthropic (and generic support for others)
+            // Prepare for provider-specific vs Gemini handling
+            let mut response_opt: Option<crate::llm::types::LLMResponse> = None;
+            let provider_kind = self
+                .model
+                .parse::<ModelId>()
+                .map(|m| m.provider())
+                .unwrap_or(ModelProvider::Gemini);
 
-            // Update progress for successful response
-            pb.set_message(format!(
-                "{} {} received response, processing...",
-                self.agent_type,
-                style("(RECV)").green().bold()
-            ));
+            if matches!(provider_kind, ModelProvider::OpenAI | ModelProvider::Anthropic) {
+                let resp = self
+                    .provider_client
+                    .generate(request.clone())
+                    .await
+                    .map_err(|e| {
+                        pb.finish_with_message(format!(
+                            "{} Failed",
+                            style("(ERROR)").red().bold().on_black()
+                        ));
+                        anyhow!(
+                            "Agent {} execution failed at turn {}: {}",
+                            self.agent_type,
+                            turn,
+                            e
+                        )
+                    })?;
+
+                // Update progress for successful response
+                pb.set_message(format!(
+                    "{} {} received response, processing...",
+                    self.agent_type,
+                    style("(RECV)").green().bold()
+                ));
+
+                let mut had_tool_call = false;
+
+                if let Some(tool_calls) = resp.tool_calls.as_ref() {
+                    if !tool_calls.is_empty() {
+                        had_tool_call = true;
+                        for call in tool_calls {
+                            let name = call.function.name.as_str();
+                            println!(
+                                "{} [{}] Calling tool: {}",
+                                style("[TOOL_CALL]").blue().bold(),
+                                self.agent_type,
+                                name
+                            );
+                            let args = call
+                                .parsed_arguments()
+                                .unwrap_or_else(|_| serde_json::json!({}));
+                            match self.execute_tool(name, &args).await {
+                                Ok(result) => {
+                                    pb.set_message(format!(
+                                        "{} {} tool executed successfully",
+                                        style("(OK)").green(),
+                                        name
+                                    ));
+                                    let tool_result = serde_json::to_string(&result)?;
+                                    conversation.push(Content {
+                                        role: "user".to_string(),
+                                        parts: vec![Part::Text {
+                                            text: format!(
+                                                "Tool {} result: {}",
+                                                name, tool_result
+                                            ),
+                                        }],
+                                    });
+                                    executed_commands.push(name.to_string());
+                                    if name == tools::WRITE_FILE {
+                                        if let Some(filepath) = args.get("path").and_then(|p| p.as_str()) {
+                                            modified_files.push(filepath.to_string());
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    pb.set_message(format!(
+                                        "{} {} tool failed: {}",
+                                        style("(ERR)").red(),
+                                        name,
+                                        e
+                                    ));
+                                    warnings.push(format!("Tool {} failed: {}", name, e));
+                                    conversation.push(Content {
+                                        role: "user".to_string(),
+                                        parts: vec![Part::Text {
+                                            text: format!("Tool {} failed: {}", name, e),
+                                        }],
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // If no tool calls, treat as regular content
+                let response_text = resp.content.clone().unwrap_or_default();
+                if !had_tool_call {
+                    if !response_text.trim().is_empty() {
+                        Self::print_compact_response(self.agent_type, &response_text);
+                        conversation.push(Content {
+                            role: "model".to_string(),
+                            parts: vec![Part::Text { text: response_text.clone() }],
+                        });
+                    }
+                }
+
+                // Completion detection
+                if !has_completed {
+                    let response_lower = response_text.to_lowercase();
+                    let completion_indicators = [
+                        "task completed",
+                        "task done",
+                        "finished",
+                        "complete",
+                        "summary",
+                        "i have successfully",
+                        "i've completed",
+                        "i have finished",
+                        "task accomplished",
+                        "mission accomplished",
+                        "objective achieved",
+                        "work is done",
+                        "all done",
+                        "completed successfully",
+                        "task execution complete",
+                        "operation finished",
+                    ];
+                    let is_completed = completion_indicators
+                        .iter()
+                        .any(|&indicator| response_lower.contains(indicator));
+                    let has_explicit_completion = response_lower.contains("the task is complete")
+                        || response_lower.contains("task has been completed")
+                        || response_lower.contains("i am done")
+                        || response_lower.contains("that's all")
+                        || response_lower.contains("no more actions needed");
+                    if is_completed || has_explicit_completion {
+                        has_completed = true;
+                        pb.set_message(format!(
+                            "{} {} completed task successfully",
+                            self.agent_type,
+                            style("(SUCCESS)").green().bold()
+                        ));
+                    }
+                }
+
+                let should_continue = had_tool_call || (!has_completed && turn < 9);
+                if !should_continue {
+                    if has_completed {
+                        pb.set_message(format!(
+                            "{} {} finished - task completed",
+                            self.agent_type,
+                            style("(SUCCESS)").green().bold()
+                        ));
+                    } else if turn >= 9 {
+                        pb.set_message(format!(
+                            "{} {} finished - maximum turns reached",
+                            self.agent_type,
+                            style("(TIME)").yellow().bold()
+                        ));
+                    } else {
+                        pb.set_message(format!(
+                            "{} {} finished",
+                            self.agent_type,
+                            style("(FINISH)").blue().bold()
+                        ));
+                    }
+                    break;
+                }
+
+                // Continue loop for tool results
+                continue;
+            } else {
+                // Gemini path (existing flow)
+                let response = self
+                    .client
+                    .generate(&serde_json::to_string(&request)?)
+                    .await
+                    .map_err(|e| {
+                        pb.finish_with_message(format!(
+                            "{} Failed",
+                            style("(ERROR)").red().bold().on_black()
+                        ));
+                        anyhow!(
+                            "Agent {} execution failed at turn {}: {}",
+                            self.agent_type,
+                            turn,
+                            e
+                        )
+                    })?;
+                response_opt = Some(response);
+            }
+
+            // For Gemini path: use original response handling
+            let response = response_opt.expect("response should be set for Gemini path");
+
+                // Update progress for successful response
+                pb.set_message(format!(
+                    "{} {} received response, processing...",
+                    self.agent_type,
+                    style("(RECV)").green().bold()
+                ));
 
             // Use response content directly
             if !response.content.is_empty() {
@@ -593,12 +820,7 @@ impl AgentRunner {
                         }
                     } else {
                         // Regular content response
-                        println!(
-                            "{} [{}]: {}",
-                            style("[RESPONSE]").cyan().bold(),
-                            self.agent_type,
-                            response.content.trim()
-                        );
+                        Self::print_compact_response(self.agent_type, response.content.trim());
                         conversation.push(Content {
                             role: "model".to_string(),
                             parts: vec![Part::Text {
@@ -608,12 +830,7 @@ impl AgentRunner {
                     }
                 } else {
                     // Regular text response
-                    println!(
-                        "{} [{}]: {}",
-                        style("[RESPONSE]").cyan().bold(),
-                        self.agent_type,
-                        response.content.trim()
-                    );
+                    Self::print_compact_response(self.agent_type, response.content.trim());
                     conversation.push(Content {
                         role: "model".to_string(),
                         parts: vec![Part::Text {

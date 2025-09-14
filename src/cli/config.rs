@@ -51,7 +51,7 @@ fn generate_default_config() -> String {
     let config = if Path::new("vtagent.toml").exists() {
         // Load existing config to preserve user customizations
         match ConfigManager::load_from_file("vtagent.toml") {
-            Ok(config_manager) => config_manager.config,
+            Ok(config_manager) => config_manager.config().clone(),
             Err(_) => VTAgentConfig::default(), // Fall back to defaults if loading fails
         }
     } else {

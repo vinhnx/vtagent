@@ -11,6 +11,8 @@ pub mod defaults;
 pub mod loader;
 pub mod models;
 pub mod multi_agent;
+pub mod router;
+pub mod telemetry;
 pub mod types;
 
 // Re-export main types for backward compatibility
@@ -20,6 +22,8 @@ pub use defaults::{
 };
 pub use loader::{ConfigManager, VTAgentConfig};
 pub use multi_agent::{ExecutionMode, MultiAgentSystemConfig};
+pub use router::{RouterConfig, ComplexityModelMap, ResourceBudget};
+pub use telemetry::TelemetryConfig;
 
 use serde::{Deserialize, Serialize};
 

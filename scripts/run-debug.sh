@@ -8,15 +8,28 @@ set -e
 echo "VTAGENT - Debug Mode (Fast Build)"
 echo "=================================="
 
-# Check if API key is set
-if [[ -z "$GEMINI_API_KEY" && -z "$GOOGLE_API_KEY" ]]; then
+# Load .env for local development if present
+if [[ -f ".env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source ./.env
+  set +a
+fi
+
+# Check if API key is set for any supported provider
+if [[ -z "$GEMINI_API_KEY" && -z "$GOOGLE_API_KEY" && -z "$OPENAI_API_KEY" && -z "$ANTHROPIC_API_KEY" ]]; then
     echo "Error: API key not found!"
     echo ""
-    echo "Please set one of these environment variables:"
-    echo "  export GEMINI_API_KEY='your_gemini_api_key_here'"
-    echo "  export GOOGLE_API_KEY='your_google_api_key_here'"
+    echo "Set one of these environment variables:"
+    echo "  export GEMINI_API_KEY='your_gemini_api_key_here'     # Google Gemini"
+    echo "  export GOOGLE_API_KEY='your_google_api_key_here'     # Google Gemini (alias)"
+    echo "  export OPENAI_API_KEY='your_openai_api_key_here'     # OpenAI GPT"
+    echo "  export ANTHROPIC_API_KEY='your_anthropic_api_key'    # Anthropic Claude"
     echo ""
-    echo "Get your API key from: https://aistudio.google.com/app/apikey"
+    echo "Docs:"
+    echo "  Gemini:   https://aistudio.google.com/app/apikey"
+    echo "  OpenAI:   https://platform.openai.com/api-keys"
+    echo "  Anthropic:https://console.anthropic.com/"
     exit 1
 fi
 
@@ -41,5 +54,17 @@ echo "  - Press Ctrl+C to exit"
 echo "  - The agent has access to file operations and coding tools"
 echo ""
 
+# Build optional args from environment
+EXTRA_ARGS=()
+if [[ -n "$MODEL" ]]; then
+  EXTRA_ARGS+=(--model "$MODEL")
+fi
+if [[ -n "$PROVIDER" ]]; then
+  EXTRA_ARGS+=(--provider "$PROVIDER")
+fi
+if [[ -n "$WORKSPACE" ]]; then
+  EXTRA_ARGS+=(--workspace "$WORKSPACE")
+fi
+
 # Run with advanced features enabled by default
-cargo run --  --show-file-diffs --debug chat
+cargo run --  "${EXTRA_ARGS[@]}" --show-file-diffs --debug chat

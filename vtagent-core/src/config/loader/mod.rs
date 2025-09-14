@@ -1,6 +1,8 @@
 use crate::config::PtyConfig;
 use crate::config::core::{AgentConfig, CommandsConfig, SecurityConfig, ToolsConfig};
 use crate::config::multi_agent::MultiAgentSystemConfig;
+use crate::config::telemetry::TelemetryConfig;
+use crate::config::router::RouterConfig;
 use crate::project::SimpleProjectManager;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -33,6 +35,14 @@ pub struct VTAgentConfig {
     /// Multi-agent system configuration
     #[serde(default)]
     pub multi_agent: MultiAgentSystemConfig,
+
+    /// Router configuration (dynamic model + engine selection)
+    #[serde(default)]
+    pub router: RouterConfig,
+
+    /// Telemetry configuration (logging, trajectory)
+    #[serde(default)]
+    pub telemetry: TelemetryConfig,
 }
 
 impl Default for VTAgentConfig {
@@ -44,6 +54,8 @@ impl Default for VTAgentConfig {
             security: SecurityConfig::default(),
             pty: PtyConfig::default(),
             multi_agent: MultiAgentSystemConfig::default(),
+            router: RouterConfig::default(),
+            telemetry: TelemetryConfig::default(),
         }
     }
 }

@@ -37,7 +37,7 @@ mod integration_tests {
             "path": "."
         });
 
-        let result = registry.execute("list_files", args).await;
+        let result = registry.execute_tool("list_files", args).await;
         assert!(result.is_ok());
 
         let response: serde_json::Value = result.unwrap();
@@ -59,7 +59,7 @@ mod integration_tests {
             "path": "read_test.txt"
         });
 
-        let result = registry.execute("read_file", args).await;
+        let result = registry.execute_tool("read_file", args).await;
         assert!(result.is_ok());
 
         let response: serde_json::Value = result.unwrap();
@@ -80,7 +80,7 @@ mod integration_tests {
             "create_dirs": false
         });
 
-        let result = registry.execute("write_file", args).await;
+        let result = registry.execute_tool("write_file", args).await;
         assert!(result.is_ok());
 
         let _response: serde_json::Value = result.unwrap();
@@ -117,7 +117,7 @@ fn calculate_sum(a: i32, b: i32) -> i32 {
             "type": "regex"
         });
 
-        let result = registry.execute("rp_search", args).await;
+        let result = registry.execute_tool("rp_search", args).await;
         assert!(result.is_ok());
 
         let response: serde_json::Value = result.unwrap();

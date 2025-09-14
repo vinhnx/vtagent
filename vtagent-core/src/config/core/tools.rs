@@ -11,6 +11,16 @@ pub struct ToolsConfig {
     /// Specific tool policies
     #[serde(default)]
     pub policies: IndexMap<String, ToolPolicy>,
+
+    /// Maximum inner tool-call loops per user turn
+    ///
+    /// Prevents infinite tool-calling cycles in interactive chat. This limits how
+    /// many back-and-forths the agent will perform executing tools and
+    /// re-asking the model before returning a final answer.
+    ///
+    /// Can be overridden by env var `VTAGENT_MAX_TOOL_LOOPS`.
+    #[serde(default = "default_max_tool_loops")]
+    pub max_tool_loops: usize,
 }
 
 impl Default for ToolsConfig {
@@ -18,6 +28,7 @@ impl Default for ToolsConfig {
         Self {
             default_policy: default_tool_policy(),
             policies: IndexMap::new(),
+            max_tool_loops: default_max_tool_loops(),
         }
     }
 }
@@ -36,4 +47,8 @@ pub enum ToolPolicy {
 
 fn default_tool_policy() -> ToolPolicy {
     ToolPolicy::Prompt
+}
+
+fn default_max_tool_loops() -> usize {
+    6
 }

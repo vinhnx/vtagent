@@ -1,7 +1,6 @@
 use anyhow::Result;
 use console::style;
-use vtagent_core::types::AgentConfig as CoreAgentConfig;
-use vtagent_core::tree_sitter::{TreeSitterAnalyzer, LanguageSupport};
+use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
 use std::path::Path;
 use walkdir::WalkDir;
 
@@ -50,14 +49,7 @@ async fn analyze_workspace(workspace_path: &Path) -> Result<()> {
         println!("    {}: {} files", lang, count);
     }
     
-    // Analyze code quality with tree-sitter
-    if let Ok(analyzer) = TreeSitterAnalyzer::new() {
-        println!("Analyzing code structure...");
-        
-        // This would be expanded to do more detailed analysis
-        // For now, we'll just show that the analyzer is working
-        println!("  Tree-sitter analyzer initialized successfully");
-    }
+    // Placeholder for deeper analysis (tree-sitter integration lives in core)
     
     println!("Workspace analysis complete!");
     

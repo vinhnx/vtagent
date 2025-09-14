@@ -28,6 +28,8 @@ VTAgent is a Rust-based terminal coding agent with modular architecture supporti
 - **Configuration Flexibility**: Comprehensive TOML configuration for all aspects
 - **Multi-Agent Coordination**: Strategic task delegation and verification workflows
 - **Performance Monitoring**: Real-time metrics and benchmarking capabilities
+- **Router & Budgets**: Config-driven routing with per-class budgets
+- **Trajectory Logging**: JSONL logs for route decisions and tool calls
 - **Research-Preview Features**: Advanced context compression and conversation summarization
 
 ## Quick Start
@@ -71,6 +73,59 @@ export GEMINI_API_KEY=your_api_key_here
 # Or run specific commands
 cargo run -- chat
 ```
+
+## Router & Budgets
+
+Configure dynamic routing and per-class budgets in `vtagent.toml`:
+
+```
+[router]
+enabled = true
+heuristic_classification = true
+llm_router_model = "gemini-2.5-flash-lite" # optional LLM router
+multi_agent_threshold = "complex"          # standard|complex|codegen_heavy|retrieval_heavy
+
+[router.models]
+simple = "gemini-2.5-flash-lite"
+standard = "gemini-2.5-flash"
+complex = "gemini-2.5-pro"
+codegen_heavy = "gemini-2.5-flash"
+retrieval_heavy = "gemini-2.5-flash"
+
+[router.budgets.standard]
+max_tokens = 2000
+max_parallel_tools = 4
+```
+
+**Usage Notes:**
+- Enable LLM routing by setting `[router] llm_router_model = "<model-id>"`
+- Tune budgets by adding `[router.budgets.<class>]` with max_tokens and max_parallel_tools
+- Budgets apply to both provider-agnostic and Gemini-native request paths
+
+## Trajectory Logging
+
+Control logging via:
+
+```
+[telemetry]
+trajectory_enabled = true
+```
+
+**Usage Notes:**
+- Logs for trajectory: check `logs/trajectory.jsonl`
+- Inspect with: `vtagent trajectory --top 10` (pretty summary)
+- Gate trajectory logging behind config flag: set `trajectory_enabled = false` to disable
+
+## Usage Notes
+
+### LLM Routing
+To enable LLM routing: set `[router] llm_router_model = "<model-id>"`.
+
+### Budget Tuning
+To tune budgets: add `[router.budgets.<class>]` with max_tokens and max_parallel_tools.
+
+### Trajectory Logs
+Logs for trajectory: check `logs/trajectory.jsonl`.
 
 ## Available Models & Providers
 
@@ -560,3 +615,17 @@ VTAgent is an open-source project. Contributions are welcome! Please see our [co
 ## License
 
 Licensed under the MIT License. See [LICENSE](LICENSE) for details.
+### Tool Loop Guard
+
+- **Config key**: `[tools].max_tool_loops`
+- **Purpose**: Prevents infinite tool-calling cycles by limiting how many tool→respond iterations the agent performs per user turn.
+- **Default**: `6`
+- **Env override**: `VTAGENT_MAX_TOOL_LOOPS`
+
+Example:
+
+```toml
+[tools]
+default_policy = "prompt"
+max_tool_loops = 4  # override with VTAGENT_MAX_TOOL_LOOPS
+```

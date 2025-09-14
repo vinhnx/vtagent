@@ -98,6 +98,17 @@ Deploying VTAgent in production? Focus on enterprise features:
 
 ## Usage Patterns
 
+### Usage Notes
+
+**LLM Routing:**
+To enable LLM routing: set `[router] llm_router_model = "<model-id>"`.
+
+**Budget Tuning:**
+To tune budgets: add `[router.budgets.<class>]` with max_tokens and max_parallel_tools.
+
+**Trajectory Logs:**
+Logs for trajectory: check `logs/trajectory.jsonl`.
+
 ### Multi-Agent Workflows
 
 ```bash
@@ -151,7 +162,7 @@ VTAgent includes comprehensive testing infrastructure:
 
 ### Test Categories
 
-- **Unit Tests** - Component-level testing with `cargo test`
+- **Unit Tests** - Component-level testing with `cargo nextest run`
 - **Integration Tests** - End-to-end workflow validation
 - **Performance Tests** - Benchmarking with `cargo bench`
 - **Configuration Tests** - TOML validation and policy testing
@@ -160,7 +171,7 @@ VTAgent includes comprehensive testing infrastructure:
 
 ```bash
 # Run full test suite
-cargo test
+cargo nextest run --workspace
 
 # Run with coverage
 cargo tarpaulin

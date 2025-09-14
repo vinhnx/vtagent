@@ -7,4 +7,6 @@ pub mod orchestrator_retry;
 pub mod performance_monitor;
 pub mod performance_profiler;
 pub mod prompt_caching;
+pub mod router;
 pub mod timeout_detector;
+pub mod trajectory;

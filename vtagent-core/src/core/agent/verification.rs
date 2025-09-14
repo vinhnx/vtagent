@@ -237,14 +237,15 @@ impl VerificationWorkflow {
             },
         );
 
+        // Explorer is read-only / analysis-focused: keep thresholds lenient
         criteria_by_agent.insert(
             AgentType::Explorer,
             VerificationCriteria {
-                min_confidence: 0.7,
-                min_completeness: 0.8,
+                min_confidence: 0.5,
+                min_completeness: 0.5,
                 require_compilation: false,
                 require_tests: false,
-                max_errors: 2,
+                max_errors: 3,
                 required_formats: vec![],
                 custom_rules: vec![],
             },

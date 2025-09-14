@@ -122,7 +122,7 @@ Execute build, test, and development commands.
 {
   "tool_name": "run_command",
   "parameters": {
-    "command": "cargo test --verbose",
+    "command": "cargo nextest run --verbose",
     "working_dir": "/project/root",
     "timeout": 60
   }

@@ -6,7 +6,7 @@
 - **AST-based Code Operations**: ast_grep_search, ast_grep_transform, ast_grep_lint, ast_grep_refactor (syntax-aware code search, transformation, and analysis)
 - **Advanced File Operations**: batch_file_operations, extract_dependencies
 - **Code Quality**: code analysis, linting, formatting
-- **Build & Test**: cargo check, cargo build, cargo test
+- **Build & Test**: cargo check, cargo build, cargo nextest run
 - **Git Operations**: git status, git diff, git log
 - **Terminal Access**: run_terminal_cmd for basic shell operations
 - **PTY Access**: run_pty_cmd, run_pty_cmd_streaming for full terminal emulation (use for interactive commands, shells, REPLs, SSH sessions, etc.)

@@ -344,7 +344,7 @@ impl ToolRegistry {
 
         // Handle execution errors with detailed error information
         match result {
-            Ok(value) => Ok(value),
+            Ok(value) => Ok(Self::normalize_tool_output(value, name)),
             Err(e) => {
                 let error_type = self.classify_error(&e, name);
                 let error = ToolExecutionError::with_original_error(
@@ -356,6 +356,28 @@ impl ToolRegistry {
                 Ok(error.to_json_value())
             }
         }
+    }
+
+    /// Normalize tool outputs for consistent rendering in the CLI
+    fn normalize_tool_output(mut val: Value, _name: &str) -> Value {
+        if !val.is_object() {
+            return json!({ "success": true, "result": val });
+        }
+        let obj = val.as_object_mut().unwrap();
+        // Success defaults to true unless explicitly false
+        obj.entry("success").or_insert(json!(true));
+        // Map common 'output' field to stdout when stdout missing
+        if !obj.contains_key("stdout") {
+            if let Some(output) = obj.get("output").and_then(|v| v.as_str()) {
+                obj.insert("stdout".into(), json!(output.trim_end()));
+            }
+        } else if let Some(stdout) = obj.get_mut("stdout") {
+            if let Some(s) = stdout.as_str() { *stdout = json!(s.trim_end()); }
+        }
+        if let Some(stderr) = obj.get_mut("stderr") {
+            if let Some(s) = stderr.as_str() { *stderr = json!(s.trim_end()); }
+        }
+        val
     }
 
     async fn execute_apply_patch(&self, args: Value) -> Result<Value> {

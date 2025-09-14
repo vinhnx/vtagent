@@ -5,7 +5,7 @@ use vtagent_core::tools::ToolRegistry;
 
 #[tokio::test]
 async fn test_pty_functionality() {
-    let registry = ToolRegistry::new(PathBuf::from("."));
+    let mut registry = ToolRegistry::new(PathBuf::from("."));
 
     // Test a simple echo command
     let result = registry
@@ -28,7 +28,7 @@ async fn test_pty_functionality() {
 
 #[tokio::test]
 async fn test_pty_functionality_with_exit_code() {
-    let registry = ToolRegistry::new(PathBuf::from("."));
+    let mut registry = ToolRegistry::new(PathBuf::from("."));
 
     // Test a command that exits with code 1
     let result = registry

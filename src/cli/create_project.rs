@@ -1,7 +1,7 @@
 use anyhow::Result;
 use console::style;
 use itertools::Itertools;
-use vtagent_core::types::AgentConfig as CoreAgentConfig;
+use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
 use std::fs;
 use std::path::Path;
 
@@ -36,18 +36,11 @@ fn create_project_structure(project_path: &Path, features: &[String]) -> Result<
     let src_path = project_path.join("src");
     fs::create_dir_all(&src_path)?;
 
-    // Create main file based on features
-    let main_content = if features.contains(&"cli".to_string()) {
-        r#"fn main() {
+    // Create main file (simple template; extend later for feature-specific scaffolds)
+    let main_content = r#"fn main() {
     println!("Hello, world!");
 }
-"#
-    } else {
-        r#"fn main() {
-    println!("Hello, world!");
-}
-"#
-    };
+"#;
 
     fs::write(src_path.join("main.rs"), main_content)?;
 

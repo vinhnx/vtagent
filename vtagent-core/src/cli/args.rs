@@ -60,6 +60,12 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub force_multi_agent: bool,
 
+    /// Force single-agent mode even if multi-agent is enabled in config
+    ///
+    /// Use this to get a compact single-agent chat regardless of config.
+    #[arg(long, global = true)]
+    pub single_agent: bool,
+
     /// **Agent type** when using multi-agent mode
     ///
     /// Options:
@@ -237,6 +243,30 @@ pub enum Commands {
 
     /// **Display performance metrics** and system status\n\n**Shows:**\n• Token usage and API costs\n• Response times and latency\n• Tool execution statistics\n• Memory usage patterns\n• Agent performance (in multi-agent mode)\n\n**Usage:** vtagent performance
     Performance,
+
+    /// Pretty-print trajectory logs and show basic analytics
+    ///
+    /// Sources:
+    ///   • logs/trajectory.jsonl (default)
+    /// Options:
+    ///   • --file to specify an alternate path
+    ///   • --top to limit report rows (default: 10)
+    ///
+    /// Shows:
+    ///   • Class distribution with percentages
+    ///   • Model usage statistics
+    ///   • Tool success rates with status indicators
+    ///   • Multi-agent usage statistics
+    ///   • Time range of logged activity
+    #[command(name = "trajectory")]
+    Trajectory {
+        /// Optional path to trajectory JSONL file
+        #[arg(long)]
+        file: Option<std::path::PathBuf>,
+        /// Number of top entries to show for each section
+        #[arg(long, default_value_t = 10)]
+        top: usize,
+    },
 
     /// **Benchmark against SWE-bench evaluation framework**
     ///
@@ -585,6 +615,7 @@ impl Default for Cli {
             api_key_env: "GEMINI_API_KEY".to_string(),
             workspace: None,
             force_multi_agent: false,
+            single_agent: false,
             agent_type: "single".to_string(),
             enable_tree_sitter: false,
             performance_monitoring: false,

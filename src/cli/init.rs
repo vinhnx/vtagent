@@ -1,7 +1,6 @@
 use anyhow::Result;
 use console::style;
 use std::path::Path;
-use std::process::Command;
 
 /// Handle the init command
 pub async fn handle_init_command(workspace: &Path, force: bool, run: bool) -> Result<()> {

@@ -34,6 +34,8 @@ pub struct MultiAgentSystem {
     session: SessionManager,
     /// Reasoning effort level for agents
     reasoning_effort: Option<String>,
+    /// Verbose logging flag (gates console banners)
+    verbose: bool,
 }
 
 /// Individual subagent instance
@@ -169,6 +171,7 @@ impl MultiAgentSystem {
         api_key: String,
         workspace: std::path::PathBuf,
         reasoning_effort: Option<String>,
+        verbose: bool,
     ) -> Result<Self> {
         // Generate unique session ID
         let session_id = format!(
@@ -179,10 +182,12 @@ impl MultiAgentSystem {
                 .as_secs()
         );
 
-        eprintln!(
-            "Initializing multi-agent system with session ID: {}",
-            session_id
-        );
+        if verbose {
+            eprintln!(
+                "Initializing multi-agent system with session ID: {}",
+                session_id
+            );
+        }
 
         // Create orchestrator client
         let (orchestrator_model, subagent_model) = if config.use_single_model {
@@ -291,17 +296,19 @@ impl MultiAgentSystem {
             stats: SessionStatistics::default(),
         };
 
-        eprintln!("Multi-agent system initialized successfully");
-        eprintln!("- Orchestrator: {} model", orchestrator_model);
-        eprintln!("- Subagents: {} model", subagent_model);
-        eprintln!(
-            "- Coder agents: {}",
-            subagents.get(&AgentType::Coder).map_or(0, |v| v.len())
-        );
-        eprintln!(
-            "- Explorer agents: {}",
-            subagents.get(&AgentType::Explorer).map_or(0, |v| v.len())
-        );
+        if verbose {
+            eprintln!("Multi-agent system initialized successfully");
+            eprintln!("- Orchestrator: {} model", orchestrator_model);
+            eprintln!("- Subagents: {} model", subagent_model);
+            eprintln!(
+                "- Coder agents: {}",
+                subagents.get(&AgentType::Coder).map_or(0, |v| v.len())
+            );
+            eprintln!(
+                "- Explorer agents: {}",
+                subagents.get(&AgentType::Explorer).map_or(0, |v| v.len())
+            );
+        }
 
         Ok(Self {
             orchestrator,
@@ -311,6 +318,7 @@ impl MultiAgentSystem {
             config: convert_to_multi_agent_config(&config),
             session,
             reasoning_effort,
+            verbose,
         })
     }
 
@@ -322,18 +330,12 @@ impl MultiAgentSystem {
         required_agent_type: AgentType,
     ) -> Result<OptimizedTaskResult> {
         let start_time = Instant::now();
-        let task_id = format!(
-            "task_{}",
-            SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos()
-        );
-
-        eprintln!(
-            "Starting optimized task execution: {} ({})",
-            task_title, task_id
-        );
+        if self.verbose {
+            eprintln!(
+                "Starting optimized task execution: {}",
+                task_title
+            );
+        }
 
         // Create task
         let task_id_result = self.orchestrator.create_task(
@@ -344,6 +346,9 @@ impl MultiAgentSystem {
             vec![], // Context bootstrap
             crate::core::agent::multi_agent::TaskPriority::Normal,
         )?;
+
+        // Use orchestrator-generated task id for all tracking
+        let task_id = task_id_result.clone();
 
         // Record task start in performance monitor
         let perf_start = Instant::now();
@@ -826,7 +831,9 @@ impl MultiAgentSystem {
 
     /// Shutdown the multi-agent system gracefully
     pub async fn shutdown(&mut self) -> Result<()> {
-        eprintln!("Shutting down multi-agent system...");
+        if self.verbose {
+            eprintln!("Shutting down multi-agent system...");
+        }
 
         // Wait for active tasks to complete or timeout
         let timeout = Duration::from_secs(30);
@@ -837,28 +844,32 @@ impl MultiAgentSystem {
             if active_tasks.is_empty() {
                 break;
             }
-            eprintln!(
-                "Waiting for {} active tasks to complete...",
-                active_tasks.len()
-            );
+            if self.verbose {
+                eprintln!(
+                    "Waiting for {} active tasks to complete...",
+                    active_tasks.len()
+                );
+            }
             drop(active_tasks);
             tokio::time::sleep(Duration::from_secs(1)).await;
         }
 
         // Generate final performance report
         let report = self.performance.generate_report().await;
-        eprintln!("Final performance report:");
-        eprintln!("- Total tasks: {}", report.summary.total_tasks);
-        eprintln!(
-            "- Success rate: {:.2}%",
-            report.summary.overall_success_rate * 100.0
-        );
-        eprintln!(
-            "- Average response time: {:?}",
-            report.summary.avg_response_time
-        );
+        if self.verbose {
+            eprintln!("Final performance report:");
+            eprintln!("- Total tasks: {}", report.summary.total_tasks);
+            eprintln!(
+                "- Success rate: {:.2}%",
+                report.summary.overall_success_rate * 100.0
+            );
+            eprintln!(
+                "- Average response time: {:?}",
+                report.summary.avg_response_time
+            );
 
-        eprintln!("Multi-agent system shutdown complete");
+            eprintln!("Multi-agent system shutdown complete");
+        }
         Ok(())
     }
 }

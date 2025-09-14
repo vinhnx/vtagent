@@ -444,7 +444,7 @@ Choose validation approach based on approval mode:
 ### Validation Commands
 
 Common validation commands to consider:
-- **Rust**: `cargo check`, `cargo test`, `cargo clippy`, `cargo fmt`
+- **Rust**: `cargo check`, `cargo nextest run`, `cargo clippy`, `cargo fmt`
 - **Python**: `pytest`, `ruff check`, `ruff format`, `mypy`
 - **JavaScript/TypeScript**: `npm test`, `eslint`, `prettier`
 - **General**: Build commands, integration tests, deployment checks

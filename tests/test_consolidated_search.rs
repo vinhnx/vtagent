@@ -10,7 +10,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Testing consolidated rp_search functionality...");
 
     let root = PathBuf::from(".");
-    let registry = ToolRegistry::new(root).await?;
+    let mut registry = ToolRegistry::new(root);
 
     // Test 1: Basic exact search
     println!("\n1. Testing exact search mode:");

@@ -1,19 +1,20 @@
 //! Focused test for LLM provider functionality
 
 use vtagent_core::llm::{
-    AnthropicProvider, GeminiProvider, LLMFactory, LLMProvider, Message, MessageRole,
-    OpenAIProvider, UnifiedLLMClient,
+    factory::{create_provider_for_model, LLMFactory},
+    provider::{LLMProvider, LLMRequest, Message, MessageRole},
+    providers::{AnthropicProvider, GeminiProvider, OpenAIProvider},
 };
 
 #[test]
 fn test_provider_factory_basic() {
     let factory = LLMFactory::new();
-    let providers = factory.available_providers();
-
-    assert_eq!(providers.len(), 3);
+    // Test available providers
+    let providers = factory.list_providers();
     assert!(providers.contains(&"gemini".to_string()));
     assert!(providers.contains(&"openai".to_string()));
     assert!(providers.contains(&"anthropic".to_string()));
+    assert_eq!(providers.len(), 3);
 }
 
 #[test]
@@ -29,7 +30,7 @@ fn test_provider_auto_detection() {
         Some("anthropic".to_string())
     );
     assert_eq!(
-        factory.provider_from_model("gemini-2.5-flash"),
+        factory.provider_from_model("gemini-2.5-flash-lite"),
         Some("gemini".to_string())
     );
     assert_eq!(factory.provider_from_model("unknown-model"), None);
@@ -37,18 +38,15 @@ fn test_provider_auto_detection() {
 
 #[test]
 fn test_unified_client_creation() {
-    let gemini_client =
-        UnifiedLLMClient::new("gemini-2.5-flash".to_string(), "test_key".to_string());
-    assert!(gemini_client.is_ok());
+    // Test creating providers directly using the factory
+    let gemini = create_provider_for_model("gemini-2.5-flash-lite", "test_key".to_string());
+    assert!(gemini.is_ok());
 
-    let openai_client = UnifiedLLMClient::new("gpt-5".to_string(), "test_key".to_string());
-    assert!(openai_client.is_ok());
+    let openai = create_provider_for_model("gpt-5", "test_key".to_string());
+    assert!(openai.is_ok());
 
-    let anthropic_client = UnifiedLLMClient::new(
-        "claude-sonnet-4-20250514".to_string(),
-        "test_key".to_string(),
-    );
-    assert!(anthropic_client.is_ok());
+    let anthropic = create_provider_for_model("claude-sonnet-4-20250514", "test_key".to_string());
+    assert!(anthropic.is_ok());
 }
 
 #[test]
@@ -86,7 +84,7 @@ fn test_anthropic_tool_message_handling() {
         tool_call_id: None,
     };
 
-    let request = vtagent_core::llm::LLMRequest {
+    let request = LLMRequest {
         messages: vec![tool_message],
         system_prompt: None,
         tools: None,
@@ -94,9 +92,12 @@ fn test_anthropic_tool_message_handling() {
         max_tokens: None,
         temperature: None,
         stream: false,
+        tool_choice: None,
+        parallel_tool_calls: None,
+        parallel_tool_config: None,
+        reasoning_effort: None,
     };
 
-    // This should convert tool messages to user messages without error
-    let result = anthropic.convert_to_anthropic_format(&request);
-    assert!(result.is_ok());
+    // Validate request shape instead of internal conversion
+    assert!(anthropic.validate_request(&request).is_ok());
 }

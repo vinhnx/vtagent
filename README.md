@@ -1,8 +1,8 @@
-# VTAgent - minimal coding agent
+# VTAgent - Coding Agent
 
 [![tool-eval](https://github.com/vinhnx/vtagent/actions/workflows/tool-eval.yml/badge.svg)](https://github.com/vinhnx/vtagent/actions/workflows/tool-eval.yml)
 
-VTAgent is a Rust-based terminal coding agent with modular architecture supporting multiple LLM providers (Gemini, OpenAI, Anthropic) and tree-sitter parsers for 6+ languages. It provides a reliable, context-aware coding experience through intelligent tool integration and sophisticated prompt engineering.
+VTAgent is a Rust-based terminal coding agent with modular architecture supporting multiple LLM providers (Gemini, OpenAI, Anthropic, DeepSeek) and tree-sitter parsers for 6+ languages. It provides a reliable, context-aware coding experience through intelligent tool integration and sophisticated prompt engineering.
 
 <div align="center">
   <img src="screenshots/vtagent.png" alt="VTAgent screenshot" width="800">
@@ -13,7 +13,7 @@ VTAgent is a Rust-based terminal coding agent with modular architecture supporti
 ### Core Capabilities
 
 - **Multi-Agent Architecture**: Orchestrator, Explorer, and Coder agents for specialized tasks
-- **Multiple LLM Providers**: Gemini, OpenAI, Anthropic support
+- **Multiple LLM Providers**: Gemini, OpenAI, Anthropic, DeepSeek support with latest models
 - **Advanced Code Analysis**: Tree-sitter parsers for Rust, Python, JavaScript, TypeScript, Go, Java
 - **Intelligent Tool Suite**: File operations, search, terminal commands, and PTY integration
 - **Configuration Management**: TOML-based configuration with comprehensive policies
@@ -27,6 +27,8 @@ VTAgent is a Rust-based terminal coding agent with modular architecture supporti
 - **Batch Operations**: Efficient multi-file processing and terminal command execution
 - **Configuration Flexibility**: Comprehensive TOML configuration for all aspects
 - **Multi-Agent Coordination**: Strategic task delegation and verification workflows
+- **Performance Monitoring**: Real-time metrics and benchmarking capabilities
+- **Research-Preview Features**: Advanced context compression and conversation summarization
 
 ## Quick Start
 
@@ -37,6 +39,7 @@ VTAgent is a Rust-based terminal coding agent with modular architecture supporti
   - `GEMINI_API_KEY` or `GOOGLE_API_KEY` for Gemini
   - `OPENAI_API_KEY` for OpenAI
   - `ANTHROPIC_API_KEY` for Anthropic
+  - `DEEPSEEK_API_KEY` for DeepSeek
 
 ### Installation
 
@@ -67,6 +70,248 @@ export GEMINI_API_KEY=your_api_key_here
 
 # Or run specific commands
 cargo run -- chat
+```
+
+## Available Models & Providers
+
+VTAgent supports the latest models from multiple providers:
+
+### Gemini (Google)
+- `gemini-2.5-flash-lite` - Fastest, most cost-effective (default)
+- `gemini-2.5-flash` - Fast, cost-effective
+- `gemini-2.5-pro` - Latest, most capable
+
+### OpenAI
+- `gpt-5` - Latest GPT model
+
+### Anthropic
+- `claude-sonnet-4-20250514` - Latest Claude model
+
+### DeepSeek
+- `deepseek-reasoner` - Advanced reasoning model
+
+### Local Models
+- `qwen/qwen3-4b-2507` - Qwen3 local model
+
+## Command Reference
+
+### Core Commands
+
+#### `chat` - Interactive AI coding assistant
+**Features:**
+• Multi-agent coordination for complex tasks
+• Real-time code generation and editing
+• Tree-sitter powered analysis
+• Research-preview context management
+
+**Usage:** `vtagent chat`
+
+#### `ask <prompt>` - Single prompt mode
+**Perfect for:**
+• Quick questions
+• Code explanations
+• Simple queries
+
+**Example:** `vtagent ask "Explain Rust ownership"`
+
+#### `chat-verbose` - Verbose interactive chat
+**Shows:**
+• Tool execution details
+• API request/response
+• Agent coordination (in multi-agent mode)
+• Performance metrics
+
+**Usage:** `vtagent chat-verbose`
+
+#### `analyze` - Analyze workspace
+**Provides:**
+• Project structure analysis
+• Language detection
+• Code complexity metrics
+• Dependency insights
+• Symbol extraction
+
+**Usage:** `vtagent analyze`
+
+#### `performance` - Display performance metrics
+**Shows:**
+• Token usage and API costs
+• Response times and latency
+• Tool execution statistics
+• Memory usage patterns
+• Agent performance (in multi-agent mode)
+
+**Usage:** `vtagent performance`
+
+### Project Management
+
+#### `init` - Initialize project
+**Features:**
+• Creates project directory structure
+• Sets up config, cache, embeddings directories
+• Creates .project metadata file
+• Tree-sitter parser setup
+• Multi-agent context stores
+
+**Usage:** `vtagent init`
+
+#### `init-project` - Initialize project with dot-folder structure
+**Features:**
+• Creates project directory structure in ~/.vtagent/projects/
+• Sets up config, cache, embeddings, and retrieval directories
+• Creates .project metadata file
+• Migrates existing config/cache files with user confirmation
+
+**Examples:**
+```
+vtagent init-project
+vtagent init-project --name my-project
+vtagent init-project --force
+```
+
+#### `create-project <name> <features>` - Create complete Rust project
+**Features:**
+• Web frameworks (Axum, Rocket, Warp)
+• Database integration
+• Authentication systems
+• Testing setup
+• Tree-sitter integration
+
+**Example:** `vtagent create-project my-api serde,axum,tokio`
+
+### Advanced Features
+
+#### `compress-context` - Compress conversation context
+**Benefits:**
+• Reduced token usage
+• Faster responses
+• Memory optimization
+• Context preservation
+
+**Usage:** `vtagent compress-context`
+
+#### `benchmark` - Benchmark against SWE-bench
+**Features:**
+• Automated performance testing
+• Comparative analysis across models
+• Benchmark scoring and metrics
+• Optimization insights
+
+**Usage:** `vtagent benchmark`
+
+### Snapshot Management
+
+#### `snapshots` - List all available snapshots
+**Shows:**
+• Snapshot ID and turn number
+• Creation timestamp
+• Description
+• File size and compression status
+
+**Usage:** `vtagent snapshots`
+
+#### `revert --turn <n>` - Revert to previous snapshot
+**Features:**
+• Revert to any previous turn
+• Partial reverts (memory, context, full)
+• Safe rollback with validation
+
+**Examples:**
+```
+vtagent revert --turn 5
+vtagent revert --turn 3 --partial memory
+```
+
+#### `cleanup-snapshots` - Clean up old snapshots
+**Features:**
+• Remove snapshots beyond limit
+• Configurable retention policy
+• Safe deletion with confirmation
+
+**Examples:**
+```
+vtagent cleanup-snapshots
+vtagent cleanup-snapshots --max 20
+```
+
+### Configuration Management
+
+#### `config` - Generate configuration file
+**Features:**
+• Generate default configuration
+• Support for global (home directory) and local configuration
+• TOML format with comprehensive settings
+• Multi-agent configuration options
+• Tree-sitter and performance monitoring settings
+
+**Examples:**
+```
+vtagent config
+vtagent config --output ./custom-config.toml
+vtagent config --global
+```
+
+#### `tool-policy` - Manage tool execution policies
+**Features:**
+• Granular tool permissions
+• Security level presets
+• Audit logging
+• Safe tool execution
+
+**Examples:**
+```
+vtagent tool-policy status
+vtagent tool-policy allow file-write
+vtagent tool-policy deny shell-exec
+```
+
+#### `models` - Manage models and providers
+**Features:**
+• Support for latest models (DeepSeek, etc.)
+• Provider configuration and testing
+• Model performance comparison
+• API key management
+
+**Examples:**
+```
+vtagent models list
+vtagent models set-provider deepseek
+vtagent models set-model deepseek-reasoner
+vtagent models test gemini
+```
+
+### Security & Analysis
+
+#### `security` - Security and safety management
+**Features:**
+• Security scanning and vulnerability detection
+• Audit logging and monitoring
+• Access control management
+• Privacy protection settings
+
+**Usage:** `vtagent security`
+
+#### `tree-sitter` - Tree-sitter code analysis tools
+**Features:**
+• AST-based code parsing
+• Symbol extraction and navigation
+• Code complexity analysis
+• Multi-language refactoring
+
+**Usage:** `vtagent tree-sitter`
+
+#### `man` - Generate man pages
+**Features:**
+• Generate Unix man pages for all commands
+• Display detailed command documentation
+• Save man pages to files
+• Comprehensive help for all VTAgent features
+
+**Examples:**
+```
+vtagent man
+vtagent man chat
+vtagent man chat --output chat.1
 ```
 
 ## Architecture
@@ -273,42 +518,45 @@ These utilities are available through the `vtagent_core::utils::colors` module f
 ./run.sh models test gemini
 ```
 
-## Command Reference
+## Global Options
 
-### Core Commands
+VTAgent supports several global options that can be used with any command:
 
-- **`chat`** - Interactive AI coding assistant with full tool access
-- **`ask <prompt>`** - Single question mode without tool usage
-- **`chat-verbose`** - Interactive chat with enhanced logging and transparency
-- **`analyze`** - Comprehensive workspace analysis and project overview
-- **`performance`** - Display system performance metrics and statistics
+### Model & Provider Options
+- `--model <MODEL>` - Specify LLM model (e.g., `gemini-2.5-flash-lite`)
+- `--provider <PROVIDER>` - Specify LLM provider (e.g., `gemini`, `openai`, `anthropic`, `deepseek`)
+- `--api-key-env <ENV_VAR>` - Specify API key environment variable
 
-### Project Management
+### Multi-Agent Options
+- `--force-multi-agent` - Enable multi-agent mode for complex tasks
+- `--agent-type <TYPE>` - Specify agent type (`orchestrator`, `explorer`, `coder`, `single`)
 
-- **`init`** - Initialize project with VTAgent configuration and AGENTS.md
-- **`create-project <name> <features>`** - Generate complete Rust project with specified features
+### Feature Flags
+- `--enable-tree-sitter` - Enable tree-sitter code analysis
+- `--performance-monitoring` - Enable performance monitoring
+- `--research-preview` - Enable research-preview features
 
-### Advanced Features
+### Security & Safety
+- `--security-level <LEVEL>` - Set security level (`strict`, `moderate`, `permissive`)
+- `--max-concurrent-ops <NUM>` - Maximum concurrent operations (default: 5)
+- `--max-tool-calls <NUM>` - Maximum tool calls per session (default: 10)
 
-- **`compress-context`** - Compress conversation context for long-running sessions
-- **`demo-async`** - Demonstrate async file operations and diff rendering
+### Output & Logging
+- `--verbose` - Enable verbose logging
+- `--debug` - Enable debug output
+- `--log-level <LEVEL>` - Set log level (`error`, `warn`, `info`, `debug`, `trace`)
+- `--no-color` - Disable color output
+- `--show-file-diffs` - Show file diffs in chat interface
 
-### Snapshot System
+### System Configuration
+- `--workspace <PATH>` - Set workspace root directory
+- `--config <PATH>` - Specify configuration file path
+- `--skip-confirmations` - Skip safety confirmations
 
-- **`snapshots`** - List all available conversation snapshots
-- **`revert --turn <n> [--partial <scope>]`** - Revert to previous conversation state
-- **`cleanup-snapshots [--max <n>]`** - Clean up old snapshots (default: keep 50)
+## Contributing
 
-### Configuration
+VTAgent is an open-source project. Contributions are welcome! Please see our [contributing guidelines](CONTRIBUTING.md) for details.
 
-- **`tool-policy <command>`** - Manage tool execution policies
-  - `status` - Show current policies
-  - `allow <tool>` - Allow specific tool
-  - `deny <tool>` - Deny specific tool
-  - `reset` - Reset to defaults
+## License
 
-- **`models <command>`** - Manage LLM providers and models
-  - `list` - Show available providers and models
-  - `set-provider <provider>` - Switch LLM provider
-  - `set-model <model>` - Set specific model
-  - `test <provider>` - Test provider connectivity
+Licensed under the MIT License. See [LICENSE](LICENSE) for details.

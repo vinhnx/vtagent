@@ -2192,10 +2192,6 @@ https://deepwiki.com/indexmap-rs/indexmap
 
 enhance vtagent-core/src/markdown_storage.rs with https://deepwiki.com/arthurprs/canopydb. Use canopydb to store and query markdown files more efficiently. Update the system prompt to reflect this new capability. Test the integration thoroughly to ensure it works as expected. Update the tools policy and tool registry accordingly. Write end-to-end tests for this new integration in vtagent core's read and write commands. make sure to regular update the project context on each chat turn session or via command
 
----
-
-enhance vtagent-core/src/tools/cache.rs with https://deepwiki.com/arthurprs/quick-cache. Use quick-cache to improve caching performance and efficiency. Update the system prompt to reflect this new capability. Test the integration thoroughly to ensure it works as expected. Update the tools policy and tool registry accordingly. Write end-to-end tests for this new integration in vtagent core's read and write commands.
-
 --
 fetch
 https://deepwiki.com/ratatui/ratatui integrate and port chat repl

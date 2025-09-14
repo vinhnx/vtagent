@@ -148,7 +148,7 @@ if is_valid && is_allowed && is_secure {
 ### Async Operations
 - **Tokio Runtime**: Full async support with multi-threading
 - **Streaming**: Real-time output for long-running commands
-- **Caching**: Strategic caching for file operations
+- **Caching**: High-performance quick-cache for file and directory operations with automatic eviction and TTL management
 
 ### Memory Management
 - **Chunked Reading**: Large file handling without memory exhaustion

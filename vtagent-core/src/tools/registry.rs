@@ -1019,7 +1019,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // Ripgrep search tool
         FunctionDeclaration {
             name: tools::GREP_SEARCH.to_string(),
-            description: "code_search: Unified grep-based search. Modes: 'exact' (default), 'fuzzy', 'multi', 'similarity'. Returns concise results by default; set response_format='detailed' for raw ripgrep JSON. Example: grep_search({pattern:'TODO|FIXME', path:'src', max_results:100, response_format:'concise'}).".to_string(),
+            description: "Performs advanced code search across the workspace using ripgrep, supporting multiple search modes and patterns. This tool is ideal for finding specific code patterns, function definitions, variable usages, or text matches across multiple files. It should be used when you need to locate code elements, search for TODO comments, find function calls, or identify patterns in the codebase. Do not use this tool for simple file listing or when you already know the exact file location. The tool supports exact matching, fuzzy search, multi-pattern searches with AND/OR logic, and similarity-based searches. Results can be returned in concise format (recommended for most cases) or detailed raw ripgrep JSON format. Always specify a reasonable max_results limit to prevent token overflow.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
@@ -1045,7 +1045,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // Consolidated file operations tool
         FunctionDeclaration {
             name: "list_files".to_string(),
-            description: "fs_list: File discovery. Modes: 'list' (default), 'recursive', 'find_name', 'find_content'. Supports pagination and response_format for token efficiency. Example: list_files({path:'src', page:1, per_page:50, response_format:'concise'}).".to_string(),
+            description: "Explores and lists files and directories in the workspace with multiple discovery modes. This tool is essential for understanding project structure, finding files by name or content, and navigating the codebase. Use this tool when you need to see what files exist in a directory, find files matching specific patterns, or search for files containing certain content. It supports recursive directory traversal, pagination for large directories, and various filtering options. The tool can operate in different modes: 'list' for basic directory contents, 'recursive' for deep directory traversal, 'find_name' for filename-based searches, and 'find_content' for content-based file discovery. Always use pagination (page and per_page parameters) for large directories to prevent token overflow. The concise response format is recommended for most cases as it omits low-value metadata.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
@@ -1069,7 +1069,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // File reading tool
         FunctionDeclaration {
             name: tools::READ_FILE.to_string(),
-            description: "fs_read: Read file contents. Use max_bytes to limit tokens. Example: read_file({path:'src/main.rs', max_bytes:20000}).".to_string(),
+            description: "Reads the contents of a specific file from the workspace. This tool is fundamental for examining source code, configuration files, documentation, and any text-based content. Use this tool when you need to see the implementation details of a function, understand file structure, read configuration settings, or examine documentation. It automatically handles large files by reading in chunks and provides line-numbered output for easy reference. The tool will return an error if the file doesn't exist or if there are permission issues. Always prefer this tool over terminal commands like 'cat' when you need to read file contents, as it provides better error handling and formatting. Note that this tool only reads text files; it cannot read binary files or execute code.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
@@ -1082,7 +1082,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // File writing tool
         FunctionDeclaration {
             name: tools::WRITE_FILE.to_string(),
-            description: "fs_write: Write content to a file. Modes: 'overwrite' (default) | 'append' | 'skip_if_exists'. Example: write_file({path:'README.md', content:'Hello', mode:'overwrite'}).".to_string(),
+            description: "Creates new files or overwrites existing files with specified content. This tool is essential for creating new source files, configuration files, documentation, or any text-based content. Use this tool when you need to create a new file from scratch, replace an entire file's contents, or append content to an existing file. The tool supports different write modes: 'overwrite' (default) completely replaces the file content, 'append' adds content to the end of the file, and 'skip_if_exists' prevents overwriting existing files. Always ensure you have the correct file path and that the directory exists before writing. This tool cannot create directories automatically - use the terminal command tool for directory creation if needed. The tool validates that the content is properly written and returns success/failure status.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
@@ -1097,7 +1097,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // File editing tool
         FunctionDeclaration {
             name: tools::EDIT_FILE.to_string(),
-            description: "fs_edit: Replace specific text in a file. Read the file first to identify exact spans. Example: edit_file({path:'src/lib.rs', old_str:'foo', new_str:'bar'}).".to_string(),
+            description: "Performs precise text replacements within existing files by finding and replacing exact text matches. This tool is crucial for making targeted code changes, fixing bugs, updating configurations, or modifying documentation. Use this tool when you need to change specific text in a file without affecting the rest of the content. Always read the file first using the read_file tool to identify the exact text to replace, including proper indentation and surrounding context. The old_str parameter must match the existing text exactly, including whitespace and formatting. This tool is preferred over write_file when you only need to modify part of a file, as it preserves the rest of the file's content. Note that this tool performs exact string matching - it cannot handle complex refactoring or pattern-based replacements.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
@@ -1112,7 +1112,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // Consolidated command execution tool
         FunctionDeclaration {
             name: tools::RUN_TERMINAL_CMD.to_string(),
-            description: "shell_run: Execute a program with args. Modes: 'terminal' (default), 'pty', 'streaming'. Prefer file tools for edits. Example: run_terminal_cmd({command:['bash','-lc','echo test'], timeout_secs:10, mode:'terminal'}).".to_string(),
+            description: "Executes shell commands and external programs in the workspace environment. This tool is essential for running build processes, package managers, test suites, and system commands that cannot be handled by specialized file or search tools. Use this tool when you need to compile code, install dependencies, run tests, execute scripts, or perform system operations. It supports different execution modes: 'terminal' for standard command execution, 'pty' for interactive commands requiring a pseudo-terminal, and 'streaming' for long-running processes. Always specify appropriate timeouts to prevent hanging commands. Prefer specialized tools (read_file, write_file, grep_search) for file operations rather than shell commands. The tool provides both concise and detailed output formats, with concise being recommended for most cases to save tokens.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
@@ -1129,7 +1129,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // AST-grep search and transformation tool
         FunctionDeclaration {
             name: tools::AST_GREP_SEARCH.to_string(),
-            description: "code_astgrep: Syntax-aware code search and rewrite using AST-grep. Operations include 'search', 'transform', 'lint', 'refactor', and 'custom'. Provide patterns and optional context_lines/max_results to control output size.".to_string(),
+            description: "Performs advanced syntax-aware code analysis and transformation using AST-grep patterns. This tool excels at structural code searches, automated refactoring, and complex code transformations that require understanding of programming language syntax. Use this tool for finding function definitions, class structures, import statements, or complex code patterns that cannot be easily found with simple text search. It supports multiple operations: 'search' for finding code patterns, 'transform' for automated code changes, 'lint' for code quality checks, 'refactor' for structural improvements, and 'custom' for specialized operations. The tool can work with multiple programming languages and provides context-aware results. Always specify reasonable limits for context_lines and max_results to prevent token overflow. Preview mode is enabled by default for transform operations to allow safe review before applying changes.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
@@ -1153,7 +1153,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // Simple bash-like search tool
         FunctionDeclaration {
             name: tools::SIMPLE_SEARCH.to_string(),
-            description: "Simple bash-like search and file operations: grep, find, ls, cat, head, tail, index. Direct file operations without complex abstractions.".to_string(),
+            description: "Provides simple bash-like file operations and searches for quick, straightforward tasks. This tool offers direct access to common Unix commands like grep, find, ls, cat, head, tail, and file indexing. Use this tool when you need basic file operations without the complexity of advanced search features. It is ideal for quick file content previews, directory listings, or simple pattern matching. The tool supports various commands: 'grep' for text searching, 'find' for file discovery, 'ls' for directory listing, 'cat' for full file reading, 'head'/'tail' for partial file reading, and 'index' for file indexing. This tool is less powerful than specialized search tools but provides fast, intuitive access to common operations. Use appropriate max_results limits to prevent excessive output, especially with recursive operations.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
@@ -1175,7 +1175,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // Bash-like command tool
         FunctionDeclaration {
             name: tools::BASH.to_string(),
-            description: "shell_bash: Bash-like commands via PTY (ls, pwd, grep, find, cat, head, tail, mkdir, rm, cp, mv, stat, run). Restricted for safety; prefer 'run_terminal_cmd' and file/search tools when possible.".to_string(),
+            description: "Executes bash-like commands through a pseudo-terminal interface for interactive operations. This tool provides access to common shell commands with enhanced terminal emulation. Use this tool when you need interactive command execution, complex shell pipelines, or commands that require a proper terminal environment. It supports essential commands like 'ls' for directory listing, 'pwd' for current directory, 'grep' for text search, 'find' for file discovery, 'cat'/'head'/'tail' for file content viewing, and file manipulation commands like 'mkdir', 'rm', 'cp', 'mv'. The tool includes safety restrictions and should be used as a complement to specialized tools rather than a replacement. Prefer 'run_terminal_cmd' for non-interactive commands and file/search tools for file operations. Always use appropriate flags and be aware of the recursive and force options which can affect multiple files.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
@@ -1203,7 +1203,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // Apply patch tool (Codex patch format)
         FunctionDeclaration {
             name: "apply_patch".to_string(),
-            description: "fs_patch: Apply a Codex-style patch block (*** Begin Patch ... *** End Patch) to the workspace. Use when the assistant provides a patch instead of calling write_file.".to_string(),
+            description: "Applies Codex-style patch blocks to modify multiple files in the workspace. This tool is specialized for applying structured patches that contain changes to multiple files or complex modifications. Use this tool when you receive patch content in the Codex format (marked with '*** Begin Patch' and '*** End Patch') instead of making individual file edits. The tool parses the patch format, validates the changes, and applies them atomically to prevent partial updates. It is particularly useful for applying code review suggestions, automated refactoring changes, or complex multi-file modifications. The tool provides detailed feedback on which files were modified and any issues encountered during application. Always ensure the patch content is complete and properly formatted before using this tool.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {

@@ -97,7 +97,7 @@ async fn load_project_context(
 /// Handle the ask command - single prompt mode
 async fn handle_ask_command(
     args: &Cli,
-    prompt: &[String],
+    prompt: &str,
     vtagent_config: &VTAgentConfig,
 ) -> Result<()> {
     use vtagent_core::llm::provider::{Message, MessageRole};
@@ -108,7 +108,7 @@ async fn handle_ask_command(
         std::process::exit(1);
     }
 
-    let prompt_text = prompt.join(" ");
+    let prompt_text = prompt.to_string();
     println!("{}", "🤖 Single Prompt Mode".bold().blue());
     println!("Prompt: {}", prompt_text);
     println!();
@@ -233,7 +233,7 @@ async fn main() -> Result<()> {
             }
         }
         Some(Commands::Ask { prompt }) => {
-            if let Err(e) = handle_ask_command(&args, prompt, &vtagent_config).await {
+            if let Err(e) = handle_ask_command(&args, &prompt, &vtagent_config).await {
                 eprintln!("{}: {}", style("Error").red().bold(), e);
                 std::process::exit(1);
             }

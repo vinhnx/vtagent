@@ -6,6 +6,7 @@
 use crate::config::models::ModelId;
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
@@ -242,6 +243,7 @@ pub fn is_retryable_error(error: &anyhow::Error) -> bool {
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::sync::{Arc, Mutex};
 
     #[test]
     fn test_empty_response_detection() {
@@ -310,18 +312,23 @@ mod tests {
             backoff_multiplier: 2.0,
         });
 
-        let mut attempt_count = 0;
+        let attempt_count = Arc::new(Mutex::new(0));
+        let attempt_count_clone = attempt_count.clone();
         let result = manager
             .execute_with_retry(
                 "test_operation",
                 &ModelId::Gemini25Flash,
                 Some(&ModelId::Gemini25FlashLite),
-                |_model| async {
-                    attempt_count += 1;
-                    if attempt_count < 2 {
-                        Err(anyhow!("Temporary failure"))
-                    } else {
-                        Ok::<String, anyhow::Error>("success".to_string())
+                move |_model| {
+                    let attempt_count = attempt_count_clone.clone();
+                    async move {
+                        let mut count = attempt_count.lock().unwrap();
+                        *count += 1;
+                        if *count < 2 {
+                            Err(anyhow!("Temporary failure"))
+                        } else {
+                            Ok::<String, anyhow::Error>("success".to_string())
+                        }
                     }
                 },
             )

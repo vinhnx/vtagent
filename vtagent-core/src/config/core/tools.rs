@@ -1,5 +1,5 @@
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Tools configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -10,14 +10,14 @@ pub struct ToolsConfig {
 
     /// Specific tool policies
     #[serde(default)]
-    pub policies: HashMap<String, ToolPolicy>,
+    pub policies: IndexMap<String, ToolPolicy>,
 }
 
 impl Default for ToolsConfig {
     fn default() -> Self {
         Self {
             default_policy: default_tool_policy(),
-            policies: HashMap::new(),
+            policies: IndexMap::new(),
         }
     }
 }

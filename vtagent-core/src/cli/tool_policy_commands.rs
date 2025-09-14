@@ -6,7 +6,7 @@ use clap::Subcommand;
 use console::style;
 
 /// Tool policy management commands
-#[derive(Debug, Subcommand)]
+#[derive(Debug, Clone, Subcommand)]
 pub enum ToolPolicyCommands {
     /// Show current tool policy status
     Status,

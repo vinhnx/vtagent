@@ -70,8 +70,10 @@ anstyle-query = "1.0"
 anstream = "0.6"
 anstyle-parse = "0.2"
 anstyle-ls = "1.0"
+anstyle-roff = "0.3"
 quick_cache = "0.6"
 indexmap = "2.2"
+roff = "0.2"
 
 [[example]]
 name = "anstyle_test"

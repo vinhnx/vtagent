@@ -9,8 +9,8 @@ use crate::simple_indexer::SimpleIndexer;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use serde_json::{Value, json};
-use std::{path::PathBuf, process::Stdio};
-use tokio::process::Command;
+use std::{path::PathBuf, process::Stdio, time::Duration};
+use tokio::{process::Command, time::timeout};
 
 /// Simple bash-like search tool
 #[derive(Clone)]
@@ -38,12 +38,18 @@ impl SimpleSearchTool {
         &self,
         command: &str,
         args: Vec<String>,
-        _timeout_secs: Option<u64>,
+        timeout_secs: Option<u64>,
     ) -> Result<String> {
         let full_command_parts = std::iter::once(command.to_string())
             .chain(args.clone())
             .collect::<Vec<String>>();
         self.validate_command(&full_command_parts)?;
+
+        let full_command = if args.is_empty() {
+            command.to_string()
+        } else {
+            format!("{} {}", command, args.join(" "))
+        };
 
         let work_dir = self.indexer.workspace_root().to_path_buf();
         let mut cmd = Command::new(command);
@@ -54,10 +60,18 @@ impl SimpleSearchTool {
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
 
-        let output = cmd
-            .output()
+        let duration = Duration::from_secs(timeout_secs.unwrap_or(30));
+        let output = timeout(duration, cmd.output())
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to execute command: {}", e))?;
+            .with_context(|| {
+                format!(
+                    "command '{}' timed out after {}s",
+                    full_command,
+                    duration.as_secs()
+                )
+            })?
+            .with_context(|| format!("Failed to execute command: {}", full_command))?;
+
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 

@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
-use console::style;
 use std::io::{self, Write};
 use vtagent_core::config::loader::{ConfigManager, VTAgentConfig};
 use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
+use vtagent_core::utils::ansi::{AnsiRenderer, MessageStyle};
 
 // Single-agent engine with Decision Ledger support
 use vtagent_core::gemini::function_calling::{FunctionCall, FunctionResponse};
@@ -25,14 +25,17 @@ fn read_prompt_refiner_prompt() -> Option<String> {
 }
 
 fn render_tool_output(val: &serde_json::Value) {
+    let mut renderer = AnsiRenderer::stdout();
     if let Some(stdout) = val.get("stdout").and_then(|v| v.as_str()) {
         if !stdout.trim().is_empty() {
-            println!("{}\n{}", style("[stdout]").blue().bold(), stdout);
+            let _ = renderer.line(MessageStyle::Info, "[stdout]");
+            let _ = renderer.line(MessageStyle::Output, stdout);
         }
     }
     if let Some(stderr) = val.get("stderr").and_then(|v| v.as_str()) {
         if !stderr.trim().is_empty() {
-            eprintln!("{}\n{}", style("[stderr]").red().bold(), stderr);
+            let _ = renderer.line(MessageStyle::Error, "[stderr]");
+            let _ = renderer.line(MessageStyle::Error, stderr);
         }
     }
 }
@@ -118,13 +121,20 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
     if provider != Provider::Gemini {
         return run_single_agent_loop_unified(config, provider, vt_cfg).await;
     }
-    println!("{}", style("Interactive chat (tools)").blue().bold());
-    println!("Model: {}", config.model);
-    println!("Workspace: {}", config.workspace.display());
+    let mut renderer = AnsiRenderer::stdout();
+    renderer.line(MessageStyle::Info, "Interactive chat (tools)")?;
+    renderer.line(MessageStyle::Output, &format!("Model: {}", config.model))?;
+    renderer.line(
+        MessageStyle::Output,
+        &format!("Workspace: {}", config.workspace.display()),
+    )?;
     if let Some(summary) = summarize_workspace_languages(&config.workspace) {
-        println!("Detected languages: {}", summary);
+        renderer.line(
+            MessageStyle::Output,
+            &format!("Detected languages: {}", summary),
+        )?;
     }
-    println!();
+    renderer.line(MessageStyle::Output, "")?;
 
     let mut client = GeminiClient::new(config.api_key.clone(), config.model.clone());
     let traj = ConfigManager::load_from_workspace(&config.workspace)
@@ -155,10 +165,10 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
     let _base_system_prompt = read_system_prompt_from_md()
         .unwrap_or_else(|_| "You are a helpful coding assistant for a Rust workspace.".to_string());
 
-    println!(
-        "{}",
-        style("Type 'exit' to quit, 'help' for commands").dim()
-    );
+    renderer.line(
+        MessageStyle::Info,
+        "Type 'exit' to quit, 'help' for commands",
+    )?;
     loop {
         print!("> ");
         io::stdout().flush()?;
@@ -169,11 +179,11 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
         match input {
             "" => continue,
             "exit" | "quit" => {
-                println!("Goodbye!");
+                renderer.line(MessageStyle::Info, "Goodbye!")?;
                 break;
             }
             "help" => {
-                println!("Commands: exit, help");
+                renderer.line(MessageStyle::Info, "Commands: exit, help")?;
                 continue;
             }
             _ => {}
@@ -199,7 +209,6 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
             },
             &input.chars().take(120).collect::<String>(),
         );
-
 
         // Ensure Gemini client uses the routed model for this turn
         if decision.selected_model != config.model {
@@ -254,7 +263,13 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
 
             // Compose refreshed system instruction including ledger
             let (lg_enabled, lg_max, lg_include) = vt_cfg
-                .map(|c| (c.context.ledger.enabled, c.context.ledger.max_entries, c.context.ledger.include_in_prompt))
+                .map(|c| {
+                    (
+                        c.context.ledger.enabled,
+                        c.context.ledger.max_entries,
+                        c.context.ledger.include_in_prompt,
+                    )
+                })
                 .unwrap_or((true, 12, true));
 
             // Update ledger context first
@@ -265,13 +280,15 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
                 })
             });
             ledger.start_turn(working_history.len(), last_content);
-            let tool_names: Vec<String> = tools.iter()
+            let tool_names: Vec<String> = tools
+                .iter()
                 .flat_map(|t| t.function_declarations.iter().map(|fd| fd.name.clone()))
                 .collect();
             ledger.update_available_tools(tool_names);
 
-            let base_system_prompt = read_system_prompt_from_md()
-                .unwrap_or_else(|_| "You are a helpful coding assistant for a Rust workspace.".to_string());
+            let base_system_prompt = read_system_prompt_from_md().unwrap_or_else(|_| {
+                "You are a helpful coding assistant for a Rust workspace.".to_string()
+            });
             let system_prompt = if lg_enabled && lg_include {
                 format!(
                     "{}\n\n[Decision Ledger]\n{}",
@@ -308,7 +325,7 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
 
             if function_calls.is_empty() {
                 if let Some(text) = _final_text.clone() {
-                    println!("{}", text);
+                    renderer.line(MessageStyle::Output, &text)?;
                 }
                 if let Some(text) = _final_text {
                     working_history.push(Content::system_text(text));
@@ -319,7 +336,7 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
             for call in function_calls {
                 let name = call.name.as_str();
                 let args = call.args.clone();
-                eprintln!("[TOOL] {} {}", name, args);
+                renderer.line(MessageStyle::Info, &format!("[TOOL] {} {}", name, args))?;
                 let decision_id = ledger.record_decision(
                     format!("Execute tool '{}' to progress task", name),
                     DTAction::ToolCall {
@@ -387,7 +404,11 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
                     || text.contains("I have updated")
                     || text.contains("updated the `");
                 if claims_write && !any_write_effect {
-                    println!("\nNote: The assistant mentioned edits but no write tool ran.");
+                    renderer.line(MessageStyle::Output, "")?;
+                    renderer.line(
+                        MessageStyle::Info,
+                        "Note: The assistant mentioned edits but no write tool ran.",
+                    )?;
                 }
             }
         }
@@ -397,10 +418,14 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
 }
 
 async fn run_prompt_only_loop(config: &CoreAgentConfig) -> Result<()> {
-    println!("{}", style("Interactive chat (prompt-only)").blue().bold());
-    println!("Model: {}", config.model);
-    println!("Workspace: {}", config.workspace.display());
-    println!("{}", style("Type 'exit' to quit").dim());
+    let mut renderer = AnsiRenderer::stdout();
+    renderer.line(MessageStyle::Info, "Interactive chat (prompt-only)")?;
+    renderer.line(MessageStyle::Output, &format!("Model: {}", config.model))?;
+    renderer.line(
+        MessageStyle::Output,
+        &format!("Workspace: {}", config.workspace.display()),
+    )?;
+    renderer.line(MessageStyle::Info, "Type 'exit' to quit")?;
 
     // Load VT config for optional router
     let cfg_manager = ConfigManager::load_from_workspace(&config.workspace).ok();
@@ -422,7 +447,7 @@ async fn run_prompt_only_loop(config: &CoreAgentConfig) -> Result<()> {
             continue;
         }
         if matches!(input, "exit" | "quit") {
-            println!("Goodbye!");
+            renderer.line(MessageStyle::Info, "Goodbye!")?;
             break;
         }
 
@@ -439,7 +464,7 @@ async fn run_prompt_only_loop(config: &CoreAgentConfig) -> Result<()> {
         }
 
         let resp = client.generate(input).await?;
-        println!("{}", resp.content);
+        renderer.line(MessageStyle::Output, &resp.content)?;
     }
     Ok(())
 }
@@ -450,13 +475,20 @@ async fn run_single_agent_loop_unified(
     _provider: Provider,
     vt_cfg: Option<&VTAgentConfig>,
 ) -> Result<()> {
-    println!("{}", style("Interactive chat (tools)").blue().bold());
-    println!("Model: {}", config.model);
-    println!("Workspace: {}", config.workspace.display());
+    let mut renderer = AnsiRenderer::stdout();
+    renderer.line(MessageStyle::Info, "Interactive chat (tools)")?;
+    renderer.line(MessageStyle::Output, &format!("Model: {}", config.model))?;
+    renderer.line(
+        MessageStyle::Output,
+        &format!("Workspace: {}", config.workspace.display()),
+    )?;
     if let Some(summary) = summarize_workspace_languages(&config.workspace) {
-        println!("Detected languages: {}", summary);
+        renderer.line(
+            MessageStyle::Output,
+            &format!("Detected languages: {}", summary),
+        )?;
     }
-    println!("");
+    renderer.line(MessageStyle::Output, "")?;
 
     // Create provider client from model + api key
     let provider_client = create_provider_for_model(&config.model, config.api_key.clone())
@@ -491,10 +523,10 @@ async fn run_single_agent_loop_unified(
             }
         })
         .unwrap_or_else(|| TrajectoryLogger::new(&config.workspace));
-    println!(
-        "{}",
-        style("Type 'exit' to quit, 'help' for commands").dim()
-    );
+    renderer.line(
+        MessageStyle::Info,
+        "Type 'exit' to quit, 'help' for commands",
+    )?;
     loop {
         print!("> ");
         io::stdout().flush()?;
@@ -505,11 +537,11 @@ async fn run_single_agent_loop_unified(
         match input {
             "" => continue,
             "exit" | "quit" => {
-                println!("Goodbye!");
+                renderer.line(MessageStyle::Info, "Goodbye!")?;
                 break;
             }
             "help" => {
-                println!("Commands: exit, help");
+                renderer.line(MessageStyle::Info, "Commands: exit, help")?;
                 continue;
             }
             _ => {}
@@ -560,7 +592,6 @@ async fn run_single_agent_loop_unified(
             let active_model = decision.selected_model;
             // Apply budgets if present
             let (max_tokens_opt, parallel_cfg_opt) = if let Some(vt) = vt_cfg {
-
                 let key = match decision.class {
                     TaskClass::Simple => "simple",
                     TaskClass::Standard => "standard",
@@ -583,16 +614,26 @@ async fn run_single_agent_loop_unified(
             };
             // Inject Decision Ledger for unified providers as well
             let (lg_enabled, lg_max, lg_include) = vt_cfg
-                .map(|c| (c.context.ledger.enabled, c.context.ledger.max_entries, c.context.ledger.include_in_prompt))
+                .map(|c| {
+                    (
+                        c.context.ledger.enabled,
+                        c.context.ledger.max_entries,
+                        c.context.ledger.include_in_prompt,
+                    )
+                })
                 .unwrap_or((true, 12, true));
 
             // Update ledger context first
-            ledger.start_turn(working_history.len(), working_history.last().map(|m| m.content.clone()));
+            ledger.start_turn(
+                working_history.len(),
+                working_history.last().map(|m| m.content.clone()),
+            );
             let tool_names: Vec<String> = tools.iter().map(|t| t.function.name.clone()).collect();
             ledger.update_available_tools(tool_names);
 
-            let base_system_prompt = read_system_prompt_from_md()
-                .unwrap_or_else(|_| "You are a helpful coding assistant for a Rust workspace.".to_string());
+            let base_system_prompt = read_system_prompt_from_md().unwrap_or_else(|_| {
+                "You are a helpful coding assistant for a Rust workspace.".to_string()
+            });
             let system_prompt = if lg_enabled && lg_include {
                 format!(
                     "{}\n\n[Decision Ledger]\n{}",
@@ -604,7 +645,10 @@ async fn run_single_agent_loop_unified(
             };
 
             // Update ledger context and build system prompt with ledger
-            ledger.start_turn(working_history.len(), working_history.last().map(|m| m.content.clone()));
+            ledger.start_turn(
+                working_history.len(),
+                working_history.last().map(|m| m.content.clone()),
+            );
             let tool_names: Vec<String> = tools.iter().map(|t| t.function.name.clone()).collect();
             ledger.update_available_tools(tool_names);
 
@@ -664,7 +708,13 @@ async fn run_single_agent_loop_unified(
                                     serde_json::to_string(&tool_output).unwrap_or("{}".to_string());
                                 working_history
                                     .push(uni::Message::tool_response(call.id.clone(), content));
-                                ledger.record_outcome(&dec_id, DecisionOutcome::Success { result: "tool_ok".to_string(), metrics: Default::default() });
+                                ledger.record_outcome(
+                                    &dec_id,
+                                    DecisionOutcome::Success {
+                                        result: "tool_ok".to_string(),
+                                        metrics: Default::default(),
+                                    },
+                                );
                             }
                             Err(e) => {
                                 traj.log_tool_call(working_history.len(), name, &args_val, false);
@@ -672,7 +722,14 @@ async fn run_single_agent_loop_unified(
                                 let content = err.to_string();
                                 working_history
                                     .push(uni::Message::tool_response(call.id.clone(), content));
-                                ledger.record_outcome(&dec_id, DecisionOutcome::Failure { error: e.to_string(), recovery_attempts: 0, context_preserved: true });
+                                ledger.record_outcome(
+                                    &dec_id,
+                                    DecisionOutcome::Failure {
+                                        error: e.to_string(),
+                                        recovery_attempts: 0,
+                                        context_preserved: true,
+                                    },
+                                );
                             }
                         }
                     }
@@ -716,7 +773,7 @@ async fn run_single_agent_loop_unified(
                         }
                     }
                 }
-                println!("{}", text);
+                renderer.line(MessageStyle::Output, &text)?;
                 working_history.push(uni::Message::assistant(text));
             }
             break 'outer;
@@ -737,7 +794,11 @@ async fn run_single_agent_loop_unified(
                     || text.contains("I have updated")
                     || text.contains("updated the `");
                 if claims_write && !any_write_effect {
-                    println!("\nNote: The assistant mentioned edits but no write tool ran.");
+                    renderer.line(MessageStyle::Output, "")?;
+                    renderer.line(
+                        MessageStyle::Info,
+                        "Note: The assistant mentioned edits but no write tool ran.",
+                    )?;
                 }
             }
         }

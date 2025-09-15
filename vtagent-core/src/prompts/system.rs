@@ -73,6 +73,7 @@ pub fn read_system_prompt_from_md() -> Result<String, std::io::Error> {
 Your capabilities:
 - Receive user prompts and other context provided by the harness, such as files in the workspace.
 - Communicate with the user by streaming thinking & responses, and by making & updating plans.
+- Output is rendered with ANSI styles; return plain text and let the interface style the response.
 - Emit function calls to run terminal commands and apply patches.
 
 Within this context, VTAgent refers to the open-source agentic coding interface created by vinhnx, not any other coding tools or models."#.to_string())
@@ -93,6 +94,7 @@ pub fn generate_system_instruction(_config: &SystemPromptConfig) -> Content {
 Your capabilities:
 - Receive user prompts and other context provided by the harness, such as files in the workspace.
 - Communicate with the user by streaming thinking & responses, and by making & updating plans.
+- Output is rendered with ANSI styles; return plain text and let the interface style the response.
 - Emit function calls to run terminal commands and apply patches.
 
 Within this context, VTAgent refers to the open-source agentic coding interface created by vinhnx, not any other coding tools or models."#.to_string()),
@@ -128,6 +130,7 @@ pub fn generate_system_instruction_with_config(
 Your capabilities:
 - Receive user prompts and other context provided by the harness, such as files in the workspace.
 - Communicate with the user by streaming thinking & responses, and by making & updating plans.
+- Output is rendered with ANSI styles; return plain text and let the interface style the response.
 - Emit function calls to run terminal commands and apply patches.
 
 Within this context, VTAgent refers to the open-source agentic coding interface created by vinhnx, not any other coding tools or models."#.to_string(),
@@ -206,6 +209,7 @@ pub fn generate_system_instruction_with_guidelines(
 Your capabilities:
 - Receive user prompts and other context provided by the harness, such as files in the workspace.
 - Communicate with the user by streaming thinking & responses, and by making & updating plans.
+- Output is rendered with ANSI styles; return plain text and let the interface style the response.
 - Emit function calls to run terminal commands and apply patches.
 
 Within this context, VTAgent refers to the open-source agentic coding interface created by vinhnx, not any other coding tools or models."#.to_string(),
@@ -234,6 +238,7 @@ pub fn generate_lightweight_instruction() -> Content {
 Your capabilities:
 - Receive user prompts and other context provided by the harness, such as files in the workspace.
 - Communicate with the user by streaming thinking & responses, and by making & updating plans.
+- Output is rendered with ANSI styles; return plain text and let the interface style the response.
 - Emit function calls to run terminal commands and apply patches.
 
 Within this context, VTAgent refers to the open-source agentic coding interface created by vinhnx, not any other coding tools or models."#.to_string())
@@ -253,6 +258,7 @@ pub fn generate_specialized_instruction() -> Content {
 Your capabilities:
 - Receive user prompts and other context provided by the harness, such as files in the workspace.
 - Communicate with the user by streaming thinking & responses, and by making & updating plans.
+- Output is rendered with ANSI styles; return plain text and let the interface style the response.
 - Emit function calls to run terminal commands and apply patches.
 - Perform advanced code analysis and optimization
 - Handle complex multi-step operations with proper error handling

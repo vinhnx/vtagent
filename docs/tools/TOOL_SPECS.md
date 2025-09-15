@@ -38,7 +38,7 @@ This document summarizes the updated tool schemas and guidance following Anthrop
 
 - run_terminal_cmd
   - Purpose: Execute a program with arguments.
-  - Key args: `command` (string[]), `working_dir` (string), `timeout_secs` (int), `mode` (string: pty|terminal|streaming), `response_format`.
+  - Key args: `command` (string|string[]), `working_dir` (string), `timeout_secs` (int), `mode` (string: pty|terminal|streaming), `response_format`.
   - Default mode is `pty` so output retains ANSI styling.
 
 - ast_grep_search

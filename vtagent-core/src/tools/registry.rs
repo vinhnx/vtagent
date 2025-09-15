@@ -20,6 +20,7 @@ use anyhow::{Context, Result, anyhow};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use shell_words::split;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -296,7 +297,9 @@ impl ToolRegistry {
             }
         } else {
             // No policy manager available, allow execution
-            eprintln!("Warning: No policy manager available, allowing tool execution without policy check");
+            eprintln!(
+                "Warning: No policy manager available, allowing tool execution without policy check"
+            );
         }
 
         // Apply optional scoped constraints from policy
@@ -410,7 +413,12 @@ impl ToolRegistry {
 
     /// Apply optional scoped constraints from tool policy to arguments to improve safety
     fn apply_policy_constraints(&self, name: &str, mut args: Value) -> Result<Value> {
-        if let Some(constraints) = self.tool_policy.as_ref().and_then(|tp| tp.get_constraints(name)).cloned() {
+        if let Some(constraints) = self
+            .tool_policy
+            .as_ref()
+            .and_then(|tp| tp.get_constraints(name))
+            .cloned()
+        {
             let obj = args
                 .as_object_mut()
                 .ok_or_else(|| anyhow!("Error: tool arguments must be an object"))?;
@@ -524,22 +532,30 @@ impl ToolRegistry {
 
     /// Get tool policy manager (mutable reference)
     pub fn policy_manager_mut(&mut self) -> Result<&mut ToolPolicyManager> {
-        self.tool_policy.as_mut().ok_or_else(|| anyhow!("Tool policy manager not available"))
+        self.tool_policy
+            .as_mut()
+            .ok_or_else(|| anyhow!("Tool policy manager not available"))
     }
 
     /// Get tool policy manager (immutable reference)
     pub fn policy_manager(&self) -> Result<&ToolPolicyManager> {
-        self.tool_policy.as_ref().ok_or_else(|| anyhow!("Tool policy manager not available"))
+        self.tool_policy
+            .as_ref()
+            .ok_or_else(|| anyhow!("Tool policy manager not available"))
     }
 
     /// Set policy for a specific tool
     pub fn set_tool_policy(&mut self, tool_name: &str, policy: ToolPolicy) -> Result<()> {
-        self.tool_policy.as_mut().expect("Tool policy manager not initialized").set_policy(tool_name, policy)
+        self.tool_policy
+            .as_mut()
+            .expect("Tool policy manager not initialized")
+            .set_policy(tool_name, policy)
     }
 
     /// Get policy for a specific tool
     pub fn get_tool_policy(&self, tool_name: &str) -> ToolPolicy {
-        self.tool_policy.as_ref()
+        self.tool_policy
+            .as_ref()
             .map(|tp| tp.get_policy(tool_name))
             .unwrap_or(ToolPolicy::Allow) // Default to allow when no policy manager
     }
@@ -749,6 +765,16 @@ impl ToolRegistry {
             .unwrap_or_default();
 
         let mut args = args;
+        if let Some(cmd_str) = args.get("command").and_then(|v| v.as_str()) {
+            let parts = split(cmd_str).context("failed to parse command string")?;
+            if parts.is_empty() {
+                return Err(anyhow!("command cannot be empty"));
+            }
+            if let Some(map) = args.as_object_mut() {
+                map.insert("command".to_string(), json!(parts));
+            }
+        }
+
         // Try to extract the command text for policy checking
         let cmd_text = if let Some(cmd_val) = args.get("command") {
             if cmd_val.is_array() {
@@ -1566,5 +1592,22 @@ pub fn build_function_declarations_for_level(level: CapabilityLevel) -> Vec<Func
                     || fd.name == tools::BASH
             })
             .collect(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anyhow::Result;
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn run_terminal_cmd_accepts_string() -> Result<()> {
+        let mut registry = ToolRegistry::new(std::env::current_dir().unwrap());
+        let out = registry
+            .run_terminal_cmd(json!({"command": "echo test", "mode": "terminal"}))
+            .await?;
+        assert_eq!(out["stdout"], "test");
+        Ok(())
     }
 }

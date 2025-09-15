@@ -770,3 +770,10 @@ Quick Checklist
     Document tool usage in AGENTS.md
 
 If you tell me which path you prefer (subprocess vs embedded vs service), I can generate concrete file blocks (Rust + optional Python patch). Which direction do you want to take?
+
+---
+
+> > > IMPORTANT check this chat and scrolldown to get the full context implementation from github copilot for spectkit integration into vtagent
+
+1. https://github.com/copilot/c/b0ffc926-cf0c-45bf-b6aa-e6d8b01744b0
+2. https://github.com/copilot/c/c8306ebb-788e-400d-a901-9e1ecfae2582

@@ -44,12 +44,15 @@ test_tool_directly() {
 
     echo -e "\n${YELLOW}Testing $tool_name tool directly${NC}"
 
-    # Try to build and test the tool
+    # Build and execute the tool through the binary
     if cargo build --bin vtagent >/dev/null 2>&1; then
-        # If binary builds, we could test it directly
-        # For now, just check if it compiles
-        echo -e "${GREEN}Tool compiles successfully${NC}"
-        TESTS_PASSED=$((TESTS_PASSED + 1))
+        output=$(cargo run --quiet --bin vtagent -- "$tool_name" "$test_input" 2>/dev/null)
+        if echo "$output" | grep -q "$expected_contains"; then
+            echo -e "${GREEN}Tool output verified${NC}"
+            TESTS_PASSED=$((TESTS_PASSED + 1))
+        else
+            echo -e "${RED}❌ Unexpected tool output${NC}"
+        fi
     else
         echo -e "${RED}❌ Tool compilation failed${NC}"
     fi

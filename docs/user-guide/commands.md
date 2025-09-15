@@ -58,11 +58,18 @@ Ask: Search for TODO|FIXME across the repo with 2 lines of context in .rs files
 
 - `list_files(path, max_items?, include_hidden?)`
 - `read_file(path, max_bytes?)`
-- `write_file(path, content, overwrite?)`
-- `edit_file(path, old_str, new_str)`
+- `write_file(path, content, mode?)` — mode: `overwrite`, `append`, or `skip_if_exists`
+- `edit_file(path, old_str, new_str)` — tolerant to whitespace differences and detects rename conflicts
+
+## stats (session metrics)
+
+Display current configuration, available tools, and live performance metrics for the running
+session. Use `--format` to choose `text`, `json`, or `html` output and `--detailed` to list each
+tool.
 
 ## Tips
 
 - The agent respects `.vtagentgitignore` to exclude files from search and I/O.
 - Prefer `rp_search` for fast, focused searches with glob filters and context.
 - Ask for “N lines of context” when searching to understand usage in-place.
+- Shell commands are filtered by allow/deny lists and can be extended via `VTAGENT_<AGENT>_COMMANDS_*` environment variables.

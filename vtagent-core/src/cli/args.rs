@@ -16,7 +16,7 @@ pub struct Cli {
     /// LLM Model ID with latest model support
     ///
     /// Available providers & models:
-    ///   • gemini-2.5-flash-lite - Fastest, most cost-effective (default)
+    ///   • gemini-2.5-flash-lite-preview-06-17 - Fastest, most cost-effective (default)
     ///   • gemini-2.5-flash - Fast, cost-effective
     ///   • gemini-2.5-pro - Latest, most capable
     ///   • gpt-5 - OpenAI's latest
@@ -600,7 +600,7 @@ impl Cli {
     ///
     /// Supported keys (top-level): model, api_key_env, verbose, log_level, workspace
     /// Example:
-    ///   model = "gemini-2.5-flash-lite"
+    ///   model = "gemini-2.5-flash-lite-preview-06-17"
     ///   api_key_env = "GEMINI_API_KEY"
     ///   verbose = true
     ///   log_level = "info"

@@ -38,18 +38,21 @@ impl SimpleSearchTool {
         &self,
         command: &str,
         args: Vec<String>,
-        timeout_secs: Option<u64>,
+        _timeout_secs: Option<u64>,
     ) -> Result<String> {
         let full_command_parts = std::iter::once(command.to_string())
             .chain(args.clone())
             .collect::<Vec<String>>();
         self.validate_command(&full_command_parts)?;
 
-        let full_command = if args.is_empty() {
-            command.to_string()
-        } else {
-            format!("{} {}", command, args.join(" "))
-        };
+        let work_dir = self.indexer.workspace_root().to_path_buf();
+        let mut cmd = Command::new(command);
+        if !args.is_empty() {
+            cmd.args(&args);
+        }
+        cmd.current_dir(&work_dir);
+        cmd.stdout(Stdio::piped());
+        cmd.stderr(Stdio::piped());
 
         let work_dir = self.indexer.workspace_root().to_path_buf();
         let mut cmd = Command::new(command);

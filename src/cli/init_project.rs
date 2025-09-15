@@ -1,9 +1,11 @@
 //! Init-project command implementation
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use console::style;
+use std::fs;
 use std::path::Path;
 use vtagent_core::{ProjectData, SimpleProjectManager};
+use walkdir::WalkDir;
 
 /// Handle the init-project command
 pub async fn handle_init_project_command(
@@ -148,18 +150,68 @@ async fn migrate_existing_files(
         println!("  - {} ({})", name, path.display());
     }
 
-    // In a real implementation, we would:
-    // 1. Prompt user for confirmation
-    // 2. Backup original files
-    // 3. Copy/move files to appropriate project directories
-    // 4. Update any relative paths in config files
+    for (name, path) in files_to_migrate {
+        let destination = if name.contains("cache") {
+            let dir = _project_manager.cache_dir(_project_name).join(name);
+            dir
+        } else if name.contains("vtagent.toml") {
+            _project_manager
+                .config_dir(_project_name)
+                .join("vtagent.toml")
+        } else {
+            _project_manager.project_data_dir(_project_name).join(name)
+        };
 
-    println!("\nMigration functionality would be implemented here in a full version.");
-    println!("In a complete implementation, this would:");
-    println!("  • Prompt for user confirmation before migration");
-    println!("  • Backup original files before migration");
-    println!("  • Copy/move files to appropriate project directories");
-    println!("  • Update any relative paths in config files");
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent).with_context(|| {
+                format!(
+                    "failed to create destination directory {}",
+                    parent.display()
+                )
+            })?;
+        }
 
+        if destination.exists() {
+            let backup = destination.with_extension("bak");
+            fs::rename(&destination, &backup)
+                .with_context(|| format!("failed to backup {}", destination.display()))?;
+        }
+
+        if path.is_dir() {
+            for entry in WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
+                let file_path = entry.path();
+                let relative = file_path.strip_prefix(&path).unwrap_or(file_path);
+                let dest_path = destination.join(relative);
+                if entry.file_type().is_dir() {
+                    fs::create_dir_all(&dest_path).with_context(|| {
+                        format!("failed to create directory {}", dest_path.display())
+                    })?;
+                } else {
+                    if let Some(parent) = dest_path.parent() {
+                        fs::create_dir_all(parent).with_context(|| {
+                            format!("failed to create directory {}", parent.display())
+                        })?;
+                    }
+                    fs::copy(file_path, &dest_path).with_context(|| {
+                        format!(
+                            "failed to copy {} to {}",
+                            file_path.display(),
+                            dest_path.display()
+                        )
+                    })?;
+                }
+            }
+        } else {
+            fs::copy(&path, &destination).with_context(|| {
+                format!(
+                    "failed to copy {} to {}",
+                    path.display(),
+                    destination.display()
+                )
+            })?;
+        }
+    }
+
+    println!("Migration completed successfully.");
     Ok(())
 }

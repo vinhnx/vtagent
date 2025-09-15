@@ -46,7 +46,7 @@ impl ManPageGenerator {
             .control("SH", ["OPTIONS"])
             .control("TP", [])
             .text([bold("-m"), roman(", "), bold("--model"), roman(" "), italic("MODEL")])
-            .text([roman("Specify the LLM model to use (default: gemini-2.5-flash-lite)")])
+            .text([roman("Specify the LLM model to use (default: gemini-2.5-flash-lite-preview-06-17)")])
             .control("TP", [])
             .text([bold("-p"), roman(", "), bold("--provider"), roman(" "), italic("PROVIDER")])
             .text([roman("Specify the LLM provider (gemini, openai, anthropic, deepseek)")])

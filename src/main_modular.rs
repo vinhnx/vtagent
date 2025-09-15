@@ -28,7 +28,7 @@ use cli::*;
     about = "minimal coding agent",
 )]
 pub struct Cli {
-    /// Gemini model ID (e.g., gemini-2.5-flash-lite)
+    /// Gemini model ID (e.g., gemini-2.5-flash-lite-preview-06-17)
     #[arg(long, global = true, default_value = defaults::DEFAULT_CLI_MODEL)]
     pub model: String,
 

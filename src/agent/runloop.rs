@@ -383,7 +383,13 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
                 generation_config: gen_cfg,
             };
 
-            let response = client.generate(&req).await?;
+            let response = match client.generate(&req).await {
+                Ok(r) => r,
+                Err(e) => {
+                    renderer.line(MessageStyle::Error, &format!("Provider error: {e}"))?;
+                    break 'outer;
+                }
+            };
             _final_text = None;
             let mut function_calls: Vec<FunctionCall> = Vec::new();
             if let Some(candidate) = response.candidates.first() {
@@ -446,6 +452,7 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
                         );
                     }
                     Err(e) => {
+                        renderer.line(MessageStyle::Error, &format!("Tool error: {e}"))?;
                         let err = serde_json::json!({ "error": e.to_string() });
                         let fr = FunctionResponse {
                             name: call.name.clone(),
@@ -538,7 +545,13 @@ async fn run_prompt_only_loop(config: &CoreAgentConfig) -> Result<()> {
             }
         }
 
-        let resp = client.generate(input).await?;
+        let resp = match client.generate(input).await {
+            Ok(r) => r,
+            Err(e) => {
+                renderer.line(MessageStyle::Error, &format!("Provider error: {e}"))?;
+                continue;
+            }
+        };
         renderer.line(MessageStyle::Output, &resp.content)?;
     }
     Ok(())
@@ -741,10 +754,13 @@ async fn run_single_agent_loop_unified(
                 reasoning_effort: vt_cfg.map(|c| c.agent.reasoning_effort.clone()),
             };
 
-            let response = provider_client
-                .generate(request)
-                .await
-                .context("Provider request failed")?;
+            let response = match provider_client.generate(request).await {
+                Ok(r) => r,
+                Err(e) => {
+                    renderer.line(MessageStyle::Error, &format!("Provider error: {e}"))?;
+                    break 'outer;
+                }
+            };
 
             _final_text = response.content.clone();
 
@@ -793,6 +809,7 @@ async fn run_single_agent_loop_unified(
                             }
                             Err(e) => {
                                 traj.log_tool_call(working_history.len(), name, &args_val, false);
+                                renderer.line(MessageStyle::Error, &format!("Tool error: {e}"))?;
                                 let err = serde_json::json!({ "error": e.to_string() });
                                 let content = err.to_string();
                                 working_history

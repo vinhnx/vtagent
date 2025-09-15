@@ -2,7 +2,7 @@
 
 use serde_json::json;
 use vtagent_core::llm::{
-    factory::{create_provider_for_model, LLMFactory},
+    factory::{LLMFactory, create_provider_for_model},
     provider::{LLMProvider, LLMRequest, Message, MessageRole, ToolCall, ToolDefinition},
     providers::{AnthropicProvider, GeminiProvider, OpenAIProvider},
 };
@@ -93,7 +93,8 @@ fn test_unified_client_creation() {
         assert_eq!(client.name(), "openai");
     }
 
-    let anthropic_client = create_provider_for_model("claude-sonnet-4-20250514", "test_key".to_string());
+    let anthropic_client =
+        create_provider_for_model("claude-sonnet-4-20250514", "test_key".to_string());
     assert!(anthropic_client.is_ok());
     if let Ok(client) = anthropic_client {
         assert_eq!(client.name(), "anthropic");

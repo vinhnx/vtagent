@@ -17,7 +17,6 @@ use vtagent_core::{
 };
 
 mod cli;
-mod multi_agent_loop;
 
 use cli::*;
 
@@ -48,10 +47,6 @@ pub struct Cli {
     /// Skip safety confirmations (use with caution)
     #[arg(long, global = true)]
     pub skip_confirmations: bool,
-
-    /// Force multi-agent mode
-    #[arg(long, global = true)]
-    pub force_multi_agent: bool,
 
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -146,11 +141,11 @@ async fn main() -> Result<()> {
     // Dispatch to appropriate command handler
     match args.command.unwrap_or(Commands::Chat) {
         Commands::Chat => {
-            handle_chat_command(&config, args.force_multi_agent, args.skip_confirmations).await?;
+            handle_chat_command(&config, args.skip_confirmations).await?;
         }
         Commands::ChatVerbose => {
             println!("{}", style("Verbose chat mode selected").blue().bold());
-            handle_chat_command(&config, args.force_multi_agent, args.skip_confirmations).await?;
+            handle_chat_command(&config, args.skip_confirmations).await?;
         }
         Commands::Ask { prompt } => {
             let prompt_text = prompt.join(" ");

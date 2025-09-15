@@ -120,3 +120,9 @@ pub struct CompactionStatistics {
     /// Compaction frequency (operations per hour)
     pub compaction_frequency: f64,
 }
+
+/// Agent type for single-agent architecture
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AgentType {
+    Single,
+}

@@ -1,7 +1,7 @@
 //! Integration tests for universal LLM provider system
 
 use vtagent_core::llm::{
-    factory::{create_provider_for_model, LLMFactory},
+    factory::{LLMFactory, create_provider_for_model},
     provider::{LLMProvider, Message},
     providers::{AnthropicProvider, GeminiProvider, OpenAIProvider},
 };
@@ -53,7 +53,8 @@ fn test_unified_client_creation() {
     let openai_client = create_provider_for_model("gpt-5", "test_key".to_string());
     assert!(openai_client.is_ok());
 
-    let anthropic_client = create_provider_for_model("claude-sonnet-4-20250514", "test_key".to_string());
+    let anthropic_client =
+        create_provider_for_model("claude-sonnet-4-20250514", "test_key".to_string());
     assert!(anthropic_client.is_ok());
 }
 

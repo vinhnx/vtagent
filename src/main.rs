@@ -5,13 +5,12 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use vtagent_core::cli::args::{Cli, Commands};
-use vtagent_core::config::api_keys::{get_api_key, load_dotenv, ApiKeySources};
+use vtagent_core::config::api_keys::{ApiKeySources, get_api_key, load_dotenv};
 use vtagent_core::config::loader::ConfigManager;
 use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
 
-mod cli; // local CLI handlers in src/cli
-mod agent; // agent runloops (single & multi)
-// multi_agent_loop intentionally not compiled; chat_tools provides fallback multi-agent handler
+mod agent;
+mod cli; // local CLI handlers in src/cli // agent runloops (single-agent only)
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -61,26 +60,14 @@ async fn main() -> Result<()> {
             vtagent_core::cli::models_commands::handle_models_command(&args, command).await?;
         }
         Some(Commands::Chat) => {
-            cli::handle_chat_command(
-                &core_cfg,
-                args.force_multi_agent,
-                args.single_agent,
-                args.skip_confirmations,
-            )
-                .await?;
+            cli::handle_chat_command(&core_cfg, args.skip_confirmations).await?;
         }
         Some(Commands::Ask { prompt }) => {
             cli::handle_ask_single_command(&core_cfg, prompt).await?;
         }
         Some(Commands::ChatVerbose) => {
             // Reuse chat path; verbose behavior is handled in the module if applicable
-            cli::handle_chat_command(
-                &core_cfg,
-                args.force_multi_agent,
-                args.single_agent,
-                args.skip_confirmations,
-            )
-                .await?;
+            cli::handle_chat_command(&core_cfg, args.skip_confirmations).await?;
         }
         Some(Commands::Analyze) => {
             cli::handle_analyze_command(&core_cfg).await?;
@@ -112,7 +99,11 @@ async fn main() -> Result<()> {
         Some(Commands::Config { output, global }) => {
             cli::handle_config_command(output.as_deref(), *global).await?;
         }
-        Some(Commands::InitProject { name, force, migrate }) => {
+        Some(Commands::InitProject {
+            name,
+            force,
+            migrate,
+        }) => {
             cli::handle_init_project_command(name.clone(), *force, *migrate).await?;
         }
         Some(Commands::Benchmark) => {
@@ -123,13 +114,7 @@ async fn main() -> Result<()> {
         }
         _ => {
             // Default to chat
-            cli::handle_chat_command(
-                &core_cfg,
-                args.force_multi_agent,
-                args.single_agent,
-                args.skip_confirmations,
-            )
-            .await?;
+            cli::handle_chat_command(&core_cfg, args.skip_confirmations).await?;
         }
     }
 

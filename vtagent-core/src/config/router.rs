@@ -46,10 +46,6 @@ pub struct RouterConfig {
     /// Optional: allow an LLM-based router step
     #[serde(default)]
     pub llm_router_model: String,
-    /// Switch to multi-agent when complexity >= this level
-    /// Values: "standard" | "complex" | "codegen_heavy" | "retrieval_heavy"
-    #[serde(default = "default_multi_threshold")]
-    pub multi_agent_threshold: String,
     /// Model mapping per complexity class
     #[serde(default)]
     pub models: ComplexityModelMap,
@@ -65,7 +61,6 @@ impl Default for RouterConfig {
             enabled: true,
             heuristic_classification: true,
             llm_router_model: String::new(),
-            multi_agent_threshold: "complex".to_string(),
             models: ComplexityModelMap {
                 simple: models::google::GEMINI_2_5_FLASH_LITE.to_string(),
                 standard: models::google::GEMINI_2_5_FLASH.to_string(),
@@ -78,7 +73,9 @@ impl Default for RouterConfig {
     }
 }
 
-fn default_true() -> bool { true }
-fn default_enabled() -> bool { true }
-fn default_multi_threshold() -> String { "complex".to_string() }
-
+fn default_true() -> bool {
+    true
+}
+fn default_enabled() -> bool {
+    true
+}

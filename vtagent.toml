@@ -4,7 +4,7 @@
 [agent]
 # Provider to use: one of "gemini", "openai", "anthropic"
 provider = "gemini"
-# Default model for single-agent/multi-agent modes
+# Default model for single-agent mode
 default_model = "gemini-2.5-flash-lite"
 # Environment variable for API key (important for proper key handling)
 api_key_env = "GEMINI_API_KEY"
@@ -29,22 +29,6 @@ require_write_tool_for_claims = true
 # Auto-apply patches detected in responses (use with caution)
 auto_apply_detected_patches = false
 
-[multi_agent]
-# Enable multi-agent mode (experimental feature)
-enabled = false
-# Use single model for all agents when multi-agent is enabled (recommended for consistency)
-use_single_model = true
-# Main orchestrator agent model (used when multi-agent is enabled)
-orchestrator_model = "gemini-2.5-flash-lite"
-# Executor agent model (used for single-agent mode and as subagents in multi-agent mode)
-executor_model = ""
-# Maximum number of concurrent subagents (prevents resource exhaustion)
-max_concurrent_subagents = 3
-# Enable context sharing between agents (improves coordination but increases token usage)
-context_sharing_enabled = true
-# Task execution timeout in seconds (prevents hanging tasks)
-task_timeout_seconds = 300
-
 [tools]
 # Default tool policy for tools not explicitly listed below
 # Values: "allow" | "deny" | "prompt" (require confirmation)
@@ -60,9 +44,9 @@ max_tool_loops = 100
 read_file = "allow"
 list_dir = "allow"
 grep_search = "allow"
-run_terminal_cmd = "prompt"
-create_file = "prompt"
-edit_file = "prompt"
+run_terminal_cmd = "allow"
+create_file = "allow"
+edit_file = "allow"
 delete_file = "deny"
 
 # Code analysis tools
@@ -191,8 +175,6 @@ command_timeout_seconds = 300
 enabled = true
 heuristic_classification = true
 llm_router_model = ""
-# Switch to multi-agent at or above this complexity
-multi_agent_threshold = "complex" # one of: standard|complex|codegen_heavy|retrieval_heavy
 
 [router.models]
 simple = "gemini-2.5-flash-lite"

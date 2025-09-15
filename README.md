@@ -12,36 +12,37 @@ VTAgent is a Rust-based terminal coding agent with modular architecture supporti
 
 ### Core Capabilities
 
-- **Multi-Agent Architecture**: Orchestrator, Explorer, and Coder agents for specialized tasks
-- **Multiple LLM Providers**: Gemini, OpenAI, Anthropic, DeepSeek support with latest models
-- **Advanced Code Analysis**: Tree-sitter parsers for Rust, Python, JavaScript, TypeScript, Go, Java
-- **Intelligent Tool Suite**: File operations, search, terminal commands, and PTY integration
-- **Configuration Management**: TOML-based configuration with comprehensive policies
-- **Safety & Security**: Path validation, command policies, and human-in-the-loop controls
+-   **Single-Agent Reliability (default)**: Streamlined, linear agent with robust context engineering
+-   **Decision Ledger**: Structured, compact record of key decisions injected each turn for consistency
+-   **Multiple LLM Providers**: Gemini, OpenAI, Anthropic, DeepSeek support with latest models
+-   **Advanced Code Analysis**: Tree-sitter parsers for Rust, Python, JavaScript, TypeScript, Go, Java
+-   **Intelligent Tool Suite**: File operations, search, terminal commands, and PTY integration
+-   **Configuration Management**: TOML-based configuration with comprehensive policies
+-   **Safety & Security**: Path validation, command policies, and human-in-the-loop controls
 
 ### Key Features
 
-- **Context Engineering**: Full conversation history with intelligent management
-- **Workspace Safety**: Path validation and configurable file exclusions
-- **Enhanced PTY Support**: Full terminal emulation for interactive commands
-- **Batch Operations**: Efficient multi-file processing and terminal command execution
-- **Configuration Flexibility**: Comprehensive TOML configuration for all aspects
-- **Multi-Agent Coordination**: Strategic task delegation and verification workflows
-- **Performance Monitoring**: Real-time metrics and benchmarking capabilities
-- **Router & Budgets**: Config-driven routing with per-class budgets
-- **Trajectory Logging**: JSONL logs for route decisions and tool calls
-- **Research-Preview Features**: Advanced context compression and conversation summarization
+-   **Context Engineering**: Full conversation history with intelligent management and Decision Ledger
+-   **Workspace Safety**: Path validation and configurable file exclusions
+-   **Enhanced PTY Support**: Full terminal emulation for interactive commands
+-   **Batch Operations**: Efficient multi-file processing and terminal command execution
+-   **Configuration Flexibility**: Comprehensive TOML configuration for all aspects
+-   **Single-Agent Coordination**: Reliable task execution with structured decision tracking
+-   **Performance Monitoring**: Real-time metrics and benchmarking capabilities
+-   **Router & Budgets**: Config-driven routing with per-class budgets
+-   **Trajectory Logging**: JSONL logs for route decisions and tool calls
+-   **Research-Preview Features**: Advanced context compression and conversation summarization
 
 ## Quick Start
 
 ### Prerequisites
 
-- Rust 1.75+ (stable)
-- API key for your preferred LLM provider:
-  - `GEMINI_API_KEY` or `GOOGLE_API_KEY` for Gemini
-  - `OPENAI_API_KEY` for OpenAI
-  - `ANTHROPIC_API_KEY` for Anthropic
-  - `DEEPSEEK_API_KEY` for DeepSeek
+-   Rust 1.75+ (stable)
+-   API key for your preferred LLM provider:
+    -   `GEMINI_API_KEY` or `GOOGLE_API_KEY` for Gemini
+    -   `OPENAI_API_KEY` for OpenAI
+    -   `ANTHROPIC_API_KEY` for Anthropic
+    -   `DEEPSEEK_API_KEY` for DeepSeek
 
 ### Installation
 
@@ -83,7 +84,6 @@ Configure dynamic routing and per-class budgets in `vtagent.toml`:
 enabled = true
 heuristic_classification = true
 llm_router_model = "gemini-2.5-flash-lite" # optional LLM router
-multi_agent_threshold = "complex"          # standard|complex|codegen_heavy|retrieval_heavy
 
 [router.models]
 simple = "gemini-2.5-flash-lite"
@@ -98,9 +98,10 @@ max_parallel_tools = 4
 ```
 
 **Usage Notes:**
-- Enable LLM routing by setting `[router] llm_router_model = "<model-id>"`
-- Tune budgets by adding `[router.budgets.<class>]` with max_tokens and max_parallel_tools
-- Budgets apply to both provider-agnostic and Gemini-native request paths
+
+-   Enable LLM routing by setting `[router] llm_router_model = "<model-id>"`
+-   Tune budgets by adding `[router.budgets.<class>]` with max_tokens and max_parallel_tools
+-   Budgets apply to both provider-agnostic and Gemini-native request paths
 
 ## Trajectory Logging
 
@@ -112,19 +113,23 @@ trajectory_enabled = true
 ```
 
 **Usage Notes:**
-- Logs for trajectory: check `logs/trajectory.jsonl`
-- Inspect with: `vtagent trajectory --top 10` (pretty summary)
-- Gate trajectory logging behind config flag: set `trajectory_enabled = false` to disable
+
+-   Logs for trajectory: check `logs/trajectory.jsonl`
+-   Inspect with: `vtagent trajectory --top 10` (pretty summary)
+-   Gate trajectory logging behind config flag: set `trajectory_enabled = false` to disable
 
 ## Usage Notes
 
 ### LLM Routing
+
 To enable LLM routing: set `[router] llm_router_model = "<model-id>"`.
 
 ### Budget Tuning
+
 To tune budgets: add `[router.budgets.<class>]` with max_tokens and max_parallel_tools.
 
 ### Trajectory Logs
+
 Logs for trajectory: check `logs/trajectory.jsonl`.
 
 ## Available Models & Providers
@@ -132,29 +137,35 @@ Logs for trajectory: check `logs/trajectory.jsonl`.
 VTAgent supports the latest models from multiple providers:
 
 ### Gemini (Google)
-- `gemini-2.5-flash-lite` - Fastest, most cost-effective (default)
-- `gemini-2.5-flash` - Fast, cost-effective
-- `gemini-2.5-pro` - Latest, most capable
+
+-   `gemini-2.5-flash-lite` - Fastest, most cost-effective (default)
+-   `gemini-2.5-flash` - Fast, cost-effective
+-   `gemini-2.5-pro` - Latest, most capable
 
 ### OpenAI
-- `gpt-5` - Latest GPT model
+
+-   `gpt-5` - Latest GPT model
 
 ### Anthropic
-- `claude-sonnet-4-20250514` - Latest Claude model
+
+-   `claude-sonnet-4-20250514` - Latest Claude model
 
 ### DeepSeek
-- `deepseek-reasoner` - Advanced reasoning model
+
+-   `deepseek-reasoner` - Advanced reasoning model
 
 ### Local Models
-- `qwen/qwen3-4b-2507` - Qwen3 local model
+
+-   `qwen/qwen3-4b-2507` - Qwen3 local model
 
 ## Command Reference
 
 ### Core Commands
 
 #### `chat` - Interactive AI coding assistant
+
 **Features:**
-• Multi-agent coordination for complex tasks
+• Single-agent coordination with Decision Ledger for complex tasks
 • Real-time code generation and editing
 • Tree-sitter powered analysis
 • Research-preview context management
@@ -162,6 +173,7 @@ VTAgent supports the latest models from multiple providers:
 **Usage:** `vtagent chat`
 
 #### `ask <prompt>` - Single prompt mode
+
 **Perfect for:**
 • Quick questions
 • Code explanations
@@ -170,15 +182,17 @@ VTAgent supports the latest models from multiple providers:
 **Example:** `vtagent ask "Explain Rust ownership"`
 
 #### `chat-verbose` - Verbose interactive chat
+
 **Shows:**
 • Tool execution details
 • API request/response
-• Agent coordination (in multi-agent mode)
+• Decision Ledger tracking (in single-agent mode)
 • Performance metrics
 
 **Usage:** `vtagent chat-verbose`
 
 #### `analyze` - Analyze workspace
+
 **Provides:**
 • Project structure analysis
 • Language detection
@@ -189,28 +203,31 @@ VTAgent supports the latest models from multiple providers:
 **Usage:** `vtagent analyze`
 
 #### `performance` - Display performance metrics
+
 **Shows:**
 • Token usage and API costs
 • Response times and latency
 • Tool execution statistics
 • Memory usage patterns
-• Agent performance (in multi-agent mode)
+• Decision Ledger statistics (in single-agent mode)
 
 **Usage:** `vtagent performance`
 
 ### Project Management
 
 #### `init` - Initialize project
+
 **Features:**
 • Creates project directory structure
 • Sets up config, cache, embeddings directories
 • Creates .project metadata file
 • Tree-sitter parser setup
-• Multi-agent context stores
+• Context compression and Decision Ledger setup
 
 **Usage:** `vtagent init`
 
 #### `init-project` - Initialize project with dot-folder structure
+
 **Features:**
 • Creates project directory structure in ~/.vtagent/projects/
 • Sets up config, cache, embeddings, and retrieval directories
@@ -218,6 +235,7 @@ VTAgent supports the latest models from multiple providers:
 • Migrates existing config/cache files with user confirmation
 
 **Examples:**
+
 ```
 vtagent init-project
 vtagent init-project --name my-project
@@ -225,6 +243,7 @@ vtagent init-project --force
 ```
 
 #### `create-project <name> <features>` - Create complete Rust project
+
 **Features:**
 • Web frameworks (Axum, Rocket, Warp)
 • Database integration
@@ -237,6 +256,7 @@ vtagent init-project --force
 ### Advanced Features
 
 #### `compress-context` - Compress conversation context
+
 **Benefits:**
 • Reduced token usage
 • Faster responses
@@ -246,6 +266,7 @@ vtagent init-project --force
 **Usage:** `vtagent compress-context`
 
 #### `benchmark` - Benchmark against SWE-bench
+
 **Features:**
 • Automated performance testing
 • Comparative analysis across models
@@ -257,6 +278,7 @@ vtagent init-project --force
 ### Snapshot Management
 
 #### `snapshots` - List all available snapshots
+
 **Shows:**
 • Snapshot ID and turn number
 • Creation timestamp
@@ -266,24 +288,28 @@ vtagent init-project --force
 **Usage:** `vtagent snapshots`
 
 #### `revert --turn <n>` - Revert to previous snapshot
+
 **Features:**
 • Revert to any previous turn
 • Partial reverts (memory, context, full)
 • Safe rollback with validation
 
 **Examples:**
+
 ```
 vtagent revert --turn 5
 vtagent revert --turn 3 --partial memory
 ```
 
 #### `cleanup-snapshots` - Clean up old snapshots
+
 **Features:**
 • Remove snapshots beyond limit
 • Configurable retention policy
 • Safe deletion with confirmation
 
 **Examples:**
+
 ```
 vtagent cleanup-snapshots
 vtagent cleanup-snapshots --max 20
@@ -292,14 +318,16 @@ vtagent cleanup-snapshots --max 20
 ### Configuration Management
 
 #### `config` - Generate configuration file
+
 **Features:**
 • Generate default configuration
 • Support for global (home directory) and local configuration
 • TOML format with comprehensive settings
-• Multi-agent configuration options
+• Context Ledger and compression configuration options
 • Tree-sitter and performance monitoring settings
 
 **Examples:**
+
 ```
 vtagent config
 vtagent config --output ./custom-config.toml
@@ -307,6 +335,7 @@ vtagent config --global
 ```
 
 #### `tool-policy` - Manage tool execution policies
+
 **Features:**
 • Granular tool permissions
 • Security level presets
@@ -314,6 +343,7 @@ vtagent config --global
 • Safe tool execution
 
 **Examples:**
+
 ```
 vtagent tool-policy status
 vtagent tool-policy allow file-write
@@ -321,6 +351,7 @@ vtagent tool-policy deny shell-exec
 ```
 
 #### `models` - Manage models and providers
+
 **Features:**
 • Support for latest models (DeepSeek, etc.)
 • Provider configuration and testing
@@ -328,6 +359,7 @@ vtagent tool-policy deny shell-exec
 • API key management
 
 **Examples:**
+
 ```
 vtagent models list
 vtagent models set-provider deepseek
@@ -338,6 +370,7 @@ vtagent models test gemini
 ### Security & Analysis
 
 #### `security` - Security and safety management
+
 **Features:**
 • Security scanning and vulnerability detection
 • Audit logging and monitoring
@@ -347,6 +380,7 @@ vtagent models test gemini
 **Usage:** `vtagent security`
 
 #### `tree-sitter` - Tree-sitter code analysis tools
+
 **Features:**
 • AST-based code parsing
 • Symbol extraction and navigation
@@ -356,6 +390,7 @@ vtagent models test gemini
 **Usage:** `vtagent tree-sitter`
 
 #### `man` - Generate man pages
+
 **Features:**
 • Generate Unix man pages for all commands
 • Display detailed command documentation
@@ -363,6 +398,7 @@ vtagent models test gemini
 • Comprehensive help for all VTAgent features
 
 **Examples:**
+
 ```
 vtagent man
 vtagent man chat
@@ -373,32 +409,35 @@ vtagent man chat --output chat.1
 
 ### Core Components
 
-- **`vtagent-core/`**: Library crate with core functionality
-- **`src/`**: Binary crate with CLI interface
-- **`prompts/`**: System prompts for different agent types
-- **`docs/`**: Comprehensive documentation
-- **Tool specs**: see `docs/tools/TOOL_SPECS.md` for schemas, examples, and limits
-- **`examples/`**: Usage examples and demonstrations
+-   **`vtagent-core/`**: Library crate with core functionality
+-   **`src/`**: Binary crate with CLI interface
+-   **`prompts/`**: System prompts for different agent types
+-   **`docs/`**: Comprehensive documentation
+-   **Tool specs**: see `docs/tools/TOOL_SPECS.md` for schemas, examples, and limits
+-   **`examples/`**: Usage examples and demonstrations
 
 ### Agent Types
 
 #### Orchestrator Agent
-- **Strategic coordinator** managing complex development tasks
-- **Task delegation** to specialized subagents
-- **Context management** and knowledge accumulation
-- **Verification workflows** ensuring implementation quality
+
+-   **Strategic coordinator** managing complex development tasks
+-   **Task delegation** to specialized subagents
+-   **Context management** and knowledge accumulation
+-   **Verification workflows** ensuring implementation quality
 
 #### Explorer Agent
-- **Read-only investigator** for understanding and verification
-- **System exploration** and configuration discovery
-- **Implementation verification** of coder agent work
-- **Structured reporting** through context accumulation
+
+-   **Read-only investigator** for understanding and verification
+-   **System exploration** and configuration discovery
+-   **Implementation verification** of coder agent work
+-   **Structured reporting** through context accumulation
 
 #### Coder Agent
-- **Implementation specialist** with full write access
-- **Code generation** and modification capabilities
-- **Technical sophistication** in debugging and optimization
-- **Quality assurance** through comprehensive testing
+
+-   **Implementation specialist** with full write access
+-   **Code generation** and modification capabilities
+-   **Technical sophistication** in debugging and optimization
+-   **Quality assurance** through comprehensive testing
 
 ## Configuration
 
@@ -461,40 +500,46 @@ cp vtagent.toml.example vtagent.toml
 ```
 
 **Configuration Generation**: The `config` command implements two-way synchronization:
-- **Reads existing `vtagent.toml`** if present, preserving your customizations
-- **Generates complete TOML** with all sections, even missing ones
-- **Falls back to defaults** if no configuration exists
-- **Ensures consistency** between your config file and generated templates
+
+-   **Reads existing `vtagent.toml`** if present, preserving your customizations
+-   **Generates complete TOML** with all sections, even missing ones
+-   **Falls back to defaults** if no configuration exists
+-   **Ensures consistency** between your config file and generated templates
 
 ## Tool Suite
 
 ### File Operations
-- `list_files(path?)` - Explore directories with metadata
-- `read_file(path, start_line?, end_line?)` - Read text files with line control
-- `write_file(path, content)` - Create or overwrite files
-- `edit_file(path, old_string, new_string)` - Surgical file editing
+
+-   `list_files(path?)` - Explore directories with metadata
+-   `read_file(path, start_line?, end_line?)` - Read text files with line control
+-   `write_file(path, content)` - Create or overwrite files
+-   `edit_file(path, old_string, new_string)` - Surgical file editing
 
 ### Search & Analysis
-- `rp_search(pattern, path?)` - Fast text search using ripgrep
-- `grep_search(pattern, include_pattern?)` - Advanced regex search
-- `ast_grep_search(pattern, language?)` - Syntax-aware code search
+
+-   `rp_search(pattern, path?)` - Fast text search using ripgrep
+-   `grep_search(pattern, include_pattern?)` - Advanced regex search
+-   `ast_grep_search(pattern, language?)` - Syntax-aware code search
 
 ### Terminal Integration
-- `run_terminal_cmd(command)` - Execute terminal commands
-- `run_in_terminal(command, is_background?)` - Enhanced terminal execution
+
+-   `run_terminal_cmd(command)` - Execute terminal commands
+-   `run_in_terminal(command, is_background?)` - Enhanced terminal execution
 
 ### PTY Support
-- `configure_notebook(file_path)` - Configure Jupyter notebook kernels
-- `run_notebook_cell(cell_id, file_path)` - Execute notebook cells
-- `read_notebook_cell_output(cell_id, file_path)` - Read cell execution results
+
+-   `configure_notebook(file_path)` - Configure Jupyter notebook kernels
+-   `run_notebook_cell(cell_id, file_path)` - Execute notebook cells
+-   `read_notebook_cell_output(cell_id, file_path)` - Read cell execution results
 
 ### Color Utilities
+
 VTAgent now includes advanced color manipulation capabilities through the `coolor` crate integration:
 
-- RGB to ANSI color conversion for terminal compatibility
-- HSL color space support for intuitive color manipulation
-- Color blending and harmonious color scheme generation
-- Lighten/darken operations for dynamic color adjustments
+-   RGB to ANSI color conversion for terminal compatibility
+-   HSL color space support for intuitive color manipulation
+-   Color blending and harmonious color scheme generation
+-   Lighten/darken operations for dynamic color adjustments
 
 These utilities are available through the `vtagent_core::utils::colors` module for developers extending VTAgent's functionality.
 
@@ -578,35 +623,36 @@ These utilities are available through the `vtagent_core::utils::colors` module f
 VTAgent supports several global options that can be used with any command:
 
 ### Model & Provider Options
-- `--model <MODEL>` - Specify LLM model (e.g., `gemini-2.5-flash-lite`)
-- `--provider <PROVIDER>` - Specify LLM provider (e.g., `gemini`, `openai`, `anthropic`, `deepseek`)
-- `--api-key-env <ENV_VAR>` - Specify API key environment variable
 
-### Multi-Agent Options
-- `--force-multi-agent` - Enable multi-agent mode for complex tasks
-- `--agent-type <TYPE>` - Specify agent type (`orchestrator`, `explorer`, `coder`, `single`)
+-   `--model <MODEL>` - Specify LLM model (e.g., `gemini-2.5-flash-lite`)
+-   `--provider <PROVIDER>` - Specify LLM provider (e.g., `gemini`, `openai`, `anthropic`, `deepseek`)
+-   `--api-key-env <ENV_VAR>` - Specify API key environment variable
 
 ### Feature Flags
-- `--enable-tree-sitter` - Enable tree-sitter code analysis
-- `--performance-monitoring` - Enable performance monitoring
-- `--research-preview` - Enable research-preview features
+
+-   `--enable-tree-sitter` - Enable tree-sitter code analysis
+-   `--performance-monitoring` - Enable performance monitoring
+-   `--research-preview` - Enable research-preview features
 
 ### Security & Safety
-- `--security-level <LEVEL>` - Set security level (`strict`, `moderate`, `permissive`)
-- `--max-concurrent-ops <NUM>` - Maximum concurrent operations (default: 5)
-- `--max-tool-calls <NUM>` - Maximum tool calls per session (default: 10)
+
+-   `--security-level <LEVEL>` - Set security level (`strict`, `moderate`, `permissive`)
+-   `--max-concurrent-ops <NUM>` - Maximum concurrent operations (default: 5)
+-   `--max-tool-calls <NUM>` - Maximum tool calls per session (default: 10)
 
 ### Output & Logging
-- `--verbose` - Enable verbose logging
-- `--debug` - Enable debug output
-- `--log-level <LEVEL>` - Set log level (`error`, `warn`, `info`, `debug`, `trace`)
-- `--no-color` - Disable color output
-- `--show-file-diffs` - Show file diffs in chat interface
+
+-   `--verbose` - Enable verbose logging
+-   `--debug` - Enable debug output
+-   `--log-level <LEVEL>` - Set log level (`error`, `warn`, `info`, `debug`, `trace`)
+-   `--no-color` - Disable color output
+-   `--show-file-diffs` - Show file diffs in chat interface
 
 ### System Configuration
-- `--workspace <PATH>` - Set workspace root directory
-- `--config <PATH>` - Specify configuration file path
-- `--skip-confirmations` - Skip safety confirmations
+
+-   `--workspace <PATH>` - Set workspace root directory
+-   `--config <PATH>` - Specify configuration file path
+-   `--skip-confirmations` - Skip safety confirmations
 
 ## Contributing
 
@@ -615,12 +661,13 @@ VTAgent is an open-source project. Contributions are welcome! Please see our [co
 ## License
 
 Licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
 ### Tool Loop Guard
 
-- **Config key**: `[tools].max_tool_loops`
-- **Purpose**: Prevents infinite tool-calling cycles by limiting how many tool→respond iterations the agent performs per user turn.
-- **Default**: `6`
-- **Env override**: `VTAGENT_MAX_TOOL_LOOPS`
+-   **Config key**: `[tools].max_tool_loops`
+-   **Purpose**: Prevents infinite tool-calling cycles by limiting how many tool→respond iterations the agent performs per user turn.
+-   **Default**: `6`
+-   **Env override**: `VTAGENT_MAX_TOOL_LOOPS`
 
 Example:
 

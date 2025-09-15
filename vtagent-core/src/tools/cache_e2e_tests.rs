@@ -187,4 +187,194 @@ mod e2e_tests {
         assert!(result2.is_ok());
         assert_eq!(result2.unwrap()["content"], "modified");
     }
+
+    #[tokio::test]
+    async fn test_write_file_overwrite_mode() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let workspace_root = temp_dir.path().to_path_buf();
+        let mut registry = ToolRegistry::new(workspace_root.clone());
+        let test_file = workspace_root.join("test.txt");
+
+        // Write initial content
+        let args = json!({
+            "path": "test.txt",
+            "content": "Hello World",
+            "mode": "overwrite"
+        });
+
+        let result = registry.execute_tool("write_file", args).await.expect("write_file should succeed");
+        assert_eq!(result["success"], true);
+
+        // Verify file content
+        let content = fs::read_to_string(&test_file).expect("File should exist");
+        assert_eq!(content, "Hello World");
+    }
+
+    #[tokio::test]
+    async fn test_write_file_append_mode() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let workspace_root = temp_dir.path().to_path_buf();
+        let mut registry = ToolRegistry::new(workspace_root.clone());
+        let test_file = workspace_root.join("test.txt");
+
+        // Write initial content
+        registry.execute_tool("write_file", json!({
+            "path": "test.txt",
+            "content": "Hello",
+            "mode": "overwrite"
+        })).await.expect("Initial write should succeed");
+
+        // Append content
+        let args = json!({
+            "path": "test.txt",
+            "content": " World",
+            "mode": "append"
+        });
+
+        let result = registry.execute_tool("write_file", args).await.expect("append write_file should succeed");
+        assert_eq!(result["success"], true);
+
+        // Verify file content
+        let content = fs::read_to_string(&test_file).expect("File should exist");
+        assert_eq!(content, "Hello World");
+    }
+
+    #[tokio::test]
+    async fn test_write_file_skip_if_exists_mode() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let workspace_root = temp_dir.path().to_path_buf();
+        let mut registry = ToolRegistry::new(workspace_root.clone());
+        let test_file = workspace_root.join("test.txt");
+
+        // Write initial content
+        registry.execute_tool("write_file", json!({
+            "path": "test.txt",
+            "content": "Original",
+            "mode": "overwrite"
+        })).await.expect("Initial write should succeed");
+
+        // Try to write with skip_if_exists
+        let args = json!({
+            "path": "test.txt",
+            "content": "New Content",
+            "mode": "skip_if_exists"
+        });
+
+        let result = registry.execute_tool("write_file", args).await.expect("skip_if_exists write_file should succeed");
+        assert_eq!(result["success"], true);
+        assert_eq!(result["skipped"], true);
+
+        // Verify file content is unchanged
+        let content = fs::read_to_string(&test_file).expect("File should exist");
+        assert_eq!(content, "Original");
+    }
+
+    #[tokio::test]
+    async fn test_edit_file_exact_match() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let workspace_root = temp_dir.path().to_path_buf();
+        let mut registry = ToolRegistry::new(workspace_root.clone());
+        let test_file = workspace_root.join("test.txt");
+
+        // Create initial file
+        registry.execute_tool("write_file", json!({
+            "path": "test.txt",
+            "content": "Hello World\nThis is a test file.",
+            "mode": "overwrite"
+        })).await.expect("Initial write should succeed");
+
+        // Edit file - replace "World" with "Universe"
+        let edit_args = json!({
+            "path": "test.txt",
+            "old_str": "Hello World",
+            "new_str": "Hello Universe"
+        });
+
+        let result = registry.execute_tool("edit_file", edit_args).await.expect("edit_file should succeed");
+        assert_eq!(result["success"], true);
+
+        // Verify file content
+        let content = fs::read_to_string(&test_file).expect("File should exist");
+        assert_eq!(content, "Hello Universe\nThis is a test file.");
+    }
+
+    #[tokio::test]
+    async fn test_edit_file_multiple_occurrences() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let workspace_root = temp_dir.path().to_path_buf();
+        let mut registry = ToolRegistry::new(workspace_root.clone());
+        let test_file = workspace_root.join("test.txt");
+
+        // Create initial file with multiple occurrences
+        registry.execute_tool("write_file", json!({
+            "path": "test.txt",
+            "content": "test\ntest\nmore test content",
+            "mode": "overwrite"
+        })).await.expect("Initial write should succeed");
+
+        // Edit file - replace all "test" with "example"
+        let edit_args = json!({
+            "path": "test.txt",
+            "old_str": "test",
+            "new_str": "example"
+        });
+
+        let result = registry.execute_tool("edit_file", edit_args).await.expect("edit_file should succeed");
+        assert_eq!(result["success"], true);
+
+        // Verify file content - all occurrences should be replaced
+        let content = fs::read_to_string(&test_file).expect("File should exist");
+        assert_eq!(content, "example\nexample\nmore example content");
+    }
+
+    #[tokio::test]
+    async fn test_edit_file_with_newlines() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let workspace_root = temp_dir.path().to_path_buf();
+        let mut registry = ToolRegistry::new(workspace_root.clone());
+        let test_file = workspace_root.join("test.txt");
+
+        // Create initial file
+        registry.execute_tool("write_file", json!({
+            "path": "test.txt",
+            "content": "Line 1\nLine 2\nLine 3",
+            "mode": "overwrite"
+        })).await.expect("Initial write should succeed");
+
+        // Edit file - replace multiple lines
+        let edit_args = json!({
+            "path": "test.txt",
+            "old_str": "Line 1\nLine 2",
+            "new_str": "New Line 1\nNew Line 2"
+        });
+
+        let result = registry.execute_tool("edit_file", edit_args).await.expect("edit_file should succeed");
+        assert_eq!(result["success"], true);
+
+        // Verify file content
+        let content = fs::read_to_string(&test_file).expect("File should exist");
+        assert_eq!(content, "New Line 1\nNew Line 2\nLine 3");
+    }
+
+    #[tokio::test]
+    async fn test_write_file_creates_directories() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let workspace_root = temp_dir.path().to_path_buf();
+        let mut registry = ToolRegistry::new(workspace_root.clone());
+        let nested_file = temp_dir.path().join("dir").join("subdir").join("test.txt");
+
+        // Write to nested path that doesn't exist
+        let args = json!({
+            "path": "dir/subdir/test.txt",
+            "content": "Nested content",
+            "mode": "overwrite"
+        });
+
+        let result = registry.execute_tool("write_file", args).await.expect("write_file should succeed");
+        assert_eq!(result["success"], true);
+
+        // Verify file content and directory creation
+        let content = fs::read_to_string(&nested_file).expect("File should exist");
+        assert_eq!(content, "Nested content");
+    }
 }

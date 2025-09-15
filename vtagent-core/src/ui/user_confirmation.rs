@@ -43,75 +43,12 @@ impl UserConfirmation {
         Ok(confirmed)
     }
 
-    /// Ask for confirmation before switching to multi-agent mode
-    /// This is critical for optimizing efficiency and resource use
-    pub fn confirm_multi_agent_usage(task_description: &str) -> Result<bool> {
-        println!("{}", style("Multi-Agent Mode Request").yellow().bold());
-        println!("Task: {}", style(task_description).cyan());
-        println!();
-        println!("Multi-agent mode provides:");
-        println!("• Parallel task execution");
-        println!("• Specialized agent expertise");
-        println!("• Enhanced verification and quality");
-        println!();
-        println!("However, it also means:");
-        println!("• Higher API costs (multiple model calls)");
-        println!("• Increased complexity");
-        println!("• Longer setup time");
-        println!();
-        println!("For simple tasks, a single coder agent is usually more efficient.");
-
-        let confirmed = Confirm::new()
-            .with_prompt("Do you want to use multi-agent mode for this complex task?")
-            .default(false)
-            .interact()?;
-
-        if confirmed {
-            println!("{}", style("Confirmed: Using multi-agent mode").green());
-        } else {
-            println!("{}", style("Cancelled: Using single coder agent").yellow());
-        }
-
-        Ok(confirmed)
-    }
-
     /// Present agent mode selection options to the user
     pub fn select_agent_mode() -> Result<AgentMode> {
         println!("{}", style("Agent Mode Selection").cyan().bold());
+        println!("VTAgent now uses single-agent mode with Decision Ledger for reliable task execution.");
 
-        let options = vec![
-            "Single Coder Agent (Recommended for most tasks)",
-            "Multi-Agent System (For complex, multi-step tasks)",
-        ];
-
-        let selection = Select::new()
-            .with_prompt("Choose the agent mode for your task")
-            .default(0)
-            .items(&options)
-            .interact()?;
-
-        let mode = match selection {
-            0 => AgentMode::SingleCoder,
-            1 => AgentMode::MultiAgent,
-            _ => AgentMode::SingleCoder, // Default fallback
-        };
-
-        match mode {
-            AgentMode::SingleCoder => {
-                println!("{}", style("Selected: Single Coder Agent").green());
-                println!("• Fast and efficient");
-                println!("• Lower costs");
-                println!("• Direct implementation");
-            }
-            AgentMode::MultiAgent => {
-                println!("{}", style("Selected: Multi-Agent System").green());
-                println!("• Specialized expertise");
-                println!("• Parallel execution");
-                println!("• Enhanced verification");
-            }
-        }
-
-        Ok(mode)
+        Ok(AgentMode::SingleCoder)
     }
 
     /// Ask for task complexity assessment to determine agent mode
@@ -155,7 +92,7 @@ impl UserConfirmation {
             TaskComplexity::Complex => {
                 println!(
                     "{}",
-                    style("Complex task - Multi-agent mode recommended").blue()
+                    style("Complex task detected - proceeding with single-agent mode").blue()
                 );
             }
         }
@@ -190,10 +127,8 @@ impl UserConfirmation {
 /// Available agent modes
 #[derive(Debug, Clone, PartialEq)]
 pub enum AgentMode {
-    /// Single coder agent - efficient for most tasks
+    /// Single coder agent with Decision Ledger - reliable for all tasks
     SingleCoder,
-    /// Multi-agent system - for complex tasks requiring specialization
-    MultiAgent,
 }
 
 /// Task complexity levels for agent mode selection
@@ -212,12 +147,7 @@ impl TaskComplexity {
     pub fn recommended_agent_mode(&self) -> AgentMode {
         match self {
             TaskComplexity::Simple | TaskComplexity::Moderate => AgentMode::SingleCoder,
-            TaskComplexity::Complex => AgentMode::MultiAgent,
+            TaskComplexity::Complex => AgentMode::SingleCoder, // Default to SingleCoder as MultiAgent is removed
         }
-    }
-
-    /// Check if multi-agent mode is recommended for this complexity
-    pub fn recommends_multi_agent(&self) -> bool {
-        matches!(self, TaskComplexity::Complex)
     }
 }

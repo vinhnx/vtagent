@@ -1,40 +1,41 @@
 # Getting Started with VTAgent
 
-Welcome to VTAgent! This guide will help you get up and running with this Rust-based terminal coding agent that provides intelligent, context-aware coding assistance through multi-agent architecture.
+Welcome to VTAgent! This guide will help you get up and running with this Rust-based terminal coding agent that provides intelligent.
 
 ## What Makes VTAgent Special
 
 VTAgent represents a modern approach to AI-powered software development, featuring:
 
-- **Multi-Agent Architecture** - Orchestrator, Explorer, and Coder agents for specialized tasks
-- **Multi-Provider LLM Support** - Gemini, OpenAI, Anthropic integration
-- **Advanced Code Intelligence** - Tree-sitter parsers for 6+ programming languages
-- **Enterprise-Grade Safety** - Comprehensive security controls and path validation
-- **Flexible Configuration** - TOML-based configuration with granular policies
-- **Research-Preview Features** - Cutting-edge agent coordination and context engineering
+-   **Multi-Provider LLM Support** - Gemini, OpenAI, Anthropic integration
+-   **Advanced Code Intelligence** - Tree-sitter parsers for 6+ programming languages
+-   **Enterprise-Grade Safety** - Comprehensive security controls and path validation
+-   **Flexible Configuration** - TOML-based configuration with granular policies
+-   **Research-Preview Features** - Cutting-edge agent coordination and context engineering
 
 ## Prerequisites
 
 ### System Requirements
 
-- **Rust**: 1.75+ (stable recommended)
-  - Install from [rustup.rs](https://rustup.rs/)
-  - Includes Cargo package manager
-- **Git**: For version control and cloning the repository
-- **Operating System**: macOS, Linux, or Windows (with WSL2)
+-   **Rust**: 1.75+ (stable recommended)
+    -   Install from [rustup.rs](https://rustup.rs/)
+    -   Includes Cargo package manager
+-   **Git**: For version control and cloning the repository
+-   **Operating System**: macOS, Linux, or Windows (with WSL2)
 
 ### API Requirements
 
 Choose one of the supported LLM providers:
 
-- **Gemini** (Primary): `export GEMINI_API_KEY=your_key_here` or `export GOOGLE_API_KEY=your_key_here`
-  - Get from [Google AI Studio](https://aistudio.google.com/app/apikey)
+-   **Gemini** (Primary): `export GEMINI_API_KEY=your_key_here` or `export GOOGLE_API_KEY=your_key_here`
 
-- **OpenAI**: `export OPENAI_API_KEY=your_key_here`
-  - Get from [OpenAI Platform](https://platform.openai.com/api-keys)
+    -   Get from [Google AI Studio](https://aistudio.google.com/app/apikey)
 
-- **Anthropic**: `export ANTHROPIC_API_KEY=your_key_here`
-  - Get from [Anthropic Console](https://console.anthropic.com/)
+-   **OpenAI**: `export OPENAI_API_KEY=your_key_here`
+
+    -   Get from [OpenAI Platform](https://platform.openai.com/api-keys)
+
+-   **Anthropic**: `export ANTHROPIC_API_KEY=your_key_here`
+    -   Get from [Anthropic Console](https://console.anthropic.com/)
 
 ## Installation
 
@@ -141,7 +142,7 @@ run_terminal_cmd = "prompt"
 
 ### Advanced Configuration
 
-```toml
+````toml
 # Command permissions
 [commands]
 allow_list = ["ls", "pwd", "cat", "git status", "cargo check"]
@@ -154,40 +155,20 @@ default_rows = 24
 default_cols = 80
 command_timeout_seconds = 300
 
-# Multi-agent settings
-[multi_agent]
-enabled = true
-max_concurrent_tasks = 3
-context_store_size_mb = 100
-```
-
 ## Usage Examples
 
 ### Basic Chat Session
 
 ```bash
 vtagent chat
-```
+````
 
 The agent will greet you and await your instructions. Try asking:
 
-- "Analyze this codebase"
-- "Add error handling to the user authentication"
-- "Refactor this function to be more readable"
-- "Create a new API endpoint for user registration"
-
-### Multi-Agent Mode
-
-```bash
-# Start orchestrator for complex tasks
-vtagent orchestrate "Implement a complete user management system"
-
-# Explorer agent for investigation
-vtagent explore "Analyze the current database schema"
-
-# Coder agent for implementation
-vtagent code "Add password reset functionality"
-```
+-   "Analyze this codebase"
+-   "Add error handling to the user authentication"
+-   "Refactor this function to be more readable"
+-   "Create a new API endpoint for user registration"
 
 ### Project Analysis
 
@@ -205,19 +186,22 @@ vtagent summary
 ## Understanding the Agents
 
 ### Orchestrator Agent
-- **Role**: Strategic coordinator and task planner
-- **Capabilities**: Task decomposition, agent delegation, progress tracking
-- **Use for**: Complex multi-step tasks requiring coordination
+
+-   **Role**: Strategic coordinator and task planner
+-   **Capabilities**: Task decomposition, agent delegation, progress tracking
+-   **Use for**: Complex multi-step tasks requiring coordination
 
 ### Explorer Agent
-- **Role**: Investigation and verification specialist
-- **Capabilities**: Code analysis, system exploration, testing
-- **Use for**: Understanding codebases, verifying implementations
+
+-   **Role**: Investigation and verification specialist
+-   **Capabilities**: Code analysis, system exploration, testing
+-   **Use for**: Understanding codebases, verifying implementations
 
 ### Coder Agent
-- **Role**: Implementation specialist
-- **Capabilities**: Code writing, refactoring, debugging
-- **Use for**: Making code changes, adding features, fixing bugs
+
+-   **Role**: Implementation specialist
+-   **Capabilities**: Code writing, refactoring, debugging
+-   **Use for**: Making code changes, adding features, fixing bugs
 
 ## Advanced Features
 
@@ -225,36 +209,37 @@ vtagent summary
 
 VTAgent automatically manages conversation context:
 
-- **Intelligent compression** of long conversations
-- **Persistent context store** across sessions
-- **Automatic summarization** of completed tasks
-- **Context-aware responses** based on full history
+-   **Intelligent compression** of long conversations
+-   **Persistent context store** across sessions
+-   **Automatic summarization** of completed tasks
+-   **Context-aware responses** based on full history
 
 ### Safety Features
 
 Comprehensive security controls:
 
-- **Path validation** - Prevents access outside workspace
-- **Command policies** - Allow/deny lists for terminal commands
-- **Human-in-the-loop** - Confirmation for dangerous operations
-- **File size limits** - Prevents processing of large files
-- **API key masking** - Secure credential handling
+-   **Path validation** - Prevents access outside workspace
+-   **Command policies** - Allow/deny lists for terminal commands
+-   **Human-in-the-loop** - Confirmation for dangerous operations
+-   **File size limits** - Prevents processing of large files
+-   **API key masking** - Secure credential handling
 
 ### Tool Integration
 
 Rich tool ecosystem:
 
-- **File Operations**: Read, write, edit files safely
-- **Search & Analysis**: Fast text search and AST-based analysis
-- **Terminal Commands**: Execute shell commands with PTY support
-- **Code Intelligence**: Tree-sitter powered syntax analysis
-- **Batch Operations**: Process multiple files efficiently
+-   **File Operations**: Read, write, edit files safely
+-   **Search & Analysis**: Fast text search and AST-based analysis
+-   **Terminal Commands**: Execute shell commands with PTY support
+-   **Code Intelligence**: Tree-sitter powered syntax analysis
+-   **Batch Operations**: Process multiple files efficiently
 
 ## Troubleshooting
 
 ### Common Issues
 
 #### API Key Not Set
+
 ```bash
 # Check if API key is set
 echo $GEMINI_API_KEY
@@ -264,6 +249,7 @@ export GEMINI_API_KEY=your_key_here
 ```
 
 #### Configuration Issues
+
 ```bash
 # Validate configuration
 vtagent config --validate
@@ -273,6 +259,7 @@ vtagent config --reset
 ```
 
 #### Build Issues
+
 ```bash
 # Clean and rebuild
 cargo clean
@@ -285,27 +272,26 @@ cargo --version
 
 ### Getting Help
 
-- **Documentation**: Comprehensive guides in `docs/` directory
-- **GitHub Issues**: Report bugs and request features
-- **GitHub Discussions**: Community support and discussions
-- **Configuration Examples**: Check `vtagent.toml.example`
+-   **Documentation**: Comprehensive guides in `docs/` directory
+-   **GitHub Issues**: Report bugs and request features
+-   **GitHub Discussions**: Community support and discussions
+-   **Configuration Examples**: Check `vtagent.toml.example`
 
 ## Next Steps
 
 Now that you have VTAgent running, explore:
 
-1. **[Multi-Agent Guide](../MULTI_AGENT_GUIDE.md)** - Learn about agent coordination
-2. **[Configuration Guide](../CONFIGURATION.md)** - Advanced configuration options
-3. **[Architecture Guide](../ARCHITECTURE.md)** - System design and components
-4. **[Provider Guides](../PROVIDER_GUIDES.md)** - LLM provider integration
+1. **[Configuration Guide](../CONFIGURATION.md)** - Advanced configuration options
+1. **[Architecture Guide](../ARCHITECTURE.md)** - System design and components
+1. **[Provider Guides](../PROVIDER_GUIDES.md)** - LLM provider integration
 
 ## Contributing
 
 Interested in contributing? Check out:
 
-- **[Development Guide](../development/README.md)** - Development setup
-- **[Contributing Guide](../../CONTRIBUTING.md)** - Contribution guidelines
-- **[Code Standards](../development/code-style.md)** - Coding conventions
+-   **[Development Guide](../development/README.md)** - Development setup
+-   **[Contributing Guide](../../CONTRIBUTING.md)** - Contribution guidelines
+-   **[Code Standards](../development/code-style.md)** - Coding conventions
 
 ---
 

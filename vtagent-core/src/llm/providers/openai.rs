@@ -299,7 +299,7 @@ impl OpenAIProvider {
 
 #[async_trait]
 impl LLMClient for OpenAIProvider {
-    async fn generate(&mut self, prompt: &str) -> Result<llm_types::LLMResponse, LLMError> {
+    async fn generate(&mut self, _prompt: &str) -> Result<llm_types::LLMResponse, LLMError> {
         let model = models::openai::DEFAULT_MODEL.to_string();
 
         // Validate the model

@@ -14,9 +14,14 @@ fn core_cfg(model: &str) -> CoreAgentConfig {
 #[test]
 fn classify_simple_and_codegen() {
     assert_eq!(Router::classify_heuristic("list files"), TaskClass::Simple);
-    assert_eq!(Router::classify_heuristic("```
+    assert_eq!(
+        Router::classify_heuristic(
+            "```
 fn main() {}
-```"), TaskClass::CodegenHeavy);
+```"
+        ),
+        TaskClass::CodegenHeavy
+    );
 }
 
 #[test]
@@ -33,4 +38,3 @@ fn route_uses_model_mapping() {
     let r2 = Router::route(&cfg, &core, "Provide a patch:\n```diff\n- a\n+ b\n```\n");
     assert_eq!(r2.selected_model, "gemini-2.5-pro");
 }
-

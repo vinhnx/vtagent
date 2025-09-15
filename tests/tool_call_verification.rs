@@ -2,8 +2,10 @@
 
 use serde_json::json;
 use vtagent_core::llm::{
+    provider::{
+        LLMProvider, LLMRequest, Message, MessageRole, ToolCall, ToolChoice, ToolDefinition,
+    },
     providers::{AnthropicProvider, GeminiProvider, OpenAIProvider},
-    provider::{LLMProvider, LLMRequest, Message, MessageRole, ToolCall, ToolChoice, ToolDefinition},
 };
 
 #[test]

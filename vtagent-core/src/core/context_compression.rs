@@ -159,6 +159,15 @@ impl ContextCompressor {
             return true;
         }
 
+        // Preserve decision ledger summaries explicitly
+        if message.content.contains("[Decision Ledger]")
+            || message
+                .content
+                .contains("Decision Ledger (most recent first)")
+        {
+            return true;
+        }
+
         // Preserve system messages if configured
         if self.config.preserve_system_messages && matches!(message.role, MessageRole::System) {
             return true;

@@ -15,9 +15,18 @@ pub async fn handle_performance_command() -> Result<()> {
     println!("  Family: {}", std::env::consts::FAMILY);
 
     println!("\nMemory:");
-    println!("  Total: {:.2} GB", sys.total_memory() as f64 / 1024.0 / 1024.0 / 1024.0);
-    println!("  Used: {:.2} GB", sys.used_memory() as f64 / 1024.0 / 1024.0 / 1024.0);
-    println!("  Available: {:.2} GB", sys.available_memory() as f64 / 1024.0 / 1024.0 / 1024.0);
+    println!(
+        "  Total: {:.2} GB",
+        sys.total_memory() as f64 / 1024.0 / 1024.0 / 1024.0
+    );
+    println!(
+        "  Used: {:.2} GB",
+        sys.used_memory() as f64 / 1024.0 / 1024.0 / 1024.0
+    );
+    println!(
+        "  Available: {:.2} GB",
+        sys.available_memory() as f64 / 1024.0 / 1024.0 / 1024.0
+    );
 
     println!("\nCPU:");
     println!("  Cores: {}", sys.cpus().len());
@@ -25,7 +34,10 @@ pub async fn handle_performance_command() -> Result<()> {
 
     println!("\nProcesses: {}", sys.processes().len());
     if let Some(process) = sys.process(sysinfo::Pid::from_u32(std::process::id())) {
-        println!("  Self RSS: {:.2} MB", process.memory() as f64 / 1024.0 / 1024.0);
+        println!(
+            "  Self RSS: {:.2} MB",
+            process.memory() as f64 / 1024.0 / 1024.0
+        );
         println!("  Self CPU: {:.1}%", process.cpu_usage());
     }
 

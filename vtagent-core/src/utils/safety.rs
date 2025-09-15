@@ -4,7 +4,7 @@
 //! or resource-intensive operations to ensure user control and efficiency.
 
 use crate::config::models::ModelId;
-use crate::ui::user_confirmation::{AgentMode, TaskComplexity, UserConfirmation};
+use crate::ui::user_confirmation::{AgentMode, UserConfirmation};
 use anyhow::Result;
 use console::style;
 
@@ -63,101 +63,15 @@ impl SafetyValidator {
     /// Validate agent mode selection based on task complexity and user preferences
     /// Returns the recommended agent mode with user confirmation if needed
     pub fn validate_agent_mode(
-        task_description: &str,
-        requested_multi_agent: bool,
-        force_multi_agent: bool,
-        skip_confirmations: bool,
+        _task_description: &str,
+        _skip_confirmations: bool,
     ) -> Result<AgentMode> {
-        // Handle force multi-agent flag
-        if force_multi_agent {
-            if skip_confirmations {
-                println!(
-                    "{}",
-                    style("Forcing multi-agent mode (confirmations skipped)").yellow()
-                );
-                return Ok(AgentMode::MultiAgent);
-            }
-
-            let confirmed = UserConfirmation::confirm_multi_agent_usage(task_description)?;
-            return Ok(if confirmed {
-                AgentMode::MultiAgent
-            } else {
-                AgentMode::SingleCoder
-            });
-        }
-
-        // If multi-agent is explicitly requested, ask for confirmation
-        if requested_multi_agent {
-            if skip_confirmations {
-                println!(
-                    "{}",
-                    style("Using multi-agent mode (confirmations skipped)").yellow()
-                );
-                return Ok(AgentMode::MultiAgent);
-            }
-
-            let confirmed = UserConfirmation::confirm_multi_agent_usage(task_description)?;
-
-            if confirmed {
-                return Ok(AgentMode::MultiAgent);
-            } else {
-                println!("{}", style("Switching to single coder agent mode").yellow());
-                return Ok(AgentMode::SingleCoder);
-            }
-        }
-
-        // For auto mode, assess task complexity and recommend
-        if skip_confirmations {
-            println!(
-                "{}",
-                style("Using single coder agent (confirmations skipped)").yellow()
-            );
-            return Ok(AgentMode::SingleCoder);
-        }
-
-        let complexity = UserConfirmation::assess_task_complexity(task_description)?;
-        let _recommended_mode = complexity.recommended_agent_mode();
-
-        match complexity {
-            TaskComplexity::Complex => {
-                // For complex tasks, offer multi-agent but don't force it
-                println!(
-                    "{}",
-                    style("Complex task detected - Multi-agent mode recommended")
-                        .blue()
-                        .bold()
-                );
-
-                let confirmed = UserConfirmation::confirm_multi_agent_usage(task_description)?;
-
-                if confirmed {
-                    Ok(AgentMode::MultiAgent)
-                } else {
-                    println!(
-                        "{}",
-                        style("Using single coder agent for complex task").yellow()
-                    );
-                    Ok(AgentMode::SingleCoder)
-                }
-            }
-            TaskComplexity::Moderate => {
-                // For moderate tasks, default to single agent but offer choice
-                println!(
-                    "{}",
-                    style("Moderate task - Single agent recommended").green()
-                );
-                println!("Single coder agent should handle this efficiently.");
-                Ok(AgentMode::SingleCoder)
-            }
-            TaskComplexity::Simple => {
-                // For simple tasks, always use single agent
-                println!(
-                    "{}",
-                    style("Simple task - Using single coder agent").green()
-                );
-                Ok(AgentMode::SingleCoder)
-            }
-        }
+        // Always use single-agent mode
+        println!(
+            "{}",
+            style("Using single-agent mode with Decision Ledger").green()
+        );
+        Ok(AgentMode::SingleCoder)
     }
 
     /// Check if a model switch is safe and cost-effective
@@ -217,18 +131,12 @@ impl SafetyValidator {
         // Agent mode recommendations
         match agent_mode {
             AgentMode::SingleCoder => {
-                println!("{}", style("Single Coder Agent:").green());
-                println!("• Direct and efficient");
+                println!("{}", style("Single-Agent System:").blue());
+                println!("• Streamlined execution");
+                println!("• Decision Ledger tracking");
                 println!("• Lower API costs");
                 println!("• Faster task completion");
                 println!("• Best for most development tasks");
-            }
-            AgentMode::MultiAgent => {
-                println!("{}", style("Multi-Agent System:").blue());
-                println!("• Specialized expertise");
-                println!("• Parallel task execution");
-                println!("• Enhanced verification");
-                println!("• Higher resource usage");
             }
         }
 
@@ -238,7 +146,7 @@ impl SafetyValidator {
     /// Validate resource usage and warn about potential costs
     pub fn validate_resource_usage(
         model: &str,
-        agent_mode: &AgentMode,
+        _agent_mode: &AgentMode,
         estimated_tokens: Option<usize>,
     ) -> Result<bool> {
         use crate::config::constants::models;
@@ -249,10 +157,7 @@ impl SafetyValidator {
             warnings.push("Using most expensive model (Gemini 2.5 Pro)");
         }
 
-        // Check for multi-agent resource usage
-        if matches!(agent_mode, AgentMode::MultiAgent) {
-            warnings.push("Multi-agent mode will use multiple model calls");
-        }
+        // Single-agent mode uses standard resource usage
 
         // Check for high token usage
         if let Some(tokens) = estimated_tokens {

@@ -1,4 +1,3 @@
-//! Agent run loops for single- and multi-agent modes
+//! Agent run loops for single-agent mode
 
 pub mod runloop;
-

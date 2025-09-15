@@ -1,8 +1,8 @@
 use anyhow::Result;
 use console::style;
-use std::path::Path;
 use std::fs;
 use std::io::Write;
+use std::path::Path;
 use vtagent_core::config::{ConfigManager, VTAgentConfig};
 
 /// Handle the config command
@@ -14,7 +14,7 @@ pub async fn handle_config_command(output: Option<&Path>, use_home_dir: bool) ->
         let created_files = VTAgentConfig::bootstrap_project_with_options(
             std::env::current_dir()?,
             true, // force overwrite
-            true  // use home directory
+            true, // use home directory
         )?;
 
         if !created_files.is_empty() {
@@ -79,22 +79,6 @@ reasoning_effort = "medium"
 # Enable human-in-the-loop mode
 human_in_the_loop = true
 
-[multi_agent]
-# Enable multi-agent mode
-enabled = false
-# Use single model for all agents when multi-agent is enabled
-use_single_model = true
-# Main orchestrator agent model (used when multi-agent is enabled)
-orchestrator_model = "qwen/qwen3-4b-2507"
-# Executor agent model (used for single-agent mode and as subagents in multi-agent mode)
-executor_model = "qwen/qwen3-4b-2507"
-# Maximum number of concurrent subagents
-max_concurrent_subagents = 3
-# Enable context sharing between agents
-context_sharing_enabled = true
-# Task execution timeout in seconds
-task_timeout_seconds = 300
-
 [tools]
 # Default tool execution policy
 default_policy = "prompt"
@@ -113,6 +97,7 @@ default_cols = 80
 max_sessions = 10
 # Command execution timeout in seconds
 command_timeout_seconds = 300
-"#.to_string()
+"#
+        .to_string()
     })
 }

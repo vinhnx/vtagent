@@ -65,8 +65,8 @@ run_test "VTAgent Core Compilation" "cargo check --package vtagent-core --quiet 
 echo -e "\nTesting PTY Dependencies"
 echo "============================"
 
-# Test 2: Check if rexpect is available (PTY library)
-run_test "PTY Library Available" "cargo tree --package vtagent-core | grep rexpect && echo 'found'" "found"
+# Test 2: Check if expectrl is available (PTY library)
+run_test "PTY Library Available" "cargo tree --package vtagent-core | grep expectrl && echo 'found'" "found"
 
 # Test 3: Check if ripgrep is available
 run_test "Ripgrep Available" "which rg" "rg"

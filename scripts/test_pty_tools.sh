@@ -46,8 +46,8 @@ run_test "Ripgrep Available" "which rg" "rg"
 # Test 3: AST-grep
 run_test "AST Grep Available" "which ast-grep" "ast-grep"
 
-# Test 4: rexpect (PTY library) - check if it's in Cargo.toml
-run_test "PTY Library in Dependencies" "grep rexpect vtagent-core/Cargo.toml" "rexpect"
+# Test 4: expectrl (PTY library) - check if it's in Cargo.toml
+run_test "PTY Library in Dependencies" "grep expectrl vtagent-core/Cargo.toml" "expectrl"
 
 echo -e "\n🧪 Testing Tool Functionality"
 echo "============================"
@@ -67,8 +67,8 @@ run_test "BashTool PTY Methods" "grep 'execute_pty_command' vtagent-core/src/too
 # Test 8: Check if SimpleSearchTool PTY methods exist
 run_test "SimpleSearchTool PTY Methods" "grep 'execute_pty_command' vtagent-core/src/tools/simple_search.rs" "execute_pty_command"
 
-# Test 9: Check if rexpect is imported
-run_test "PTY Imports" "grep 'rexpect::spawn' vtagent-core/src/tools/bash_tool.rs" "rexpect::spawn"
+# Test 9: Check if expectrl is imported
+run_test "PTY Imports" "grep 'expectrl::spawn' vtagent-core/src/tools/bash_tool.rs" "expectrl::spawn"
 
 echo -e "\n📊 Test Results"
 echo "==============="

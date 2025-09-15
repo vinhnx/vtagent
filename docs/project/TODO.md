@@ -161,3 +161,31 @@ These observations on context engineering are just the start to what we might so
 --> don't return break the agent chat loop when error happens. instead, return the error message to the user and let them decide what to do next. update the system prompt accordingly. make sure to log the error for debugging purposes. test it out with some error scenarios to ensure it works as expected. update with tools policy accordingly and tool registry. write end to end tests for this new error handling for vtagent core write and edit commands.
 
 ---
+
+IMPORTANT: search all "// For now," comments and implement actual logic instead of stubs. make sure cover all edge cases and handle errors properly. test it out with various scenarios to ensure it works as expected. update with tools policy accordingly and tool registry. write end to end tests for this new logic for vtagent core write and edit commands. update the system prompt accordingly. update the documentation accordingly.
+
+---
+
+IMPORTANT: search for "In a real implementation" comments and implement actual logic instead of stubs. make sure cover all edge cases and handle errors properly. test it out with various scenarios to ensure it works as expected. update with tools policy accordingly and tool registry. write end to end tests for this new logic for vtagent core write and edit commands. update the system prompt accordingly. update the documentation accordingly.
+
+---
+
+support mcp https://modelcontextprotocol.io/docs/getting-started/intro
+
+---
+
+support https://agents.md
+
+---
+
+review all these crates seem not apply to chat repl
+
+# ANSI styling
+
+anstyle = "1.0"
+anstyle-query = "1.0"
+anstream = "0.6"
+anstyle-parse = "0.2"
+anstyle-ls = "1.0"
+anstyle-git = "0.3"
+anstyle-roff = "0.3"

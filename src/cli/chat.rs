@@ -1,7 +1,5 @@
 use anyhow::{Context, Result};
-use anstyle_git::Highlight;
 use console::style;
-use regex::Regex;
 use std::io::{self, Write};
 use vtagent_core::{
     config::{ConfigManager, constants::tools},
@@ -17,57 +15,6 @@ use vtagent_core::{
 use vtagent_core::gemini::function_calling::{FunctionCall, FunctionResponse};
 use vtagent_core::gemini::models::ToolConfig;
 use serde_json::json;
-
-/// Highlight code blocks in text using anstyle-git
-fn highlight_code_blocks(text: &str) -> String {
-    let mut result = String::new();
-    let mut last_end = 0;
-
-    // Regex to match code blocks: ```language\ncode\n```
-    let code_block_re = Regex::new(r"```(\w+)?\n(.*?)\n```").unwrap();
-
-    for cap in code_block_re.captures_iter(text) {
-        let full_match = cap.get(0).unwrap();
-        let language = cap.get(1).map_or("", |m| m.as_str());
-        let code = cap.get(2).unwrap().as_str();
-
-        // Add text before the code block
-        result.push_str(&text[last_end..full_match.start()]);
-
-        // Highlight the code block
-        let highlighted_code = match language {
-            "rust" | "rs" => Highlight::Rust.highlight(code),
-            "python" | "py" => Highlight::Python.highlight(code),
-            "javascript" | "js" => Highlight::JavaScript.highlight(code),
-            "typescript" | "ts" => Highlight::TypeScript.highlight(code),
-            "java" => Highlight::Java.highlight(code),
-            "go" => Highlight::Go.highlight(code),
-            "cpp" | "c++" | "cxx" => Highlight::Cpp.highlight(code),
-            "c" => Highlight::C.highlight(code),
-            "bash" | "sh" | "shell" => Highlight::Bash.highlight(code),
-            "json" => Highlight::Json.highlight(code),
-            "yaml" | "yml" => Highlight::Yaml.highlight(code),
-            "toml" => Highlight::Toml.highlight(code),
-            "sql" => Highlight::Sql.highlight(code),
-            "html" => Highlight::Html.highlight(code),
-            "css" => Highlight::Css.highlight(code),
-            "markdown" | "md" => Highlight::Markdown.highlight(code),
-            _ => Highlight::Plaintext.highlight(code), // Default fallback
-        };
-
-        // Format the highlighted code block
-        result.push_str("```\n");
-        result.push_str(&highlighted_code);
-        result.push_str("\n```");
-
-        last_end = full_match.end();
-    }
-
-    // Add remaining text after the last code block
-    result.push_str(&text[last_end..]);
-
-    result
-}
 
 /// Handle the chat command
 pub async fn handle_chat_command(config: &CoreAgentConfig, skip_confirmations: bool) -> Result<()> {
@@ -198,8 +145,7 @@ pub async fn handle_chat_command(config: &CoreAgentConfig, skip_confirmations: b
             if function_calls.is_empty() {
                 // No tool calls: print final_text if present and finish
                 if let Some(text) = final_text.clone() {
-                    let highlighted_text = highlight_code_blocks(&text);
-                    println!("{}", highlighted_text);
+                    println!("{}", text);
                 }
                 // Commit the assistant text to true history
                 if let Some(text) = final_text { conversation_history.push(Content::system_text(text)); }

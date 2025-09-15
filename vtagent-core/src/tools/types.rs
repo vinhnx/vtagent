@@ -67,6 +67,10 @@ pub struct Input {
     pub encoding: Option<String>,
     #[serde(default)]
     pub ast_grep_pattern: Option<String>,
+    #[serde(default)]
+    pub chunk_lines: Option<usize>,
+    #[serde(default)]
+    pub max_lines: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]

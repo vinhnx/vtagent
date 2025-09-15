@@ -10,10 +10,6 @@ pub mod styled;
 pub mod terminal;
 pub mod user_confirmation;
 
-// Conditional modules for additional UI features
-// Optional module for ANSI style parsing (feature gate not currently used)
-pub mod anstyle_parse_utils;
-
 pub use markdown::*;
 pub use spinner::*;
 pub use styled::*;

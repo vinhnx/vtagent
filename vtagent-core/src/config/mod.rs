@@ -6,22 +6,20 @@
 
 pub mod api_keys;
 pub mod constants;
+pub mod context;
 pub mod core;
 pub mod defaults;
 pub mod loader;
 pub mod models;
-pub mod context;
 pub mod router;
 pub mod telemetry;
 pub mod types;
 
 // Re-export main types for backward compatibility
-pub use core::{AgentConfig, CommandsConfig, SecurityConfig, ToolPolicy, ToolsConfig};
-pub use defaults::{
-    ContextStoreDefaults, PerformanceDefaults, ScenarioDefaults,
-};
-pub use loader::{ConfigManager, VTAgentConfig};
 pub use context::{ContextFeaturesConfig, LedgerConfig};
+pub use core::{AgentConfig, CommandsConfig, SecurityConfig, ToolPolicy, ToolsConfig};
+pub use defaults::{ContextStoreDefaults, PerformanceDefaults, ScenarioDefaults};
+pub use loader::{ConfigManager, VTAgentConfig};
 pub use router::{ComplexityModelMap, ResourceBudget, RouterConfig};
 pub use telemetry::TelemetryConfig;
 

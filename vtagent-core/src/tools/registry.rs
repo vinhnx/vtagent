@@ -185,7 +185,7 @@ pub struct ToolRegistry {
     command_tool: CommandTool,
     grep_search: Arc<GrepSearchManager>,
     ast_grep_engine: Option<Arc<AstGrepEngine>>,
-    tool_policy: ToolPolicyManager,
+    tool_policy: Option<ToolPolicyManager>,
     pty_config: PtyConfig,
     active_pty_sessions: Arc<AtomicUsize>,
 }
@@ -216,14 +216,16 @@ impl ToolRegistry {
         };
 
         // Initialize policy manager and update available tools
-        let mut policy_manager = ToolPolicyManager::new_with_workspace(&workspace_root)
-            .unwrap_or_else(|e| {
-                eprintln!("Warning: Failed to initialize tool policy manager: {}", e);
-                // Create a fallback that allows all tools
-                ToolPolicyManager::new().unwrap()
-            });
+        let policy_manager_result = ToolPolicyManager::new_with_workspace(&workspace_root);
 
-        // Update available tools in policy manager
+        let (mut policy_manager, _has_policy) = match policy_manager_result {
+            Ok(manager) => (Some(manager), true),
+            Err(e) => {
+                eprintln!("Warning: Failed to initialize tool policy manager: {}", e);
+                (None, false)
+            }
+        };
+
         let mut available_tools = vec![
             tools::GREP_SEARCH.to_string(),
             tools::LIST_FILES.to_string(),
@@ -240,8 +242,11 @@ impl ToolRegistry {
             available_tools.push(tools::AST_GREP_SEARCH.to_string());
         }
 
-        if let Err(e) = policy_manager.update_available_tools(available_tools) {
-            eprintln!("Warning: Failed to update tool policies: {}", e);
+        // Update available tools in policy manager if available
+        if let Some(ref mut pm) = policy_manager {
+            if let Err(e) = pm.update_available_tools(available_tools) {
+                eprintln!("Warning: Failed to update tool policies: {}", e);
+            }
         }
 
         Self {
@@ -279,14 +284,19 @@ impl ToolRegistry {
 
     /// Execute a tool by name with policy checking
     pub async fn execute_tool(&mut self, name: &str, args: Value) -> Result<Value> {
-        // Check tool policy before execution
-        if !self.policy_manager_mut().should_execute_tool(name)? {
-            let error = ToolExecutionError::new(
-                name.to_string(),
-                ToolErrorType::PolicyViolation,
-                format!("Tool '{}' execution denied by policy", name),
-            );
-            return Ok(error.to_json_value());
+        // Check tool policy before execution (if policy manager is available)
+        if let Ok(policy_manager) = self.policy_manager_mut() {
+            if !policy_manager.should_execute_tool(name)? {
+                let error = ToolExecutionError::new(
+                    name.to_string(),
+                    ToolErrorType::PolicyViolation,
+                    format!("Tool '{}' execution denied by policy", name),
+                );
+                return Ok(error.to_json_value());
+            }
+        } else {
+            // No policy manager available, allow execution
+            eprintln!("Warning: No policy manager available, allowing tool execution without policy check");
         }
 
         // Apply optional scoped constraints from policy
@@ -400,7 +410,7 @@ impl ToolRegistry {
 
     /// Apply optional scoped constraints from tool policy to arguments to improve safety
     fn apply_policy_constraints(&self, name: &str, mut args: Value) -> Result<Value> {
-        if let Some(constraints) = self.tool_policy.get_constraints(name).cloned() {
+        if let Some(constraints) = self.tool_policy.as_ref().and_then(|tp| tp.get_constraints(name)).cloned() {
             let obj = args
                 .as_object_mut()
                 .ok_or_else(|| anyhow!("Error: tool arguments must be an object"))?;
@@ -513,43 +523,61 @@ impl ToolRegistry {
     }
 
     /// Get tool policy manager (mutable reference)
-    pub fn policy_manager_mut(&mut self) -> &mut ToolPolicyManager {
-        &mut self.tool_policy
+    pub fn policy_manager_mut(&mut self) -> Result<&mut ToolPolicyManager> {
+        self.tool_policy.as_mut().ok_or_else(|| anyhow!("Tool policy manager not available"))
     }
 
     /// Get tool policy manager (immutable reference)
-    pub fn policy_manager(&self) -> &ToolPolicyManager {
-        &self.tool_policy
+    pub fn policy_manager(&self) -> Result<&ToolPolicyManager> {
+        self.tool_policy.as_ref().ok_or_else(|| anyhow!("Tool policy manager not available"))
     }
 
     /// Set policy for a specific tool
     pub fn set_tool_policy(&mut self, tool_name: &str, policy: ToolPolicy) -> Result<()> {
-        self.tool_policy.set_policy(tool_name, policy)
+        self.tool_policy.as_mut().expect("Tool policy manager not initialized").set_policy(tool_name, policy)
     }
 
     /// Get policy for a specific tool
     pub fn get_tool_policy(&self, tool_name: &str) -> ToolPolicy {
-        self.tool_policy.get_policy(tool_name)
+        self.tool_policy.as_ref()
+            .map(|tp| tp.get_policy(tool_name))
+            .unwrap_or(ToolPolicy::Allow) // Default to allow when no policy manager
     }
 
     /// Reset all tool policies to prompt
     pub fn reset_tool_policies(&mut self) -> Result<()> {
-        self.tool_policy.reset_all_to_prompt()
+        if let Some(tp) = self.tool_policy.as_mut() {
+            tp.reset_all_to_prompt()
+        } else {
+            Err(anyhow!("Tool policy manager not available"))
+        }
     }
 
     /// Allow all tools
     pub fn allow_all_tools(&mut self) -> Result<()> {
-        self.tool_policy.allow_all_tools()
+        if let Some(tp) = self.tool_policy.as_mut() {
+            tp.allow_all_tools()
+        } else {
+            Err(anyhow!("Tool policy manager not available"))
+        }
     }
 
     /// Deny all tools
     pub fn deny_all_tools(&mut self) -> Result<()> {
-        self.tool_policy.deny_all_tools()
+        if let Some(tp) = self.tool_policy.as_mut() {
+            tp.deny_all_tools()
+        } else {
+            Err(anyhow!("Tool policy manager not available"))
+        }
     }
 
-    /// Print tool policy status
-    pub fn print_tool_policy_status(&self) {
-        self.tool_policy.print_status();
+    /// Print policy status
+    pub fn print_policy_status(&self) {
+        if let Some(tp) = self.tool_policy.as_ref() {
+            tp.print_status();
+        } else {
+            eprintln!("Tool policy manager not available");
+        }
     }
 
     /// Get cache statistics
@@ -585,9 +613,10 @@ impl ToolRegistry {
 
         let input: EditInput = serde_json::from_value(args).context("invalid edit_file args")?;
 
-        // Read the current file content
+        // Read the current file content (disable chunking for edit operations)
         let read_args = json!({
-            "path": input.path
+            "path": input.path,
+            "max_lines": 1000000  // Set a very high threshold to avoid chunking
         });
 
         let read_result = self.file_ops_tool.read_file(read_args).await?;
@@ -829,6 +858,13 @@ impl ToolRegistry {
                     "cwd".to_string(),
                     json!(self.workspace_root.display().to_string()),
                 );
+            });
+        }
+
+        // Default to PTY mode if not specified
+        if args.get("mode").is_none() {
+            args.as_object_mut().map(|m| {
+                m.insert("mode".to_string(), json!("pty"));
             });
         }
 
@@ -1311,7 +1347,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // Consolidated file operations tool
         FunctionDeclaration {
             name: "list_files".to_string(),
-            description: "Explores and lists files and directories in the workspace with multiple discovery modes. This tool is essential for understanding project structure, finding files by name or content, and navigating the codebase. Use this tool when you need to see what files exist in a directory, find files matching specific patterns, or search for files containing certain content. It supports recursive directory traversal, pagination for large directories, and various filtering options. The tool can operate in different modes: 'list' for basic directory contents, 'recursive' for deep directory traversal, 'find_name' for filename-based searches, and 'find_content' for content-based file discovery. Always use pagination (page and per_page parameters) for large directories to prevent token overflow. The concise response format is recommended for most cases as it omits low-value metadata.".to_string(),
+            description: "Explores and lists files and directories in the workspace with multiple discovery modes. This tool is essential for understanding project structure, finding files by name or content, and navigating the codebase. Use this tool when you need to see what files exist in a directory, find files matching specific patterns, or search for files containing certain content. It supports recursive directory traversal, pagination for large directories, and various filtering options. The tool can operate in different modes: 'list' for basic directory contents, 'recursive' for deep directory traversal, 'find_name' for filename-based searches, and 'find_content' for content-based file discovery. PAGINATION BEST PRACTICES: Always use pagination (page and per_page parameters) for large directories to prevent token overflow and timeouts. Default per_page=50 for optimal performance. Monitor the 'has_more' flag and continue with subsequent pages. For very large directories (>1000 items), consider reducing per_page to 25. The concise response format is recommended for most cases as it omits low-value metadata.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
@@ -1319,10 +1355,10 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
                     "mode": {"type": "string", "description": "'list' | 'recursive' | 'find_name' | 'find_content'", "default": "list"},
                     "max_items": {"type": "integer", "description": "Cap total items scanned (token safety). Default: 1000", "default": 1000},
                     "page": {"type": "integer", "description": "Page number (1-based). Default: 1", "default": 1},
-                    "per_page": {"type": "integer", "description": "Items per page. Default: 100", "default": 100},
+                    "per_page": {"type": "integer", "description": "Items per page. Default: 50", "default": 50},
                     "response_format": {"type": "string", "description": "'concise' (default) omits low-signal fields; 'detailed' includes them", "default": "concise"},
                     "include_hidden": {"type": "boolean", "description": "Include hidden files", "default": false},
-                    "name_pattern": {"type": "string", "description": "For 'recursive'/'find_name' modes. Example: '*.rs'"},
+                    "name_pattern": {"type": "string", "description": "Optional pattern for 'recursive'/'find_name' modes. Use '*' or omit for all files. Example: '*.rs'", "default": "*"},
                     "content_pattern": {"type": "string", "description": "For 'find_content' mode. Example: 'fn main'"},
                     "file_extensions": {"type": "array", "items": {"type": "string"}, "description": "Filter by file extensions"},
                     "case_sensitive": {"type": "boolean", "description": "Case sensitive pattern matching", "default": true},
@@ -1335,11 +1371,14 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // File reading tool
         FunctionDeclaration {
             name: tools::READ_FILE.to_string(),
-            description: "Reads the contents of a specific file from the workspace. This tool is fundamental for examining source code, configuration files, documentation, and any text-based content. Use this tool when you need to see the implementation details of a function, understand file structure, read configuration settings, or examine documentation. It automatically handles large files by reading in chunks and provides line-numbered output for easy reference. The tool will return an error if the file doesn't exist or if there are permission issues. Always prefer this tool over terminal commands like 'cat' when you need to read file contents, as it provides better error handling and formatting. Note that this tool only reads text files; it cannot read binary files or execute code.".to_string(),
+            description: "Reads the contents of a specific file from the workspace with intelligent chunking for large files. This tool automatically handles large files by reading the first and last portions when files exceed size thresholds, ensuring efficient token usage while preserving important content. For files larger than 2,000 lines, it reads the first 800 and last 800 lines with a truncation indicator. Use chunk_lines or max_lines parameters to customize the threshold. The tool provides structured logging of chunking operations for debugging.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "File path to read"}
+                    "path": {"type": "string", "description": "File path to read"},
+                    "max_bytes": {"type": "integer", "description": "Maximum bytes to read (optional)", "default": null},
+                    "chunk_lines": {"type": "integer", "description": "Line threshold for chunking (optional, default: 2000)", "default": 2000},
+                    "max_lines": {"type": "integer", "description": "Alternative parameter for chunk_lines (optional)", "default": null}
                 },
                 "required": ["path"]
             }),
@@ -1378,7 +1417,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // Consolidated command execution tool
         FunctionDeclaration {
             name: tools::RUN_TERMINAL_CMD.to_string(),
-            description: "Executes shell commands and external programs in the workspace environment. This tool is essential for running build processes, package managers, test suites, and system commands that cannot be handled by specialized file or search tools. Use this tool when you need to compile code, install dependencies, run tests, execute scripts, or perform system operations. It supports different execution modes: 'terminal' for standard command execution, 'pty' for interactive commands requiring a pseudo-terminal, and 'streaming' for long-running processes. Always specify appropriate timeouts to prevent hanging commands. Prefer specialized tools (read_file, write_file, grep_search) for file operations rather than shell commands. The tool provides both concise and detailed output formats, with concise being recommended for most cases to save tokens.".to_string(),
+            description: "Executes shell commands and external programs in the workspace environment with intelligent output truncation for large command outputs. This tool automatically handles verbose command outputs by truncating to the first and last portions when output exceeds 10,000 lines, ensuring efficient token usage while preserving important information. For commands producing excessive output, it shows the first 5,000 and last 5,000 lines with a truncation indicator. Use this tool for build processes, package managers, test suites, and system operations. Supports 'terminal' (default), 'pty' (interactive), and 'streaming' (long-running) modes. Always specify timeouts and prefer specialized tools for file operations.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {

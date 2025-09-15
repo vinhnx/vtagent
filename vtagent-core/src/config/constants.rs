@@ -8,15 +8,15 @@ pub mod prompts {
 pub mod models {
     // Google/Gemini models
     pub mod google {
-        pub const DEFAULT_MODEL: &str = "gemini-2.5-flash-lite";
+        pub const DEFAULT_MODEL: &str = "gemini-2.5-flash-lite-preview-06-17";
         pub const SUPPORTED_MODELS: &[&str] = &[
-            "gemini-2.5-flash-lite",
+            "gemini-2.5-flash-lite-preview-06-17",
             "gemini-2.5-flash",
             "gemini-2.5-pro",
         ];
 
         // Convenience constants for commonly used models
-        pub const GEMINI_2_5_FLASH_LITE: &str = "gemini-2.5-flash-lite";
+        pub const GEMINI_2_5_FLASH_LITE: &str = "gemini-2.5-flash-lite-preview-06-17";
         pub const GEMINI_2_5_FLASH: &str = "gemini-2.5-flash";
         pub const GEMINI_2_5_PRO: &str = "gemini-2.5-pro";
     }
@@ -146,4 +146,31 @@ pub mod tools {
 
     // Special wildcard for full access
     pub const WILDCARD_ALL: &str = "*";
+}
+
+/// Chunking constants for large file handling
+pub mod chunking {
+    /// Maximum lines before triggering chunking for read_file
+    pub const MAX_LINES_THRESHOLD: usize = 2_000;
+
+    /// Number of lines to read from start of file when chunking
+    pub const CHUNK_START_LINES: usize = 800;
+
+    /// Number of lines to read from end of file when chunking
+    pub const CHUNK_END_LINES: usize = 800;
+
+    /// Maximum lines for terminal command output before truncation
+    pub const MAX_TERMINAL_OUTPUT_LINES: usize = 3_000;
+
+    /// Number of lines to show from start of terminal output when truncating
+    pub const TERMINAL_OUTPUT_START_LINES: usize = 1_000;
+
+    /// Number of lines to show from end of terminal output when truncating
+    pub const TERMINAL_OUTPUT_END_LINES: usize = 1_000;
+
+    /// Maximum content size for write_file before chunking (in bytes)
+    pub const MAX_WRITE_CONTENT_SIZE: usize = 500_000; // 500KB
+
+    /// Chunk size for write operations (in bytes)
+    pub const WRITE_CHUNK_SIZE: usize = 50_000; // 50KB chunks
 }

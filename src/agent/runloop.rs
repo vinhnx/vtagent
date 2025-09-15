@@ -715,8 +715,16 @@ async fn run_single_agent_loop_unified(
                             },
                             None,
                         );
+                        renderer.line(
+                            MessageStyle::Info,
+                            &format!("Running '{}' to progress task", name),
+                        )?;
                         match tool_registry.execute_tool(name, args_val.clone()).await {
                             Ok(tool_output) => {
+                                renderer.line(
+                                    MessageStyle::Info,
+                                    &format!("Tool '{}' completed successfully", name),
+                                )?;
                                 traj.log_tool_call(working_history.len(), name, &args_val, true);
                                 render_tool_output(&tool_output);
                                 if matches!(
@@ -739,8 +747,11 @@ async fn run_single_agent_loop_unified(
                                 );
                             }
                             Err(e) => {
+                                renderer.line(
+                                    MessageStyle::Error,
+                                    &format!("Tool '{}' failed: {e}", name),
+                                )?;
                                 traj.log_tool_call(working_history.len(), name, &args_val, false);
-                                renderer.line(MessageStyle::Error, &format!("Tool error: {e}"))?;
                                 let err = serde_json::json!({ "error": e.to_string() });
                                 let content = err.to_string();
                                 working_history

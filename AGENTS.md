@@ -212,6 +212,13 @@ if is_valid && is_allowed && is_secure {
 - Document CLI usage and examples
 - Document (.md) files must put in ./docs folder. don't put any unrelated files in root folder. THIS IS IMPORTANT
 
+### Tool Call Transparency
+
+- Before each tool execution, provide a brief one-sentence purpose
+- After execution, summarize the outcome in one sentence, noting errors if any
+- On errors, explain the issue and next step in one sentence
+- Keep messages concise and free of jargon
+
 ## Tree-sitter Integration
 
 - Use tree-sitter parsers for supported languages

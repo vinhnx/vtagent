@@ -15,10 +15,10 @@ use anyhow::Result;
 use serde_json;
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
-use std::sync::Arc;
-use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
+use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 
@@ -72,6 +72,7 @@ struct SearchState {
 
     /// If there is an active search, this will be the query being searched.
     active_search: Option<ActiveSearch>,
+    last_result: Option<GrepSearchResult>,
 }
 
 struct ActiveSearch {
@@ -86,6 +87,7 @@ impl GrepSearchManager {
                 latest_query: String::new(),
                 is_search_scheduled: false,
                 active_search: None,
+                last_result: None,
             })),
             search_dir,
         }
@@ -161,6 +163,13 @@ impl GrepSearchManager {
         });
     }
 
+    /// Retrieve the last successful search result
+    pub fn last_result(&self) -> Option<GrepSearchResult> {
+        #[expect(clippy::unwrap_used)]
+        let st = self.state.lock().unwrap();
+        st.last_result.clone()
+    }
+
     fn spawn_rp_search(
         query: String,
         search_dir: PathBuf,
@@ -206,19 +215,22 @@ impl GrepSearchManager {
 
             let is_cancelled = cancellation_token.load(Ordering::Relaxed);
             if !is_cancelled {
-                // Process the results if the command succeeded
                 if let Ok(output) = output {
                     if output.status.success() {
-                        // Parse the JSON output
                         let output_str = String::from_utf8_lossy(&output.stdout);
+                        let mut matches = Vec::new();
                         for line in output_str.lines() {
-                            if !line.trim().is_empty() {
-                                // In a real implementation, this would send the search results
-                                // to the UI or store them somewhere accessible
-                                // For now, we'll just print them
-                                println!("Search result: {}", line);
+                            if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
+                                matches.push(val);
                             }
                         }
+                        let result = GrepSearchResult {
+                            query: query.clone(),
+                            matches,
+                        };
+                        #[expect(clippy::unwrap_used)]
+                        let mut st = search_state.lock().unwrap();
+                        st.last_result = Some(result);
                     }
                 }
             }

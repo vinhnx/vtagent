@@ -118,17 +118,29 @@ impl AnthropicProvider {
                 "content": msg.content
             });
 
-            // Add tool_call_id for tool responses if present
-            // This helps maintain context for tool call chains
+            // Tool responses must be represented as tool_result content in a user message
             if msg.role == MessageRole::Tool {
-                if let Some(_tool_call_id) = &msg.tool_call_id {
-                    // Note: Anthropic doesn't use tool_call_id in the same way as OpenAI
-                    // but we can include it as metadata in the content or ignore it
-                    // For now, we'll include the tool response content as-is
+                if let Some(tool_call_id) = &msg.tool_call_id {
+                    messages.push(json!({
+                        "role": "user",
+                        "content": [{
+                            "type": "tool_result",
+                            "tool_use_id": tool_call_id,
+                            "content": [
+                                {"type": "text", "text": msg.content}
+                            ]
+                        }]
+                    }));
+                } else {
+                    // Fallback: treat as plain user message if id missing
+                    messages.push(json!({
+                        "role": "user",
+                        "content": [{"type": "text", "text": msg.content}]
+                    }));
                 }
+            } else {
+                messages.push(message);
             }
-
-            messages.push(message);
         }
 
         let mut anthropic_request = json!({

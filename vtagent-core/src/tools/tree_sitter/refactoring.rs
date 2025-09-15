@@ -15,7 +15,7 @@ pub struct RefactoringOperation {
 }
 
 /// Type of refactoring operation
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum RefactoringKind {
     Rename,
     ExtractFunction,
@@ -292,13 +292,41 @@ impl RefactoringEngine {
     }
 
     /// Check for naming conflicts
-    fn check_naming_conflicts(
-        &self,
-        _operation: &RefactoringOperation,
-    ) -> Vec<RefactoringConflict> {
-        // This would implement sophisticated conflict detection
-        // For now, return empty vector
-        Vec::new()
+    fn check_naming_conflicts(&self, operation: &RefactoringOperation) -> Vec<RefactoringConflict> {
+        let mut conflicts = Vec::new();
+
+        if operation.kind != RefactoringKind::Rename {
+            return conflicts;
+        }
+
+        if let Some(change) = operation.changes.first() {
+            if let Ok(content) = std::fs::read_to_string(&change.file_path) {
+                if let Ok(re) =
+                    regex::Regex::new(&format!(r"\b{}\b", regex::escape(&change.new_text)))
+                {
+                    for mat in re.find_iter(&content) {
+                        if mat.start() != change.old_range.start.byte_offset {
+                            conflicts.push(RefactoringConflict {
+                                kind: ConflictKind::NameConflict,
+                                message: format!(
+                                    "name '{}' already exists in {}",
+                                    change.new_text, change.file_path
+                                ),
+                                position: Position {
+                                    row: 0,
+                                    column: 0,
+                                    byte_offset: mat.start(),
+                                },
+                                suggestion: Some("choose a different name".to_string()),
+                            });
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        conflicts
     }
 
     /// Check for scope conflicts
@@ -309,14 +337,28 @@ impl RefactoringEngine {
 
     /// Apply a single change
     fn apply_change(&mut self, change: &CodeChange) -> Result<(), RefactoringError> {
-        // This would implement the actual file modification
-        // For now, just validate the change
         if change.old_range.start.byte_offset > change.old_range.end.byte_offset {
             return Err(RefactoringError::InvalidRange(format!(
                 "Invalid range: start > end in {}",
                 change.file_path
             )));
         }
+
+        let mut content = std::fs::read_to_string(&change.file_path)
+            .map_err(|e| RefactoringError::FileOperationError(e.to_string()))?;
+
+        let start = change.old_range.start.byte_offset;
+        let end = change.old_range.end.byte_offset;
+        if end > content.len() {
+            return Err(RefactoringError::InvalidRange(format!(
+                "range exceeds file length in {}",
+                change.file_path
+            )));
+        }
+
+        content.replace_range(start..end, &change.new_text);
+        std::fs::write(&change.file_path, content)
+            .map_err(|e| RefactoringError::FileOperationError(e.to_string()))?;
 
         Ok(())
     }
@@ -404,19 +446,66 @@ impl RefactoringUtils {
     }
 
     fn analyze_repeated_expressions(
-        _node: &SyntaxNode,
-        _suggestions: &mut Vec<VariableExtractionSuggestion>,
+        node: &SyntaxNode,
+        suggestions: &mut Vec<VariableExtractionSuggestion>,
     ) {
-        // This would implement expression repetition analysis
-        // For now, leave empty
+        use std::collections::HashMap;
+        let mut expr_map: HashMap<String, (usize, Position)> = HashMap::new();
+
+        fn traverse(node: &SyntaxNode, map: &mut HashMap<String, (usize, Position)>) {
+            if node.kind.contains("expression") {
+                let entry = map
+                    .entry(node.text.clone())
+                    .or_insert((0, node.start_position.clone()));
+                entry.0 += 1;
+            }
+            for child in &node.children {
+                traverse(child, map);
+            }
+        }
+
+        traverse(node, &mut expr_map);
+
+        for (expr, (count, pos)) in expr_map {
+            if count > 1 {
+                suggestions.push(VariableExtractionSuggestion {
+                    expression: expr,
+                    position: pos,
+                    occurrences: count,
+                    suggestion: "Consider extracting this repeated expression into a variable"
+                        .to_string(),
+                });
+            }
+        }
     }
 
     fn analyze_magic_values(
-        _node: &SyntaxNode,
-        _suggestions: &mut Vec<ConstantExtractionSuggestion>,
+        node: &SyntaxNode,
+        suggestions: &mut Vec<ConstantExtractionSuggestion>,
     ) {
-        // This would implement magic value detection
-        // For now, leave empty
+        fn traverse(node: &SyntaxNode, out: &mut Vec<ConstantExtractionSuggestion>) {
+            if node.kind.contains("number") || node.kind.contains("string") {
+                let val = node.text.trim();
+                if val != "0" && val != "1" && !val.is_empty() {
+                    let value_type = if node.kind.contains("string") {
+                        "string"
+                    } else {
+                        "number"
+                    };
+                    out.push(ConstantExtractionSuggestion {
+                        value: val.to_string(),
+                        position: node.start_position.clone(),
+                        value_type: value_type.to_string(),
+                        suggestion: "Consider extracting this literal into a constant".to_string(),
+                    });
+                }
+            }
+            for child in &node.children {
+                traverse(child, out);
+            }
+        }
+
+        traverse(node, suggestions);
     }
 
     fn calculate_node_size(node: &SyntaxNode) -> usize {

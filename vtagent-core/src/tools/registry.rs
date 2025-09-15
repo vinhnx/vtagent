@@ -15,7 +15,7 @@ use crate::config::types::CapabilityLevel;
 use crate::gemini::FunctionDeclaration;
 use crate::tool_policy::{ToolPolicy, ToolPolicyManager};
 use crate::tools::ast_grep::AstGrepEngine;
-use crate::tools::grep_search::GrepSearchManager;
+use crate::tools::grep_search::{GrepSearchManager, GrepSearchResult};
 use anyhow::{Context, Result, anyhow};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -183,7 +183,7 @@ pub struct ToolRegistry {
     bash_tool: BashTool,
     file_ops_tool: FileOpsTool,
     command_tool: CommandTool,
-    // Removed stored grep_search (no longer needed as a field)
+    grep_search: Arc<GrepSearchManager>,
     ast_grep_engine: Option<Arc<AstGrepEngine>>,
     tool_policy: ToolPolicyManager,
     pty_config: PtyConfig,
@@ -251,6 +251,7 @@ impl ToolRegistry {
             bash_tool,
             file_ops_tool,
             command_tool,
+            grep_search,
             ast_grep_engine,
             tool_policy: policy_manager,
             pty_config,
@@ -701,6 +702,11 @@ impl ToolRegistry {
         self.execute_tool(tools::GREP_SEARCH, args).await
     }
 
+    /// Get last ripgrep search result
+    pub fn last_rp_search_result(&self) -> Option<GrepSearchResult> {
+        self.grep_search.last_result()
+    }
+
     pub async fn list_files(&mut self, args: Value) -> Result<Value> {
         self.execute_tool(tools::LIST_FILES, args).await
     }
@@ -731,8 +737,12 @@ impl ToolRegistry {
             String::new()
         };
 
+        let mut deny_regex = cfg.commands.deny_regex.clone();
+        if let Ok(extra) = std::env::var("VTAGENT_COMMANDS_DENY_REGEX") {
+            deny_regex.extend(extra.split(',').map(|s| s.trim().to_string()));
+        }
         // Deny regex
-        for pat in &cfg.commands.deny_regex {
+        for pat in &deny_regex {
             if Regex::new(pat)
                 .ok()
                 .map(|re| re.is_match(&cmd_text))
@@ -741,8 +751,12 @@ impl ToolRegistry {
                 return Err(anyhow!("Command denied by regex policy: {}", pat));
             }
         }
+        let mut deny_glob = cfg.commands.deny_glob.clone();
+        if let Ok(extra) = std::env::var("VTAGENT_COMMANDS_DENY_GLOB") {
+            deny_glob.extend(extra.split(',').map(|s| s.trim().to_string()));
+        }
         // Deny glob (convert basic * to .*)
-        for pat in &cfg.commands.deny_glob {
+        for pat in &deny_glob {
             let re = format!("^{}$", regex::escape(pat).replace(r"\*", ".*"));
             if Regex::new(&re)
                 .ok()
@@ -753,17 +767,28 @@ impl ToolRegistry {
             }
         }
         // Exact deny list
-        for d in &cfg.commands.deny_list {
+        let mut deny_list = cfg.commands.deny_list.clone();
+        if let Ok(extra) = std::env::var("VTAGENT_COMMANDS_DENY_LIST") {
+            deny_list.extend(extra.split(',').map(|s| s.trim().to_string()));
+        }
+        for d in &deny_list {
             if cmd_text.starts_with(d) {
                 return Err(anyhow!("Command denied by policy: {}", d));
             }
         }
 
         // Allow: if allow_regex/glob present, require one match
-        let mut allow_ok =
-            cfg.commands.allow_regex.is_empty() && cfg.commands.allow_glob.is_empty();
+        let mut allow_regex = cfg.commands.allow_regex.clone();
+        if let Ok(extra) = std::env::var("VTAGENT_COMMANDS_ALLOW_REGEX") {
+            allow_regex.extend(extra.split(',').map(|s| s.trim().to_string()));
+        }
+        let mut allow_glob = cfg.commands.allow_glob.clone();
+        if let Ok(extra) = std::env::var("VTAGENT_COMMANDS_ALLOW_GLOB") {
+            allow_glob.extend(extra.split(',').map(|s| s.trim().to_string()));
+        }
+        let mut allow_ok = allow_regex.is_empty() && allow_glob.is_empty();
         if !allow_ok {
-            if cfg.commands.allow_regex.iter().any(|pat| {
+            if allow_regex.iter().any(|pat| {
                 Regex::new(pat)
                     .ok()
                     .map(|re| re.is_match(&cmd_text))
@@ -772,7 +797,7 @@ impl ToolRegistry {
                 allow_ok = true;
             }
             if !allow_ok
-                && cfg.commands.allow_glob.iter().any(|pat| {
+                && allow_glob.iter().any(|pat| {
                     let re = format!("^{}$", regex::escape(pat).replace(r"\*", ".*"));
                     Regex::new(&re)
                         .ok()
@@ -785,12 +810,12 @@ impl ToolRegistry {
         }
         if !allow_ok {
             // Fall back to exact allow_list if provided
-            if !cfg.commands.allow_list.is_empty() {
-                allow_ok = cfg
-                    .commands
-                    .allow_list
-                    .iter()
-                    .any(|p| cmd_text.starts_with(p));
+            let mut allow_list = cfg.commands.allow_list.clone();
+            if let Ok(extra) = std::env::var("VTAGENT_COMMANDS_ALLOW_LIST") {
+                allow_list.extend(extra.split(',').map(|s| s.trim().to_string()));
+            }
+            if !allow_list.is_empty() {
+                allow_ok = allow_list.iter().any(|p| cmd_text.starts_with(p));
             }
         }
         if !allow_ok {

@@ -6,12 +6,12 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use console::style;
 use std::path::PathBuf;
-use vtagent_core::constants::defaults;
+use vtagent_core::api_keys::{get_api_key, load_dotenv, ApiKeySources};
 use vtagent_core::config::loader::ConfigManager;
-use vtagent_core::api_keys::{ApiKeySources, get_api_key, load_dotenv};
+use vtagent_core::constants::defaults;
 use vtagent_core::{
     config::ConfigManager,
-    models::{Provider, ModelId},
+    models::{ModelId, Provider},
     safety::SafetyValidator,
     types::AgentConfig as CoreAgentConfig,
 };
@@ -22,11 +22,7 @@ use cli::*;
 
 /// Main CLI structure for VT Code
 #[derive(Parser, Debug)]
-#[command(
-    name = "vtcode",
-    version,
-    about = "minimal coding agent",
-)]
+#[command(name = "vtcode", version, about = "minimal coding agent")]
 pub struct Cli {
     /// Gemini model ID (e.g., gemini-2.5-flash-lite)
     #[arg(long, global = true, default_value = defaults::DEFAULT_CLI_MODEL)]
@@ -75,7 +71,7 @@ pub enum Commands {
     /// Generate configuration file
     Config {
         #[arg(long)]
-        output: Option<PathBuf>
+        output: Option<PathBuf>,
     },
     /// Show performance metrics
     Performance,
@@ -89,11 +85,13 @@ async fn main() -> Result<()> {
     let args = Cli::parse();
 
     // Determine workspace
-    let workspace = args.workspace.unwrap_or_else(|| std::env::current_dir().unwrap());
+    let workspace = args
+        .workspace
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
 
     // Load configuration
-    let config_manager = ConfigManager::load_from_workspace(&workspace)
-        .context("Failed to load configuration")?;
+    let config_manager =
+        ConfigManager::load_from_workspace(&workspace).context("Failed to load configuration")?;
     let vtcode_config = config_manager.config();
 
     // Create API key sources configuration
@@ -133,7 +131,7 @@ async fn main() -> Result<()> {
     let validated_model = SafetyValidator::validate_model_usage(
         &config.model,
         Some("Interactive coding session"),
-        args.skip_confirmations
+        args.skip_confirmations,
     )?;
 
     config.model = validated_model;
@@ -156,12 +154,14 @@ async fn main() -> Result<()> {
             // Create a simple LLM client and get a response
             let client = vtagent_core::llm::make_client(
                 config.api_key.clone(),
-                config.model.parse().unwrap_or_default()
+                config.model.parse().unwrap_or_default(),
             );
 
             // For a minimal implementation, we'll just print a placeholder response
             // In a full implementation, this would actually call the LLM
-            println!("Answer: This is a placeholder response. In a full implementation, this would call the LLM with your question.");
+            println!(
+                "Answer: This is a placeholder response. In a full implementation, this would call the LLM with your question."
+            );
         }
         Commands::Analyze => {
             handle_analyze_command(&config).await?;
@@ -176,15 +176,11 @@ async fn main() -> Result<()> {
             handle_config_command(output.as_deref()).await?;
         }
         Commands::Performance => {
-            println!("{}", style("Performance metrics mode selected").blue().bold());
-
-            // Performance metrics implementation
-            // In a real implementation, this would collect and display actual performance metrics
-            println!("Performance Metrics:");
-            println!("  Response time: N/A (not implemented)");
-            println!("  Memory usage: N/A (not implemented)");
-            println!("  Token usage: N/A (not implemented)");
-            println!("  Cache hit rate: N/A (not implemented)");
+            println!(
+                "{}",
+                style("Performance metrics mode selected").blue().bold()
+            );
+            handle_performance_command().await?;
         }
     }
 

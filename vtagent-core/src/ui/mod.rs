@@ -11,8 +11,7 @@ pub mod terminal;
 pub mod user_confirmation;
 
 // Conditional modules for additional UI features
-#[allow(unexpected_cfgs)]
-#[cfg(feature = "anstyle-parse")]
+// Optional module for ANSI style parsing (feature gate not currently used)
 pub mod anstyle_parse_utils;
 
 pub use markdown::*;

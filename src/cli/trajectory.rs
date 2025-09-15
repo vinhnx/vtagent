@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use console::style;
 use serde::Deserialize;
 use serde_json::Value;
@@ -177,12 +178,11 @@ pub async fn handle_trajectory_command(
 }
 
 fn format_timestamp(ts: i64) -> String {
-    if let Some(_dt) = SystemTime::UNIX_EPOCH.checked_add(std::time::Duration::from_secs(ts as u64))
-    {
-        // For simplicity, just return a basic format. In a real implementation,
-        // you might want to use chrono for better date formatting.
-        format!("{}", ts)
+    if let Some(dt) = NaiveDateTime::from_timestamp_opt(ts, 0) {
+        DateTime::<Utc>::from_utc(dt, Utc)
+            .format("%Y-%m-%d %H:%M:%S UTC")
+            .to_string()
     } else {
-        format!("{}", ts)
+        ts.to_string()
     }
 }

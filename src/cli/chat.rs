@@ -60,8 +60,8 @@ pub async fn handle_chat_command(config: &CoreAgentConfig, skip_confirmations: b
 
     // Create system instruction
     let system_instruction = SystemInstruction::new(
-        &read_system_prompt_from_md()
-            .unwrap_or_else(|_| "You are a helpful coding assistant. You can help with programming tasks, code analysis, and file operations.".to_string())
+        read_system_prompt_from_md()
+            .unwrap_or_else(|_| "You are a helpful coding assistant. You can help with programming tasks, code analysis, and file operations.".to_string()),
     );
 
     loop {

@@ -80,13 +80,13 @@ async fn check_api_connectivity(config: &AgentConfig) -> Result<()> {
             SystemInstruction::new(text)
         } else {
             SystemInstruction::new(
-                &read_system_prompt_from_md()
+                read_system_prompt_from_md()
                     .unwrap_or_else(|_| "You are a helpful coding assistant.".to_string()),
             )
         }
     } else {
         SystemInstruction::new(
-            &read_system_prompt_from_md()
+            read_system_prompt_from_md()
                 .unwrap_or_else(|_| "You are a helpful coding assistant.".to_string()),
         )
     };

@@ -78,8 +78,8 @@ impl VtagentGitignore {
             }
 
             // Parse the pattern
-            let (pattern_str, negated) = if line.starts_with('!') {
-                (line[1..].to_string(), true)
+            let (pattern_str, negated) = if let Some(stripped) = line.strip_prefix('!') {
+                (stripped.to_string(), true)
             } else {
                 (line.to_string(), false)
             };

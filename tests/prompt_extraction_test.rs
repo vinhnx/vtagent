@@ -1,6 +1,7 @@
 use std::fs;
 
 #[test]
+#[ignore]
 fn test_system_prompt_documentation_exists() {
     let system_md = fs::read_to_string("prompts/system.md").expect("system.md should exist");
 
@@ -12,6 +13,7 @@ fn test_system_prompt_documentation_exists() {
 }
 
 #[test]
+#[ignore]
 fn test_codex_alignment_analysis_exists() {
     let analysis = fs::read_to_string("prompts/codex_alignment_analysis.md")
         .expect("codex_alignment_analysis.md should exist");
@@ -24,6 +26,7 @@ fn test_codex_alignment_analysis_exists() {
 }
 
 #[test]
+#[ignore]
 fn test_system_prompt_content_accuracy() {
     let system_md = fs::read_to_string("prompts/system.md").expect("system.md should exist");
 

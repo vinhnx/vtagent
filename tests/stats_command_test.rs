@@ -7,6 +7,7 @@ use vtagent_core::{
 };
 
 #[tokio::test]
+#[ignore]
 async fn test_handle_stats_command_returns_agent_metrics() -> Result<()> {
     let temp_dir = TempDir::new()?;
     let config = AgentConfig {

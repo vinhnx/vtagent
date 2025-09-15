@@ -9,7 +9,6 @@ use async_trait::async_trait;
 use rexpect::spawn;
 use serde_json::{Value, json};
 use std::path::PathBuf;
-use std::time::Duration;
 
 /// Command execution tool with multiple modes
 #[derive(Clone)]
@@ -24,45 +23,11 @@ impl CommandTool {
 
     /// Execute standard terminal command
     async fn execute_terminal_command(&self, input: &EnhancedTerminalInput) -> Result<Value> {
-        if input.command.is_empty() {
-            return Err(anyhow!("command array cannot be empty"));
+        let mut result = self.execute_pty_command(input).await?;
+        if let Some(obj) = result.as_object_mut() {
+            obj.insert("mode".to_string(), json!("terminal"));
         }
-
-        let program = &input.command[0];
-        let cmd_args = &input.command[1..];
-
-        // Build the command
-        let mut cmd = tokio::process::Command::new(program);
-        cmd.args(cmd_args);
-
-        // Set working directory if provided
-        if let Some(ref working_dir) = input.working_dir {
-            let work_path = self.workspace_root.join(working_dir);
-            cmd.current_dir(work_path);
-        } else {
-            cmd.current_dir(&self.workspace_root);
-        }
-
-        // Set timeout
-        let timeout = Duration::from_secs(input.timeout_secs.unwrap_or(30));
-
-        // Execute with timeout
-        let output = tokio::time::timeout(timeout, cmd.output())
-            .await
-            .map_err(|_| anyhow!("Command timed out after {} seconds", timeout.as_secs()))?
-            .map_err(|e| anyhow!("Failed to execute command: {}", e))?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
-
-        Ok(json!({
-            "success": output.status.success(),
-            "exit_code": output.status.code(),
-            "stdout": stdout,
-            "stderr": stderr,
-            "mode": "terminal",
-            "command": input.command.join(" ")
-        }))
+        Ok(result)
     }
 
     /// Execute PTY command (for both pty and streaming modes)

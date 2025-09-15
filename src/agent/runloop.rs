@@ -51,14 +51,17 @@ fn render_tool_output(val: &serde_json::Value) {
     }
 }
 
+const DEFAULT_LS_COLORS: &str = "di=34:ln=35:ex=32:fi=0";
+
 fn parse_ls_colors() -> HashMap<String, AnsiStyle> {
     let mut map = HashMap::new();
-    if let Ok(colors) = std::env::var("LS_COLORS") {
-        for entry in colors.split(':') {
-            if let Some((key, val)) = entry.split_once('=') {
-                if let Some(style) = anstyle_ls::parse(val) {
-                    map.insert(key.to_string(), style);
-                }
+    let colors = std::env::var("LS_COLORS")
+        .or_else(|_| std::env::var("VTAGENT_LS_COLORS"))
+        .unwrap_or_else(|_| DEFAULT_LS_COLORS.to_string());
+    for entry in colors.split(':') {
+        if let Some((key, val)) = entry.split_once('=') {
+            if let Some(style) = anstyle_ls::parse(val) {
+                map.insert(key.to_string(), style);
             }
         }
     }

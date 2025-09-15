@@ -11,6 +11,7 @@ async fn test_write_and_edit_rendered() -> Result<()> {
     let temp_dir = TempDir::new()?;
     let mut registry = ToolRegistry::new(temp_dir.path().to_path_buf());
     let mut renderer = AnsiRenderer::stdout();
+    registry.allow_all_tools()?;
 
     let write_args = json!({
         "path": "file.txt",

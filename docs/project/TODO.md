@@ -37,3 +37,36 @@ https://deepwiki.com/ratatui/ratatui integrate and port chat repl
 ---
 
 IMPORTANT: check for comment "// For now..." and remove those comments and implement the missing functionality. make sure to test the new functionality thoroughly. make sure to cover edge cases and handle errors gracefully. update documentation accordingly. run all existing tests to ensure nothing is broken. if any tests fail, fix the issues before proceeding. once everything is working, commit the changes with a clear message describing what was implemented and why. update the system prompt to reflect the new functionality. inform the team about the changes made and any new features added. ensure that the code is clean and follows best practices. review the code for any potential improvements or optimizations. once satisfied, push the changes to the repository and create a pull request for review. monitor the pull request for feedback and make any necessary adjustments based on the review comments. once approved, merge the changes into the main branch and deploy if applicable. finally, update any relevant project management tools or documentation to reflect the new functionality and its impact on the project.
+
+https://github.com/vinhnx/vtagent/pull/3#discussion_r2348626196
+
+--
+
+for each tools call execution, let the agent speak out loud what it is doing and why, before executing the tool call. after the tool call, let the agent speak out loud what it did and what the result was. if there was an error, let the agent explain what went wrong and how it plans to fix it. this will help with transparency and understanding of the agent's actions. update the system prompt to include this new behavior. test it out with some tool calls to ensure it works as expected. make sure to handle edge cases and errors properly. update documentation accordingly. inform the team about this new feature and how it works. monitor feedback and make adjustments as needed. ensure that the agent's explanations are clear and concise, avoiding unnecessary jargon or complexity. aim for a balance between informativeness and brevity to keep users engaged without overwhelming them with details. the message should be short and concise, ideally no more than one sentence. it should provide enough context to understand the agent's actions without going into excessive detail. the goal is to enhance transparency and build trust with users by keeping them informed about what the agent is doing and why.
+for example:
+
+````log
+
+agent: I'll go ahead and commit with the message: "fix(tools): restore command execution timeouts".
+
+I'll open up simple_search now to dig deeper.
+[TOOL] run_terminal_cmd {"command":["sed","-n"]}
+
+```shell
+    31              indexer,
+    32              workspace_root,
+    31              indexer,
+    32              workspace_root,
+    33          }
+    34      }
+````
+
+It seems like git status --short didn't run due to the combined command--I'll try again.
+[TOOL] run_terminal_cmd {"command":["git status","-short"]}
+
+```shell
+    31              indexer,
+    32              workspace_root,
+    33          }
+    34      }
+```

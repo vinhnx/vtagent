@@ -331,7 +331,7 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
 
             if function_calls.is_empty() {
                 if let Some(text) = _final_text.clone() {
-                    renderer.line(MessageStyle::Output, &text)?;
+                    renderer.line(MessageStyle::Response, &text)?;
                 }
                 if let Some(text) = _final_text {
                     working_history.push(Content::system_text(text));
@@ -477,7 +477,7 @@ async fn run_prompt_only_loop(config: &CoreAgentConfig) -> Result<()> {
                 continue;
             }
         };
-        renderer.line(MessageStyle::Output, &resp.content)?;
+        renderer.line(MessageStyle::Response, &resp.content)?;
     }
     Ok(())
 }
@@ -798,7 +798,7 @@ async fn run_single_agent_loop_unified(
                         }
                     }
                 }
-                renderer.line(MessageStyle::Output, &text)?;
+                renderer.line(MessageStyle::Response, &text)?;
                 working_history.push(uni::Message::assistant(text));
             }
             break 'outer;

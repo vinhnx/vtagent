@@ -68,7 +68,6 @@ tracing = "0.1"
 anstyle = "1.0"
 anstyle-query = "1.0"
 anstream = "0.6"
-anstyle-parse = "0.2"
 colorchoice-clap = "1.0"
 quick_cache = "0.6"
 roff = "0.2"
@@ -76,9 +75,6 @@ roff = "0.2"
 [[example]]
 name = "anstyle_test"
 path = "examples/anstyle_test.rs"
-[[example]]
-name = "anstyle_parse_example"
-path = "examples/anstyle_parse_example.rs"
 
 [[example]]
 name = "dialoguer_example"

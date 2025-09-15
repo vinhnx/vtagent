@@ -8,21 +8,21 @@ use super::file_ops::FileOpsTool;
 use super::search::SearchTool;
 use super::simple_search::SimpleSearchTool;
 use super::traits::Tool;
-use crate::config::PtyConfig;
 use crate::config::constants::tools;
 use crate::config::loader::ConfigManager;
 use crate::config::types::CapabilityLevel;
+use crate::config::PtyConfig;
 use crate::gemini::FunctionDeclaration;
 use crate::tool_policy::{ToolPolicy, ToolPolicyManager};
 use crate::tools::ast_grep::AstGrepEngine;
-use crate::tools::grep_search::GrepSearchManager;
-use anyhow::{Context, Result, anyhow};
+use crate::tools::grep_search::{GrepSearchManager, GrepSearchResult};
+use anyhow::{anyhow, Context, Result};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 /// Enhanced error handling for tool execution following Anthropic's best practices
 /// Provides detailed error information and recovery suggestions
@@ -183,7 +183,7 @@ pub struct ToolRegistry {
     bash_tool: BashTool,
     file_ops_tool: FileOpsTool,
     command_tool: CommandTool,
-    // Removed stored grep_search (no longer needed as a field)
+    grep_search: Arc<GrepSearchManager>,
     ast_grep_engine: Option<Arc<AstGrepEngine>>,
     tool_policy: Option<ToolPolicyManager>,
     pty_config: PtyConfig,
@@ -256,6 +256,7 @@ impl ToolRegistry {
             bash_tool,
             file_ops_tool,
             command_tool,
+            grep_search,
             ast_grep_engine,
             tool_policy: policy_manager,
             pty_config,
@@ -728,6 +729,11 @@ impl ToolRegistry {
 
     pub async fn rp_search(&mut self, args: Value) -> Result<Value> {
         self.execute_tool(tools::GREP_SEARCH, args).await
+    }
+
+    /// Get last ripgrep search result
+    pub fn last_rp_search_result(&self) -> Option<GrepSearchResult> {
+        self.grep_search.last_result()
     }
 
     pub async fn list_files(&mut self, args: Value) -> Result<Value> {

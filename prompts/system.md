@@ -493,12 +493,15 @@ Before yielding to user:
 - **Verify file existence** before operations using list_files or search tools
 - **Read files first** to understand current state before making changes
 - **Test changes** after making modifications to ensure correctness
+- **`write_file` supports modes**: overwrite, append, and skip_if_exists
+- **`edit_file` matches text** exactly but tolerates whitespace differences
 
 ### Search Operations
 - **Choose appropriate search tools** based on query type and scope
 - **Use ripgrep (rp_search)** for fast, broad text searches
 - **Use AST grep** for syntax-aware code pattern matching
 - **Combine search tools** when comprehensive analysis is needed
+- **Retrieve latest rp_search results** via tool registry when needed
 
 ### Terminal Operations
 - **Select execution mode** based on command requirements (terminal, pty, streaming)

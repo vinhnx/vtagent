@@ -58,8 +58,14 @@ Ask: Search for TODO|FIXME across the repo with 2 lines of context in .rs files
 
 - `list_files(path, max_items?, include_hidden?)`
 - `read_file(path, max_bytes?)`
-- `write_file(path, content, overwrite?)`
-- `edit_file(path, old_str, new_str)`
+- `write_file(path, content, mode?)` — mode: `overwrite`, `append`, or `skip_if_exists`
+- `edit_file(path, old_str, new_str)` — tolerant to whitespace differences
+
+## stats (session metrics)
+
+Display current configuration, available tools, and live performance metrics for the running
+session. Use `--format` to choose `text`, `json`, or `html` output and `--detailed` to list each
+tool.
 
 ## Tips
 

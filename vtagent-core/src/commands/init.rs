@@ -13,7 +13,9 @@ use anyhow::Result;
 use console::style;
 use indexmap::IndexMap;
 use serde_json::json;
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
 
 /// Project analysis result
 #[derive(Debug, Clone)]
@@ -325,15 +327,40 @@ fn extract_package_dependencies(analysis: &mut ProjectAnalysis, content: &str) {
 
 /// Check if files contain a specific pattern
 fn files_contain_pattern(analysis: &ProjectAnalysis, pattern: &str) -> bool {
-    // This is a simplified implementation
-    // In a real implementation, you'd scan actual files for patterns
-    // For now, we'll implement a basic check
-    analysis.source_dirs.iter().any(|dir| dir.contains(pattern))
-        || analysis
-            .config_files
-            .iter()
-            .any(|file| file.contains(pattern))
-        || analysis.languages.iter().any(|lang| lang.contains(pattern))
+    // Scan source directories for the pattern
+    for dir in &analysis.source_dirs {
+        let path = Path::new(dir);
+        if path.is_dir() {
+            for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+                if entry.file_type().is_file() {
+                    if let Ok(content) = fs::read_to_string(entry.path()) {
+                        if content.contains(pattern) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        } else if path.is_file() {
+            if let Ok(content) = fs::read_to_string(path) {
+                if content.contains(pattern) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    // Check config files
+    for file in &analysis.config_files {
+        let path = Path::new(file);
+        if let Ok(content) = fs::read_to_string(path) {
+            if content.contains(pattern) {
+                return true;
+            }
+        }
+    }
+
+    // Fallback to metadata search
+    analysis.languages.iter().any(|lang| lang.contains(pattern))
 }
 
 /// Analyze git history to detect commit message patterns

@@ -733,10 +733,10 @@ impl TreeSitterAnalyzer {
 
         Ok(CodeAnalysis {
             file_path: self.current_file.clone(),
-            language: language,
-            symbols: symbols,
-            dependencies: dependencies,
-            metrics: metrics,
+            language,
+            symbols,
+            dependencies,
+            metrics,
             issues: vec![], // Would need to implement actual issue detection
             complexity: Default::default(), // Would need to implement actual complexity analysis
             structure: Default::default(), // Would need to implement actual structure analysis
@@ -810,16 +810,12 @@ mod tests {
     #[test]
     fn test_analyzer_creation() {
         let analyzer = create_test_analyzer();
-        assert!(
-            analyzer
-                .supported_languages
-                .contains(&LanguageSupport::Rust)
-        );
-        assert!(
-            analyzer
-                .supported_languages
-                .contains(&LanguageSupport::Python)
-        );
+        assert!(analyzer
+            .supported_languages
+            .contains(&LanguageSupport::Rust));
+        assert!(analyzer
+            .supported_languages
+            .contains(&LanguageSupport::Python));
     }
 
     #[test]
@@ -838,11 +834,9 @@ mod tests {
         }
 
         // Test unknown extension should return error
-        assert!(
-            analyzer
-                .detect_language_from_path(Path::new("file.unknown"))
-                .is_err()
-        );
+        assert!(analyzer
+            .detect_language_from_path(Path::new("file.unknown"))
+            .is_err());
     }
 
     #[test]

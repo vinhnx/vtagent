@@ -150,14 +150,6 @@ VTAgent supports the latest models from multiple providers:
 
 -   `claude-sonnet-4-20250514` - Latest Claude model
 
-### DeepSeek
-
--   `deepseek-reasoner` - Advanced reasoning model
-
-### Local Models
-
--   `qwen/qwen3-4b-2507` - Qwen3 local model
-
 ## Command Reference
 
 ### Core Commands

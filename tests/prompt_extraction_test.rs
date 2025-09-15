@@ -5,7 +5,7 @@ fn test_system_prompt_documentation_exists() {
     let system_md = fs::read_to_string("prompts/system.md").expect("system.md should exist");
 
     // Verify key sections exist
-    assert!(system_md.contains("## Main System Prompt"));;
+    assert!(system_md.contains("## Main System Prompt"));
     assert!(system_md.contains("## Configuration Integration"));
     assert!(system_md.contains("AVAILABLE TOOLS"));
     assert!(system_md.contains("AST-Grep Power Tools"));

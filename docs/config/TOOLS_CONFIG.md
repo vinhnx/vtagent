@@ -15,3 +15,5 @@ default_policy = "prompt"
 max_tool_loops = 6 # can be overridden by VTAGENT_MAX_TOOL_LOOPS
 ```
 
+
+Tool outputs are rendered with ANSI styles in the chat interface. Tools should return plain text.

@@ -80,7 +80,7 @@ edition = "2021"
 fn create_vtagent_config(project_path: &Path) -> Result<()> {
     let config_content = r#"# VTAgent Configuration
 [model]
-name = "gemini-1.5-flash"
+name = "gemini-2.5-flash-lite-preview-06-17"
 
 [workspace]
 path = "."

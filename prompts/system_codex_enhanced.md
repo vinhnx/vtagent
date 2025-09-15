@@ -221,6 +221,7 @@ rp_search "api_key\s*=\s*[\"'][^\"']+[\"']"
 ### Error Handling
 - **Graceful Degradation**: Provide partial results if full analysis fails
 - **Clear Error Messages**: Explain what went wrong and suggest fixes
+- **Retry or clarify on failure**: If a command fails, state the error in one concise sentence and either retry or ask the user for guidance
 - **Fallback Strategies**: Use alternative approaches when primary tools fail
 
 ### Quality Metrics

@@ -41,6 +41,12 @@ impl TestEnv {
     }
 }
 
+impl Default for TestEnv {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for TestEnv {
     fn drop(&mut self) {
         // Restore original working directory
@@ -140,7 +146,7 @@ mod tests {
     );
 
     // Create submodules
-    let src_dir = env.create_test_dir("src");
+    env.create_test_dir("src");
     env.create_test_file(
         "src/utils.rs",
         r#"

@@ -1,5 +1,6 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
-use vtagent_core::tree_sitter::TreeSitterAnalyzer;
+use vtagent_core::TreeSitterAnalyzer;
+use vtagent_core::tools::tree_sitter::LanguageSupport;
 
 /// Benchmark tree-sitter parsing performance
 fn benchmark_tree_sitter_parsing(c: &mut Criterion) {
@@ -19,7 +20,7 @@ fn benchmark_tree_sitter_parsing(c: &mut Criterion) {
     group.bench_function("parse_rust_code", |b| {
         b.iter(|| {
             let mut analyzer = TreeSitterAnalyzer::new().expect("Failed to create analyzer");
-            let tree = analyzer.parse(test_code, vtagent_core::tree_sitter::LanguageSupport::Rust);
+            let tree = analyzer.parse(test_code, LanguageSupport::Rust);
             black_box(tree.is_ok())
         })
     });
@@ -27,14 +28,8 @@ fn benchmark_tree_sitter_parsing(c: &mut Criterion) {
     group.bench_function("extract_symbols", |b| {
         b.iter(|| {
             let mut analyzer = TreeSitterAnalyzer::new().expect("Failed to create analyzer");
-            if let Ok(tree) =
-                analyzer.parse(test_code, vtagent_core::tree_sitter::LanguageSupport::Rust)
-            {
-                let symbols = analyzer.extract_symbols(
-                    &tree,
-                    test_code,
-                    vtagent_core::tree_sitter::LanguageSupport::Rust,
-                );
+            if let Ok(tree) = analyzer.parse(test_code, LanguageSupport::Rust) {
+                let symbols = analyzer.extract_symbols(&tree, test_code, LanguageSupport::Rust);
                 black_box(symbols.is_ok())
             } else {
                 black_box(false)

@@ -30,13 +30,13 @@ pub async fn handle_ask_command(config: AgentConfig, prompt: Vec<String>) -> Res
             SystemInstruction::new(text)
         } else {
             SystemInstruction::new(
-                &read_system_prompt_from_md()
+                read_system_prompt_from_md()
                     .unwrap_or_else(|_| "You are a helpful coding assistant.".to_string()),
             )
         }
     } else {
         SystemInstruction::new(
-            &read_system_prompt_from_md()
+            read_system_prompt_from_md()
                 .unwrap_or_else(|_| "You are a helpful coding assistant.".to_string()),
         )
     };

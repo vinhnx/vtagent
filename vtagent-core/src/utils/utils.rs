@@ -59,7 +59,7 @@ impl ProjectOverview {
         }
         if let Some(ver) = &self.version {
             if !out.is_empty() {
-                out.push_str(" ");
+                out.push(' ');
             }
             out.push_str(&format!("v{}", ver));
         }
@@ -201,11 +201,11 @@ pub fn summarize_workspace_languages(root: &std::path::Path) -> Option<String> {
         .filter_map(|e| e.ok())
     {
         let path = entry.path();
-        if path.is_file() {
-            if let Ok(lang) = analyzer.detect_language_from_path(path) {
-                *counts.entry(format!("{:?}", lang)).or_insert(0) += 1;
-                total += 1;
-            }
+        if path.is_file()
+            && let Ok(lang) = analyzer.detect_language_from_path(path)
+        {
+            *counts.entry(format!("{:?}", lang)).or_insert(0) += 1;
+            total += 1;
         }
         if total > 5000 {
             break;

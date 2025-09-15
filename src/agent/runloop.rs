@@ -8,9 +8,7 @@ use vtagent_core::utils::ansi::{AnsiRenderer, MessageStyle};
 use vtagent_core::gemini::function_calling::{FunctionCall, FunctionResponse};
 use vtagent_core::gemini::models::{SystemInstruction, ToolConfig};
 use vtagent_core::gemini::{Client as GeminiClient, Content, GenerateContentRequest, Part, Tool};
-use vtagent_core::llm::{
-    AnyClient, factory::create_provider_for_model, make_client, provider as uni,
-};
+use vtagent_core::llm::{factory::create_provider_for_model, provider as uni};
 use vtagent_core::models::{ModelId, Provider};
 use vtagent_core::prompts::read_system_prompt_from_md;
 use vtagent_core::tools::{ToolRegistry, build_function_declarations};
@@ -26,17 +24,17 @@ fn read_prompt_refiner_prompt() -> Option<String> {
 
 fn render_tool_output(val: &serde_json::Value) {
     let mut renderer = AnsiRenderer::stdout();
-    if let Some(stdout) = val.get("stdout").and_then(|v| v.as_str()) {
-        if !stdout.trim().is_empty() {
-            let _ = renderer.line(MessageStyle::Info, "[stdout]");
-            let _ = renderer.line(MessageStyle::Output, stdout);
-        }
+    if let Some(stdout) = val.get("stdout").and_then(|v| v.as_str())
+        && !stdout.trim().is_empty()
+    {
+        let _ = renderer.line(MessageStyle::Info, "[stdout]");
+        let _ = renderer.line(MessageStyle::Output, stdout);
     }
-    if let Some(stderr) = val.get("stderr").and_then(|v| v.as_str()) {
-        if !stderr.trim().is_empty() {
-            let _ = renderer.line(MessageStyle::Error, "[stderr]");
-            let _ = renderer.line(MessageStyle::Error, stderr);
-        }
+    if let Some(stderr) = val.get("stderr").and_then(|v| v.as_str())
+        && !stderr.trim().is_empty()
+    {
+        let _ = renderer.line(MessageStyle::Error, "[stderr]");
+        let _ = renderer.line(MessageStyle::Error, stderr);
     }
 }
 
@@ -98,7 +96,7 @@ async fn refine_user_prompt_if_enabled(
     match refiner
         .generate(req)
         .await
-        .and_then(|r| Ok(r.content.unwrap_or_default()))
+        .map(|r| r.content.unwrap_or_default())
     {
         Ok(text) if !text.trim().is_empty() => text,
         _ => raw.to_string(),
@@ -421,64 +419,6 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
         }
     }
 
-    Ok(())
-}
-
-async fn run_prompt_only_loop(config: &CoreAgentConfig) -> Result<()> {
-    let mut renderer = AnsiRenderer::stdout();
-    renderer.line(MessageStyle::Info, "Interactive chat (prompt-only)")?;
-    renderer.line(MessageStyle::Output, &format!("Model: {}", config.model))?;
-    renderer.line(
-        MessageStyle::Output,
-        &format!("Workspace: {}", config.workspace.display()),
-    )?;
-    renderer.line(MessageStyle::Info, "Type 'exit' to quit")?;
-
-    // Load VT config for optional router
-    let cfg_manager = ConfigManager::load_from_workspace(&config.workspace).ok();
-    let vt_cfg = cfg_manager.as_ref().map(|m| m.config());
-
-    let model = config
-        .model
-        .parse::<ModelId>()
-        .map_err(|_| anyhow::anyhow!("Invalid model: {}", config.model))?;
-    let mut client: AnyClient = make_client(config.api_key.clone(), model);
-
-    loop {
-        print!("> ");
-        io::stdout().flush()?;
-        let mut input = String::new();
-        io::stdin().read_line(&mut input)?;
-        let input = input.trim();
-        if input.is_empty() {
-            continue;
-        }
-        if matches!(input, "exit" | "quit") {
-            renderer.line(MessageStyle::Info, "Goodbye!")?;
-            break;
-        }
-
-        // Router-based model override per turn
-        let selected_model = vt_cfg
-            .filter(|c| c.router.enabled)
-            .map(|c| Router::route(c, config, input).selected_model)
-            .unwrap_or_else(|| config.model.clone());
-        // If model differs significantly (provider change), recreate client
-        if selected_model != client.model_id() {
-            if let Ok(new_model) = selected_model.parse::<ModelId>() {
-                client = make_client(config.api_key.clone(), new_model);
-            }
-        }
-
-        let resp = match client.generate(input).await {
-            Ok(r) => r,
-            Err(e) => {
-                renderer.line(MessageStyle::Error, &format!("Provider error: {e}"))?;
-                continue;
-            }
-        };
-        renderer.line(MessageStyle::Response, &resp.content)?;
-    }
     Ok(())
 }
 

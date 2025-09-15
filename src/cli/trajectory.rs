@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use console::style;
 use serde::Deserialize;
 use serde_json::Value;
@@ -7,7 +7,6 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
-use std::time::SystemTime;
 use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
 
 #[derive(Debug, Deserialize)]
@@ -15,16 +14,19 @@ use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
 enum Rec {
     #[serde(rename = "route")]
     Route {
-        turn: usize,
+        #[serde(rename = "turn")]
+        _turn: usize,
         selected_model: String,
         class: String,
         ts: i64,
     },
     #[serde(rename = "tool")]
     Tool {
-        turn: usize,
+        #[serde(rename = "turn")]
+        _turn: usize,
         name: String,
-        args: Value,
+        #[serde(rename = "args")]
+        _args: Value,
         ok: bool,
         ts: i64,
     },
@@ -178,10 +180,8 @@ pub async fn handle_trajectory_command(
 }
 
 fn format_timestamp(ts: i64) -> String {
-    if let Some(dt) = NaiveDateTime::from_timestamp_opt(ts, 0) {
-        DateTime::<Utc>::from_utc(dt, Utc)
-            .format("%Y-%m-%d %H:%M:%S UTC")
-            .to_string()
+    if let Some(dt) = DateTime::<Utc>::from_timestamp(ts, 0) {
+        dt.format("%Y-%m-%d %H:%M:%S UTC").to_string()
     } else {
         ts.to_string()
     }

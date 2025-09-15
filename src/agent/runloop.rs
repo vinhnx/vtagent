@@ -769,7 +769,6 @@ mod tests {
         // VT config with refinement enabled and not restricted to OpenAI
         let mut vt = VTAgentConfig::default();
         vt.agent.refine_prompts_enabled = true;
-        vt.agent.refine_prompts_only_for_openai = false;
 
         // Act
         let raw = "make me a list of files";

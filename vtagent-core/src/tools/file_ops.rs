@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use tracing::{error, info, warn};
 use walkdir::WalkDir;
 
 /// File operations tool with multiple modes
@@ -36,7 +37,8 @@ impl FileOpsTool {
 
         let mut all_items = Vec::new();
         if base.is_file() {
-            let metadata = tokio::fs::metadata(&base).await?;
+            let metadata = tokio::fs::metadata(&base).await
+                .with_context(|| format!("Failed to read metadata for file: {}", input.path))?;
             all_items.push(json!({
                 "name": base.file_name().unwrap().to_string_lossy(),
                 "path": input.path,
@@ -45,8 +47,10 @@ impl FileOpsTool {
                 "modified": metadata.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs())
             }));
         } else if base.is_dir() {
-            let mut entries = tokio::fs::read_dir(&base).await?;
-            while let Some(entry) = entries.next_entry().await? {
+            let mut entries = tokio::fs::read_dir(&base).await
+                .with_context(|| format!("Failed to read directory: {}", input.path))?;
+            while let Some(entry) = entries.next_entry().await
+                .with_context(|| format!("Failed to read directory entry in: {}", input.path))? {
                 let path = entry.path();
                 let name = entry.file_name().to_string_lossy().to_string();
 
@@ -57,7 +61,8 @@ impl FileOpsTool {
                     continue;
                 }
 
-                let metadata = entry.metadata().await?;
+                let metadata = entry.metadata().await
+                    .with_context(|| format!("Failed to read metadata for: {}", path.display()))?;
                 all_items.push(json!({
                     "name": name,
                     "path": path.strip_prefix(&self.workspace_root).unwrap_or(&path).to_string_lossy(),
@@ -66,6 +71,15 @@ impl FileOpsTool {
                     "modified": metadata.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs())
                 }));
             }
+        } else {
+            warn!(
+                path = %input.path,
+                exists = base.exists(),
+                is_file = base.is_file(),
+                is_dir = base.is_dir(),
+                "Path does not exist or is neither file nor directory"
+            );
+            return Err(anyhow!("Path '{}' does not exist", input.path));
         }
 
         // Apply max_items cap first for token efficiency
@@ -78,9 +92,41 @@ impl FileOpsTool {
         let end = (start + per_page).min(capped_total);
         let has_more = end < capped_total;
 
+        // Log paging operation details
+        info!(
+            path = %input.path,
+            total_items = all_items.len(),
+            capped_total = capped_total,
+            page = page,
+            per_page = per_page,
+            start_index = start,
+            end_index = end,
+            has_more = has_more,
+            "Executing paginated file listing"
+        );
+
+        // Validate paging parameters
+        if page > 1 && start >= capped_total {
+            warn!(
+                path = %input.path,
+                page = page,
+                per_page = per_page,
+                total_items = capped_total,
+                "Requested page exceeds available data"
+            );
+        }
+
         let mut page_items = if start < end {
             all_items[start..end].to_vec()
         } else {
+            warn!(
+                path = %input.path,
+                page = page,
+                per_page = per_page,
+                start_index = start,
+                end_index = end,
+                "Empty page result - no items in requested range"
+            );
             vec![]
         };
 
@@ -571,9 +617,43 @@ impl FileOpsTool {
         let start = (page - 1).saturating_mul(per_page);
         let end = (start + per_page).min(total_capped);
         let has_more = end < total_capped;
+
+        // Log pagination operation details
+        info!(
+            mode = %mode,
+            pattern = ?pattern,
+            total_items = total_count,
+            capped_total = total_capped,
+            page = page,
+            per_page = per_page,
+            start_index = start,
+            end_index = end,
+            has_more = has_more,
+            "Executing paginated search results"
+        );
+
+        // Validate pagination parameters
+        if page > 1 && start >= total_capped {
+            warn!(
+                mode = %mode,
+                page = page,
+                per_page = per_page,
+                total_items = total_capped,
+                "Requested page exceeds available search results"
+            );
+        }
+
         let mut page_items = if start < end {
             items[start..end].to_vec()
         } else {
+            warn!(
+                mode = %mode,
+                page = page,
+                per_page = per_page,
+                start_index = start,
+                end_index = end,
+                "Empty page result - no search results in requested range"
+            );
             vec![]
         };
 

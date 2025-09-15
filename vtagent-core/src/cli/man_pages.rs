@@ -462,9 +462,20 @@ impl ManPageGenerator {
     fn generate_init_man_page() -> Result<String> {
         let current_date = Self::current_date();
         let page = Roff::new()
-            .control("TH", ["VTAGENT-INIT", "1", &current_date, "VTAgent", "User Commands"])
+            .control(
+                "TH",
+                [
+                    "VTAGENT-INIT",
+                    "1",
+                    &current_date,
+                    "VTAgent",
+                    "User Commands",
+                ],
+            )
             .control("SH", ["NAME"])
-            .text([roman("vtagent-init - Initialize project with enhanced structure")])
+            .text([roman(
+                "vtagent-init - Initialize project with enhanced structure",
+            )])
             .control("SH", ["SYNOPSIS"])
             .text([
                 bold("vtagent"),
@@ -480,7 +491,9 @@ impl ManPageGenerator {
                 roman(" embeddings storage, and tree-sitter parser setup."),
             ])
             .control("SH", ["DIRECTORY STRUCTURE"])
-            .text([roman("• .vtagent/ - Main project cache and context directory")])
+            .text([roman(
+                "• .vtagent/ - Main project cache and context directory",
+            )])
             .text([roman("• .vtagent/config/ - Configuration files")])
             .text([roman("• .vtagent/cache/ - File and analysis cache")])
             .text([roman("• .vtagent/embeddings/ - Code embeddings storage")])
@@ -490,7 +503,11 @@ impl ManPageGenerator {
             .text([roman("Initialize current directory:")])
             .text([bold("  vtagent init")])
             .control("SH", ["SEE ALSO"])
-            .text([bold("vtagent(1)"), roman(", "), bold("vtagent-create-project(1)")])
+            .text([
+                bold("vtagent(1)"),
+                roman(", "),
+                bold("vtagent-create-project(1)"),
+            ])
             .render();
 
         Ok(page)

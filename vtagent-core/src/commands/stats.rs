@@ -1,16 +1,17 @@
 //! Stats command implementation - show session statistics and performance metrics
 
 use crate::config::types::{AgentConfig, OutputFormat, PerformanceMetrics};
+use crate::core::agent::core::Agent;
 use crate::tools::build_function_declarations;
 use anyhow::Result;
 use console::style;
 
 /// Handle the stats command - display session statistics and performance metrics
 pub async fn handle_stats_command(
-    config: AgentConfig,
+    agent: &Agent,
     detailed: bool,
     format: String,
-) -> Result<()> {
+) -> Result<PerformanceMetrics> {
     let output_format = match format.to_lowercase().as_str() {
         "text" => OutputFormat::Text,
         "json" => OutputFormat::Json,
@@ -20,24 +21,15 @@ pub async fn handle_stats_command(
 
     println!("{}", style("Session Statistics").cyan().bold());
 
-    // Mock performance metrics (in a real implementation, these would come from the agent)
-    let metrics = PerformanceMetrics {
-        session_duration_seconds: 0, // Would be tracked
-        total_api_calls: 0,
-        total_tokens_used: None,
-        average_response_time_ms: 0.0,
-        tool_execution_count: 0,
-        error_count: 0,
-        recovery_success_rate: 0.0,
-    };
+    let metrics = agent.performance_metrics();
 
     match output_format {
-        OutputFormat::Text => display_text_stats(&config, &metrics, detailed),
-        OutputFormat::Json => display_json_stats(&config, &metrics),
-        OutputFormat::Html => display_html_stats(&config, &metrics),
+        OutputFormat::Text => display_text_stats(agent.config(), &metrics, detailed),
+        OutputFormat::Json => display_json_stats(agent.config(), &metrics),
+        OutputFormat::Html => display_html_stats(agent.config(), &metrics),
     }
 
-    Ok(())
+    Ok(metrics)
 }
 
 fn display_text_stats(config: &AgentConfig, metrics: &PerformanceMetrics, detailed: bool) {

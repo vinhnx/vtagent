@@ -21,12 +21,7 @@ cd test-vtagent-project || exit 1
 
 # Initialize project structure
 echo "Initializing project structure..."
-# In a real implementation, we would run: vtagent init-project
-# For now, we'll simulate the directory structure
-mkdir -p "$HOME/.vtagent/projects/test-vtagent-project/config"
-mkdir -p "$HOME/.vtagent/projects/test-vtagent-project/cache"
-mkdir -p "$HOME/.vtagent/projects/test-vtagent-project/embeddings"
-mkdir -p "$HOME/.vtagent/projects/test-vtagent-project/retrieval"
+cargo run --quiet --manifest-path /workspace/vtagent/Cargo.toml -- init-project --name test-vtagent-project --force >/dev/null 2>&1
 
 # Create project metadata
 cat > "$HOME/.vtagent/projects/test-vtagent-project/.project" << EOF
@@ -82,13 +77,23 @@ fi
 
 # Test 5: Test configuration loading priority
 echo -e "\nTest 5: Testing configuration concepts..."
-# In a real implementation, this would test the actual configuration loading
-echo "PASS: Configuration concepts validated"
+CONFIG_FILE="$PROJECT_DIR/config/vtagent.toml"
+if [ -f "$CONFIG_FILE" ]; then
+    echo "PASS: Configuration file found"
+else
+    echo "FAIL: Configuration file missing"
+    exit 1
+fi
 
 # Test 6: Test project identification
 echo -e "\nTest 6: Testing project identification..."
-# In a real implementation, this would test the actual project identification
-echo "PASS: Project identification concepts validated"
+IDENTIFIED_PROJECT=$(grep -o '"name"[ ]*:[ ]*"[^"]*"' "$PROJECT_DIR/.project" | head -n1 | cut -d'"' -f4)
+if [ "$IDENTIFIED_PROJECT" = "test-vtagent-project" ]; then
+    echo "PASS: Project identified correctly"
+else
+    echo "FAIL: Project identification failed"
+    exit 1
+fi
 
 # Cleanup
 echo -e "\nCleaning up test files..."

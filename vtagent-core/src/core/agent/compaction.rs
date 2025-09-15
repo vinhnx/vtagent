@@ -9,10 +9,10 @@ pub use crate::core::agent::engine::*;
 pub use crate::core::agent::semantic::*;
 
 // Re-export specific types to avoid ambiguity
-pub use crate::core::agent::stats::CompactionResult;
-pub use crate::core::agent::stats::CompactionStatistics;
 pub use crate::core::agent::types::CompactedContext;
 pub use crate::core::agent::types::CompactedMessage;
+pub use crate::core::agent::types::CompactionResult;
+pub use crate::core::agent::types::CompactionStatistics;
 pub use crate::core::agent::types::CompactionSuggestion;
 pub use crate::core::agent::types::EnhancedMessage;
 pub use crate::core::agent::types::MessagePriority;

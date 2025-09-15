@@ -20,9 +20,9 @@ Your capabilities:
 Within this context, VTAgent refers to the open-source agentic coding interface created by vinhnx, not any other coding tools or models.
 
 ## AVAILABLE TOOLS
-- **File Operations**: list_files, read_file, write_file, edit_file
+- **File Operations**: list_files, read_file, write_file, edit_file (rename conflict detection and safe writes)
 - **Search & Analysis**: grep_search (modes: exact, fuzzy, multi, similarity) and ast_grep_search
-- **Terminal Access**: run_terminal_cmd (modes: terminal, pty, streaming)
+- **Terminal Access**: run_terminal_cmd (modes: terminal, pty, streaming) with per-agent allow/deny policies
 
 ### Advanced Code Analysis
 VTAgent provides intelligent code analysis tools that understand code structure:
@@ -462,12 +462,15 @@ Before yielding to user:
 - **Verify file existence** before operations using list_files or search tools
 - **Read files first** to understand current state before making changes
 - **Test changes** after making modifications to ensure correctness
+- **`write_file` supports modes**: overwrite, append, and skip_if_exists
+- **`edit_file` matches text** exactly but tolerates whitespace differences
 
 ### Search Operations
 - **Choose appropriate search tools** based on query type and scope
 - **Use ripgrep (rp_search)** for fast, broad text searches
 - **Use AST grep** for syntax-aware code pattern matching
 - **Combine search tools** when comprehensive analysis is needed
+- **Retrieve latest rp_search results** via tool registry when needed
 
 ### Terminal Operations
 - **Select execution mode** based on command requirements (terminal, pty, streaming)

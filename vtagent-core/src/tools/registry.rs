@@ -612,9 +612,10 @@ impl ToolRegistry {
 
         let input: EditInput = serde_json::from_value(args).context("invalid edit_file args")?;
 
-        // Read the current file content
+        // Read the current file content (disable chunking for edit operations)
         let read_args = json!({
-            "path": input.path
+            "path": input.path,
+            "max_lines": 1000000  // Set a very high threshold to avoid chunking
         });
 
         let read_result = self.file_ops_tool.read_file(read_args).await?;
@@ -1314,7 +1315,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // Consolidated file operations tool
         FunctionDeclaration {
             name: "list_files".to_string(),
-            description: "Explores and lists files and directories in the workspace with multiple discovery modes. This tool is essential for understanding project structure, finding files by name or content, and navigating the codebase. Use this tool when you need to see what files exist in a directory, find files matching specific patterns, or search for files containing certain content. It supports recursive directory traversal, pagination for large directories, and various filtering options. The tool can operate in different modes: 'list' for basic directory contents, 'recursive' for deep directory traversal, 'find_name' for filename-based searches, and 'find_content' for content-based file discovery. PAGINATION BEST PRACTICES: Always use pagination (page and per_page parameters) for large directories to prevent token overflow and timeouts. Default per_page=100 for optimal performance. Monitor the 'has_more' flag and continue with subsequent pages. For very large directories (>1000 items), consider reducing per_page to 50. The concise response format is recommended for most cases as it omits low-value metadata.".to_string(),
+            description: "Explores and lists files and directories in the workspace with multiple discovery modes. This tool is essential for understanding project structure, finding files by name or content, and navigating the codebase. Use this tool when you need to see what files exist in a directory, find files matching specific patterns, or search for files containing certain content. It supports recursive directory traversal, pagination for large directories, and various filtering options. The tool can operate in different modes: 'list' for basic directory contents, 'recursive' for deep directory traversal, 'find_name' for filename-based searches, and 'find_content' for content-based file discovery. PAGINATION BEST PRACTICES: Always use pagination (page and per_page parameters) for large directories to prevent token overflow and timeouts. Default per_page=50 for optimal performance. Monitor the 'has_more' flag and continue with subsequent pages. For very large directories (>1000 items), consider reducing per_page to 25. The concise response format is recommended for most cases as it omits low-value metadata.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
@@ -1322,10 +1323,10 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
                     "mode": {"type": "string", "description": "'list' | 'recursive' | 'find_name' | 'find_content'", "default": "list"},
                     "max_items": {"type": "integer", "description": "Cap total items scanned (token safety). Default: 1000", "default": 1000},
                     "page": {"type": "integer", "description": "Page number (1-based). Default: 1", "default": 1},
-                    "per_page": {"type": "integer", "description": "Items per page. Default: 100", "default": 100},
+                    "per_page": {"type": "integer", "description": "Items per page. Default: 50", "default": 50},
                     "response_format": {"type": "string", "description": "'concise' (default) omits low-signal fields; 'detailed' includes them", "default": "concise"},
                     "include_hidden": {"type": "boolean", "description": "Include hidden files", "default": false},
-                    "name_pattern": {"type": "string", "description": "For 'recursive'/'find_name' modes. Example: '*.rs'"},
+                    "name_pattern": {"type": "string", "description": "Optional pattern for 'recursive'/'find_name' modes. Use '*' or omit for all files. Example: '*.rs'", "default": "*"},
                     "content_pattern": {"type": "string", "description": "For 'find_content' mode. Example: 'fn main'"},
                     "file_extensions": {"type": "array", "items": {"type": "string"}, "description": "Filter by file extensions"},
                     "case_sensitive": {"type": "boolean", "description": "Case sensitive pattern matching", "default": true},
@@ -1338,11 +1339,14 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // File reading tool
         FunctionDeclaration {
             name: tools::READ_FILE.to_string(),
-            description: "Reads the contents of a specific file from the workspace. This tool is fundamental for examining source code, configuration files, documentation, and any text-based content. Use this tool when you need to see the implementation details of a function, understand file structure, read configuration settings, or examine documentation. It automatically handles large files by reading in chunks and provides line-numbered output for easy reference. The tool will return an error if the file doesn't exist or if there are permission issues. Always prefer this tool over terminal commands like 'cat' when you need to read file contents, as it provides better error handling and formatting. Note that this tool only reads text files; it cannot read binary files or execute code.".to_string(),
+            description: "Reads the contents of a specific file from the workspace with intelligent chunking for large files. This tool automatically handles large files by reading the first and last portions when files exceed size thresholds, ensuring efficient token usage while preserving important content. For files larger than 2,000 lines, it reads the first 800 and last 800 lines with a truncation indicator. Use chunk_lines or max_lines parameters to customize the threshold. The tool provides structured logging of chunking operations for debugging.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "File path to read"}
+                    "path": {"type": "string", "description": "File path to read"},
+                    "max_bytes": {"type": "integer", "description": "Maximum bytes to read (optional)", "default": null},
+                    "chunk_lines": {"type": "integer", "description": "Line threshold for chunking (optional, default: 2000)", "default": 2000},
+                    "max_lines": {"type": "integer", "description": "Alternative parameter for chunk_lines (optional)", "default": null}
                 },
                 "required": ["path"]
             }),
@@ -1381,7 +1385,7 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
         // Consolidated command execution tool
         FunctionDeclaration {
             name: tools::RUN_TERMINAL_CMD.to_string(),
-            description: "Executes shell commands and external programs in the workspace environment. This tool is essential for running build processes, package managers, test suites, and system commands that cannot be handled by specialized file or search tools. Use this tool when you need to compile code, install dependencies, run tests, execute scripts, or perform system operations. It supports different execution modes: 'terminal' for standard command execution, 'pty' for interactive commands requiring a pseudo-terminal, and 'streaming' for long-running processes. Always specify appropriate timeouts to prevent hanging commands. Prefer specialized tools (read_file, write_file, grep_search) for file operations rather than shell commands. The tool provides both concise and detailed output formats, with concise being recommended for most cases to save tokens.".to_string(),
+            description: "Executes shell commands and external programs in the workspace environment with intelligent output truncation for large command outputs. This tool automatically handles verbose command outputs by truncating to the first and last portions when output exceeds 10,000 lines, ensuring efficient token usage while preserving important information. For commands producing excessive output, it shows the first 5,000 and last 5,000 lines with a truncation indicator. Use this tool for build processes, package managers, test suites, and system operations. Supports 'terminal' (default), 'pty' (interactive), and 'streaming' (long-running) modes. Always specify timeouts and prefer specialized tools for file operations.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {

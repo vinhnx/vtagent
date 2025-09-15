@@ -65,6 +65,37 @@ Example: When analyzing a codebase, read core files (main.rs, lib.rs, Cargo.toml
 - Performing safe refactoring operations
 - You know the exact syntax pattern you're looking for
 
+### Intelligent Chunking for Large Files and Outputs
+
+VTAgent implements automatic chunking strategies to handle large files and verbose outputs efficiently:
+
+**File Reading (read_file):**
+- Files exceeding 2,000 lines are automatically chunked
+- Shows first 800 and last 800 lines with truncation indicator
+- Use `chunk_lines` parameter to customize threshold (e.g., `{"chunk_lines": 1000}`)
+- Result includes `truncated: true` and `total_lines` for awareness
+
+**File Writing (write_file):**
+- Large content (>500KB) is written in 50KB chunks for memory efficiency
+- Ensures atomicity through sequential chunked writes
+- Result includes `chunked: true` and `chunks_written` count
+
+**File Editing (edit_file):**
+- Leverages chunked read/write for large file modifications
+- Preserves line numbers and context during edits
+- Handles overlaps through diff-based merging
+
+**Terminal Commands (run_terminal_cmd):**
+- Output exceeding 10,000 lines is truncated to first/last 5,000 lines
+- Includes truncation summary and total line count
+- Uses efficient piping (`head`/`tail`) for large outputs
+
+**Interpreting Chunked Results:**
+- Look for `truncated: true` in response to identify partial data
+- Check `total_lines` or `total_output_lines` for complete size
+- Request specific sections if chunked content is insufficient
+- Chunking preserves most important content (headers, footers, key sections)
+
 **Guidance and Errors:**
 - If output says "Showing N of M", request next page.
 - If a tool errors, adjust inputs per its message and retry.
@@ -549,7 +580,7 @@ Use `run_terminal_cmd` with pty mode for:
 Use `run_terminal_cmd` with streaming mode for:
 - **Long-running commands** where you want to see output in real-time
 - **Commands with progress monitoring** (builds, downloads, long-running processes)
-- **Interactive sessions** where you want to see results as they happen
+- **Interactive applications** where you want to see results as they happen
 - **Background processes** that provide ongoing status updates
 
 ### Mode Selection Guidelines

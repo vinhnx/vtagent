@@ -107,7 +107,7 @@ async fn test_pagination_basic() -> Result<()> {
         fs::write(&file_path, format!("Content of file {}", i))?;
     }
 
-    // Test first page with default per_page (100)
+    // Test first page with default per_page (50)
     let args = json!({
         "path": "test_dir",
         "page": 1
@@ -116,9 +116,9 @@ async fn test_pagination_basic() -> Result<()> {
     let result = registry.execute_tool("list_files", args).await?;
     assert_eq!(result["success"], true);
     assert_eq!(result["page"], 1);
-    assert_eq!(result["per_page"], 100);
+    assert_eq!(result["per_page"], 50);
     assert_eq!(result["has_more"], true);
-    assert!(result["count"].as_u64().unwrap() <= 100);
+    assert!(result["count"].as_u64().unwrap() <= 50);
 
     Ok(())
 }
@@ -142,28 +142,28 @@ async fn test_pagination_multiple_pages() -> Result<()> {
     let args = json!({
         "path": "test_dir",
         "page": 2,
-        "per_page": 100
+        "per_page": 50
     });
 
     let result = registry.execute_tool("list_files", args).await?;
     assert_eq!(result["success"], true);
     assert_eq!(result["page"], 2);
-    assert_eq!(result["per_page"], 100);
+    assert_eq!(result["per_page"], 50);
     assert_eq!(result["has_more"], true); // Should have more since we have 250 files
-    assert!(result["count"].as_u64().unwrap() <= 100);
+    assert!(result["count"].as_u64().unwrap() <= 50);
 
     // Test third page
     let args = json!({
         "path": "test_dir",
         "page": 3,
-        "per_page": 100
+        "per_page": 50
     });
 
     let result = registry.execute_tool("list_files", args).await?;
     assert_eq!(result["success"], true);
     assert_eq!(result["page"], 3);
-    assert_eq!(result["per_page"], 100);
-    assert_eq!(result["has_more"], false); // Should be the last page
+    assert_eq!(result["per_page"], 50);
+    assert_eq!(result["has_more"], true); // Should NOT be the last page (250 total files, 50 per page)
     assert!(result["count"].as_u64().unwrap() <= 50); // Should have remaining 50 files
 
     Ok(())
@@ -314,6 +314,174 @@ async fn test_pagination_performance_large_directory() -> Result<()> {
 
     // Performance check: should complete within reasonable time (less than 1 second)
     assert!(duration.as_millis() < 1000, "Large directory pagination took too long: {:?}", duration);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_read_file_chunking_large_file() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let mut registry = ToolRegistry::new(temp_dir.path().to_path_buf());
+
+    // Create a large test file (>10,000 lines)
+    let test_file = temp_dir.path().join("large_file.txt");
+    let mut content = String::new();
+
+    // Create 15,000 lines of content
+    for i in 1..=15_000 {
+        content.push_str(&format!("Line {}: This is a test line with some content\n", i));
+    }
+
+    fs::write(&test_file, &content)?;
+
+    // Read the file (should be automatically chunked)
+    let args = json!({
+        "path": "large_file.txt"
+    });
+
+    let result = registry.execute_tool("read_file", args).await?;
+
+    // Check that the file was chunked
+    assert_eq!(result["success"], true);
+    assert_eq!(result["truncated"], true);
+    assert_eq!(result["total_lines"], 15_000);
+    assert_eq!(result["shown_lines"], 1_600); // 800 + 800
+
+    let content_str = result["content"].as_str().unwrap();
+    assert!(content_str.contains("... [13400 lines truncated - showing first 800 and last 800 lines] ..."));
+    assert!(content_str.contains("Line 1:")); // First line present
+    assert!(content_str.contains("Line 15000:")); // Last line present
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_read_file_chunking_custom_threshold() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let mut registry = ToolRegistry::new(temp_dir.path().to_path_buf());
+
+    // Create a medium test file (2,000 lines)
+    let test_file = temp_dir.path().join("medium_file.txt");
+    let mut content = String::new();
+
+    for i in 1..=2_000 {
+        content.push_str(&format!("Line {}: Content\n", i));
+    }
+
+    fs::write(&test_file, &content)?;
+
+    // Read with custom chunk threshold
+    let args = json!({
+        "path": "medium_file.txt",
+        "chunk_lines": 1000  // Custom threshold
+    });
+
+    let result = registry.execute_tool("read_file", args).await?;
+
+    // Should be chunked due to custom threshold
+    assert_eq!(result["success"], true);
+    assert_eq!(result["truncated"], true);
+    assert_eq!(result["total_lines"], 2_000);
+    assert_eq!(result["shown_lines"], 1000); // 500 + 500 with custom threshold
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_write_file_chunking_large_content() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let mut registry = ToolRegistry::new(temp_dir.path().to_path_buf());
+
+    // Create large content (>1MB)
+    let large_content = "x".repeat(2_000_000); // 2MB of content
+
+    let args = json!({
+        "path": "large_output.txt",
+        "content": large_content,
+        "mode": "overwrite"
+    });
+
+    let result = registry.execute_tool("write_file", args).await?;
+
+    // Check that chunked writing worked
+    assert_eq!(result["success"], true);
+    assert_eq!(result["chunked"], true);
+    assert_eq!(result["bytes_written"], 2_000_000);
+    assert!(result["chunks_written"].as_u64().unwrap() > 1); // Should be multiple chunks
+
+    // Verify file was written correctly
+    let written_content = fs::read_to_string(temp_dir.path().join("large_output.txt"))?;
+    assert_eq!(written_content.len(), 2_000_000);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_edit_file_with_chunking() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let mut registry = ToolRegistry::new(temp_dir.path().to_path_buf());
+
+    // Create a large file for editing
+    let test_file = temp_dir.path().join("large_edit.txt");
+    let mut content = String::new();
+
+    for i in 1..=12_000 {
+        content.push_str(&format!("Line {}: Original content\n", i));
+    }
+
+    fs::write(&test_file, &content)?;
+
+    // Edit the file (should handle chunking internally)
+    let args = json!({
+        "path": "large_edit.txt",
+        "old_str": "Line 100: Original content\n",
+        "new_str": "Line 100: Modified content\n"
+    });
+
+    let result = registry.execute_tool("edit_file", args).await?;
+
+    // Check that edit succeeded
+    assert_eq!(result["success"], true);
+
+    // Verify the edit was applied
+    let edited_content = fs::read_to_string(&test_file)?;
+    assert!(edited_content.contains("Line 100: Modified content"));
+    assert!(!edited_content.contains("Line 100: Original content"));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_run_terminal_cmd_output_truncation() -> Result<()> {
+    let temp_dir = TempDir::new()?;
+    let mut registry = ToolRegistry::new(temp_dir.path().to_path_buf());
+
+    // Create a large file to generate verbose output
+    let large_file = temp_dir.path().join("large_data.txt");
+    let mut content = String::new();
+    for i in 1..=20_000 {
+        content.push_str(&format!("data {}\n", i));
+    }
+    fs::write(&large_file, &content)?;
+
+    // Run a command that produces a lot of output
+    let args = json!({
+        "command": ["cat", "large_data.txt"],
+        "timeout_secs": 30
+    });
+
+    let result = registry.execute_tool("run_terminal_cmd", args).await?;
+
+    // Check that output was truncated
+    assert_eq!(result["success"], true);
+    assert_eq!(result["truncated"], true);
+    assert_eq!(result["total_output_lines"], 20_000);
+    assert_eq!(result["shown_lines"], 2_000); // 1,000 + 1,000
+
+    let stdout = result["stdout"].as_str().unwrap();
+    assert!(stdout.contains("... [18000 lines truncated] ..."));
+    assert!(stdout.contains("data 1")); // First line present
+    assert!(stdout.contains("data 20000")); // Last line present
 
     Ok(())
 }

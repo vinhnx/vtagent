@@ -24,8 +24,7 @@ impl MessageStyle {
                 .bold(),
             Self::Output => Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green))),
             Self::Response => Style::new()
-                .fg_color(Some(Color::Ansi(AnsiColor::Magenta)))
-                .bold(),
+                .fg_color(Some(Color::Ansi(AnsiColor::BrightBlack))),
         }
     }
 }

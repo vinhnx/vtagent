@@ -19,10 +19,6 @@ upgrade codex
 https://deepwiki.com/pawurb/hotpath
 A simple Rust profiler that shows exactly where your code spends time
 
---
-
-Use Rust's Clippy linter to thoroughly scan the entire codebase for dead code, unused variables, unreachable code, and similar inefficiencies. Review all warnings and suggestions in detail, prioritizing high-impact issues. Then, systematically fix the identified problems by removing or refactoring the dead code, ensuring the changes maintain functionality, pass all tests, and improve code quality without introducing new issues. Provide a summary of changes made.
-
 ---
 
 https://deepwiki.com/alexpovel/srgn

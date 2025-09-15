@@ -72,6 +72,7 @@ anstyle = "1.0"
 anstyle-query = "1.0"
 anstream = "0.6"
 sysinfo = "0.37.0"
+syntect = "5.2"
 
 [features]
 default = ["tool-chat"]

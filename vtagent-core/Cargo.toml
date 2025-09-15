@@ -58,7 +58,7 @@ is-terminal = "0.4.16"
 async-trait = "0.1.89"
 indicatif = "0.17"
 # PTY support
-rexpect = "0.6.2"
+expectrl = "0.8"
 # Dotenv support
 dotenvy = "0.15"
 # Home directory detection

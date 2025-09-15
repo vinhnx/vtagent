@@ -6,9 +6,9 @@ use crate::config::constants::tools;
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 // PtySession import removed as it's not directly used
-use rexpect::spawn;
+use expectrl::{Eof, Expect, spawn};
 use serde_json::{Value, json};
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
 /// Command execution tool with multiple modes
 #[derive(Clone)]
@@ -54,8 +54,9 @@ impl CommandTool {
         }
 
         // Execute command in PTY
-        let mut pty_session = spawn(&full_command, Some(timeout_ms))
-            .map_err(|e| anyhow!("Failed to spawn PTY session: {}", e))?;
+        let mut pty_session =
+            spawn(&full_command).map_err(|e| anyhow!("Failed to spawn PTY session: {}", e))?;
+        pty_session.set_expect_timeout(Some(Duration::from_millis(timeout_ms)));
 
         // Change directory
         pty_session
@@ -68,9 +69,10 @@ impl CommandTool {
         }
 
         // Wait for command to complete and capture output
-        let output = pty_session
-            .exp_eof()
+        let eof = pty_session
+            .expect(Eof)
             .map_err(|e| anyhow!("PTY session failed: {}", e))?;
+        let output = String::from_utf8_lossy(eof.before()).to_string();
 
         Ok(json!({
             "success": true,

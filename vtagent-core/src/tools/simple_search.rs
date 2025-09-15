@@ -9,9 +9,9 @@ use crate::config::constants::tools;
 use crate::simple_indexer::SimpleIndexer;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use rexpect::spawn;
+use expectrl::{Eof, Expect, spawn};
 use serde_json::{Value, json};
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
 /// Simple bash-like search tool
 #[derive(Clone)]
@@ -61,8 +61,9 @@ impl SimpleSearchTool {
         let timeout_ms = timeout_secs.unwrap_or(30) * 1000;
 
         // Execute command in PTY
-        let mut pty_session = spawn(&full_command, Some(timeout_ms))
+        let mut pty_session = spawn(&full_command)
             .map_err(|e| anyhow::anyhow!("Failed to spawn PTY session: {}", e))?;
+        pty_session.set_expect_timeout(Some(Duration::from_millis(timeout_ms)));
 
         // Change to workspace directory
         pty_session
@@ -70,11 +71,10 @@ impl SimpleSearchTool {
             .map_err(|e| anyhow::anyhow!("Failed to change directory: {}", e))?;
 
         // Wait for command to complete and capture output
-        let output = pty_session
-            .exp_eof()
+        let eof = pty_session
+            .expect(Eof)
             .map_err(|e| anyhow::anyhow!("PTY session failed: {}", e))?;
-
-        Ok(output)
+        Ok(String::from_utf8_lossy(eof.before()).to_string())
     }
 
     /// Validate command for security

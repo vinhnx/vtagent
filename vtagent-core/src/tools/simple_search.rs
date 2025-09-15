@@ -1,17 +1,16 @@
-//! Simple bash-like search tool with PTY support
+//! Simple bash-like search tool
 //!
-//! This tool provides simple, direct search capabilities that act like
-//! common bash commands: grep, find, ls, cat, etc. Now uses PTY for
-//! proper terminal emulation compatibility.
+//! This tool provides direct search capabilities similar to common
+//! bash commands such as grep, find, ls, and cat.
 
 use super::traits::Tool;
 use crate::config::constants::tools;
 use crate::simple_indexer::SimpleIndexer;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use expectrl::{Eof, Expect, spawn};
 use serde_json::{Value, json};
-use std::{path::PathBuf, time::Duration};
+use std::{path::PathBuf, process::Stdio};
+use tokio::process::Command;
 
 /// Simple bash-like search tool
 #[derive(Clone)]
@@ -34,47 +33,32 @@ impl SimpleSearchTool {
         }
     }
 
-    /// Execute command using PTY for terminal emulation
+    /// Execute command and capture its stdout
     async fn execute_pty_command(
         &self,
         command: &str,
         args: Vec<String>,
-        timeout_secs: Option<u64>,
+        _timeout_secs: Option<u64>,
     ) -> Result<String> {
-        // Validate command for security before execution
         let full_command_parts = std::iter::once(command.to_string())
             .chain(args.clone())
             .collect::<Vec<String>>();
         self.validate_command(&full_command_parts)?;
 
-        let full_command = if args.is_empty() {
-            command.to_string()
-        } else {
-            format!("{} {}", command, args.join(" "))
-        };
+        let work_dir = self.indexer.workspace_root().to_path_buf();
+        let mut cmd = Command::new(command);
+        if !args.is_empty() {
+            cmd.args(&args);
+        }
+        cmd.current_dir(&work_dir);
+        cmd.stdout(Stdio::piped());
+        cmd.stderr(Stdio::piped());
 
-        // Set working directory
-        let work_dir = self.indexer.workspace_root().display().to_string();
-        let cd_command = format!("cd {}", work_dir);
-
-        // Set timeout (default 30 seconds)
-        let timeout_ms = timeout_secs.unwrap_or(30) * 1000;
-
-        // Execute command in PTY
-        let mut pty_session = spawn(&full_command)
-            .map_err(|e| anyhow::anyhow!("Failed to spawn PTY session: {}", e))?;
-        pty_session.set_expect_timeout(Some(Duration::from_millis(timeout_ms)));
-
-        // Change to workspace directory
-        pty_session
-            .send_line(&cd_command)
-            .map_err(|e| anyhow::anyhow!("Failed to change directory: {}", e))?;
-
-        // Wait for command to complete and capture output
-        let eof = pty_session
-            .expect(Eof)
-            .map_err(|e| anyhow::anyhow!("PTY session failed: {}", e))?;
-        Ok(String::from_utf8_lossy(eof.before()).to_string())
+        let output = cmd
+            .output()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to execute command: {}", e))?;
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 
     /// Validate command for security
@@ -132,7 +116,7 @@ impl SimpleSearchTool {
         Ok(())
     }
 
-    /// Execute grep-like search using PTY
+    /// Execute grep-like search
     async fn grep(&self, args: Value) -> Result<Value> {
         let pattern = args
             .get("pattern")
@@ -145,7 +129,7 @@ impl SimpleSearchTool {
             .and_then(|v| v.as_u64())
             .unwrap_or(50) as usize;
 
-        // Build grep command with PTY
+        // Build grep command
         let mut cmd_args = vec![pattern.to_string()];
         if let Some(file_pat) = file_pattern {
             cmd_args.push("--include".to_string());
@@ -158,7 +142,7 @@ impl SimpleSearchTool {
         let output = self
             .execute_pty_command("grep", cmd_args, Some(30))
             .await
-            .context("Failed to execute grep with PTY")?;
+            .context("Failed to execute grep")?;
 
         // Parse and limit results
         let lines: Vec<&str> = output.lines().collect();
@@ -174,14 +158,14 @@ impl SimpleSearchTool {
         }))
     }
 
-    /// Execute find-like file search using PTY
+    /// Execute find-like file search
     async fn find(&self, args: Value) -> Result<Value> {
         let pattern = args
             .get("pattern")
             .and_then(|v| v.as_str())
             .context("pattern is required for find")?;
 
-        // Build find command with PTY
+        // Build find command
         let cmd_args = vec![
             ".".to_string(),
             "-name".to_string(),
@@ -193,7 +177,7 @@ impl SimpleSearchTool {
         let output = self
             .execute_pty_command("find", cmd_args, Some(30))
             .await
-            .context("Failed to execute find with PTY")?;
+            .context("Failed to execute find")?;
 
         let files: Vec<&str> = output.lines().collect();
 
@@ -207,7 +191,7 @@ impl SimpleSearchTool {
         }))
     }
 
-    /// Execute ls-like directory listing using PTY
+    /// Execute ls-like directory listing
     async fn ls(&self, args: Value) -> Result<Value> {
         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
 
@@ -216,7 +200,7 @@ impl SimpleSearchTool {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        // Build ls command with PTY
+        // Build ls command
         let mut cmd_args = vec![];
         if show_hidden {
             cmd_args.push("-la".to_string());
@@ -228,7 +212,7 @@ impl SimpleSearchTool {
         let output = self
             .execute_pty_command("ls", cmd_args, Some(10))
             .await
-            .context("Failed to execute ls with PTY")?;
+            .context("Failed to execute ls")?;
 
         let files: Vec<&str> = output.lines().collect();
 
@@ -243,7 +227,7 @@ impl SimpleSearchTool {
         }))
     }
 
-    /// Execute cat-like file content reading using PTY
+    /// Execute cat-like file content reading
     async fn cat(&self, args: Value) -> Result<Value> {
         let file_path = args
             .get("file_path")
@@ -267,7 +251,7 @@ impl SimpleSearchTool {
             let output = self
                 .execute_pty_command("sh", cmd_args, Some(10))
                 .await
-                .context("Failed to execute sed with PTY")?;
+                .context("Failed to execute sed")?;
             return Ok(json!({
                 "command": "cat",
                 "file_path": file_path,
@@ -283,7 +267,7 @@ impl SimpleSearchTool {
         let output = self
             .execute_pty_command("cat", cmd_args, Some(10))
             .await
-            .context("Failed to execute cat with PTY")?;
+            .context("Failed to execute cat")?;
 
         Ok(json!({
             "command": "cat",
@@ -296,7 +280,7 @@ impl SimpleSearchTool {
         }))
     }
 
-    /// Execute head-like file preview using PTY
+    /// Execute head-like file preview
     async fn head(&self, args: Value) -> Result<Value> {
         let file_path = args
             .get("file_path")
@@ -310,7 +294,7 @@ impl SimpleSearchTool {
         let output = self
             .execute_pty_command("head", cmd_args, Some(10))
             .await
-            .context("Failed to execute head with PTY")?;
+            .context("Failed to execute head")?;
 
         Ok(json!({
             "command": "head",
@@ -322,7 +306,7 @@ impl SimpleSearchTool {
         }))
     }
 
-    /// Execute tail-like file preview using PTY
+    /// Execute tail-like file preview
     async fn tail(&self, args: Value) -> Result<Value> {
         let file_path = args
             .get("file_path")
@@ -336,7 +320,7 @@ impl SimpleSearchTool {
         let output = self
             .execute_pty_command("tail", cmd_args, Some(10))
             .await
-            .context("Failed to execute tail with PTY")?;
+            .context("Failed to execute tail")?;
 
         Ok(json!({
             "command": "tail",
@@ -387,7 +371,7 @@ impl Tool for SimpleSearchTool {
     }
 
     fn description(&self) -> &'static str {
-        "Simple bash-like search and file operations with PTY support and security validation: grep, find, ls, cat, head, tail, index. \
+        "Simple bash-like search and file operations with security validation: grep, find, ls, cat, head, tail, index. \
          Only safe read-only operations are allowed - no file modifications or dangerous commands."
     }
 }

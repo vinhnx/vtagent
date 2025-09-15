@@ -96,5 +96,4 @@ path = "src/main.rs"
 [dev-dependencies]
 criterion = "0.5"
 tempfile = "3.0"
-expectrl = "0.8"
 dialoguer = "0.9"

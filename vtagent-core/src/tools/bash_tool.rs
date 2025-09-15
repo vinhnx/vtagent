@@ -1,18 +1,17 @@
-//! Bash-like tool using PTY for terminal emulation compatibility
+//! Bash-like tool for command execution
 //!
-//! This tool provides bash-like functionality using PTY (pseudo-terminal)
-//! for proper terminal emulation, making it compatible with interactive
-//! commands and tools that require terminal capabilities.
+//! This tool provides bash-like functionality for running common
+//! commands and tools that require a shell environment.
 
 use super::traits::Tool;
 use crate::config::constants::tools;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use expectrl::{Eof, Expect, spawn};
 use serde_json::{Value, json};
-use std::{path::PathBuf, time::Duration};
+use std::{path::PathBuf, process::Stdio};
+use tokio::process::Command;
 
-/// Bash-like tool for PTY-based command execution
+/// Bash-like tool for command execution
 #[derive(Clone)]
 pub struct BashTool {
     workspace_root: PathBuf,
@@ -24,14 +23,13 @@ impl BashTool {
         Self { workspace_root }
     }
 
-    /// Execute command using PTY for terminal emulation
+    /// Execute command and capture its output
     async fn execute_pty_command(
         &self,
         command: &str,
         args: Vec<String>,
-        timeout_secs: Option<u64>,
+        _timeout_secs: Option<u64>,
     ) -> Result<Value> {
-        // Validate command for security before execution
         let full_command_parts = std::iter::once(command.to_string())
             .chain(args.clone())
             .collect::<Vec<String>>();
@@ -43,38 +41,31 @@ impl BashTool {
             format!("{} {}", command, args.join(" "))
         };
 
-        // Set working directory
-        let work_dir = self.workspace_root.display().to_string();
-        let cd_command = format!("cd {}", work_dir);
+        let work_dir = self.workspace_root.clone();
+        let mut cmd = Command::new(command);
+        if !args.is_empty() {
+            cmd.args(&args);
+        }
+        cmd.current_dir(&work_dir);
+        cmd.stdout(Stdio::piped());
+        cmd.stderr(Stdio::piped());
 
-        // Set timeout (default 30 seconds)
-        let timeout_ms = timeout_secs.unwrap_or(30) * 1000;
-
-        // Execute command in PTY
-        let mut pty_session = spawn(&full_command)
-            .map_err(|e| anyhow::anyhow!("Failed to spawn PTY session: {}", e))?;
-        pty_session.set_expect_timeout(Some(Duration::from_millis(timeout_ms)));
-
-        // Change to workspace directory
-        pty_session
-            .send_line(&cd_command)
-            .map_err(|e| anyhow::anyhow!("Failed to change directory: {}", e))?;
-
-        // Wait for command to complete and capture output
-        let eof = pty_session
-            .expect(Eof)
-            .map_err(|e| anyhow::anyhow!("PTY session failed: {}", e))?;
-        let output = String::from_utf8_lossy(eof.before()).to_string();
+        let output = cmd
+            .output()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to execute command: {}", e))?;
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
         Ok(json!({
-            "success": true,
-            "exit_code": 0,
-            "stdout": output,
-            "stderr": "",
-            "mode": "pty",
-            "pty_enabled": true,
+            "success": output.status.success(),
+            "exit_code": output.status.code().unwrap_or_default(),
+            "stdout": stdout,
+            "stderr": stderr,
+            "mode": "terminal",
+            "pty_enabled": false,
             "command": full_command,
-            "working_directory": work_dir
+            "working_directory": work_dir.display().to_string()
         }))
     }
 
@@ -250,7 +241,7 @@ impl BashTool {
         Ok(())
     }
 
-    /// Execute ls command with PTY
+    /// Execute ls command
     async fn execute_ls(&self, args: Value) -> Result<Value> {
         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
         let show_hidden = args
@@ -268,12 +259,12 @@ impl BashTool {
         self.execute_pty_command("ls", cmd_args, Some(10)).await
     }
 
-    /// Execute pwd command with PTY
+    /// Execute pwd command
     async fn execute_pwd(&self) -> Result<Value> {
         self.execute_pty_command("pwd", vec![], Some(5)).await
     }
 
-    /// Execute grep command with PTY
+    /// Execute grep command
     async fn execute_grep(&self, args: Value) -> Result<Value> {
         let pattern = args
             .get("pattern")
@@ -294,7 +285,7 @@ impl BashTool {
         self.execute_pty_command("grep", cmd_args, Some(30)).await
     }
 
-    /// Execute find command with PTY
+    /// Execute find command
     async fn execute_find(&self, args: Value) -> Result<Value> {
         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
         let name_pattern = args.get("name_pattern").and_then(|v| v.as_str());
@@ -313,7 +304,7 @@ impl BashTool {
         self.execute_pty_command("find", cmd_args, Some(30)).await
     }
 
-    /// Execute cat command with PTY
+    /// Execute cat command
     async fn execute_cat(&self, args: Value) -> Result<Value> {
         let path = args
             .get("path")
@@ -336,7 +327,7 @@ impl BashTool {
         self.execute_pty_command("cat", cmd_args, Some(10)).await
     }
 
-    /// Execute head command with PTY
+    /// Execute head command
     async fn execute_head(&self, args: Value) -> Result<Value> {
         let path = args
             .get("path")
@@ -350,7 +341,7 @@ impl BashTool {
         self.execute_pty_command("head", cmd_args, Some(10)).await
     }
 
-    /// Execute tail command with PTY
+    /// Execute tail command
     async fn execute_tail(&self, args: Value) -> Result<Value> {
         let path = args
             .get("path")
@@ -364,7 +355,7 @@ impl BashTool {
         self.execute_pty_command("tail", cmd_args, Some(10)).await
     }
 
-    /// Execute mkdir command with PTY
+    /// Execute mkdir command
     async fn execute_mkdir(&self, args: Value) -> Result<Value> {
         let path = args
             .get("path")
@@ -384,7 +375,7 @@ impl BashTool {
         self.execute_pty_command("mkdir", cmd_args, Some(10)).await
     }
 
-    /// Execute rm command with PTY
+    /// Execute rm command
     async fn execute_rm(&self, args: Value) -> Result<Value> {
         let path = args
             .get("path")
@@ -409,7 +400,7 @@ impl BashTool {
         self.execute_pty_command("rm", cmd_args, Some(10)).await
     }
 
-    /// Execute cp command with PTY
+    /// Execute cp command
     async fn execute_cp(&self, args: Value) -> Result<Value> {
         let source = args
             .get("source")
@@ -436,7 +427,7 @@ impl BashTool {
         self.execute_pty_command("cp", cmd_args, Some(30)).await
     }
 
-    /// Execute mv command with PTY
+    /// Execute mv command
     async fn execute_mv(&self, args: Value) -> Result<Value> {
         let source = args
             .get("source")
@@ -453,7 +444,7 @@ impl BashTool {
         self.execute_pty_command("mv", cmd_args, Some(10)).await
     }
 
-    /// Execute stat command with PTY
+    /// Execute stat command
     async fn execute_stat(&self, args: Value) -> Result<Value> {
         let path = args
             .get("path")
@@ -465,7 +456,7 @@ impl BashTool {
         self.execute_pty_command("ls", cmd_args, Some(10)).await
     }
 
-    /// Execute arbitrary command with PTY
+    /// Execute arbitrary command
     async fn execute_run(&self, args: Value) -> Result<Value> {
         let command = args
             .get("command")
@@ -518,7 +509,7 @@ impl Tool for BashTool {
     }
 
     fn description(&self) -> &'static str {
-        "Bash-like commands with PTY support and security validation: ls, pwd, grep, find, cat, head, tail, mkdir, rm, cp, mv, stat, run. \
+        "Bash-like commands with security validation: ls, pwd, grep, find, cat, head, tail, mkdir, rm, cp, mv, stat, run. \
          Dangerous commands (rm, sudo, network operations, system modifications) are blocked for safety."
     }
 }

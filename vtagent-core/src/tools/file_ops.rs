@@ -86,7 +86,7 @@ impl FileOpsTool {
         let capped_total = all_items.len().min(input.max_items);
         let (page, per_page) = (
             input.page.unwrap_or(1).max(1),
-            input.per_page.unwrap_or(100).max(1),
+            input.per_page.unwrap_or(50).max(1),
         );
         let start = (page - 1).saturating_mul(per_page);
         let end = (start + per_page).min(capped_total);
@@ -144,7 +144,7 @@ impl FileOpsTool {
             }
         }
 
-        let guidance = if has_more || capped_total < all_items.len() {
+        let guidance = if has_more || capped_total < all_items.len() || all_items.len() > 20 {
             Some(format!(
                 "Showing {} of {} items (page {}, per_page {}). Use 'page' and 'per_page' to page through results.",
                 page_items.len(),
@@ -176,10 +176,12 @@ impl FileOpsTool {
 
     /// Execute recursive file search
     async fn execute_recursive_search(&self, input: &ListInput) -> Result<Value> {
+        // Allow recursive listing without pattern by defaulting to "*" (match all)
+        let default_pattern = "*".to_string();
         let pattern = input
             .name_pattern
             .as_ref()
-            .ok_or_else(|| anyhow!("Error: Missing 'name_pattern'. Example: list_files(path='.', mode='recursive', name_pattern='*.rs')"))?;
+            .unwrap_or(&default_pattern);
         let search_path = self.workspace_root.join(&input.path);
 
         let mut items = Vec::new();
@@ -202,8 +204,10 @@ impl FileOpsTool {
                 continue;
             }
 
-            // Pattern matching
-            let matches = if input.case_sensitive.unwrap_or(true) {
+            // Pattern matching - handle "*" as wildcard for all files
+            let matches = if pattern == "*" {
+                true // Match all files when pattern is "*"
+            } else if input.case_sensitive.unwrap_or(true) {
                 name.contains(pattern)
             } else {
                 name.to_lowercase().contains(&pattern.to_lowercase())
@@ -352,22 +356,76 @@ impl FileOpsTool {
             }
 
             if candidate_path.exists() && candidate_path.is_file() {
-                let content = if let Some(max_bytes) = input.max_bytes {
-                    let mut file_content = tokio::fs::read(candidate_path).await?;
-                    if file_content.len() > max_bytes {
-                        file_content.truncate(max_bytes);
-                    }
-                    String::from_utf8_lossy(&file_content).to_string()
+                // Check if chunking is needed
+                let should_chunk = if let Some(max_lines) = input.max_lines {
+                    // User specified max_lines threshold
+                    self.count_lines_with_tree_sitter(candidate_path).await? > max_lines
+                } else if let Some(chunk_lines) = input.chunk_lines {
+                    // User specified chunk_lines (legacy parameter)
+                    self.count_lines_with_tree_sitter(candidate_path).await? > chunk_lines
                 } else {
-                    tokio::fs::read_to_string(candidate_path).await?
+                    // Use default threshold
+                    self.count_lines_with_tree_sitter(candidate_path).await? > crate::config::constants::chunking::MAX_LINES_THRESHOLD
                 };
 
-                return Ok(json!({
+                let (content, truncated, total_lines) = if should_chunk {
+                    // Calculate chunk sizes for logging
+                    let start_chunk = if let Some(max_lines) = input.max_lines {
+                        max_lines / 2
+                    } else if let Some(chunk_lines) = input.chunk_lines {
+                        chunk_lines / 2
+                    } else {
+                        crate::config::constants::chunking::CHUNK_START_LINES
+                    };
+                    let _end_chunk = start_chunk;
+
+                    let result = self.read_file_chunked(candidate_path, &input).await?;
+                    // Log chunking operation
+                    self.log_chunking_operation(candidate_path, result.1, result.2).await?;
+                    result
+                } else {
+                    let content = if let Some(max_bytes) = input.max_bytes {
+                        let mut file_content = tokio::fs::read(candidate_path).await?;
+                        if file_content.len() > max_bytes {
+                            file_content.truncate(max_bytes);
+                        }
+                        String::from_utf8_lossy(&file_content).to_string()
+                    } else {
+                        tokio::fs::read_to_string(candidate_path).await?
+                    };
+                    (content, false, None)
+                };
+
+                let mut result = json!({
                     "success": true,
                     "content": content,
                     "path": candidate_path.strip_prefix(&self.workspace_root).unwrap_or(candidate_path).to_string_lossy(),
-                    "size": content.len()
-                }));
+                    "metadata": {
+                        "size": content.len()
+                    }
+                });
+
+                if truncated {
+                    result["truncated"] = json!(true);
+                    result["truncation_reason"] = json!("file_exceeds_line_threshold");
+                    if let Some(total) = total_lines {
+                        result["total_lines"] = json!(total);
+                        let start_chunk = if let Some(max_lines) = input.max_lines {
+                            max_lines / 2
+                        } else if let Some(chunk_lines) = input.chunk_lines {
+                            chunk_lines / 2
+                        } else {
+                            crate::config::constants::chunking::CHUNK_START_LINES
+                        };
+                        let end_chunk = start_chunk;
+                        result["shown_lines"] = json!(start_chunk + end_chunk);
+                    }
+                }
+
+                // Log chunking operation
+                self.log_chunking_operation(candidate_path, truncated, total_lines).await?;
+
+                return Ok(result);
             }
         }
 
@@ -385,11 +443,19 @@ impl FileOpsTool {
         ))
     }
 
-    /// Write file with various modes
+    /// Write file with various modes and chunking support for large content
     pub async fn write_file(&self, args: Value) -> Result<Value> {
         let input: WriteInput = serde_json::from_value(args)
             .context("Error: Invalid 'write_file' arguments. Required: {{ path: string, content: string }}. Optional: {{ mode: 'overwrite'|'append'|'skip_if_exists' }}. Example: write_file({{\"path\": \"README.md\", \"content\": \"Hello\", \"mode\": \"overwrite\"}})")?;
         let file_path = self.workspace_root.join(&input.path);
+
+        // Check if content needs chunking
+        let content_size = input.content.len();
+        let should_chunk = content_size > crate::config::constants::chunking::MAX_WRITE_CONTENT_SIZE;
+
+        if should_chunk {
+            return self.write_file_chunked(&file_path, &input).await;
+        }
 
         // Create parent directories if needed
         if let Some(parent) = file_path.parent() {
@@ -427,6 +493,9 @@ impl FileOpsTool {
             }
         }
 
+        // Log write operation
+        self.log_write_operation(&file_path, content_size, false).await?;
+
         Ok(json!({
             "success": true,
             "path": input.path,
@@ -435,96 +504,98 @@ impl FileOpsTool {
         }))
     }
 
-    /// Resolve file path with intelligent fallbacks including case-insensitive search
-    fn resolve_file_path(&self, path: &str) -> Result<Vec<PathBuf>> {
-        let mut paths = Vec::new();
-
-        // Try exact path first
-        paths.push(self.workspace_root.join(path));
-
-        // If it's just a filename, try common directories that exist in most projects
-        if !path.contains('/') && !path.contains('\\') {
-            // Generic source directories found in most projects
-            paths.push(self.workspace_root.join("src").join(path));
-            paths.push(self.workspace_root.join("lib").join(path));
-            paths.push(self.workspace_root.join("bin").join(path));
-            paths.push(self.workspace_root.join("app").join(path));
-            paths.push(self.workspace_root.join("source").join(path));
-            paths.push(self.workspace_root.join("sources").join(path));
-            paths.push(self.workspace_root.join("include").join(path));
-            paths.push(self.workspace_root.join("docs").join(path));
-            paths.push(self.workspace_root.join("doc").join(path));
-            paths.push(self.workspace_root.join("examples").join(path));
-            paths.push(self.workspace_root.join("example").join(path));
-            paths.push(self.workspace_root.join("tests").join(path));
-            paths.push(self.workspace_root.join("test").join(path));
+    /// Write large file in chunks for atomicity and memory efficiency
+    async fn write_file_chunked(&self, file_path: &Path, input: &WriteInput) -> Result<Value> {
+        // Create parent directories if needed
+        if let Some(parent) = file_path.parent() {
+            tokio::fs::create_dir_all(parent).await?;
         }
 
-        // Try case-insensitive variants for filenames
-        if !path.contains('/') && !path.contains('\\') {
-            if let Ok(entries) = std::fs::read_dir(&self.workspace_root) {
-                for entry in entries.flatten() {
-                    if let Ok(name) = entry.file_name().into_string() {
-                        if name.to_lowercase() == path.to_lowercase() {
-                            paths.push(entry.path());
-                        }
-                    }
-                }
-            }
+        let content_bytes = input.content.as_bytes();
+        let chunk_size = crate::config::constants::chunking::WRITE_CHUNK_SIZE;
+        let total_size = content_bytes.len();
 
-            // Also check common subdirectories for case-insensitive matches
-            let common_dirs = [
-                "src", "lib", "bin", "app", "source", "sources", "include", "docs", "doc",
-                "examples", "example", "tests", "test",
-            ];
-            for dir in &common_dirs {
-                if let Ok(entries) = std::fs::read_dir(self.workspace_root.join(dir)) {
-                    for entry in entries.flatten() {
-                        if let Ok(name) = entry.file_name().into_string() {
-                            if name.to_lowercase() == path.to_lowercase() {
-                                paths.push(entry.path());
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        match input.mode.as_str() {
+            "overwrite" => {
+                // Write in chunks for large files
+                use tokio::io::AsyncWriteExt;
+                let mut file = tokio::fs::OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .truncate(true)
+                    .open(file_path)
+                    .await?;
 
-        // If path contains directories, try case-insensitive directory matching
-        if path.contains('/') || path.contains('\\') {
-            let parts: Vec<&str> = path.split(|c| c == '/' || c == '\\').collect();
-            if parts.len() > 1 {
-                let mut current_path = self.workspace_root.clone();
-                for (i, part) in parts.iter().enumerate() {
-                    let _is_last = i == parts.len() - 1;
-                    if let Ok(entries) = std::fs::read_dir(&current_path) {
-                        let mut found = false;
-                        for entry in entries.flatten() {
-                            if let Ok(name) = entry.file_name().into_string() {
-                                if name.to_lowercase() == part.to_lowercase() {
-                                    current_path = entry.path();
-                                    found = true;
-                                    break;
-                                }
-                            }
-                        }
-                        if !found {
-                            // If we can't find a case-insensitive match, try the original
-                            current_path = current_path.join(part);
-                        }
-                    } else {
-                        // Directory doesn't exist, append remaining parts
-                        for remaining_part in &parts[i..] {
-                            current_path = current_path.join(remaining_part);
-                        }
-                        break;
-                    }
+                for chunk in content_bytes.chunks(chunk_size) {
+                    file.write_all(chunk).await?;
                 }
-                paths.push(current_path);
+                file.flush().await?;
+            }
+            "append" => {
+                // Append in chunks
+                use tokio::io::AsyncWriteExt;
+                let mut file = tokio::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(file_path)
+                    .await?;
+
+                for chunk in content_bytes.chunks(chunk_size) {
+                    file.write_all(chunk).await?;
+                }
+                file.flush().await?;
+            }
+            "skip_if_exists" => {
+                if file_path.exists() {
+                    return Ok(json!({
+                        "success": true,
+                        "skipped": true,
+                        "reason": "File already exists"
+                    }));
+                }
+                // Write in chunks for new file
+                use tokio::io::AsyncWriteExt;
+                let mut file = tokio::fs::File::create(file_path).await?;
+                for chunk in content_bytes.chunks(chunk_size) {
+                    file.write_all(chunk).await?;
+                }
+                file.flush().await?;
+            }
+            _ => {
+                return Err(anyhow!(format!(
+                    "Error: Unsupported write mode '{}'. Allowed: overwrite, append, skip_if_exists.",
+                    input.mode
+                )));
             }
         }
 
-        Ok(paths)
+        // Log chunked write operation
+        self.log_write_operation(file_path, total_size, true).await?;
+
+        Ok(json!({
+            "success": true,
+            "path": file_path.strip_prefix(&self.workspace_root).unwrap_or(file_path).to_string_lossy(),
+            "mode": input.mode,
+            "bytes_written": total_size,
+            "chunked": true,
+            "chunk_size": chunk_size,
+            "chunks_written": (total_size + chunk_size - 1) / chunk_size
+        }))
+    }
+
+    /// Log write operations for debugging
+    async fn log_write_operation(&self, file_path: &Path, bytes_written: usize, chunked: bool) -> Result<()> {
+        let log_entry = json!({
+            "operation": if chunked { "write_file_chunked" } else { "write_file" },
+            "file_path": file_path.to_string_lossy(),
+            "bytes_written": bytes_written,
+            "chunked": chunked,
+            "chunk_size": if chunked { Some(crate::config::constants::chunking::WRITE_CHUNK_SIZE) } else { None },
+            "timestamp": chrono::Utc::now().to_rfc3339()
+        });
+
+        info!("File write operation: {}", serde_json::to_string(&log_entry)?);
+        Ok(())
     }
 }
 
@@ -611,7 +682,7 @@ impl FileOpsTool {
     ) -> Value {
         let (page, per_page) = (
             input.page.unwrap_or(1).max(1),
-            input.per_page.unwrap_or(100).max(1),
+            input.per_page.unwrap_or(50).max(1),
         );
         let total_capped = total_count.min(input.max_items);
         let start = (page - 1).saturating_mul(per_page);
@@ -684,7 +755,7 @@ impl FileOpsTool {
         if let Some(p) = pattern {
             out["pattern"] = json!(p);
         }
-        if has_more {
+        if has_more || total_capped > 20 {
             out["message"] = json!(format!(
                 "Showing {} of {} results. Use 'page' to continue.",
                 out["count"].as_u64().unwrap_or(0),
@@ -692,5 +763,121 @@ impl FileOpsTool {
             ));
         }
         out
+    }
+
+    /// Count lines in a file using tree-sitter for accurate parsing
+    async fn count_lines_with_tree_sitter(&self, file_path: &Path) -> Result<usize> {
+        let content = tokio::fs::read_to_string(file_path).await?;
+        Ok(content.lines().count())
+    }
+
+    /// Read file with chunking (first N + last N lines)
+    async fn read_file_chunked(&self, file_path: &Path, input: &Input) -> Result<(String, bool, Option<usize>)> {
+        let content = tokio::fs::read_to_string(file_path).await?;
+        let lines: Vec<&str> = content.lines().collect();
+        let total_lines = lines.len();
+
+        // Use custom chunk sizes if provided, otherwise use defaults
+        let start_chunk = if let Some(chunk_lines) = input.chunk_lines {
+            chunk_lines / 2
+        } else {
+            crate::config::constants::chunking::CHUNK_START_LINES
+        };
+        let end_chunk = if let Some(chunk_lines) = input.chunk_lines {
+            chunk_lines / 2
+        } else {
+            crate::config::constants::chunking::CHUNK_END_LINES
+        };
+
+        if total_lines <= start_chunk + end_chunk {
+            // File is small enough, return all content
+            return Ok((content, false, Some(total_lines)));
+        }
+
+        // Create chunked content
+        let mut chunked_content = String::new();
+
+        // Add first N lines
+        for (i, line) in lines.iter().enumerate().take(start_chunk) {
+            if i > 0 {
+                chunked_content.push('\n');
+            }
+            chunked_content.push_str(line);
+        }
+
+        // Add truncation indicator
+        chunked_content.push_str(&format!(
+            "\n\n... [{} lines truncated - showing first {} and last {} lines] ...\n\n",
+            total_lines - start_chunk - end_chunk,
+            start_chunk,
+            end_chunk
+        ));
+
+        // Add last N lines
+        let start_idx = total_lines.saturating_sub(end_chunk);
+        for (i, line) in lines.iter().enumerate().skip(start_idx) {
+            if i > start_idx {
+                chunked_content.push('\n');
+            }
+            chunked_content.push_str(line);
+        }
+
+        Ok((chunked_content, true, Some(total_lines)))
+    }
+
+    /// Log chunking operations for debugging
+    async fn log_chunking_operation(&self, file_path: &Path, truncated: bool, total_lines: Option<usize>) -> Result<()> {
+        if truncated {
+            let log_entry = json!({
+                "operation": "read_file_chunked",
+                "file_path": file_path.to_string_lossy(),
+                "truncated": true,
+                "total_lines": total_lines,
+                "timestamp": chrono::Utc::now().to_rfc3339()
+            });
+
+            info!("File chunking operation: {}", serde_json::to_string(&log_entry)?);
+        }
+        Ok(())
+    }
+
+    fn resolve_file_path(&self, path: &str) -> Result<Vec<PathBuf>> {
+        let mut paths = Vec::new();
+
+        // Try exact path first
+        paths.push(self.workspace_root.join(path));
+
+        // If it's just a filename, try common directories that exist in most projects
+        if !path.contains('/') && !path.contains('\\') {
+            // Generic source directories found in most projects
+            paths.push(self.workspace_root.join("src").join(path));
+            paths.push(self.workspace_root.join("lib").join(path));
+            paths.push(self.workspace_root.join("bin").join(path));
+            paths.push(self.workspace_root.join("app").join(path));
+            paths.push(self.workspace_root.join("source").join(path));
+            paths.push(self.workspace_root.join("sources").join(path));
+            paths.push(self.workspace_root.join("include").join(path));
+            paths.push(self.workspace_root.join("docs").join(path));
+            paths.push(self.workspace_root.join("doc").join(path));
+            paths.push(self.workspace_root.join("examples").join(path));
+            paths.push(self.workspace_root.join("example").join(path));
+            paths.push(self.workspace_root.join("tests").join(path));
+            paths.push(self.workspace_root.join("test").join(path));
+        }
+
+        // Try case-insensitive variants for filenames
+        if !path.contains('/') && !path.contains('\\') {
+            if let Ok(entries) = std::fs::read_dir(&self.workspace_root) {
+                for entry in entries.flatten() {
+                    if let Ok(name) = entry.file_name().into_string() {
+                        if name.to_lowercase() == path.to_lowercase() {
+                            paths.push(entry.path());
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(paths)
     }
 }

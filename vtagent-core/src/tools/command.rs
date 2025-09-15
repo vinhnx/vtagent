@@ -10,6 +10,7 @@ use rexpect::spawn;
 use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::time::Duration;
+use tracing::info;
 
 /// Command execution tool with multiple modes
 #[derive(Clone)]
@@ -55,13 +56,16 @@ impl CommandTool {
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
 
-        Ok(json!({
+        let result = json!({
             "success": output.status.success(),
             "exit_code": output.status.code(),
             "stdout": stdout,
             "stderr": stderr,
             "mode": "terminal"
-        }))
+        });
+
+        // Apply output truncation if needed
+        self.truncate_command_output(result)
     }
 
     /// Execute PTY command (for both pty and streaming modes)
@@ -106,7 +110,7 @@ impl CommandTool {
             .exp_eof()
             .map_err(|e| anyhow!("PTY session failed: {}", e))?;
 
-        Ok(json!({
+        let result = json!({
             "success": true,
             "exit_code": 0,
             "stdout": output,
@@ -116,7 +120,10 @@ impl CommandTool {
             "streaming": input.mode.as_deref() == Some("streaming"),
             "shell_rendered": true,
             "command": full_command
-        }))
+        });
+
+        // Apply output truncation if needed
+        self.truncate_command_output(result)
     }
 
     /// Execute streaming command (similar to PTY but with streaming indication)
@@ -128,6 +135,87 @@ impl CommandTool {
         if let Some(obj) = result.as_object_mut() {
             obj.insert("mode".to_string(), json!("streaming"));
             obj.insert("streaming_enabled".to_string(), json!(true));
+        }
+
+        Ok(result)
+    }
+
+    /// Truncate command output if it exceeds size limits
+    fn truncate_command_output(&self, mut result: Value) -> Result<Value> {
+        if let Some(obj) = result.as_object_mut() {
+            let stdout = obj.get("stdout").and_then(|v| v.as_str()).unwrap_or("");
+            let stderr = obj.get("stderr").and_then(|v| v.as_str()).unwrap_or("");
+
+            let total_output_lines = stdout.lines().count() + stderr.lines().count();
+            let max_lines = crate::config::constants::chunking::MAX_TERMINAL_OUTPUT_LINES;
+
+            if total_output_lines > max_lines {
+                // Truncate stdout
+                let stdout_lines: Vec<&str> = stdout.lines().collect();
+                let start_lines = crate::config::constants::chunking::TERMINAL_OUTPUT_START_LINES;
+                let end_lines = crate::config::constants::chunking::TERMINAL_OUTPUT_END_LINES;
+
+                let mut truncated_stdout = String::new();
+                if start_lines > 0 && !stdout_lines.is_empty() {
+                    for (i, line) in stdout_lines.iter().enumerate().take(start_lines) {
+                        if i > 0 { truncated_stdout.push('\n'); }
+                        truncated_stdout.push_str(line);
+                    }
+                }
+
+                if end_lines > 0 && stdout_lines.len() > start_lines + end_lines {
+                    truncated_stdout.push_str(&format!(
+                        "\n\n... [{} lines truncated] ...\n\n",
+                        stdout_lines.len() - start_lines - end_lines
+                    ));
+
+                    let start_idx = stdout_lines.len().saturating_sub(end_lines);
+                    for (i, line) in stdout_lines.iter().enumerate().skip(start_idx) {
+                        if i > start_idx { truncated_stdout.push('\n'); }
+                        truncated_stdout.push_str(line);
+                    }
+                }
+
+                // Truncate stderr similarly
+                let stderr_lines: Vec<&str> = stderr.lines().collect();
+                let mut truncated_stderr = String::new();
+                if start_lines > 0 && !stderr_lines.is_empty() {
+                    for (i, line) in stderr_lines.iter().enumerate().take(start_lines) {
+                        if i > 0 { truncated_stderr.push('\n'); }
+                        truncated_stderr.push_str(line);
+                    }
+                }
+
+                if end_lines > 0 && stderr_lines.len() > start_lines + end_lines {
+                    truncated_stderr.push_str(&format!(
+                        "\n\n... [{} lines truncated] ...\n\n",
+                        stderr_lines.len() - start_lines - end_lines
+                    ));
+
+                    let start_idx = stderr_lines.len().saturating_sub(end_lines);
+                    for (i, line) in stderr_lines.iter().enumerate().skip(start_idx) {
+                        if i > start_idx { truncated_stderr.push('\n'); }
+                        truncated_stderr.push_str(line);
+                    }
+                }
+
+                obj.insert("stdout".to_string(), json!(truncated_stdout));
+                obj.insert("stderr".to_string(), json!(truncated_stderr));
+                obj.insert("truncated".to_string(), json!(true));
+                obj.insert("total_output_lines".to_string(), json!(total_output_lines));
+                obj.insert("shown_lines".to_string(), json!(start_lines + end_lines));
+
+                // Log truncation
+                let log_entry = json!({
+                    "operation": "run_terminal_cmd_truncated",
+                    "total_output_lines": total_output_lines,
+                    "max_lines": max_lines,
+                    "shown_lines": start_lines + end_lines,
+                    "timestamp": chrono::Utc::now().to_rfc3339()
+                });
+
+                info!("Command output truncated: {}", serde_json::to_string(&log_entry)?);
+            }
         }
 
         Ok(result)

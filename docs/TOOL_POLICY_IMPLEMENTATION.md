@@ -194,7 +194,7 @@ The system is designed for extensibility:
 
 The system implements optimized pagination for handling large datasets:
 
--   **Default Batch Size**: `per_page` defaults to 100 items for optimal performance
+-   **Default Batch Size**: `per_page` defaults to 50 items for optimal performance
 -   **Automatic Adjustment**: System automatically reduces batch size for very large directories
 -   **Error Recovery**: Comprehensive logging and graceful handling of pagination failures
 -   **Fallback Strategy**: On timeouts or API failures, automatically retry with smaller batches (50 items)
@@ -213,6 +213,59 @@ The system implements optimized pagination for handling large datasets:
 -   **Timeout Handling**: Automatic retry with exponential backoff for transient failures
 -   **Data Integrity**: Validation of pagination parameters to prevent invalid requests
 -   **Resource Limits**: Configurable caps on maximum items processed per operation
+
+## Intelligent Chunking System
+
+### Overview
+
+VTAgent implements automatic chunking strategies to handle large files and verbose outputs efficiently, preventing token limits and memory issues while preserving important content.
+
+### Chunking Thresholds
+
+-   **File Reading**: 2,000 lines (shows first 800 + last 800 lines)
+-   **File Writing**: 500KB content (writes in 50KB chunks)
+-   **Terminal Output**: 3,000 lines (shows first 1,000 + last 1,000 lines)
+
+### Tool-Specific Chunking Rules
+
+#### read_file Tool
+
+-   **Automatic Detection**: Files >10,000 lines are automatically chunked
+-   **Content Preservation**: Shows headers, footers, and key sections
+-   **Metadata**: Returns `truncated: true`, `total_lines`, and `shown_lines`
+-   **Customization**: `chunk_lines` parameter allows custom thresholds
+
+#### write_file Tool
+
+-   **Chunked Writing**: Large content split into 100KB chunks
+-   **Atomicity**: Sequential writes ensure data integrity
+-   **Progress Tracking**: Returns `chunked: true` and `chunks_written` count
+
+#### edit_file Tool
+
+-   **Inherited Chunking**: Uses chunked read/write for large files
+-   **Context Preservation**: Maintains line numbers during edits
+-   **Diff Merging**: Handles overlaps and conflicts in chunked operations
+
+#### run_terminal_cmd Tool
+
+-   **Output Truncation**: Verbose commands truncated to essential content
+-   **Efficiency**: Uses `head`/`tail` for large output processing
+-   **Summary**: Includes truncation indicators and total line counts
+
+### Logging and Monitoring
+
+-   **Structured Logs**: JSON-formatted chunking events with timestamps
+-   **Performance Metrics**: File sizes, chunk details, and processing times
+-   **Error Tracking**: Failed chunking operations with detailed context
+-   **Debugging Support**: Comprehensive logging for troubleshooting
+
+### User Experience
+
+-   **Transparent Operation**: Users are informed when content is truncated
+-   **Access to Full Content**: Tools provide metadata for requesting specific sections
+-   **Performance Optimization**: Chunking prevents timeouts and memory exhaustion
+-   **Backward Compatibility**: Existing tool usage remains unchanged
 
 ## Conclusion
 

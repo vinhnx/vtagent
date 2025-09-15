@@ -43,7 +43,7 @@ impl PromptTemplates {
 
     /// Get tool usage prompt
     pub fn tool_usage_prompt() -> &'static str {
-        "You have tools for files, search, and shell. Plan before calling tools; choose the most specific tool. Prefer small, targeted calls. Default to response_format='concise' and paginate long results with page/per_page (default per_page=100). If a tool truncates output or returns guidance, follow it. Use unambiguous args (e.g., path, max_results)."
+        "You have tools for files, search, and shell. Plan before calling tools; choose the most specific tool. Prefer small, targeted calls. Default to response_format='concise' and paginate long results with page/per_page (default per_page=50). If a tool truncates output or returns guidance, follow it. Use unambiguous args (e.g., path, max_results)."
     }
 
     /// Get workspace context prompt
@@ -58,6 +58,6 @@ impl PromptTemplates {
 
     /// Get pagination guidelines prompt
     pub fn pagination_guidelines_prompt() -> &'static str {
-        "PAGINATION GUIDELINES: When working with large datasets, always use pagination to prevent timeouts and token overflow. Default per_page=100 for optimal performance. For edge cases: reduce per_page to 50 for very large directories, handle incomplete pages gracefully, and retry with smaller batches on API failures. Monitor 'has_more' flag and use 'page' parameter to continue pagination."
+        "PAGINATION GUIDELINES: When working with large datasets, always use pagination to prevent timeouts and token overflow. Default per_page=50 for optimal performance. For edge cases: reduce per_page to 25 for very large directories, handle incomplete pages gracefully, and retry with smaller batches on API failures. Monitor 'has_more' flag and use 'page' parameter to continue pagination."
     }
 }

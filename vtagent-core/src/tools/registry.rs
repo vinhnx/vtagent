@@ -807,6 +807,13 @@ impl ToolRegistry {
             });
         }
 
+        // Default to PTY mode if not specified
+        if args.get("mode").is_none() {
+            args.as_object_mut().map(|m| {
+                m.insert("mode".to_string(), json!("pty"));
+            });
+        }
+
         self.execute_tool(tools::RUN_TERMINAL_CMD, args).await
     }
 

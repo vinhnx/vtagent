@@ -46,7 +46,9 @@ impl UserConfirmation {
     /// Present agent mode selection options to the user
     pub fn select_agent_mode() -> Result<AgentMode> {
         println!("{}", style("Agent Mode Selection").cyan().bold());
-        println!("VTAgent now uses single-agent mode with Decision Ledger for reliable task execution.");
+        println!(
+            "VTAgent now uses single-agent mode with Decision Ledger for reliable task execution."
+        );
 
         Ok(AgentMode::SingleCoder)
     }

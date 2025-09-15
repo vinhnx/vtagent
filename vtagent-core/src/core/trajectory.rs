@@ -42,13 +42,7 @@ impl TrajectoryLogger {
         }
     }
 
-    pub fn log_route(
-        &self,
-        turn: usize,
-        selected_model: &str,
-        class: &str,
-        input_preview: &str,
-    ) {
+    pub fn log_route(&self, turn: usize, selected_model: &str, class: &str, input_preview: &str) {
         #[derive(Serialize)]
         struct RouteRec<'a> {
             kind: &'static str,

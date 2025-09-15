@@ -733,10 +733,10 @@ impl TreeSitterAnalyzer {
 
         Ok(CodeAnalysis {
             file_path: self.current_file.clone(),
-            language: language,
-            symbols: symbols,
-            dependencies: dependencies,
-            metrics: metrics,
+            language,
+            symbols,
+            dependencies,
+            metrics,
             issues: vec![], // Would need to implement actual issue detection
             complexity: Default::default(), // Would need to implement actual complexity analysis
             structure: Default::default(), // Would need to implement actual structure analysis

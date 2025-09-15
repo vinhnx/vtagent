@@ -71,10 +71,6 @@ async-trait = "0.1.89"
 anstyle = "1.0"
 anstyle-query = "1.0"
 anstream = "0.6"
-anstyle-parse = "0.2"
-anstyle-ls = "1.0"
-anstyle-roff = "0.3"
-anstyle-git = "0.3"
 sysinfo = "0.37.0"
 
 [features]
@@ -99,5 +95,4 @@ path = "src/main.rs"
 [dev-dependencies]
 criterion = "0.5"
 tempfile = "3.0"
-rexpect = "0.6.2"
 dialoguer = "0.9"

@@ -1,11 +1,11 @@
 #!/bin/bash
 # VTAgent Tools End-to-End Test Script
-# Tests the new PTY-compatible tools: simple_search and bash
+# Tests the simple_search and bash tools
 
 set -e  # Exit on any error
 
 echo "🧪 VTAgent Tools End-to-End Test Suite"
-echo "======================================"
+echo "===================================="
 
 # Colors for output
 RED='\033[0;31m'
@@ -62,25 +62,22 @@ echo "============================"
 # Test 1: Check if tools compile
 run_test "VTAgent Core Compilation" "cargo check --package vtagent-core --quiet && echo 'success'" "success"
 
-echo -e "\nTesting PTY Dependencies"
-echo "============================"
+echo -e "\nTesting External Dependencies"
+echo "=============================="
 
-# Test 2: Check if rexpect is available (PTY library)
-run_test "PTY Library Available" "cargo tree --package vtagent-core | grep rexpect && echo 'found'" "found"
-
-# Test 3: Check if ripgrep is available
+# Test 2: Check if ripgrep is available
 run_test "Ripgrep Available" "which rg" "rg"
 
-# Test 4: Check if ast-grep is available
+# Test 3: Check if ast-grep is available
 run_test "AST Grep Available" "which ast-grep" "ast-grep"
 
 echo -e "\n🧪 Testing Tool Functionality"
 echo "============================="
 
-# Test 5: Test ripgrep directly
+# Test 4: Test ripgrep directly
 run_test "Ripgrep Direct Test" "echo 'test content' > /tmp/test_file.txt && rg 'test' /tmp/test_file.txt" "test content"
 
-# Test 6: Test ast-grep directly
+# Test 5: Test ast-grep directly
 run_test "AST Grep Direct Test" "echo 'fn test() {}' > /tmp/test.rs && ast-grep --lang rust --pattern 'fn \$A() {}' /tmp/test.rs" "fn test()"
 
 echo -e "\n📊 Test Results"

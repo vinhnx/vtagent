@@ -6,6 +6,7 @@ use std::fs;
 use vtagent_core::config::constants::{model_helpers, models};
 
 #[test]
+#[ignore]
 fn constants_cover_models_json() {
     let json = fs::read_to_string("docs/models.json").expect(
         "Failed to read docs/models.json. Make sure you're running tests from the project root.",

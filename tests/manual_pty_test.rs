@@ -2,7 +2,6 @@
 
 use anyhow::Result;
 use serde_json::json;
-use std::path::PathBuf;
 use tempfile::TempDir;
 use vtagent_core::tools::ToolRegistry;
 

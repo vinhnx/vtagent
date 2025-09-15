@@ -3,11 +3,11 @@
 use super::traits::{ModeTool, Tool};
 use super::types::*;
 use crate::config::constants::tools;
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use serde_json::{Value, json};
-use std::{path::PathBuf, process::Stdio};
-use tokio::process::Command;
+use std::{path::PathBuf, process::Stdio, time::Duration};
+use tokio::{process::Command, time::timeout};
 
 /// Command execution tool using standard process handling
 #[derive(Clone)]
@@ -40,10 +40,18 @@ impl CommandTool {
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
 
-        let output = cmd
-            .output()
+        let duration = Duration::from_secs(input.timeout_secs.unwrap_or(30));
+        let command_str = input.command.join(" ");
+        let output = timeout(duration, cmd.output())
             .await
-            .map_err(|e| anyhow!("failed to run command: {e}"))?;
+            .with_context(|| {
+                format!(
+                    "command '{}' timed out after {}s",
+                    command_str,
+                    duration.as_secs()
+                )
+            })?
+            .with_context(|| format!("failed to run command: {}", command_str))?;
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 

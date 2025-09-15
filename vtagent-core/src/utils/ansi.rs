@@ -10,6 +10,7 @@ pub enum MessageStyle {
     Info,
     Error,
     Output,
+    Response,
 }
 
 impl MessageStyle {
@@ -22,6 +23,9 @@ impl MessageStyle {
                 .fg_color(Some(Color::Ansi(AnsiColor::Red)))
                 .bold(),
             Self::Output => Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green))),
+            Self::Response => Style::new()
+                .fg_color(Some(Color::Ansi(AnsiColor::Magenta)))
+                .bold(),
         }
     }
 }
@@ -102,6 +106,8 @@ mod tests {
     fn test_styles_construct() {
         let info = MessageStyle::Info.style();
         assert_eq!(info, MessageStyle::Info.style());
+        let resp = MessageStyle::Response.style();
+        assert_eq!(resp, MessageStyle::Response.style());
     }
 
     #[test]

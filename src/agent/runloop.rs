@@ -683,19 +683,25 @@ async fn run_single_agent_loop_unified(
                 Ok(r) => r,
                 Err(e) => {
                     renderer.line(MessageStyle::Error, &format!("Provider error: {e}"))?;
-                    break 'outer;
+                    continue;
                 }
             };
 
             _final_text = response.content.clone();
 
             // Extract tool calls if any
-            if let Some(tool_calls) = response.tool_calls.as_ref() {
+            if let Some(tool_calls) = response.tool_calls.clone() {
                 if tool_calls.is_empty() {
-                    // No tools requested; finish
+                    if let Some(text) = _final_text.clone() {
+                        working_history.push(uni::Message::assistant(text));
+                    }
                 } else {
+                    if let Some(text) = _final_text.clone() {
+                        working_history
+                            .push(uni::Message::assistant_with_tools(text, tool_calls.clone()));
+                    }
                     // Execute each function call
-                    for call in tool_calls {
+                    for call in &tool_calls {
                         let name = call.function.name.as_str();
                         let args_val = call
                             .parsed_arguments()
@@ -753,6 +759,8 @@ async fn run_single_agent_loop_unified(
                     // Continue inner loop to let model use tool results
                     continue;
                 }
+            } else if let Some(text) = _final_text.clone() {
+                working_history.push(uni::Message::assistant(text));
             }
 
             // If we reach here, no (more) tool calls

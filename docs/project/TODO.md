@@ -143,4 +143,8 @@ These observations on context engineering are just the start to what we might so
 
 --
 
-replace rexpect with https://github.com/zhiburt/expectrl
+remove these crates in project
+
+anstyle-ls = "1.0"
+anstyle-roff = "0.3"
+anstyle-git = "1.1"

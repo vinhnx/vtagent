@@ -166,10 +166,6 @@ IMPORTANT: search all "// For now," comments and implement actual logic instead 
 
 ---
 
-IMPORTANT: search for "In a real implementation" comments and implement actual logic instead of stubs. make sure cover all edge cases and handle errors properly. test it out with various scenarios to ensure it works as expected. update with tools policy accordingly and tool registry. write end to end tests for this new logic for vtagent core write and edit commands. update the system prompt accordingly. update the documentation accordingly.
-
----
-
 support mcp https://modelcontextprotocol.io/docs/getting-started/intro
 
 ---

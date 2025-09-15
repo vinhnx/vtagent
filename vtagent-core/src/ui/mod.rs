@@ -10,11 +10,6 @@ pub mod styled;
 pub mod terminal;
 pub mod user_confirmation;
 
-// Conditional modules for additional UI features
-#[allow(unexpected_cfgs)]
-#[cfg(feature = "anstyle-parse")]
-pub mod anstyle_parse_utils;
-
 pub use markdown::*;
 pub use spinner::*;
 pub use styled::*;

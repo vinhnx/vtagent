@@ -134,7 +134,7 @@ impl Tool for CommandTool {
         self.validate_command(&input.command)?;
 
         let mode_clone = input.mode.clone();
-        let mode = mode_clone.as_deref().unwrap_or("terminal");
+        let mode = mode_clone.as_deref().unwrap_or("pty");
         self.execute_mode(mode, serde_json::to_value(input)?).await
     }
 
@@ -143,7 +143,7 @@ impl Tool for CommandTool {
     }
 
     fn description(&self) -> &'static str {
-        "Enhanced command execution tool with multiple modes: terminal (default), pty, streaming"
+        "Enhanced command execution tool with multiple modes: pty (default), terminal, streaming"
     }
 
     fn validate_args(&self, args: &Value) -> Result<()> {

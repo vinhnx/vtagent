@@ -67,7 +67,7 @@ pub fn read_system_prompt_from_md() -> Result<String, std::io::Error> {
 ## AVAILABLE TOOLS
 - **File Operations**: list_files, read_file, write_file, edit_file
 - **Search & Analysis**: rp_search, grep_search, ast_grep_search
-- **Terminal Access**: run_terminal_cmd for shell operations
+- **Terminal Access**: run_terminal_cmd (default: pty) for shell operations
 - **PTY Access**: Enhanced terminal emulation for interactive commands
 
 Your capabilities:
@@ -88,7 +88,7 @@ pub fn generate_system_instruction(_config: &SystemPromptConfig) -> Content {
 ## AVAILABLE TOOLS
 - **File Operations**: list_files, read_file, write_file, edit_file
 - **Search & Analysis**: rp_search, grep_search, ast_grep_search
-- **Terminal Access**: run_terminal_cmd for shell operations
+- **Terminal Access**: run_terminal_cmd (default: pty) for shell operations
 - **PTY Access**: Enhanced terminal emulation for interactive commands
 
 Your capabilities:

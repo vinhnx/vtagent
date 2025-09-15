@@ -16,6 +16,9 @@ use vtagent_core::gemini::function_calling::{FunctionCall, FunctionResponse};
 use vtagent_core::gemini::models::ToolConfig;
 use serde_json::json;
 
+// Import syntax highlighting module
+use crate::agent::syntax;
+
 /// Handle the chat command
 pub async fn handle_chat_command(config: &CoreAgentConfig, skip_confirmations: bool) -> Result<()> {
     eprintln!("[DEBUG] Entering handle_chat_command");
@@ -171,11 +174,22 @@ pub async fn handle_chat_command(config: &CoreAgentConfig, skip_confirmations: b
                         if !is_streaming || !shell_rendered {
                             if let Some(stdout) = tool_output.get("stdout").and_then(|s| s.as_str()) {
                                 if !stdout.trim().is_empty() {
-                                    println!("{}", stdout);
+                                    // Apply syntax highlighting to stdout
+                                    let highlighted = syntax::syntax_highlight_code(stdout);
+                                    match highlighted {
+                                        Ok(highlighted_output) => {
+                                            println!("{}", highlighted_output);
+                                        }
+                                        Err(e) => {
+                                            eprintln!("Syntax highlighting failed: {}", e);
+                                            println!("{}", stdout);
+                                        }
+                                    }
                                 }
                             }
                             if let Some(stderr) = tool_output.get("stderr").and_then(|s| s.as_str()) {
                                 if !stderr.trim().is_empty() {
+                                    // For stderr, just print as-is (usually error messages)
                                     eprintln!("{}", stderr);
                                 }
                             }

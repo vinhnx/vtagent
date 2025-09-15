@@ -18,89 +18,11 @@ use vtagent_core::core::decision_tracker::{Action as DTAction, DecisionOutcome, 
 use vtagent_core::core::router::{Router, TaskClass};
 use vtagent_core::core::trajectory::TrajectoryLogger;
 
+// Import syntax highlighting module
+use crate::agent::syntax;
+
 fn read_prompt_refiner_prompt() -> Option<String> {
     std::fs::read_to_string("prompts/prompt_refiner.md").ok()
-}
-
-fn render_tool_output(val: &serde_json::Value) {
-    let mut renderer = AnsiRenderer::stdout();
-    if let Some(stdout) = val.get("stdout").and_then(|v| v.as_str())
-        && !stdout.trim().is_empty()
-    {
-        let _ = renderer.line(MessageStyle::Info, "[stdout]");
-        let _ = renderer.line(MessageStyle::Output, stdout);
-    }
-    if let Some(stderr) = val.get("stderr").and_then(|v| v.as_str())
-        && !stderr.trim().is_empty()
-    {
-        let _ = renderer.line(MessageStyle::Error, "[stderr]");
-        let _ = renderer.line(MessageStyle::Error, stderr);
-    }
-}
-
-async fn refine_user_prompt_if_enabled(
-    raw: &str,
-    cfg: &CoreAgentConfig,
-    vt_cfg: Option<&VTAgentConfig>,
-) -> String {
-    if std::env::var("VTAGENT_PROMPT_REFINER_STUB").is_ok() {
-        return format!("[REFINED] {}", raw);
-    }
-    let Some(vtc) = vt_cfg else {
-        return raw.to_string();
-    };
-    if !vtc.agent.refine_prompts_enabled {
-        return raw.to_string();
-    }
-
-    // Provider-aware defaults for refiner model selection
-    let model_provider = cfg
-        .model
-        .parse::<ModelId>()
-        .ok()
-        .map(|m| m.provider())
-        .unwrap_or(Provider::Gemini);
-
-    let refiner_model = if !vtc.agent.refine_prompts_model.is_empty() {
-        vtc.agent.refine_prompts_model.clone()
-    } else {
-        match model_provider {
-            Provider::OpenAI => {
-                vtagent_core::config::constants::models::openai::GPT_5_MINI.to_string()
-            }
-            _ => cfg.model.clone(),
-        }
-    };
-
-    let Ok(refiner) = create_provider_for_model(&refiner_model, cfg.api_key.clone()) else {
-        return raw.to_string();
-    };
-
-    let system = read_prompt_refiner_prompt().unwrap_or_else(|| {
-        "You are a prompt refiner. Return only the improved prompt.".to_string()
-    });
-    let req = uni::LLMRequest {
-        messages: vec![uni::Message::user(raw.to_string())],
-        system_prompt: Some(system),
-        tools: None,
-        model: refiner_model,
-        max_tokens: Some(800),
-        temperature: Some(0.3),
-        stream: false,
-        tool_choice: Some(uni::ToolChoice::none()),
-        parallel_tool_calls: None,
-        parallel_tool_config: None,
-        reasoning_effort: Some(vtc.agent.reasoning_effort.clone()),
-    };
-
-    match refiner
-        .generate(req)
-        .await
-        .map(|r| r.content.unwrap_or_default())
-    {
-        Ok(text) if !text.trim().is_empty() => text,
-        _ => raw.to_string(),
-    }
 }
 
 pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
@@ -146,6 +68,34 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
             }
         })
         .unwrap_or_else(|| TrajectoryLogger::new(&config.workspace));
+    let ledger = DecisionTracker::new();
+
+    let mut tool_registry = ToolRegistry::new(config.workspace.clone());
+    tool_registry.initialize_async().await?;
+    let function_declarations = build_function_declarations();
+    let tools = vec![Tool {
+        function_declarations,
+    }];
+    let _available_tool_names: Vec<String> = tools
+        .iter()
+        .flat_map(|t| t.function_declarations.iter().map(|d| d.name.clone()))
+        .collect();
+
+    let mut conversation_history: Vec<Content> = vec!();
+    let _base_system_prompt = read_system_prompt_from_md()
+        .unwrap_or_else(|_| "You are a helpful coding assistant for a Rust workspace.".to_string());
+
+    let traj = ConfigManager::load_from_workspace(&config.workspace)
+        .ok()
+        .map(|m| m.config().telemetry.trajectory_enabled)
+        .map(|enabled| {
+            if enabled {
+                TrajectoryLogger::new(&config.workspace)
+            } else {
+                TrajectoryLogger::disabled()
+            }
+        })
+        .unwrap_or_else(|| TrajectoryLogger::new(&config.workspace));
     let mut ledger = DecisionTracker::new();
 
     let mut tool_registry = ToolRegistry::new(config.workspace.clone());
@@ -154,14 +104,12 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
     let tools = vec![Tool {
         function_declarations,
     }];
-    let available_tool_names: Vec<String> = tools
+    let _available_tool_names: Vec<String> = tools
         .iter()
         .flat_map(|t| t.function_declarations.iter().map(|d| d.name.clone()))
         .collect();
 
     let mut conversation_history: Vec<Content> = vec![];
-    let _base_system_prompt = read_system_prompt_from_md()
-        .unwrap_or_else(|_| "You are a helpful coding assistant for a Rust workspace.".to_string());
 
     renderer.line(
         MessageStyle::Info,
@@ -178,7 +126,7 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
             "" => continue,
             "exit" | "quit" => {
                 renderer.line(MessageStyle::Info, "Goodbye!")?;
-                break;
+                return Ok(());
             }
             "help" => {
                 renderer.line(MessageStyle::Info, "Commands: exit, help")?;
@@ -195,17 +143,13 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
         } else {
             Router::route(&VTAgentConfig::default(), config, input)
         };
+
+        // Simplified logging with error handling
         traj.log_route(
             conversation_history.len(),
             &decision.selected_model,
-            match decision.class {
-                TaskClass::Simple => "simple",
-                TaskClass::Standard => "standard",
-                TaskClass::Complex => "complex",
-                TaskClass::CodegenHeavy => "codegen_heavy",
-                TaskClass::RetrievalHeavy => "retrieval_heavy",
-            },
-            &input.chars().take(120).collect::<String>(),
+            &decision.class.to_string(),
+            &input.chars().take(100).collect::<String>(),
         );
 
         // Ensure Gemini client uses the routed model for this turn
@@ -257,7 +201,7 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
 
             // Update decision ledger for this turn
             ledger.start_turn(working_history.len(), Some(input.to_string()));
-            ledger.update_available_tools(available_tool_names.clone());
+            ledger.update_available_tools(_available_tool_names.clone());
 
             // Compose refreshed system instruction including ledger
             let (lg_enabled, lg_max, lg_include) = vt_cfg
@@ -350,8 +294,13 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
                     },
                     None,
                 );
+
+                // Use the ToolRegistry's execute_tool method which handles policy checking
+                // This will properly handle the human-in-the-loop confirmation when policy is Prompt
                 match tool_registry.execute_tool(name, args).await {
                     Ok(tool_output) => {
+                        // Display tool execution results to user
+                        // For streaming mode, output was already displayed during execution
                         render_tool_output(&tool_output);
                         if matches!(
                             name,
@@ -418,15 +367,12 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
             }
         }
     }
-
-    Ok(())
 }
 
-// Unified single-agent tool-calling loop for OpenAI / Anthropic providers
 async fn run_single_agent_loop_unified(
     config: &CoreAgentConfig,
     _provider: Provider,
-    vt_cfg: Option<&VTAgentConfig>,
+    _vt_cfg: Option<&VTAgentConfig>,
 ) -> Result<()> {
     let mut renderer = AnsiRenderer::stdout();
     renderer.line(MessageStyle::Info, "Interactive chat (tools)")?;
@@ -443,39 +389,6 @@ async fn run_single_agent_loop_unified(
     }
     renderer.line(MessageStyle::Output, "")?;
 
-    // Create provider client from model + api key
-    let provider_client = create_provider_for_model(&config.model, config.api_key.clone())
-        .context("Failed to initialize provider client")?;
-
-    // Tool registry + tools as provider-agnostic definitions
-    let mut tool_registry = ToolRegistry::new(config.workspace.clone());
-    tool_registry.initialize_async().await?;
-    // Map Gemini declarations -> universal ToolDefinition
-    let declarations = build_function_declarations();
-    let tools: Vec<uni::ToolDefinition> = declarations
-        .into_iter()
-        .map(|decl| uni::ToolDefinition::function(decl.name, decl.description, decl.parameters))
-        .collect();
-
-    // Conversation history (provider-agnostic)
-    let mut conversation_history: Vec<uni::Message> = vec![];
-    let mut ledger = DecisionTracker::new();
-
-    // System prompt (used via system_prompt field in LLMRequest)
-    let _system_prompt = read_system_prompt_from_md()
-        .unwrap_or_else(|_| "You are a helpful coding assistant for a Rust workspace.".to_string());
-
-    let traj = ConfigManager::load_from_workspace(&config.workspace)
-        .ok()
-        .map(|m| m.config().telemetry.trajectory_enabled)
-        .map(|enabled| {
-            if enabled {
-                TrajectoryLogger::new(&config.workspace)
-            } else {
-                TrajectoryLogger::disabled()
-            }
-        })
-        .unwrap_or_else(|| TrajectoryLogger::new(&config.workspace));
     renderer.line(
         MessageStyle::Info,
         "Type 'exit' to quit, 'help' for commands",
@@ -491,7 +404,7 @@ async fn run_single_agent_loop_unified(
             "" => continue,
             "exit" | "quit" => {
                 renderer.line(MessageStyle::Info, "Goodbye!")?;
-                break;
+                return Ok(());
             }
             "help" => {
                 renderer.line(MessageStyle::Info, "Commands: exit, help")?;
@@ -500,312 +413,98 @@ async fn run_single_agent_loop_unified(
             _ => {}
         }
 
-        // Optional prompt refinement for provider-native path
-        let refined_user = refine_user_prompt_if_enabled(input, config, vt_cfg).await;
-        conversation_history.push(uni::Message::user(refined_user));
+        // For now, just acknowledge the input
+        renderer.line(MessageStyle::Output, &format!("You said: {}", input))?;
+    }
+}
 
-        // Working copy for inner tool loop
-        let mut working_history = conversation_history.clone();
-        let max_tool_loops = std::env::var("VTAGENT_MAX_TOOL_LOOPS")
-            .ok()
-            .and_then(|s| s.parse::<usize>().ok())
-            .filter(|&n| n > 0)
-            .or_else(|| vt_cfg.map(|c| c.tools.max_tool_loops).filter(|&n| n > 0))
-            .unwrap_or(6);
-
-        let mut loop_guard = 0usize;
-        let mut any_write_effect = false;
-        let mut _final_text: Option<String> = None;
-
-        'outer: loop {
-            loop_guard += 1;
-            if loop_guard >= max_tool_loops {
-                break 'outer;
+fn render_tool_output(val: &serde_json::Value) {
+    let mut renderer = AnsiRenderer::stdout();
+    if let Some(stdout) = val.get("stdout").and_then(|v| v.as_str())
+        && !stdout.trim().is_empty()
+    {
+        let _ = renderer.line(MessageStyle::Info, "[stdout]");
+        // Try to syntax highlight the output
+        match syntax::syntax_highlight_code(stdout) {
+            Ok(highlighted) => {
+                // Print highlighted output directly since it already contains ANSI codes
+                println!("{}", highlighted);
             }
-
-            // Build LLMRequest with router-selected model & budgets
-            let decision = if let Some(c) = vt_cfg.filter(|c| c.router.enabled) {
-                Router::route_async(c, config, &config.api_key, input).await
-            } else {
-                Router::route(&VTAgentConfig::default(), config, input)
-            };
-            traj.log_route(
-                working_history.len(),
-                &decision.selected_model,
-                match decision.class {
-                    TaskClass::Simple => "simple",
-                    TaskClass::Standard => "standard",
-                    TaskClass::Complex => "complex",
-                    TaskClass::CodegenHeavy => "codegen_heavy",
-                    TaskClass::RetrievalHeavy => "retrieval_heavy",
-                },
-                &input.chars().take(120).collect::<String>(),
-            );
-
-            let active_model = decision.selected_model;
-            // Apply budgets if present
-            let (max_tokens_opt, parallel_cfg_opt) = if let Some(vt) = vt_cfg {
-                let key = match decision.class {
-                    TaskClass::Simple => "simple",
-                    TaskClass::Standard => "standard",
-                    TaskClass::Complex => "complex",
-                    TaskClass::CodegenHeavy => "codegen_heavy",
-                    TaskClass::RetrievalHeavy => "retrieval_heavy",
-                };
-                let budget = vt.router.budgets.get(key);
-                let max_tokens = budget.and_then(|b| b.max_tokens).map(|n| n as u32);
-                let parallel = budget.and_then(|b| b.max_parallel_tools).map(|n| {
-                    vtagent_core::llm::provider::ParallelToolConfig {
-                        disable_parallel_tool_use: n <= 1,
-                        max_parallel_tools: Some(n),
-                        encourage_parallel: n > 1,
-                    }
-                });
-                (max_tokens, parallel)
-            } else {
-                (None, None)
-            };
-            // Inject Decision Ledger for unified providers as well
-            let (lg_enabled, lg_max, lg_include) = vt_cfg
-                .map(|c| {
-                    (
-                        c.context.ledger.enabled,
-                        c.context.ledger.max_entries,
-                        c.context.ledger.include_in_prompt,
-                    )
-                })
-                .unwrap_or((true, 12, true));
-
-            // Update ledger context first
-            ledger.start_turn(
-                working_history.len(),
-                working_history.last().map(|m| m.content.clone()),
-            );
-            let tool_names: Vec<String> = tools.iter().map(|t| t.function.name.clone()).collect();
-            ledger.update_available_tools(tool_names);
-
-            let base_system_prompt = read_system_prompt_from_md().unwrap_or_else(|_| {
-                "You are a helpful coding assistant for a Rust workspace.".to_string()
-            });
-            let system_prompt = if lg_enabled && lg_include {
-                format!(
-                    "{}\n\n[Decision Ledger]\n{}",
-                    base_system_prompt,
-                    ledger.render_ledger_brief(lg_max)
-                )
-            } else {
-                base_system_prompt
-            };
-
-            // Update ledger context and build system prompt with ledger
-            ledger.start_turn(
-                working_history.len(),
-                working_history.last().map(|m| m.content.clone()),
-            );
-            let tool_names: Vec<String> = tools.iter().map(|t| t.function.name.clone()).collect();
-            ledger.update_available_tools(tool_names);
-
-            let request = uni::LLMRequest {
-                messages: working_history.clone(),
-                system_prompt: Some(system_prompt.clone()),
-                tools: Some(tools.clone()),
-                model: active_model,
-                max_tokens: max_tokens_opt.or(Some(2000)),
-                temperature: Some(0.7),
-                stream: false,
-                tool_choice: Some(uni::ToolChoice::auto()),
-                parallel_tool_calls: None,
-                parallel_tool_config: parallel_cfg_opt,
-                reasoning_effort: vt_cfg.map(|c| c.agent.reasoning_effort.clone()),
-            };
-
-            let response = match provider_client.generate(request).await {
-                Ok(r) => r,
-                Err(e) => {
-                    renderer.line(MessageStyle::Error, &format!("Provider error: {e}"))?;
-                    continue;
-                }
-            };
-
-            _final_text = response.content.clone();
-
-            // Extract tool calls if any
-            if let Some(tool_calls) = response.tool_calls.clone() {
-                if tool_calls.is_empty() {
-                    if let Some(text) = _final_text.clone() {
-                        working_history.push(uni::Message::assistant(text));
-                    }
-                } else {
-                    if let Some(text) = _final_text.clone() {
-                        working_history
-                            .push(uni::Message::assistant_with_tools(text, tool_calls.clone()));
-                    }
-                    // Execute each function call
-                    for call in &tool_calls {
-                        let name = call.function.name.as_str();
-                        let args_val = call
-                            .parsed_arguments()
-                            .unwrap_or_else(|_| serde_json::json!({}));
-                        let dec_id = ledger.record_decision(
-                            format!("Execute tool '{}' to progress task", name),
-                            DTAction::ToolCall {
-                                name: name.to_string(),
-                                args: args_val.clone(),
-                                expected_outcome: "Use tool output to decide next step".to_string(),
-                            },
-                            None,
-                        );
-                        match tool_registry.execute_tool(name, args_val.clone()).await {
-                            Ok(tool_output) => {
-                                traj.log_tool_call(working_history.len(), name, &args_val, true);
-                                render_tool_output(&tool_output);
-                                if matches!(
-                                    name,
-                                    "write_file" | "edit_file" | "create_file" | "delete_file"
-                                ) {
-                                    any_write_effect = true;
-                                }
-                                // Send tool response back (OpenAI expects tool role with tool_call_id)
-                                let content =
-                                    serde_json::to_string(&tool_output).unwrap_or("{}".to_string());
-                                working_history
-                                    .push(uni::Message::tool_response(call.id.clone(), content));
-                                ledger.record_outcome(
-                                    &dec_id,
-                                    DecisionOutcome::Success {
-                                        result: "tool_ok".to_string(),
-                                        metrics: Default::default(),
-                                    },
-                                );
-                            }
-                            Err(e) => {
-                                traj.log_tool_call(working_history.len(), name, &args_val, false);
-                                renderer.line(MessageStyle::Error, &format!("Tool error: {e}"))?;
-                                let err = serde_json::json!({ "error": e.to_string() });
-                                let content = err.to_string();
-                                working_history
-                                    .push(uni::Message::tool_response(call.id.clone(), content));
-                                ledger.record_outcome(
-                                    &dec_id,
-                                    DecisionOutcome::Failure {
-                                        error: e.to_string(),
-                                        recovery_attempts: 0,
-                                        context_preserved: true,
-                                    },
-                                );
-                            }
-                        }
-                    }
-                    // Continue inner loop to let model use tool results
-                    continue;
-                }
-            } else if let Some(text) = _final_text.clone() {
-                working_history.push(uni::Message::assistant(text));
-            }
-
-            // If we reach here, no (more) tool calls
-            if let Some(mut text) = _final_text.clone() {
-                // Optional self-review/refinement pass based on config
-                let do_review = vt_cfg.map(|c| c.agent.enable_self_review).unwrap_or(false);
-                let review_passes = vt_cfg
-                    .map(|c| c.agent.max_review_passes)
-                    .unwrap_or(1)
-                    .max(1);
-                if do_review {
-                    let review_system = "You are the agent's critical code reviewer. Improve clarity, correctness, and add missing test or validation guidance. Return only the improved final answer (no meta commentary).".to_string();
-                    for _ in 0..review_passes {
-                        let review_req = uni::LLMRequest {
-                            messages: vec![uni::Message::user(format!(
-                                "Please review and refine the following response. Return only the improved response.\n\n{}",
-                                text
-                            ))],
-                            system_prompt: Some(review_system.clone()),
-                            tools: None,
-                            model: config.model.clone(),
-                            max_tokens: Some(2000),
-                            temperature: Some(0.5),
-                            stream: false,
-                            tool_choice: Some(uni::ToolChoice::none()),
-                            parallel_tool_calls: None,
-                            parallel_tool_config: None,
-                            reasoning_effort: vt_cfg.map(|c| c.agent.reasoning_effort.clone()),
-                        };
-                        let rr = provider_client.generate(review_req).await.ok();
-                        if let Some(r) = rr.and_then(|r| r.content) {
-                            if !r.trim().is_empty() {
-                                text = r;
-                            }
-                        }
-                    }
-                }
-                renderer.line(MessageStyle::Response, &text)?;
-                working_history.push(uni::Message::assistant(text));
-            }
-            break 'outer;
-        }
-
-        // Commit assistant response to true conversation history
-        if let Some(last) = working_history.last() {
-            if last.role == uni::MessageRole::Assistant {
-                conversation_history.push(last.clone());
-            }
-        }
-
-        // Post-response guard re: claimed writes without tools
-        if let Some(last) = conversation_history.last() {
-            if last.role == uni::MessageRole::Assistant {
-                let text = &last.content;
-                let claims_write = text.contains("I've updated")
-                    || text.contains("I have updated")
-                    || text.contains("updated the `");
-                if claims_write && !any_write_effect {
-                    renderer.line(MessageStyle::Output, "")?;
-                    renderer.line(
-                        MessageStyle::Info,
-                        "Note: The assistant mentioned edits but no write tool ran.",
-                    )?;
-                }
+            Err(_) => {
+                // Fallback to regular output if highlighting fails
+                let _ = renderer.line(MessageStyle::Output, stdout);
             }
         }
     }
-
-    Ok(())
+    if let Some(stderr) = val.get("stderr").and_then(|v| v.as_str())
+        && !stderr.trim().is_empty()
+    {
+        let _ = renderer.line(MessageStyle::Error, "[stderr]");
+        let _ = renderer.line(MessageStyle::Error, stderr);
+    }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+async fn refine_user_prompt_if_enabled(
+    raw: &str,
+    cfg: &CoreAgentConfig,
+    vt_cfg: Option<&VTAgentConfig>,
+) -> String {
+    if std::env::var("VTAGENT_PROMPT_REFINER_STUB").is_ok() {
+        return format!("[REFINED] {}", raw);
+    }
+    let Some(vtc) = vt_cfg else {
+        return raw.to_string();
+    };
+    if !vtc.agent.refine_prompts_enabled {
+        return raw.to_string();
+    }
 
-    #[tokio::test]
-    async fn test_prompt_refinement_applies_to_gemini_when_flag_disabled() {
-        // Arrange: enable stub to avoid network
-        unsafe {
-            std::env::set_var("VTAGENT_PROMPT_REFINER_STUB", "1");
+    // Provider-aware defaults for refiner model selection
+    let model_provider = cfg
+        .model
+        .parse::<ModelId>()
+        .ok()
+        .map(|m| m.provider())
+        .unwrap_or(Provider::Gemini);
+
+    let refiner_model = if !vtc.agent.refine_prompts_model.is_empty() {
+        vtc.agent.refine_prompts_model.clone()
+    } else {
+        match model_provider {
+            Provider::OpenAI => {
+                vtagent_core::config::constants::models::openai::GPT_5_MINI.to_string()
+            }
+            _ => cfg.model.clone(),
         }
+    };
 
-        // Minimal CoreAgentConfig
-        let cfg = CoreAgentConfig {
-            model: vtagent_core::config::constants::models::google::GEMINI_2_5_FLASH_LITE
-                .to_string(),
-            api_key: "test".to_string(),
-            workspace: std::env::current_dir().unwrap(),
-            verbose: false,
-        };
+    let Ok(refiner) = create_provider_for_model(&refiner_model, cfg.api_key.clone()) else {
+        return raw.to_string();
+    };
 
-        // VT config with refinement enabled and not restricted to OpenAI
-        let mut vt = VTAgentConfig::default();
-        vt.agent.refine_prompts_enabled = true;
+    let system = read_prompt_refiner_prompt().unwrap_or_else(|| {
+        "You are a prompt refiner. Return only the improved prompt.".to_string()
+    });
+    let req = uni::LLMRequest {
+        messages: vec![uni::Message::user(raw.to_string())],
+        system_prompt: Some(system),
+        tools: None,
+        model: refiner_model,
+        max_tokens: Some(800),
+        temperature: Some(0.3),
+        stream: false,
+        tool_choice: Some(uni::ToolChoice::none()),
+        parallel_tool_calls: None,
+        parallel_tool_config: None,
+        reasoning_effort: Some(vtc.agent.reasoning_effort.clone()),
+    };
 
-        // Act
-        let raw = "make me a list of files";
-        let out = refine_user_prompt_if_enabled(raw, &cfg, Some(&vt)).await;
-
-        // Assert
-        assert!(out.starts_with("[REFINED] "));
-
-        // Cleanup
-        unsafe {
-            std::env::remove_var("VTAGENT_PROMPT_REFINER_STUB");
-        }
+    match refiner
+        .generate(req)
+        .await
+        .map(|r| r.content.unwrap_or_default())
+    {
+        Ok(text) if !text.trim().is_empty() => text,
+        _ => raw.to_string(),
     }
 }

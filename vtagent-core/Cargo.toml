@@ -72,6 +72,7 @@ anstream = "0.6"
 colorchoice-clap = "1.0"
 quick_cache = "0.6"
 roff = "0.2"
+syntect = "5.2"
 
 [[example]]
 name = "anstyle_test"

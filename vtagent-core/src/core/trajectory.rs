@@ -84,3 +84,36 @@ impl TrajectoryLogger {
         self.log(&rec);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+    use std::fs;
+
+    #[test]
+    fn test_trajectory_logger_log_route_integration() {
+        let temp_dir = TempDir::new().unwrap();
+        let logger = TrajectoryLogger::new(temp_dir.path());
+
+        // Test the logging functionality that would be called in the agent loop
+        logger.log_route(1, "gemini-2.5-flash", "standard", "test user input for logging");
+
+        // Check that the log file was created and contains expected content
+        let log_path = temp_dir.path().join("logs/trajectory.jsonl");
+        assert!(log_path.exists());
+
+        let content = fs::read_to_string(log_path).unwrap();
+        let lines: Vec<&str> = content.lines().collect();
+        assert_eq!(lines.len(), 1);
+
+        // Parse the JSON and verify content
+        let record: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
+        assert_eq!(record["kind"], "route");
+        assert_eq!(record["turn"], 1);
+        assert_eq!(record["selected_model"], "gemini-2.5-flash");
+        assert_eq!(record["class"], "standard");
+        assert_eq!(record["input_preview"], "test user input for logging");
+        assert!(record["ts"].is_number());
+    }
+}

@@ -90,3 +90,27 @@ max_entries = 12
 include_in_prompt = true
 preserve_in_compression = true
 
+[syntax_highlighting]
+# Enable syntax highlighting for tool output
+enabled = true
+
+# Theme to use for syntax highlighting
+# Can be an embedded theme name (e.g., "base16-ocean.dark", "base16-ocean.light")
+# Or a path to a custom .tmTheme file
+theme = "base16-ocean.dark"
+
+# Enable theme caching for better performance
+cache_themes = true
+
+# Maximum file size for syntax highlighting (in MB)
+max_file_size_mb = 10
+
+# Languages to enable syntax highlighting for
+enabled_languages = [
+    "rust", "python", "javascript", "typescript", "go", "java",
+    "cpp", "c", "php", "html", "css", "sql", "csharp", "bash"
+]
+
+# Performance settings
+highlight_timeout_ms = 5000
+

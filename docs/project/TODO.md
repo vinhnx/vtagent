@@ -11,10 +11,6 @@ upgrade codex
 https://deepwiki.com/pawurb/hotpath
 A simple Rust profiler that shows exactly where your code spends time
 
---
-
-Use Rust's Clippy linter to thoroughly scan the entire codebase for dead code, unused variables, unreachable code, and similar inefficiencies. Review all warnings and suggestions in detail, prioritizing high-impact issues. Then, systematically fix the identified problems by removing or refactoring the dead code, ensuring the changes maintain functionality, pass all tests, and improve code quality without introducing new issues. Provide a summary of changes made.
-
 ---
 
 https://deepwiki.com/alexpovel/srgn
@@ -787,3 +783,22 @@ If you tell me which path you prefer (subprocess vs embedded vs service), I can 
 
 1. https://github.com/copilot/c/b0ffc926-cf0c-45bf-b6aa-e6d8b01744b0
 2. https://github.com/copilot/c/c8306ebb-788e-400d-a901-9e1ecfae2582
+
+---
+
+"I've found a few changes:
+
+-   **`Cargo.toml` and `vtagent-core/Cargo.toml`**: The `syntect` crate has been added as a dependency.
+-   **`src/agent/runloop.rs`**:
+    -   Imports for syntax highlighting have been added.
+    -   A new function `syntax_highlight_code` has been implemented to detect the language of a code snippet and return a syntax-highlighted string.
+    -   The `render_tool_output` function has been modified to attempt syntax highlighting of the `stdout` before displaying it.
+-   **`docs/project/TODO.md`**: A TODO item related to using `clippy` for code analysis has been removed.
+
+It looks like the main focus was on integrating syntax highlighting for tool outputs.
+
+Would you like me to explore any of these changes in more detail, or perhaps run the tests to ensure everything is working as expected?"
+
+the agent output seems to be markdown, can you use markdown.rs and termimad crates to render the output in terminal with proper formatting and syntax highlighting.
+
+---

@@ -9,6 +9,61 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Syntax highlighting configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SyntaxHighlightingConfig {
+    /// Enable syntax highlighting for tool output
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+
+    /// Theme to use for syntax highlighting
+    #[serde(default = "default_theme")]
+    pub theme: String,
+
+    /// Enable theme caching for better performance
+    #[serde(default = "default_true")]
+    pub cache_themes: bool,
+
+    /// Maximum file size for syntax highlighting (in MB)
+    #[serde(default = "default_max_file_size")]
+    pub max_file_size_mb: usize,
+
+    /// Languages to enable syntax highlighting for
+    #[serde(default = "default_enabled_languages")]
+    pub enabled_languages: Vec<String>,
+
+    /// Performance settings - highlight timeout in milliseconds
+    #[serde(default = "default_highlight_timeout")]
+    pub highlight_timeout_ms: u64,
+}
+
+fn default_true() -> bool { true }
+fn default_theme() -> String { "base16-ocean.dark".to_string() }
+fn default_max_file_size() -> usize { 10 }
+fn default_enabled_languages() -> Vec<String> {
+    vec![
+        "rust".to_string(), "python".to_string(), "javascript".to_string(),
+        "typescript".to_string(), "go".to_string(), "java".to_string(),
+        "cpp".to_string(), "c".to_string(), "php".to_string(),
+        "html".to_string(), "css".to_string(), "sql".to_string(),
+        "csharp".to_string(), "bash".to_string()
+    ]
+}
+fn default_highlight_timeout() -> u64 { 5000 }
+
+impl Default for SyntaxHighlightingConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_true(),
+            theme: default_theme(),
+            cache_themes: default_true(),
+            max_file_size_mb: default_max_file_size(),
+            enabled_languages: default_enabled_languages(),
+            highlight_timeout_ms: default_highlight_timeout(),
+        }
+    }
+}
+
 /// Main configuration structure for VTAgent
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct VTAgentConfig {
@@ -43,6 +98,10 @@ pub struct VTAgentConfig {
     /// Telemetry configuration (logging, trajectory)
     #[serde(default)]
     pub telemetry: TelemetryConfig,
+
+    /// Syntax highlighting configuration
+    #[serde(default)]
+    pub syntax_highlighting: SyntaxHighlightingConfig,
 }
 
 impl Default for VTAgentConfig {
@@ -56,6 +115,7 @@ impl Default for VTAgentConfig {
             context: ContextFeaturesConfig::default(),
             router: RouterConfig::default(),
             telemetry: TelemetryConfig::default(),
+            syntax_highlighting: SyntaxHighlightingConfig::default(),
         }
     }
 }

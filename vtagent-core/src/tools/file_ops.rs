@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 use walkdir::WalkDir;
 
 /// File operations tool with multiple modes

@@ -28,7 +28,7 @@ impl BashTool {
         &self,
         command: &str,
         args: Vec<String>,
-        _timeout_secs: Option<u64>,
+        timeout_secs: Option<u64>,
     ) -> Result<Value> {
         let full_command_parts = std::iter::once(command.to_string())
             .chain(args.clone())

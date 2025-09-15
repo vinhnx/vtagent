@@ -8,9 +8,12 @@ pub struct TelemetryConfig {
 
 impl Default for TelemetryConfig {
     fn default() -> Self {
-        Self { trajectory_enabled: true }
+        Self {
+            trajectory_enabled: true,
+        }
     }
 }
 
-fn default_true() -> bool { true }
-
+fn default_true() -> bool {
+    true
+}

@@ -225,6 +225,87 @@ impl DecisionTracker {
     pub fn get_current_context(&self) -> &DecisionContext {
         &self.current_context
     }
+
+    /// Convenience: record a user goal/intention for this turn
+    pub fn record_goal(&mut self, content: String) -> String {
+        self.record_decision(
+            "User goal provided".to_string(),
+            Action::Response {
+                content,
+                response_type: ResponseType::ContextSummary,
+            },
+            None,
+        )
+    }
+
+    /// Render a compact Decision Ledger for injection into the system prompt
+    pub fn render_ledger_brief(&self, max_entries: usize) -> String {
+        let mut out = String::new();
+        out.push_str("Decision Ledger (most recent first)\n");
+        let take_n = max_entries.max(1);
+        for d in self.decisions.iter().rev().take(take_n) {
+            let ts = d.timestamp;
+            let turn = d.context.conversation_turn;
+            let line = match &d.action {
+                Action::ToolCall { name, args, .. } => {
+                    let arg_preview = match args {
+                        serde_json::Value::String(s) => s.clone(),
+                        _ => {
+                            let s = args.to_string();
+                            if s.len() > 120 {
+                                format!("{}…", &s[..120])
+                            } else {
+                                s
+                            }
+                        }
+                    };
+                    format!(
+                        "- [turn {}] tool:{} args={} (t={})",
+                        turn, name, arg_preview, ts
+                    )
+                }
+                Action::Response {
+                    response_type,
+                    content,
+                } => {
+                    let preview = if content.len() > 120 {
+                        format!("{}…", &content[..120])
+                    } else {
+                        content.clone()
+                    };
+                    format!(
+                        "- [turn {}] response:{:?} {} (t={})",
+                        turn, response_type, preview, ts
+                    )
+                }
+                Action::ContextCompression {
+                    reason,
+                    compression_ratio,
+                } => {
+                    format!(
+                        "- [turn {}] compression {:.2} reason={} (t={})",
+                        turn, compression_ratio, reason, ts
+                    )
+                }
+                Action::ErrorRecovery {
+                    error_type,
+                    recovery_strategy,
+                } => {
+                    format!(
+                        "- [turn {}] recovery {} via {} (t={})",
+                        turn, error_type, recovery_strategy, ts
+                    )
+                }
+            };
+            out.push_str(&line);
+            out.push('\n');
+        }
+        if out.is_empty() {
+            "(no decisions yet)".to_string()
+        } else {
+            out
+        }
+    }
 }
 
 /// Transparency report for the current session

@@ -70,7 +70,7 @@ fn highlight_code_blocks(text: &str) -> String {
 }
 
 /// Handle the chat command
-pub async fn handle_chat_command(config: &CoreAgentConfig, force_multi_agent: bool, skip_confirmations: bool) -> Result<()> {
+pub async fn handle_chat_command(config: &CoreAgentConfig, skip_confirmations: bool) -> Result<()> {
     eprintln!("[DEBUG] Entering handle_chat_command");
     eprintln!("[DEBUG] Workspace: {:?}", config.workspace);
     eprintln!("[DEBUG] Model: {}", config.model);
@@ -103,14 +103,6 @@ pub async fn handle_chat_command(config: &CoreAgentConfig, force_multi_agent: bo
     let config_manager = ConfigManager::load_from_workspace(&config.workspace)
         .context("Failed to load configuration")?;
     let vtcode_config = config_manager.config();
-
-    // Multi-agent mode logic
-    if force_multi_agent || vtcode_config.multi_agent.enabled {
-        println!("{}", style("Multi-agent mode enabled").green().bold());
-        // Multi-agent implementation would go here
-        println!("Multi-agent functionality not fully implemented in this minimal version");
-        return Ok(());
-    }
 
     // Single agent mode - Chat loop implementation
     println!("{}", style("Single agent mode").cyan());

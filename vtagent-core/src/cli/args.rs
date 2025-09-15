@@ -4,12 +4,12 @@ use crate::config::models::ModelId;
 use clap::{ColorChoice, Parser, Subcommand};
 use std::path::PathBuf;
 
-/// Main CLI structure for vtagent with advanced features and multi-agent support
+/// Main CLI structure for vtagent with advanced features
 #[derive(Parser, Debug)]
 #[command(
     name = "vtagent",
     version,
-    about = "Advanced coding agent with multi-agent architecture\n\nFeatures:\n• Multi-agent coordination (Orchestrator, Explorer, Coder)\n• Tree-sitter powered code analysis (Rust, Python, JavaScript, TypeScript, Go, Java)\n• Multi-provider LLM support (Gemini, OpenAI, Anthropic, DeepSeek)\n• Real-time performance monitoring and benchmarking\n• Enhanced security with tool policies and sandboxing\n• Research-preview context management and conversation compression\n\nQuick Start:\n  export GEMINI_API_KEY=\"your_key\"\n  vtagent chat\n\nMulti-Agent Mode:\n  vtagent chat --force-multi-agent",
+    about = "Advanced coding agent with Decision Ledger\n\nFeatures:\n• Single-agent architecture with Decision Ledger for reliable task execution\n• Tree-sitter powered code analysis (Rust, Python, JavaScript, TypeScript, Go, Java)\n• Multi-provider LLM support (Gemini, OpenAI, Anthropic, DeepSeek)\n• Real-time performance monitoring and benchmarking\n• Enhanced security with tool policies and sandboxing\n• Research-preview context management and conversation compression\n\nQuick Start:\n  export GEMINI_API_KEY=\"your_key\"\n  vtagent chat",
     color = ColorChoice::Auto
 )]
 pub struct Cli {
@@ -48,33 +48,6 @@ pub struct Cli {
     /// Default: Current directory
     #[arg(long, global = true)]
     pub workspace: Option<PathBuf>,
-
-    /// **Enable multi-agent mode for complex tasks**
-    ///
-    /// Agents:
-    ///   • Orchestrator - Strategic planning and delegation
-    ///   • Explorer - Read-only investigation and analysis
-    ///   • Coder - Implementation and code modification
-    ///
-    /// Benefits: Better task decomposition, parallel execution
-    #[arg(long, global = true)]
-    pub force_multi_agent: bool,
-
-    /// Force single-agent mode even if multi-agent is enabled in config
-    ///
-    /// Use this to get a compact single-agent chat regardless of config.
-    #[arg(long, global = true)]
-    pub single_agent: bool,
-
-    /// **Agent type** when using multi-agent mode
-    ///
-    /// Options:
-    ///   • orchestrator - Strategic coordinator (default)
-    ///   • explorer - Read-only investigator
-    ///   • coder - Implementation specialist
-    ///   • single - Traditional single-agent mode
-    #[arg(long, global = true, default_value = "single")]
-    pub agent_type: String,
 
     /// **Enable tree-sitter code analysis**
     ///
@@ -194,13 +167,12 @@ pub struct Cli {
     pub command: Option<Commands>,
 }
 
-/// Available commands with comprehensive features and multi-agent support
+/// Available commands with comprehensive features
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    /// **Interactive AI coding assistant** with multi-agent capabilities
+    /// **Interactive AI coding assistant** with advanced capabilities
     ///
     /// Features:
-    ///   • Multi-agent coordination for complex tasks
     ///   • Real-time code generation and editing
     ///   • Tree-sitter powered analysis
     ///   • Research-preview context management
@@ -223,7 +195,6 @@ pub enum Commands {
     /// Shows:
     ///   • Tool execution details
     ///   • API request/response
-    ///   • Agent coordination (in multi-agent mode)
     ///   • Performance metrics
     ///
     /// Usage: vtagent chat-verbose
@@ -241,7 +212,7 @@ pub enum Commands {
     /// Usage: vtagent analyze
     Analyze,
 
-    /// **Display performance metrics** and system status\n\n**Shows:**\n• Token usage and API costs\n• Response times and latency\n• Tool execution statistics\n• Memory usage patterns\n• Agent performance (in multi-agent mode)\n\n**Usage:** vtagent performance
+    /// **Display performance metrics** and system status\n\n**Shows:**\n• Token usage and API costs\n• Response times and latency\n• Tool execution statistics\n• Memory usage patterns\n\n**Usage:** vtagent performance
     Performance,
 
     /// Pretty-print trajectory logs and show basic analytics
@@ -256,7 +227,6 @@ pub enum Commands {
     ///   • Class distribution with percentages
     ///   • Model usage statistics
     ///   • Tool success rates with status indicators
-    ///   • Multi-agent usage statistics
     ///   • Time range of logged activity
     #[command(name = "trajectory")]
     Trajectory {
@@ -369,7 +339,6 @@ pub enum Commands {
     ///   • Sets up config, cache, embeddings directories
     ///   • Creates .project metadata file
     ///   • Tree-sitter parser setup
-    ///   • Multi-agent context stores
     ///
     /// Usage: vtagent init
     Init,
@@ -407,7 +376,6 @@ pub enum Commands {
     ///   • Generate default configuration
     ///   • Support for global (home directory) and local configuration
     ///   • TOML format with comprehensive settings
-    ///   • Multi-agent configuration options
     ///   • Tree-sitter and performance monitoring settings
     ///
     /// Examples:
@@ -532,7 +500,6 @@ pub struct ConfigFile {
     pub tools: Option<ToolConfig>,
     pub context: Option<ContextConfig>,
     pub logging: Option<LoggingConfig>,
-    pub multi_agent: Option<MultiAgentConfig>,
     pub tree_sitter: Option<TreeSitterConfig>,
     pub performance: Option<PerformanceConfig>,
     pub security: Option<SecurityConfig>,
@@ -562,18 +529,6 @@ pub struct LoggingConfig {
     pub log_directory: Option<String>,
     pub max_log_files: Option<usize>,
     pub max_log_size_mb: Option<usize>,
-}
-
-/// Multi-agent configuration
-#[derive(Debug, serde::Deserialize)]
-pub struct MultiAgentConfig {
-    pub enabled: Option<bool>,
-    pub use_single_model: Option<bool>,
-    pub orchestrator_model: Option<String>,
-    pub executor_model: Option<String>,
-    pub max_concurrent_subagents: Option<usize>,
-    pub context_sharing_enabled: Option<bool>,
-    pub task_timeout_seconds: Option<u64>,
 }
 
 /// Tree-sitter configuration
@@ -614,9 +569,6 @@ impl Default for Cli {
             provider: Some("gemini".to_string()),
             api_key_env: "GEMINI_API_KEY".to_string(),
             workspace: None,
-            force_multi_agent: false,
-            single_agent: false,
-            agent_type: "single".to_string(),
             enable_tree_sitter: false,
             performance_monitoring: false,
             research_preview: false,
@@ -680,7 +632,6 @@ impl Cli {
                     tools: None,
                     context: None,
                     logging: None,
-                    multi_agent: None,
                     tree_sitter: None,
                     performance: None,
                     security: None,
@@ -701,7 +652,6 @@ impl Cli {
             tools: None,
             context: None,
             logging: None,
-            multi_agent: None,
             tree_sitter: None,
             performance: None,
             security: None,
@@ -782,16 +732,6 @@ impl Cli {
     /// Check if verbose mode is enabled
     pub fn is_verbose(&self) -> bool {
         self.verbose
-    }
-
-    /// Check if multi-agent mode is enabled
-    pub fn is_multi_agent(&self) -> bool {
-        self.force_multi_agent || self.agent_type != "single"
-    }
-
-    /// Get the agent type for multi-agent mode
-    pub fn get_agent_type(&self) -> &str {
-        &self.agent_type
     }
 
     /// Check if tree-sitter analysis is enabled

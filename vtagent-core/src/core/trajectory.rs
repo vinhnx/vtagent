@@ -1,5 +1,5 @@
 use serde::Serialize;
-use std::fs::{create_dir_all, OpenOptions};
+use std::fs::{OpenOptions, create_dir_all};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -14,7 +14,10 @@ impl TrajectoryLogger {
         let dir = workspace.join("logs");
         let _ = create_dir_all(&dir);
         let path = dir.join("trajectory.jsonl");
-        Self { path, enabled: true }
+        Self {
+            path,
+            enabled: true,
+        }
     }
 
     pub fn disabled() -> Self {
@@ -29,20 +32,29 @@ impl TrajectoryLogger {
             return;
         }
         if let Ok(line) = serde_json::to_string(record) {
-            if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(&self.path) {
+            if let Ok(mut f) = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&self.path)
+            {
                 let _ = writeln!(f, "{}", line);
             }
         }
     }
 
-    pub fn log_route(&self, turn: usize, selected_model: &str, class: &str, multi: bool, input_preview: &str) {
+    pub fn log_route(
+        &self,
+        turn: usize,
+        selected_model: &str,
+        class: &str,
+        input_preview: &str,
+    ) {
         #[derive(Serialize)]
         struct RouteRec<'a> {
             kind: &'static str,
             turn: usize,
             selected_model: &'a str,
             class: &'a str,
-            multi_agent: bool,
             input_preview: &'a str,
             ts: i64,
         }
@@ -51,7 +63,6 @@ impl TrajectoryLogger {
             turn,
             selected_model,
             class,
-            multi_agent: multi,
             input_preview,
             ts: chrono::Utc::now().timestamp(),
         };
@@ -79,4 +90,3 @@ impl TrajectoryLogger {
         self.log(&rec);
     }
 }
-

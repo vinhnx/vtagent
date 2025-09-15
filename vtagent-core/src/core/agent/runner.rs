@@ -3,7 +3,7 @@
 use crate::config::constants::tools;
 use crate::config::loader::ConfigManager;
 use crate::config::models::{ModelId, Provider as ModelProvider};
-use crate::core::agent::multi_agent::*;
+use crate::core::agent::types::AgentType;
 use crate::gemini::{Content, Part, Tool};
 use crate::llm::factory::create_provider_for_model;
 use crate::llm::provider as uni_provider;
@@ -50,14 +50,22 @@ impl AgentRunner {
         const TAIL_CHARS: usize = 200;
         let clean = text.trim();
         if clean.chars().count() <= MAX_CHARS {
-            println!("{} [{}]: {}", style("[RESPONSE]").cyan().bold(), agent, clean);
+            println!(
+                "{} [{}]: {}",
+                style("[RESPONSE]").cyan().bold(),
+                agent,
+                clean
+            );
             return;
         }
         let mut out = String::new();
         let mut count = 0;
         for ch in clean.chars() {
-            if count >= HEAD_CHARS { break; }
-            out.push(ch); count += 1;
+            if count >= HEAD_CHARS {
+                break;
+            }
+            out.push(ch);
+            count += 1;
         }
         out.push_str("\n…\n");
         // tail
@@ -66,7 +74,11 @@ impl AgentRunner {
         let tail: String = clean.chars().skip(start_tail).collect();
         out.push_str(&tail);
         println!("{} [{}]: {}", style("[RESPONSE]").cyan().bold(), agent, out);
-        println!("{} truncated long response ({} chars).", style("[NOTE]").dim(), total);
+        println!(
+            "{} truncated long response ({} chars).",
+            style("[NOTE]").dim(),
+            total
+        );
     }
     /// Create informative progress message based on operation type
     fn create_progress_message(&self, operation: &str, details: Option<&str>) -> String {
@@ -139,17 +151,8 @@ impl AgentRunner {
         let provider_client = create_provider_for_model(model.as_str(), api_key.clone())
             .map_err(|e| anyhow!("Failed to create provider client: {}", e))?;
 
-        // Create system prompt based on agent type
-        let system_prompt = match agent_type {
-            AgentType::Coder => include_str!("../../../../prompts/coder_system.md").to_string(),
-            AgentType::Explorer => {
-                include_str!("../../../../prompts/explorer_system.md").to_string()
-            }
-            AgentType::Orchestrator => {
-                include_str!("../../../../prompts/orchestrator_system.md").to_string()
-            }
-            AgentType::Single => include_str!("../../../../prompts/system.md").to_string(),
-        };
+        // Create system prompt for single agent
+        let system_prompt = include_str!("../../../../prompts/system.md").to_string();
 
         Ok(Self {
             agent_type,
@@ -313,7 +316,10 @@ impl AgentRunner {
                 .map(|m| m.provider())
                 .unwrap_or(ModelProvider::Gemini);
 
-            if matches!(provider_kind, ModelProvider::OpenAI | ModelProvider::Anthropic) {
+            if matches!(
+                provider_kind,
+                ModelProvider::OpenAI | ModelProvider::Anthropic
+            ) {
                 let resp = self
                     .provider_client
                     .generate(request.clone())
@@ -365,15 +371,14 @@ impl AgentRunner {
                                     conversation.push(Content {
                                         role: "user".to_string(),
                                         parts: vec![Part::Text {
-                                            text: format!(
-                                                "Tool {} result: {}",
-                                                name, tool_result
-                                            ),
+                                            text: format!("Tool {} result: {}", name, tool_result),
                                         }],
                                     });
                                     executed_commands.push(name.to_string());
                                     if name == tools::WRITE_FILE {
-                                        if let Some(filepath) = args.get("path").and_then(|p| p.as_str()) {
+                                        if let Some(filepath) =
+                                            args.get("path").and_then(|p| p.as_str())
+                                        {
                                             modified_files.push(filepath.to_string());
                                         }
                                     }
@@ -405,7 +410,9 @@ impl AgentRunner {
                         Self::print_compact_response(self.agent_type, &response_text);
                         conversation.push(Content {
                             role: "model".to_string(),
-                            parts: vec![Part::Text { text: response_text.clone() }],
+                            parts: vec![Part::Text {
+                                text: response_text.clone(),
+                            }],
                         });
                     }
                 }
@@ -499,12 +506,12 @@ impl AgentRunner {
             // For Gemini path: use original response handling
             let response = response_opt.expect("response should be set for Gemini path");
 
-                // Update progress for successful response
-                pb.set_message(format!(
-                    "{} {} received response, processing...",
-                    self.agent_type,
-                    style("(RECV)").green().bold()
-                ));
+            // Update progress for successful response
+            pb.set_message(format!(
+                "{} {} received response, processing...",
+                self.agent_type,
+                style("(RECV)").green().bold()
+            ));
 
             // Use response content directly
             if !response.content.is_empty() {
@@ -995,39 +1002,8 @@ impl AgentRunner {
         Ok(allowed_tools)
     }
 
-    /// Check if a tool is allowed for this agent type
+    /// Check if a tool is allowed for this agent
     fn is_tool_allowed(&self, tool_name: &str) -> bool {
-        // First check agent type restrictions
-        let agent_type_allowed = match self.agent_type {
-            AgentType::Coder => {
-                // Coder agents can use file operations and command execution
-                matches!(
-                    tool_name,
-                    tools::READ_FILE
-                        | tools::WRITE_FILE
-                        | tools::LIST_FILES
-                        | tools::RUN_TERMINAL_CMD
-                )
-            }
-            AgentType::Explorer => {
-                // Explorer agents can use search and file listing
-                matches!(tool_name, tools::GREP_SEARCH | tools::LIST_FILES)
-            }
-            AgentType::Orchestrator => {
-                // Orchestrator can coordinate but not directly manipulate files
-                matches!(tool_name, tools::GREP_SEARCH | tools::LIST_FILES)
-            }
-            AgentType::Single => {
-                // Single agents have limited tool access
-                matches!(tool_name, tools::GREP_SEARCH | tools::LIST_FILES)
-            }
-        };
-
-        // If agent type doesn't allow it, deny access
-        if !agent_type_allowed {
-            return false;
-        }
-
         // Check tool policy (allow if Allow or Prompt, deny if Deny)
         let policy = self.tool_registry.policy_manager().get_policy(tool_name);
         match policy {

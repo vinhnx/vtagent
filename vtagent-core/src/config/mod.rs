@@ -10,7 +10,7 @@ pub mod core;
 pub mod defaults;
 pub mod loader;
 pub mod models;
-pub mod multi_agent;
+pub mod context;
 pub mod router;
 pub mod telemetry;
 pub mod types;
@@ -18,11 +18,11 @@ pub mod types;
 // Re-export main types for backward compatibility
 pub use core::{AgentConfig, CommandsConfig, SecurityConfig, ToolPolicy, ToolsConfig};
 pub use defaults::{
-    ContextStoreDefaults, MultiAgentDefaults, PerformanceDefaults, ScenarioDefaults,
+    ContextStoreDefaults, PerformanceDefaults, ScenarioDefaults,
 };
 pub use loader::{ConfigManager, VTAgentConfig};
-pub use multi_agent::{ExecutionMode, MultiAgentSystemConfig};
-pub use router::{RouterConfig, ComplexityModelMap, ResourceBudget};
+pub use context::{ContextFeaturesConfig, LedgerConfig};
+pub use router::{ComplexityModelMap, ResourceBudget, RouterConfig};
 pub use telemetry::TelemetryConfig;
 
 use serde::{Deserialize, Serialize};

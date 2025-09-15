@@ -29,11 +29,6 @@ This example shows how to use VTAgent for code analysis and tool execution.
         r#"
 # Advanced VTAgent Usage
 
-## Multi-Agent Coordination:
-- Coder Agent: Code analysis and modification
-- Explorer Agent: File system exploration
-- Orchestrator Agent: Task coordination
-
 ## Tool Integration:
 - All tools now support PTY for terminal emulation
 - AST-based code analysis and transformation

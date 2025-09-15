@@ -1,12 +1,16 @@
 use anyhow::Result;
 use console::style;
 use itertools::Itertools;
-use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
 use std::fs;
 use std::path::Path;
+use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
 
 /// Handle the create-project command
-pub async fn handle_create_project_command(config: &CoreAgentConfig, name: &str, features: &[String]) -> Result<()> {
+pub async fn handle_create_project_command(
+    config: &CoreAgentConfig,
+    name: &str,
+    features: &[String],
+) -> Result<()> {
     println!("{}", style("Create project mode selected").blue().bold());
     println!("Project name: {}", name);
     println!("Features: {:?}", features);

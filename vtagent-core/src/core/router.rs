@@ -1,5 +1,3 @@
-use anyhow::Result;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::config::loader::VTAgentConfig;
@@ -18,7 +16,6 @@ pub enum TaskClass {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RouteDecision {
     pub class: TaskClass,
-    pub use_multi_agent: bool,
     pub selected_model: String,
 }
 
@@ -28,37 +25,55 @@ impl Router {
     pub fn classify_heuristic(input: &str) -> TaskClass {
         let text = input.to_lowercase();
         let has_code_fence = text.contains("```") || text.contains("diff --git");
-        let has_patch_keywords = ["apply_patch", "unified diff", "patch", "edit_file", "create_file"]
-            .iter()
-            .any(|k| text.contains(k));
-        let retrieval = ["search", "web", "google", "docs", "cite", "source", "up-to-date"]
-            .iter()
-            .any(|k| text.contains(k));
+        let has_patch_keywords = [
+            "apply_patch",
+            "unified diff",
+            "patch",
+            "edit_file",
+            "create_file",
+        ]
+        .iter()
+        .any(|k| text.contains(k));
+        let retrieval = [
+            "search",
+            "web",
+            "google",
+            "docs",
+            "cite",
+            "source",
+            "up-to-date",
+        ]
+        .iter()
+        .any(|k| text.contains(k));
         let complex_markers = [
-            "plan", "multi-step", "decompose", "orchestrate", "architecture", "benchmark",
-            "implement end-to-end", "design api", "refactor module", "evaluate", "tests suite",
+            "plan",
+            "multi-step",
+            "decompose",
+            "orchestrate",
+            "architecture",
+            "benchmark",
+            "implement end-to-end",
+            "design api",
+            "refactor module",
+            "evaluate",
+            "tests suite",
         ];
         let complex = complex_markers.iter().any(|k| text.contains(k));
         let long = text.len() > 1200;
 
-        if has_code_fence || has_patch_keywords { return TaskClass::CodegenHeavy; }
-        if retrieval { return TaskClass::RetrievalHeavy; }
-        if complex || long { return TaskClass::Complex; }
-        if text.len() < 120 { return TaskClass::Simple; }
+        if has_code_fence || has_patch_keywords {
+            return TaskClass::CodegenHeavy;
+        }
+        if retrieval {
+            return TaskClass::RetrievalHeavy;
+        }
+        if complex || long {
+            return TaskClass::Complex;
+        }
+        if text.len() < 120 {
+            return TaskClass::Simple;
+        }
         TaskClass::Standard
-    }
-
-    pub fn should_use_multi_agent(class: TaskClass, threshold: &str) -> bool {
-        // Order: Simple < Standard < Complex < CodegenHeavy < RetrievalHeavy
-        let rank = |c: TaskClass| match c { TaskClass::Simple => 0, TaskClass::Standard => 1, TaskClass::Complex => 2, TaskClass::CodegenHeavy => 3, TaskClass::RetrievalHeavy => 4 };
-        let thr = match threshold {
-            "standard" => TaskClass::Standard,
-            "complex" => TaskClass::Complex,
-            "codegen_heavy" => TaskClass::CodegenHeavy,
-            "retrieval_heavy" => TaskClass::RetrievalHeavy,
-            _ => TaskClass::Complex,
-        };
-        rank(class) >= rank(thr)
     }
 
     pub fn route(vt_cfg: &VTAgentConfig, core: &CoreAgentConfig, input: &str) -> RouteDecision {
@@ -75,15 +90,13 @@ impl Router {
             TaskClass::Standard => non_empty_or(&router_cfg.models.standard, &core.model),
             TaskClass::Complex => non_empty_or(&router_cfg.models.complex, &core.model),
             TaskClass::CodegenHeavy => non_empty_or(&router_cfg.models.codegen_heavy, &core.model),
-            TaskClass::RetrievalHeavy => non_empty_or(&router_cfg.models.retrieval_heavy, &core.model),
+            TaskClass::RetrievalHeavy => {
+                non_empty_or(&router_cfg.models.retrieval_heavy, &core.model)
+            }
         };
-
-        let use_multi = Self::should_use_multi_agent(class, &router_cfg.multi_agent_threshold)
-            && vt_cfg.multi_agent.enabled;
 
         RouteDecision {
             class,
-            use_multi_agent: use_multi,
             selected_model: model.to_string(),
         }
     }
@@ -104,7 +117,9 @@ impl Router {
         };
 
         if !router_cfg.llm_router_model.trim().is_empty() {
-            if let Ok(provider) = create_provider_for_model(&router_cfg.llm_router_model, api_key.to_string()) {
+            if let Ok(provider) =
+                create_provider_for_model(&router_cfg.llm_router_model, api_key.to_string())
+            {
                 let sys = "You are a routing classifier. Output only one label: simple | standard | complex | codegen_heavy | retrieval_heavy. Choose the best class for the user's last message. No prose.".to_string();
                 let req = uni::LLMRequest {
                     messages: vec![uni::Message::user(input.to_string())],
@@ -139,19 +154,22 @@ impl Router {
             TaskClass::Standard => non_empty_or(&router_cfg.models.standard, &core.model),
             TaskClass::Complex => non_empty_or(&router_cfg.models.complex, &core.model),
             TaskClass::CodegenHeavy => non_empty_or(&router_cfg.models.codegen_heavy, &core.model),
-            TaskClass::RetrievalHeavy => non_empty_or(&router_cfg.models.retrieval_heavy, &core.model),
+            TaskClass::RetrievalHeavy => {
+                non_empty_or(&router_cfg.models.retrieval_heavy, &core.model)
+            }
         };
-        let use_multi = Self::should_use_multi_agent(class, &router_cfg.multi_agent_threshold)
-            && vt_cfg.multi_agent.enabled;
 
         RouteDecision {
             class,
-            use_multi_agent: use_multi,
             selected_model: model.to_string(),
         }
     }
 }
 
 fn non_empty_or<'a>(value: &'a str, fallback: &'a str) -> &'a str {
-    if value.trim().is_empty() { fallback } else { value }
+    if value.trim().is_empty() {
+        fallback
+    } else {
+        value
+    }
 }

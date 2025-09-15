@@ -24,7 +24,7 @@ impl ManPageGenerator {
         let page = Roff::new()
             .control("TH", ["VTAGENT", "1", &current_date, "VTAgent", "User Commands"])
             .control("SH", ["NAME"])
-            .text([roman("vtagent - Advanced coding agent with multi-agent architecture")])
+            .text([roman("vtagent - Advanced coding agent with Decision Ledger")])
             .control("SH", ["SYNOPSIS"])
             .text([
                 bold("vtagent"),
@@ -38,7 +38,7 @@ impl ManPageGenerator {
             ])
             .control("SH", ["DESCRIPTION"])
             .text([
-                roman("VTAgent is an advanced coding agent with multi-agent architecture that provides"),
+                roman("VTAgent is an advanced coding agent with single-agent architecture and Decision Ledger that provides"),
                 roman(" intelligent code generation, analysis, and modification capabilities. It supports"),
                 roman(" multiple LLM providers and includes tree-sitter powered code analysis for"),
                 roman(" Rust, Python, JavaScript, TypeScript, Go, and Java."),
@@ -53,9 +53,6 @@ impl ManPageGenerator {
             .control("TP", [])
             .text([bold("--workspace"), roman(" "), italic("PATH")])
             .text([roman("Set the workspace root directory for file operations")])
-            .control("TP", [])
-            .text([bold("--force-multi-agent")])
-            .text([roman("Enable multi-agent mode for complex tasks")])
             .control("TP", [])
             .text([bold("--enable-tree-sitter")])
             .text([roman("Enable tree-sitter code analysis")])
@@ -168,33 +165,17 @@ impl ManPageGenerator {
             ])
             .control("SH", ["DESCRIPTION"])
             .text([
-                roman("Start an interactive AI coding assistant session with multi-agent capabilities."),
+                roman("Start an interactive AI coding assistant session."),
                 roman(" The chat command provides intelligent code generation, analysis, and modification"),
                 roman(" with support for multiple LLM providers and tree-sitter powered code analysis."),
             ])
             .control("SH", ["OPTIONS"])
             .text([roman("All global options are supported. See "), bold("vtagent(1)"), roman(" for details.")])
-            .control("SH", ["MULTI-AGENT MODE"])
-            .text([
-                roman("When multi-agent mode is enabled (--force-multi-agent), VTAgent coordinates"),
-                roman(" between three specialized agents:"),
-            ])
-            .control("TP", [])
-            .text([bold("Orchestrator")])
-            .text([roman("Strategic planning and task delegation")])
-            .control("TP", [])
-            .text([bold("Explorer")])
-            .text([roman("Read-only investigation and analysis")])
-            .control("TP", [])
-            .text([bold("Coder")])
-            .text([roman("Implementation and code modification")])
             .control("SH", ["EXAMPLES"])
             .text([roman("Start basic chat session:")])
             .text([bold("  vtagent chat")])
             .text([roman("Start with specific model:")])
             .text([bold("  vtagent --model gemini-2.5-pro chat")])
-            .text([roman("Enable multi-agent mode:")])
-            .text([bold("  vtagent --force-multi-agent chat")])
             .control("SH", ["SEE ALSO"])
             .text([bold("vtagent(1)"), roman(", "), bold("vtagent-ask(1)"), roman(", "), bold("vtagent-analyze(1)")])
             .render();
@@ -347,7 +328,7 @@ impl ManPageGenerator {
             .text([roman("Memory consumption patterns")])
             .control("TP", [])
             .text([bold("Agent Performance")])
-            .text([roman("Multi-agent coordination metrics")])
+            .text([roman("Single-agent execution metrics")])
             .control("SH", ["EXAMPLES"])
             .text([roman("Show performance metrics:")])
             .text([bold("  vtagent performance")])
@@ -496,7 +477,7 @@ impl ManPageGenerator {
             .text([
                 roman("Initialize a project with enhanced dot-folder structure for VTAgent."),
                 roman(" Creates project directory structure, config files, cache directories,"),
-                roman(" embeddings storage, tree-sitter parser setup, and multi-agent context stores."),
+                roman(" embeddings storage, and tree-sitter parser setup."),
             ])
             .control("SH", ["DIRECTORY STRUCTURE"])
             .text([roman("• .vtagent/ - Main project cache and context directory")])
@@ -504,7 +485,7 @@ impl ManPageGenerator {
             .text([roman("• .vtagent/cache/ - File and analysis cache")])
             .text([roman("• .vtagent/embeddings/ - Code embeddings storage")])
             .text([roman("• .vtagent/parsers/ - Tree-sitter parsers")])
-            .text([roman("• .vtagent/agents/ - Multi-agent context stores")])
+            .text([roman("• .vtagent/context/ - Agent context stores")])
             .control("SH", ["EXAMPLES"])
             .text([roman("Initialize current directory:")])
             .text([bold("  vtagent init")])

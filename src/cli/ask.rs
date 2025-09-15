@@ -1,6 +1,8 @@
 use anyhow::Result;
 use console::style;
-use vtagent_core::{llm::make_client, models::ModelId, config::types::AgentConfig as CoreAgentConfig};
+use vtagent_core::{
+    config::types::AgentConfig as CoreAgentConfig, llm::make_client, models::ModelId,
+};
 
 /// Handle the ask command - single prompt, no tools
 pub async fn handle_ask_command(config: &CoreAgentConfig, prompt: &str) -> Result<()> {

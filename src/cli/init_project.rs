@@ -3,7 +3,7 @@
 use anyhow::Result;
 use console::style;
 use std::path::Path;
-use vtagent_core::{SimpleProjectManager, ProjectData};
+use vtagent_core::{ProjectData, SimpleProjectManager};
 
 /// Handle the init-project command
 pub async fn handle_init_project_command(
@@ -11,7 +11,12 @@ pub async fn handle_init_project_command(
     force: bool,
     migrate: bool,
 ) -> Result<()> {
-    println!("{}", style("Initialize project with dot-folder structure").blue().bold());
+    println!(
+        "{}",
+        style("Initialize project with dot-folder structure")
+            .blue()
+            .bold()
+    );
 
     // Initialize project manager
     let project_manager = SimpleProjectManager::new(std::env::current_dir()?);
@@ -35,14 +40,22 @@ pub async fn handle_init_project_command(
     // Check if project already exists
     let project_dir = project_manager.project_data_dir(&project_name);
     if project_dir.exists() && !force {
-        println!("{} Project directory already exists: {}", style("Warning").yellow(), project_dir.display());
+        println!(
+            "{} Project directory already exists: {}",
+            style("Warning").yellow(),
+            project_dir.display()
+        );
         println!("Use --force to overwrite existing project structure.");
         return Ok(());
     }
 
     // Create project structure
     project_manager.create_project(&project_name, Some("VTAgent project"))?;
-    println!("{} Created project structure in: {}", style("Success").green(), project_dir.display());
+    println!(
+        "{} Created project structure in: {}",
+        style("Success").green(),
+        project_dir.display()
+    );
 
     // Create or update project metadata
     let current_dir = std::env::current_dir()?;
@@ -56,21 +69,33 @@ pub async fn handle_init_project_command(
         migrate_existing_files(&project_manager, &project_name, &current_dir).await?;
     }
 
-    println!("\n{} Project initialization completed!", style("Success").green().bold());
+    println!(
+        "\n{} Project initialization completed!",
+        style("Success").green().bold()
+    );
     println!("Project structure created at: {}", project_dir.display());
-    println!("Configuration directory: {}", project_manager.config_dir(&project_name).display());
-    println!("Cache directory: {}", project_manager.cache_dir(&project_name).display());
+    println!(
+        "Configuration directory: {}",
+        project_manager.config_dir(&project_name).display()
+    );
+    println!(
+        "Cache directory: {}",
+        project_manager.cache_dir(&project_name).display()
+    );
 
     Ok(())
 }
 
 /// Migrate existing config/cache files to the new project structure
 async fn migrate_existing_files(
-    project_manager: &SimpleProjectManager,
-    project_name: &str,
+    _project_manager: &SimpleProjectManager,
+    _project_name: &str,
     current_dir: &Path,
 ) -> Result<()> {
-    println!("\n{} Checking for existing config/cache files to migrate...", style("Info").blue());
+    println!(
+        "\n{} Checking for existing config/cache files to migrate...",
+        style("Info").blue()
+    );
 
     let mut files_to_migrate = Vec::new();
 

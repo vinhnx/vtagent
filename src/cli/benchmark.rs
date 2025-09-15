@@ -6,4 +6,3 @@ pub async fn handle_benchmark_command() -> Result<()> {
     println!("Benchmarking not implemented yet.");
     Ok(())
 }
-

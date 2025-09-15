@@ -6,12 +6,12 @@ Welcome to the comprehensive documentation for **VTAgent**, a Rust-based termina
 
 VTAgent represents a modern approach to AI-powered software development, featuring:
 
-- **Multi-Agent Architecture** - Orchestrator, Explorer, and Coder agents for specialized tasks
-- **Multi-Provider LLM Support** - Gemini, OpenAI, Anthropic integration
-- **Advanced Code Intelligence** - Tree-sitter parsers for 6+ programming languages
-- **Enterprise-Grade Safety** - Comprehensive security controls and path validation
-- **Flexible Configuration** - TOML-based configuration with granular policies
-- **Research-Preview Features** - Cutting-edge agent coordination and context engineering
+-   **Single-Agent Reliability (default)** – Streamlined, linear agent with robust context engineering
+-   **Decision Ledger** – Structured, compact record of key decisions injected each turn for consistency
+-   **Multi-Provider LLM Support** – Gemini, OpenAI, Anthropic integration
+-   **Advanced Code Intelligence** – Tree-sitter parsers for 6+ programming languages
+-   **Enterprise-Grade Safety** – Comprehensive security controls and path validation
+-   **Flexible Configuration** – TOML-based configuration with granular policies
 
 ## Documentation Overview
 
@@ -21,60 +21,58 @@ This documentation is organized to support different user personas and use cases
 
 New to VTAgent? Start with installation and basic usage:
 
-- **[Getting Started](./user-guide/getting-started.md)** - Installation, configuration, and first steps
-- **[Multi-Agent Guide](./MULTI_AGENT_GUIDE.md)** - Understanding agent coordination
-- **[Configuration Guide](./CONFIGURATION.md)** - Comprehensive configuration options
+-   **[Getting Started](./user-guide/getting-started.md)** - Installation, configuration, and first steps
+-   [Decision Ledger](./context/DECISION_LEDGER.md) - How decisions are tracked and injected
+-   **[Configuration Guide](./CONFIGURATION.md)** - Comprehensive configuration options
 
 ### For Developers
 
 Contributing to VTAgent? Understand the architecture and development processes:
 
-- **[Architecture Overview](./ARCHITECTURE.md)** - System design and core components
-- **[Development Guide](./development/README.md)** - Development environment setup
-- **[API Documentation](./api/README.md)** - Technical API references
-- **[Code Standards](./development/code-style.md)** - Coding guidelines and best practices
+-   **[Architecture Overview](./ARCHITECTURE.md)** - System design and core components
+-   **[Development Guide](./development/README.md)** - Development environment setup
+-   **[API Documentation](./api/README.md)** - Technical API references
+-   **[Code Standards](./development/code-style.md)** - Coding guidelines and best practices
 
 ### For Organizations
 
 Deploying VTAgent in production? Focus on enterprise features:
 
-- **[Security Implementation](./SAFETY_IMPLEMENTATION.md)** - Security controls and compliance
-- **[Performance Analysis](./PERFORMANCE_ANALYSIS.md)** - Optimization and benchmarking
-- **[Provider Guides](./PROVIDER_GUIDES.md)** - LLM provider integration guides
+-   **[Security Implementation](./SAFETY_IMPLEMENTATION.md)** - Security controls and compliance
+-   **[Performance Analysis](./PERFORMANCE_ANALYSIS.md)** - Optimization and benchmarking
+-   **[Provider Guides](./PROVIDER_GUIDES.md)** - LLM provider integration guides
 
 ## Core Capabilities
 
-### Multi-Agent Architecture
+### Context Engineering
 
-- **Orchestrator Agent** - Strategic task coordination and delegation
-- **Explorer Agent** - Read-only investigation and verification
-- **Coder Agent** - Implementation specialist with full write access
-- **Context Store** - Persistent knowledge management across agents
-- **Task Verification** - Automated quality assurance workflows
+-   **Decision Ledger** – Persistent, compact history of key decisions and constraints
+-   **Context Compression** – Summarizes older turns while preserving ledger, errors, and recent activity
+-   **Tool Traces** – Tool inputs/outputs summarized and fed back for continuity
 
 ### Advanced Code Intelligence
 
-- **Tree-Sitter Integration** - Syntax-aware parsing for Rust, Python, JavaScript, TypeScript, Go, Java
-- **Intelligent Search** - Ripgrep and AST-grep powered code analysis
-- **Symbol Analysis** - Function, class, and variable extraction
-- **Dependency Mapping** - Import relationship analysis
-- **Code Quality Assessment** - Complexity and maintainability scoring
+-   **Tree-Sitter Integration** - Syntax-aware parsing for Rust, Python, JavaScript, TypeScript, Go, Java
+-   **Intelligent Search** - Ripgrep and AST-grep powered code analysis
+-   **Symbol Analysis** - Function, class, and variable extraction
+-   **Dependency Mapping** - Import relationship analysis
+-   **Code Quality Assessment** - Complexity and maintainability scoring
 
 ### Comprehensive Tool Suite
 
-- **File Operations** - Safe, validated file system operations
-- **Terminal Integration** - Enhanced PTY support for interactive commands
-- **Search & Analysis** - Fast text and syntax-aware code search
-- **Batch Processing** - Efficient multi-file operations
-- **Configuration Management** - Dynamic TOML-based settings
+-   **File Operations** - Safe, validated file system operations
+-   **Terminal Integration** - Enhanced PTY support for interactive commands
+-   **Search & Analysis** - Fast text and syntax-aware code search
+-   **Batch Processing** - Efficient multi-file operations
+-   **Configuration Management** - Dynamic TOML-based settings
 
 ### Safety & Security
 
-- **Path Validation** - Prevents access outside workspace boundaries
-- **Command Policies** - Allow/deny lists with pattern matching
-- **Human-in-the-Loop** - Confirmation for dangerous operations
-- **File Size Limits** - Configurable resource constraints
-- **API Key Security** - Secure credential management
+-   **Path Validation** - Prevents access outside workspace boundaries
+-   **Command Policies** - Allow/deny lists with pattern matching
+-   **Human-in-the-Loop** - Confirmation for dangerous operations
+-   **File Size Limits** - Configurable resource constraints
+-   **API Key Security** - Secure credential management
 
 ## Quick Start Guide
 
@@ -88,7 +86,7 @@ Deploying VTAgent in production? Focus on enterprise features:
 
 1. **[Architecture Overview](./ARCHITECTURE.md)** - Understand the system design
 2. **[Development Setup](./development/README.md)** - Configure development environment
-3. **[Multi-Agent Patterns](./MULTI_AGENT_GUIDE.md)** - Learn agent coordination
+3. **[Decision Ledger](./context/DECISION_LEDGER.md)** - Learn decision tracking and context engineering
 
 ### For Organizations
 
@@ -109,30 +107,14 @@ To tune budgets: add `[router.budgets.<class>]` with max_tokens and max_parallel
 **Trajectory Logs:**
 Logs for trajectory: check `logs/trajectory.jsonl`.
 
-### Multi-Agent Workflows
+### Single-Agent Workflows
 
 ```bash
-# Complex task orchestration
-./run.sh orchestrate "Implement user authentication system"
+# Complex task execution with Decision Ledger
+./run.sh chat "Implement user authentication system"
 
-# Codebase exploration
-./run.sh explore "Analyze current architecture"
-
-# Implementation tasks
-./run.sh code "Add new API endpoint"
-```
-
-### Intelligent Code Analysis
-
-```bash
-# Comprehensive project analysis
+# Codebase analysis
 ./run.sh analyze
-
-# Symbol search and navigation
-./run.sh search "function process_"
-
-# Dependency analysis
-./run.sh deps --graph
 ```
 
 ### Configuration Management
@@ -162,10 +144,10 @@ VTAgent includes comprehensive testing infrastructure:
 
 ### Test Categories
 
-- **Unit Tests** - Component-level testing with `cargo nextest run`
-- **Integration Tests** - End-to-end workflow validation
-- **Performance Tests** - Benchmarking with `cargo bench`
-- **Configuration Tests** - TOML validation and policy testing
+-   **Unit Tests** - Component-level testing with `cargo nextest run`
+-   **Integration Tests** - End-to-end workflow validation
+-   **Performance Tests** - Benchmarking with `cargo bench`
+-   **Configuration Tests** - TOML validation and policy testing
 
 ### Quality Assurance
 
@@ -187,36 +169,36 @@ cargo clippy && cargo fmt
 
 ### Current Status & Roadmap
 
-- **[Roadmap](../ROADMAP.md)** - Future development plans and milestones
-- **[Changelog](../CHANGELOG.md)** - Version history and release notes
-- **[TODO](./project/TODO.md)** - Current development tasks
+-   **[Roadmap](../ROADMAP.md)** - Future development plans and milestones
+-   **[Changelog](../CHANGELOG.md)** - Version history and release notes
+-   **[TODO](./project/TODO.md)** - Current development tasks
 
 ### Development Resources
 
-- **[Contributing Guide](../CONTRIBUTING.md)** - How to contribute
-- **[Code Standards](./development/code-style.md)** - Coding guidelines
-- **[Architecture Decisions](./ARCHITECTURE.md)** - Design rationale
+-   **[Contributing Guide](../CONTRIBUTING.md)** - How to contribute
+-   **[Code Standards](./development/code-style.md)** - Coding guidelines
+-   **[Architecture Decisions](./ARCHITECTURE.md)** - Design rationale
 
 ## Support & Community
 
 ### Getting Help
 
-- **GitHub Issues** - Report bugs and request features
-- **GitHub Discussions** - Community discussions and support
-- **Documentation** - Comprehensive guides and tutorials
+-   **GitHub Issues** - Report bugs and request features
+-   **GitHub Discussions** - Community discussions and support
+-   **Documentation** - Comprehensive guides and tutorials
 
 ### Community Resources
 
-- **[Main README](../README.md)** - Project overview and quick reference
-- **[GitHub Repository](https://github.com/vinhnx/vtagent)** - Source code and collaboration
-- **[Discussions](https://github.com/vinhnx/vtagent/discussions)** - Community support
+-   **[Main README](../README.md)** - Project overview and quick reference
+-   **[GitHub Repository](https://github.com/vinhnx/vtagent)** - Source code and collaboration
+-   **[Discussions](https://github.com/vinhnx/vtagent/discussions)** - Community support
 
 ### Enterprise Support
 
-- **Security Features** - Enterprise-grade security controls
-- **Multi-Agent Coordination** - Advanced workflow orchestration
-- **Provider Integration** - Multiple LLM provider support
-- **Performance Optimization** - Enterprise-scale performance tuning
+-   **Security Features** - Enterprise-grade security controls
+-   **Single-Agent Coordination** - Reliable workflow orchestration with Decision Ledger
+-   **Provider Integration** - Multiple LLM provider support
+-   **Performance Optimization** - Enterprise-scale performance tuning
 
 ## License & Attribution
 
@@ -226,11 +208,11 @@ This documentation is part of the VTAgent project. See the main [README](../READ
 
 VTAgent builds upon key developments in AI agent technology:
 
-- **Anthropic's Agent Patterns** - Tool design and safety principles
-- **Cognition's Context Engineering** - Long-running agent reliability
-- **OpenAI's Multi-Agent Concepts** - Agent coordination patterns
-- **Tree-Sitter Ecosystem** - Advanced code parsing capabilities
-- **Rust Community** - High-performance systems programming
+-   **Anthropic's Agent Patterns** - Tool design and safety principles
+-   **Cognition's Context Engineering** - Long-running agent reliability and Decision Ledger
+-   **Single-Agent Architecture** - Reliable coordination patterns
+-   **Tree-Sitter Ecosystem** - Advanced code parsing capabilities
+-   **Rust Community** - High-performance systems programming
 
 ---
 

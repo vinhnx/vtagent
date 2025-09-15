@@ -1,4 +1,3 @@
-use crate::core::context_compression::ContextCompressor;
 use crate::core::timeout_detector::{OperationType, TIMEOUT_DETECTOR};
 use anyhow::Result;
 use indexmap::IndexMap;

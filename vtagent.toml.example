@@ -73,7 +73,6 @@ command_timeout_seconds = 300
 enabled = true
 heuristic_classification = true
 llm_router_model = ""
-multi_agent_threshold = "complex"
 
 [router.models]
 simple = "gemini-2.5-flash-lite"
@@ -85,10 +84,9 @@ retrieval_heavy = "gemini-2.5-flash"
 [telemetry]
 trajectory_enabled = true
 
-[multi_agent]
-# Multi-agent system is disabled by default
-enabled = false
-# To enable multi-agent features, set enabled = true and uncomment additional settings below
-# execution_mode = "auto"
-# orchestrator_model = "gemini-2.5-flash"
-# subagent_model = "gemini-2.5-flash-lite"
+[context.ledger]
+enabled = true
+max_entries = 12
+include_in_prompt = true
+preserve_in_compression = true
+

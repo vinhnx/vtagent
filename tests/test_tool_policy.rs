@@ -13,28 +13,22 @@
 
 use anyhow::{Context, Result};
 use console::style;
-use dialoguer::Confirm;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
 /// Tool execution policy
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ToolPolicy {
     /// Allow tool execution without prompting
     Allow,
     /// Prompt user for confirmation each time
+    #[default]
     Prompt,
     /// Never allow tool execution
     Deny,
-}
-
-impl Default for ToolPolicy {
-    fn default() -> Self {
-        ToolPolicy::Prompt
-    }
 }
 
 /// Tool policy configuration stored in ~/.vtagent/tool-policy.json

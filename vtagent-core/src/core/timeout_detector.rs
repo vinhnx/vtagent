@@ -138,6 +138,12 @@ pub struct TimeoutDetector {
     stats: Arc<RwLock<TimeoutStats>>,
 }
 
+impl Default for TimeoutDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TimeoutDetector {
     pub fn new() -> Self {
         let mut configs = HashMap::new();

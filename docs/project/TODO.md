@@ -70,3 +70,43 @@ It seems like git status --short didn't run due to the combined command--I'll tr
     33          }
     34      }
 ```
+
+---
+
+check for command execution failures and handle them gracefully. if a command fails, the agent should explain what went wrong and either retry the command or ask for clarification from the user. update the system prompt to include this new behavior. test it out with some failing commands to ensure it works as expected. make sure to handle edge cases and errors properly. update documentation accordingly. inform the team about this new feature and how it works. monitor feedback and make adjustments as needed. ensure that the agent's explanations are clear and concise, avoiding unnecessary jargon or complexity. aim for a balance between informativeness and brevity to keep users engaged without overwhelming them with details. the message should be short and concise, ideally no more than one sentence. it should provide enough context to understand the agent's actions without going into excessive detail. the goal is to enhance transparency and build trust with users by keeping them informed about what the agent is doing and why.
+
+turn 1:
+
+```
+> run pty git status
+[TOOL] run_terminal_cmd {"command":"git status","mode":"pty"}
+I'm sorry, but I cannot use the 'pty' mode for the `run_terminal_cmd` tool as it is not allowed by the policy. I can use the 'terminal' mode. Would you like me to run `git status` using the 'terminal' mode?
+```
+
+turn 2:
+
+> yes
+> [TOOL] run_terminal_cmd {"command":"git status","mode":"terminal"}
+> Provider error: API error 500 Internal Server Error: {
+> "error": {
+
+    "code": 500,
+    "message": "An internal error has occurred. Please retry or report in https://developers.generativeai.google/guide/troubleshooting",
+    "status": "INTERNAL"
+
+}
+}
+-> seems like the command is not being executed properly, with simple following up user prompt "yes". but on second prompt explicit tell the agent to run the command "git status --short" again.
+
+turn 3:
+
+> run git status
+> [TOOL] run_terminal_cmd {"command":["git","status"],"mode":"terminal"}
+> [stdout]
+> On branch codex/run-clippy-and-fix-code-issues
+> Your branch is up to date with 'origin/codex/run-clippy-and-fix-code-issues'.
+
+nothing to commit, working tree clean
+I've checked the git status, and it looks like you have a clean working tree with nothing to commit.
+
+===> so the agent should be able to handle such cases where the command fails and retry or ask for clarification. update the system prompt to include this new behavior. test it out with some failing commands to ensure it works as expected. make sure to handle edge cases and errors properly. update documentation accordingly. inform the team about this new feature and how it works. monitor feedback and make adjustments as needed. ensure that the agent's explanations are clear and concise, avoiding unnecessary jargon or complexity. aim for a balance between informativeness and brevity to keep users engaged without overwhelming them with details. the message should be short and concise, ideally no more than one sentence. it should provide enough context to understand the agent's actions without going into excessive detail. the goal is to enhance transparency and build trust with users by keeping them informed about what the agent is doing and why.

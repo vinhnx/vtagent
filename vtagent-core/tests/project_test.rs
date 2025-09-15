@@ -134,4 +134,3 @@ fn test_file_cache() {
     assert_eq!(total, 2);
     assert_eq!(expired, 0);
 }
-#![cfg(any())]

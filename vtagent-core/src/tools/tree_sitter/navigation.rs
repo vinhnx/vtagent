@@ -233,17 +233,22 @@ impl CodeNavigator {
 
     /// Find related symbols (implementations, overrides, etc.)
     fn find_related_symbols(&self, symbol: &SymbolInfo) -> Vec<SymbolInfo> {
-        // This would implement sophisticated relationship analysis
-        // For now, return related symbols in the same scope
-        self.symbol_map
-            .values()
-            .filter(|other| {
-                other.scope == symbol.scope
-                    && other.name != symbol.name
-                    && other.kind == symbol.kind
-            })
-            .cloned()
-            .collect()
+        let mut related = Vec::new();
+
+        for other in self.symbol_map.values() {
+            if other.name == symbol.name && other.scope != symbol.scope {
+                // Same name in different scope - likely override or implementation
+                related.push(other.clone());
+            } else if other.scope == symbol.scope
+                && other.kind == symbol.kind
+                && other.name != symbol.name
+            {
+                // Same scope and kind but different name - sibling symbols
+                related.push(other.clone());
+            }
+        }
+
+        related
     }
 }
 

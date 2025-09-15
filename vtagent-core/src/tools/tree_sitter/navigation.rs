@@ -289,13 +289,31 @@ impl NavigationUtils {
     }
 
     /// Get the path from root to a specific node
-    pub fn get_node_path(node: &SyntaxNode) -> Vec<String> {
-        let mut path = vec![node.kind.clone()];
+    pub fn get_node_path(root: &SyntaxNode, target: &SyntaxNode) -> Vec<String> {
+        fn traverse<'a>(
+            current: &'a SyntaxNode,
+            target: &SyntaxNode,
+            path: &mut Vec<String>,
+        ) -> bool {
+            path.push(current.kind.clone());
+            if std::ptr::eq(current, target) {
+                return true;
+            }
+            for child in &current.children {
+                if traverse(child, target, path) {
+                    return true;
+                }
+            }
+            path.pop();
+            false
+        }
 
-        // In a real implementation, you'd traverse up the tree
-        // This is a simplified version
-        path.reverse();
-        path
+        let mut path = Vec::new();
+        if traverse(root, target, &mut path) {
+            path
+        } else {
+            Vec::new()
+        }
     }
 
     /// Calculate distance between two positions
@@ -320,7 +338,7 @@ impl NavigationUtils {
     /// Get scope hierarchy at a position
     pub fn get_scope_hierarchy(node: &SyntaxNode, position: &Position) -> Vec<String> {
         if let Some(target_node) = Self::find_node_at_position(node, position) {
-            Self::get_node_path(target_node)
+            Self::get_node_path(node, target_node)
         } else {
             Vec::new()
         }

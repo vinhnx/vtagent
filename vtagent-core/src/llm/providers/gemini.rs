@@ -103,6 +103,19 @@ impl GeminiProvider {
     fn convert_to_gemini_format(&self, request: &LLMRequest) -> Result<Value, LLMError> {
         let mut contents = Vec::new();
 
+        // Map tool_call_id to function name from previous assistant messages
+        use std::collections::HashMap;
+        let mut call_map: HashMap<String, String> = HashMap::new();
+        for message in &request.messages {
+            if message.role == MessageRole::Assistant {
+                if let Some(tool_calls) = &message.tool_calls {
+                    for call in tool_calls {
+                        call_map.insert(call.id.clone(), call.function.name.clone());
+                    }
+                }
+            }
+        }
+
         for message in &request.messages {
             // Skip system messages - they should be handled as systemInstruction
             if message.role == MessageRole::System {
@@ -141,14 +154,14 @@ impl GeminiProvider {
                 // For tool responses, we need to construct a functionResponse
                 // The tool_call_id should help us match this to the original function call
                 if let Some(tool_call_id) = &message.tool_call_id {
-                    // We need to extract the function name from the tool_call_id or content
-                    // For now, we'll try to parse it from the context or use a generic approach
+                    let func_name = call_map
+                        .get(tool_call_id)
+                        .cloned()
+                        .unwrap_or_else(|| tool_call_id.clone());
                     parts.push(json!({
                         "functionResponse": {
-                            "name": tool_call_id, // This should be the function name
-                            "response": {
-                                "content": message.content
-                            }
+                            "name": func_name,
+                            "response": {"content": message.content}
                         }
                     }));
                 } else {

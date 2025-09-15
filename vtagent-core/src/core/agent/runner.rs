@@ -1039,8 +1039,16 @@ impl AgentRunner {
                 String::new()
             };
 
-            // For now, use the global allow/deny lists (per-agent overrides can be added similarly)
-            for pat in &cfg.commands.deny_regex {
+            let agent_prefix = format!(
+                "VTAGENT_{}_COMMANDS_",
+                self.agent_type.to_string().to_uppercase()
+            );
+
+            let mut deny_regex = cfg.commands.deny_regex.clone();
+            if let Ok(extra) = std::env::var(format!("{}DENY_REGEX", agent_prefix)) {
+                deny_regex.extend(extra.split(',').map(|s| s.trim().to_string()));
+            }
+            for pat in &deny_regex {
                 if regex::Regex::new(pat)
                     .ok()
                     .map(|re| re.is_match(&cmd_text))
@@ -1049,7 +1057,12 @@ impl AgentRunner {
                     return Err(anyhow!("Shell command denied by regex: {}", pat));
                 }
             }
-            for pat in &cfg.commands.deny_glob {
+
+            let mut deny_glob = cfg.commands.deny_glob.clone();
+            if let Ok(extra) = std::env::var(format!("{}DENY_GLOB", agent_prefix)) {
+                deny_glob.extend(extra.split(',').map(|s| s.trim().to_string()));
+            }
+            for pat in &deny_glob {
                 let re = format!("^{}$", regex::escape(pat).replace(r"\*", ".*"));
                 if regex::Regex::new(&re)
                     .ok()

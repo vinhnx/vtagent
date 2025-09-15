@@ -162,10 +162,6 @@ These observations on context engineering are just the start to what we might so
 
 ---
 
-IMPORTANT: search all "// For now," comments and implement actual logic instead of stubs. make sure cover all edge cases and handle errors properly. test it out with various scenarios to ensure it works as expected. update with tools policy accordingly and tool registry. write end to end tests for this new logic for vtagent core write and edit commands. update the system prompt accordingly. update the documentation accordingly.
-
----
-
 support mcp https://modelcontextprotocol.io/docs/getting-started/intro
 
 ---
@@ -185,3 +181,5 @@ anstyle-parse = "0.2"
 anstyle-ls = "1.0"
 anstyle-git = "0.3"
 anstyle-roff = "0.3"
+
+maybe we could use defer rendering stategy to render the output of llm agent to chat instead of plain text rendering as of now. check these crates and see if they could help with that. make good use of anstyle crate to render ansi styles in chat repl. update the system prompt accordingly. integrate with vtagent's existing file read/write logic. make sure to handle errors properly and report them back to the user. test it out with some code modification tasks to ensure it works as expected. update with tools policy accordingly and tool registry. write end to end tests for this new tool integration for vtagent core write and edit commands.

@@ -25,5 +25,8 @@ jobs:
 
       - name: Run tool-only tests (quarantined)
         run: |
-          cargo nextest run -p vtagent-core --lib -E "test(.*tools_anthropic_alignment.*|.*transform_matches_to_concise.*)"
+          # Run the transform_matches_to_concise test from vtagent-core library
+          cargo nextest run -p vtagent-core --lib -E "test(tools::search::tests::test_transform_matches_to_concise)"
+          # Run the anthropic API key test from vtagent-core library
+          cargo nextest run -p vtagent-core --lib -E "test(config::api_keys::tests::test_get_anthropic_api_key_from_env)"
 

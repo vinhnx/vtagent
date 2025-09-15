@@ -233,17 +233,22 @@ impl CodeNavigator {
 
     /// Find related symbols (implementations, overrides, etc.)
     fn find_related_symbols(&self, symbol: &SymbolInfo) -> Vec<SymbolInfo> {
-        // This would implement sophisticated relationship analysis
-        // For now, return related symbols in the same scope
-        self.symbol_map
-            .values()
-            .filter(|other| {
-                other.scope == symbol.scope
-                    && other.name != symbol.name
-                    && other.kind == symbol.kind
-            })
-            .cloned()
-            .collect()
+        let mut related = Vec::new();
+
+        for other in self.symbol_map.values() {
+            if other.name == symbol.name && other.scope != symbol.scope {
+                // Same name in different scope - likely override or implementation
+                related.push(other.clone());
+            } else if other.scope == symbol.scope
+                && other.kind == symbol.kind
+                && other.name != symbol.name
+            {
+                // Same scope and kind but different name - sibling symbols
+                related.push(other.clone());
+            }
+        }
+
+        related
     }
 }
 
@@ -289,13 +294,31 @@ impl NavigationUtils {
     }
 
     /// Get the path from root to a specific node
-    pub fn get_node_path(node: &SyntaxNode) -> Vec<String> {
-        let mut path = vec![node.kind.clone()];
+    pub fn get_node_path(root: &SyntaxNode, target: &SyntaxNode) -> Vec<String> {
+        fn traverse<'a>(
+            current: &'a SyntaxNode,
+            target: &SyntaxNode,
+            path: &mut Vec<String>,
+        ) -> bool {
+            path.push(current.kind.clone());
+            if std::ptr::eq(current, target) {
+                return true;
+            }
+            for child in &current.children {
+                if traverse(child, target, path) {
+                    return true;
+                }
+            }
+            path.pop();
+            false
+        }
 
-        // In a real implementation, you'd traverse up the tree
-        // This is a simplified version
-        path.reverse();
-        path
+        let mut path = Vec::new();
+        if traverse(root, target, &mut path) {
+            path
+        } else {
+            Vec::new()
+        }
     }
 
     /// Calculate distance between two positions
@@ -320,7 +343,7 @@ impl NavigationUtils {
     /// Get scope hierarchy at a position
     pub fn get_scope_hierarchy(node: &SyntaxNode, position: &Position) -> Vec<String> {
         if let Some(target_node) = Self::find_node_at_position(node, position) {
-            Self::get_node_path(target_node)
+            Self::get_node_path(node, target_node)
         } else {
             Vec::new()
         }

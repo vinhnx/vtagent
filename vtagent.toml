@@ -5,7 +5,7 @@
 # Provider to use: one of "gemini", "openai", "anthropic"
 provider = "gemini"
 # Default model for single-agent mode
-default_model = "gemini-2.5-flash-lite"
+default_model = "gemini-2.5-flash-lite-preview-06-17"
 # Environment variable for API key (important for proper key handling)
 api_key_env = "GEMINI_API_KEY"
 # Max conversation turns per session (prevents infinite loops)

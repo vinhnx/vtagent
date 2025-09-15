@@ -47,7 +47,7 @@ fn test_provider_creation() {
 #[test]
 fn test_unified_client_creation() {
     // Test creating providers for different models
-    let gemini_client = create_provider_for_model("gemini-2.5-flash-lite", "test_key".to_string());
+    let gemini_client = create_provider_for_model("gemini-2.5-flash-lite-preview-06-17", "test_key".to_string());
     assert!(gemini_client.is_ok());
 
     let openai_client = create_provider_for_model("gpt-5", "test_key".to_string());
@@ -79,6 +79,7 @@ fn test_provider_supported_models() {
     assert!(gemini_models.contains(&"gemini-2.5-flash".to_string()));
     assert!(gemini_models.contains(&"gemini-2.5-flash-lite".to_string()));
     assert!(gemini_models.contains(&"gemini-2.5-pro".to_string()));
+    assert!(gemini_models.contains(&"gemini-2.5-flash-lite-preview-06-17".to_string()));
 
     let openai = OpenAIProvider::new("test_key".to_string());
     let openai_models = openai.supported_models();

@@ -6,7 +6,7 @@
 //! - Manage snapshot lifecycle and cleanup
 //! - Support compression and encryption
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -388,7 +388,7 @@ impl SnapshotManager {
             .compaction_engine()
             .get_statistics()
             .await
-            .unwrap_or_else(|_| crate::core::agent::stats::CompactionStatistics {
+            .unwrap_or_else(|_| crate::core::agent::types::CompactionStatistics {
                 total_messages: 0,
                 messages_by_priority: std::collections::HashMap::new(),
                 total_memory_usage: 0,

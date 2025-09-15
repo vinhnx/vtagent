@@ -158,6 +158,7 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
     renderer.line(MessageStyle::Output, "")?;
 
     let mut client = GeminiClient::new(config.api_key.clone(), config.model.clone());
+    let status_client = create_provider_for_model(&config.model, config.api_key.clone()).ok();
     let traj = ConfigManager::load_from_workspace(&config.workspace)
         .ok()
         .map(|m| m.config().telemetry.trajectory_enabled)
@@ -363,6 +364,15 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
             for call in function_calls {
                 let name = call.name.as_str();
                 let args = call.args.clone();
+                if let Some(sc) = status_client.as_ref() {
+                    let pre_prompt =
+                        format!("Briefly note running the '{name}' tool and why it helps.");
+                    if let Some(msg) =
+                        llm_tool_status(sc.as_ref(), &config.model, &pre_prompt).await
+                    {
+                        renderer.line(MessageStyle::Info, &msg)?;
+                    }
+                }
                 renderer.line(MessageStyle::Info, &format!("[TOOL] {} {}", name, args))?;
                 let decision_id = ledger.record_decision(
                     format!("Execute tool '{}' to progress task", name),
@@ -375,6 +385,16 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
                 );
                 match tool_registry.execute_tool(name, args).await {
                     Ok(tool_output) => {
+                        if let Some(sc) = status_client.as_ref() {
+                            let post_prompt = format!(
+                                "In one short sentence, confirm '{name}' ran and summarize the result."
+                            );
+                            if let Some(msg) =
+                                llm_tool_status(sc.as_ref(), &config.model, &post_prompt).await
+                            {
+                                renderer.line(MessageStyle::Info, &msg)?;
+                            }
+                        }
                         render_tool_output(&tool_output);
                         if matches!(
                             name,
@@ -398,7 +418,16 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
                         );
                     }
                     Err(e) => {
-                        renderer.line(MessageStyle::Error, &format!("Tool error: {e}"))?;
+                        if let Some(sc) = status_client.as_ref() {
+                            let err_prompt = format!(
+                                "In one short sentence, note '{name}' failed with {e} and next step."
+                            );
+                            if let Some(msg) =
+                                llm_tool_status(sc.as_ref(), &config.model, &err_prompt).await
+                            {
+                                renderer.line(MessageStyle::Error, &msg)?;
+                            }
+                        }
                         let err = serde_json::json!({ "error": e.to_string() });
                         let fr = FunctionResponse {
                             name: call.name.clone(),

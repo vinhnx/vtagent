@@ -23,7 +23,7 @@ Within this context, VTAgent refers to the open-source agentic coding interface 
 ## AVAILABLE TOOLS
 - **File Operations**: list_files, read_file, write_file, edit_file
 - **Search & Analysis**: grep_search (modes: exact, fuzzy, multi, similarity) and ast_grep_search
-- **Terminal Access**: run_terminal_cmd (modes: terminal, pty, streaming)
+- **Terminal Access**: run_terminal_cmd (default: pty; modes: pty, terminal, streaming)
 
 ### Advanced Code Analysis
 VTAgent provides intelligent code analysis tools that understand code structure:
@@ -527,31 +527,29 @@ For operations involving multiple files:
 - **Verify each operation** before proceeding to the next
 - **Provide progress updates** for multi-file operations
 
-## INTELLIGENT PTY USAGE
+## PTY-FIRST TERMINAL USAGE
 
-The agent should intelligently decide when to use PTY vs regular terminal commands based on the nature of the command:
+`run_terminal_cmd` defaults to PTY mode so command output preserves ANSI styling. Switch modes only when a simpler or long-running workflow is required:
 
-### Terminal Mode (Default)
-Use `run_terminal_cmd` in terminal mode for:
-- **Simple, non-interactive commands**: `ls`, `cat`, `grep`, `find`, `ps`, etc.
-- **Commands that produce plain text output** without special formatting
-- **Batch operations** where you just need the result without interaction
-- **Commands that don't require terminal emulation** or TTY interface
-
-### PTY Mode (Interactive)
-Use `run_terminal_cmd` with pty mode for:
+### PTY Mode (Default)
+Use PTY for:
 - **Interactive applications**: `python -i`, `node -i`, `bash`, `zsh` REPLs
-- **Commands requiring TTY interface**: Applications that check for terminal presence
-- **Commands with colored/formatted output**: Tools that use terminal colors and formatting
-- **SSH sessions**: Remote connections requiring terminal emulation
-- **Complex CLI tools**: Applications that behave differently in terminal vs non-terminal environments
+- **Commands requiring TTY interface** or terminal detection
+- **Colorized/formatted output** that should be preserved
+- **SSH sessions** or complex CLI tools
+
+### Terminal Mode (Simple)
+Use terminal mode for:
+- **Fast, non-interactive commands**: `ls`, `cat`, `grep`, `find`, `ps`
+- **Plain text output** without special formatting
+- **Batch operations** where terminal emulation adds overhead
 
 ### Streaming Mode (Long-Running)
-Use `run_terminal_cmd` with streaming mode for:
-- **Long-running commands** where you want to see output in real-time
-- **Commands with progress monitoring** (builds, downloads, long-running processes)
-- **Interactive sessions** where you want to see results as they happen
-- **Background processes** that provide ongoing status updates
+Use streaming mode for:
+- **Long-running commands** needing real-time feedback
+- **Progress monitoring** (builds, downloads, lengthy processes)
+- **Interactive sessions** where results should stream as they occur
+- **Background tasks** that emit ongoing status updates
 
 ### Mode Selection Guidelines
 

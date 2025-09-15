@@ -38,8 +38,8 @@ This document summarizes the updated tool schemas and guidance following Anthrop
 
 - run_terminal_cmd
   - Purpose: Execute a program with arguments.
-  - Key args: `command` (string[]), `working_dir` (string), `timeout_secs` (int), `mode` (string: terminal|pty|streaming), `response_format`.
-  - Policy defaults restrict `mode` to `terminal` unless configured otherwise.
+  - Key args: `command` (string[]), `working_dir` (string), `timeout_secs` (int), `mode` (string: pty|terminal|streaming), `response_format`.
+  - Default mode is `pty` so output retains ANSI styling.
 
 - ast_grep_search
   - Purpose: AST-grep based structural search/transform.
@@ -57,7 +57,7 @@ The workspace `.vtagent/tool-policy.json` may include constraints like:
 ```json
 {
   "constraints": {
-    "run_terminal_cmd": { "allowed_modes": ["terminal"], "default_response_format": "concise" },
+    "run_terminal_cmd": { "allowed_modes": ["pty", "terminal", "streaming"], "default_response_format": "concise" },
     "list_files": { "max_items_per_call": 500, "default_response_format": "concise" },
     "grep_search": { "max_results_per_call": 200, "default_response_format": "concise" },
     "read_file": { "max_bytes_per_read": 200000 }

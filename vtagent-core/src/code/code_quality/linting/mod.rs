@@ -3,6 +3,7 @@ pub mod eslint;
 pub mod pylint;
 
 use crate::code::code_quality::config::{LintConfig, LintSeverity};
+use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 // use anyhow::Result;
@@ -127,21 +128,140 @@ impl LintingOrchestrator {
         }
     }
 
-    fn parse_clippy_output(&self, _output: &str, _base_path: &Path) -> Vec<LintFinding> {
-        // In a real implementation, this would parse clippy's JSON output
-        // For now, return empty vector
-        Vec::new()
+    fn parse_clippy_output(&self, output: &str, base_path: &Path) -> Vec<LintFinding> {
+        let mut findings = Vec::new();
+        for line in output.lines() {
+            if let Ok(json) = serde_json::from_str::<Value>(line) {
+                if json.get("reason").and_then(Value::as_str) == Some("compiler-message") {
+                    if let Some(message) = json.get("message") {
+                        if let Some(spans) = message.get("spans").and_then(Value::as_array) {
+                            for span in spans {
+                                if span.get("is_primary").and_then(Value::as_bool) == Some(true) {
+                                    let file =
+                                        span.get("file_name").and_then(Value::as_str).unwrap_or("");
+                                    let line_num =
+                                        span.get("line_start").and_then(Value::as_u64).unwrap_or(0);
+                                    let column = span
+                                        .get("column_start")
+                                        .and_then(Value::as_u64)
+                                        .unwrap_or(0);
+                                    let rule = message
+                                        .get("code")
+                                        .and_then(|c| c.get("code"))
+                                        .and_then(Value::as_str)
+                                        .unwrap_or("")
+                                        .to_string();
+                                    let severity = match message
+                                        .get("level")
+                                        .and_then(Value::as_str)
+                                        .unwrap_or("")
+                                    {
+                                        "error" => LintSeverity::Error,
+                                        "warning" => LintSeverity::Warning,
+                                        _ => LintSeverity::Info,
+                                    };
+                                    let msg = message
+                                        .get("message")
+                                        .and_then(Value::as_str)
+                                        .unwrap_or("")
+                                        .to_string();
+                                    findings.push(LintFinding {
+                                        file_path: base_path.join(file),
+                                        line: line_num as usize,
+                                        column: column as usize,
+                                        severity,
+                                        rule,
+                                        message: msg,
+                                        suggestion: None,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        findings
     }
 
-    fn parse_eslint_output(&self, _output: &str, _base_path: &Path) -> Vec<LintFinding> {
-        // In a real implementation, this would parse ESLint's JSON output
-        // For now, return empty vector
-        Vec::new()
+    fn parse_eslint_output(&self, output: &str, base_path: &Path) -> Vec<LintFinding> {
+        let mut findings = Vec::new();
+        if let Ok(json) = serde_json::from_str::<Value>(output) {
+            if let Some(arr) = json.as_array() {
+                for file in arr {
+                    let path = file.get("filePath").and_then(Value::as_str).unwrap_or("");
+                    if let Some(messages) = file.get("messages").and_then(Value::as_array) {
+                        for m in messages {
+                            let line = m.get("line").and_then(Value::as_u64).unwrap_or(0);
+                            let column = m.get("column").and_then(Value::as_u64).unwrap_or(0);
+                            let rule = m
+                                .get("ruleId")
+                                .and_then(Value::as_str)
+                                .unwrap_or("")
+                                .to_string();
+                            let severity =
+                                match m.get("severity").and_then(Value::as_u64).unwrap_or(0) {
+                                    2 => LintSeverity::Error,
+                                    1 => LintSeverity::Warning,
+                                    _ => LintSeverity::Info,
+                                };
+                            let msg = m
+                                .get("message")
+                                .and_then(Value::as_str)
+                                .unwrap_or("")
+                                .to_string();
+                            findings.push(LintFinding {
+                                file_path: base_path.join(path),
+                                line: line as usize,
+                                column: column as usize,
+                                severity,
+                                rule,
+                                message: msg,
+                                suggestion: m.get("fix").map(|_| "fix available".to_string()),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        findings
     }
 
-    fn parse_pylint_output(&self, _output: &str, _base_path: &Path) -> Vec<LintFinding> {
-        // In a real implementation, this would parse pylint's JSON output
-        // For now, return empty vector
-        Vec::new()
+    fn parse_pylint_output(&self, output: &str, base_path: &Path) -> Vec<LintFinding> {
+        let mut findings = Vec::new();
+        if let Ok(json) = serde_json::from_str::<Value>(output) {
+            if let Some(arr) = json.as_array() {
+                for item in arr {
+                    let path = item.get("path").and_then(Value::as_str).unwrap_or("");
+                    let line = item.get("line").and_then(Value::as_u64).unwrap_or(0);
+                    let column = item.get("column").and_then(Value::as_u64).unwrap_or(0);
+                    let rule = item
+                        .get("symbol")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string();
+                    let msg = item
+                        .get("message")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string();
+                    let severity = match item.get("type").and_then(Value::as_str).unwrap_or("") {
+                        "error" | "fatal" => LintSeverity::Error,
+                        "warning" => LintSeverity::Warning,
+                        _ => LintSeverity::Info,
+                    };
+                    findings.push(LintFinding {
+                        file_path: base_path.join(path),
+                        line: line as usize,
+                        column: column as usize,
+                        severity,
+                        rule,
+                        message: msg,
+                        suggestion: None,
+                    });
+                }
+            }
+        }
+        findings
     }
 }

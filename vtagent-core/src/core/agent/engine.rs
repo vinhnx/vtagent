@@ -2,11 +2,15 @@
 
 use crate::core::agent::config::CompactionConfig;
 use crate::core::agent::semantic::SemanticAnalyzer;
-use crate::core::agent::types::{CompactedMessage, EnhancedMessage, MessageType};
+use crate::core::agent::types::{
+    CompactedMessage, CompactionResult, CompactionStatistics, CompactionSuggestion,
+    EnhancedMessage, MessagePriority, MessageType, Urgency,
+};
 use crate::gemini::Content;
 use anyhow::Result;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
 
 /// Main compaction engine
@@ -16,6 +20,9 @@ pub struct CompactionEngine {
     message_history: Arc<RwLock<VecDeque<CompactedMessage>>>,
     enhanced_messages: Arc<RwLock<Vec<EnhancedMessage>>>,
     semantic_analyzer: SemanticAnalyzer,
+    last_compaction: Arc<RwLock<u64>>,
+    compaction_count: Arc<RwLock<u64>>,
+    start_time: Instant,
 }
 
 impl CompactionEngine {
@@ -26,6 +33,9 @@ impl CompactionEngine {
             message_history: Arc::new(RwLock::new(VecDeque::new())),
             enhanced_messages: Arc::new(RwLock::new(Vec::new())),
             semantic_analyzer: SemanticAnalyzer::new(),
+            last_compaction: Arc::new(RwLock::new(0)),
+            compaction_count: Arc::new(RwLock::new(0)),
+            start_time: Instant::now(),
         }
     }
 
@@ -36,6 +46,9 @@ impl CompactionEngine {
             message_history: Arc::new(RwLock::new(VecDeque::new())),
             enhanced_messages: Arc::new(RwLock::new(Vec::new())),
             semantic_analyzer: SemanticAnalyzer::new(),
+            last_compaction: Arc::new(RwLock::new(0)),
+            compaction_count: Arc::new(RwLock::new(0)),
+            start_time: Instant::now(),
         }
     }
 
@@ -128,65 +141,134 @@ impl CompactionEngine {
     }
 
     /// Get compaction suggestions
-    pub async fn get_compaction_suggestions(
-        &self,
-    ) -> Result<Vec<crate::core::agent::compaction::CompactionSuggestion>> {
-        // In a real implementation, this would analyze the conversation history
-        // and suggest which messages could be compacted based on various factors:
-        // - Age of the message
-        // - Importance/relevance to current context
-        // - Size of the message
-        // - Semantic similarity to other messages
+    pub async fn get_compaction_suggestions(&self) -> Result<Vec<CompactionSuggestion>> {
+        let config = self.config.read().await.clone();
+        let history = self.message_history.read().await;
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let mut suggestions = Vec::new();
 
-        // For now, we'll return an empty vector as this is a complex feature
-        // that would require sophisticated analysis
-        Ok(Vec::new())
+        for msg in history.iter() {
+            let too_old = now.saturating_sub(msg.timestamp) > config.max_message_age_seconds;
+            let over_limit = history.len() > config.max_uncompressed_messages;
+            if too_old || over_limit {
+                let urgency = if over_limit {
+                    Urgency::High
+                } else {
+                    Urgency::Medium
+                };
+                suggestions.push(CompactionSuggestion {
+                    action: "compact_message".to_string(),
+                    urgency,
+                    estimated_savings: msg.original_size,
+                    reasoning: "message exceeds configured thresholds".to_string(),
+                });
+            }
+        }
+
+        Ok(suggestions)
     }
 
     /// Get statistics
-    pub async fn get_statistics(
-        &self,
-    ) -> Result<crate::core::agent::compaction::CompactionStatistics> {
-        // In a real implementation, this would collect and return actual statistics
-        // about the compaction engine's performance and the state of messages
+    pub async fn get_statistics(&self) -> Result<CompactionStatistics> {
+        let history = self.message_history.read().await;
+        let enhanced = self.enhanced_messages.read().await;
+        let total_messages = history.len();
+        let total_memory_usage: usize = history.iter().map(|m| m.original_size).sum();
+        let average_message_size = if total_messages > 0 {
+            total_memory_usage / total_messages
+        } else {
+            0
+        };
+        let mut messages_by_priority: HashMap<MessagePriority, usize> = HashMap::new();
+        for msg in enhanced.iter() {
+            *messages_by_priority
+                .entry(msg.priority.clone())
+                .or_insert(0) += 1;
+        }
+        let last_compaction_timestamp = *self.last_compaction.read().await;
+        let elapsed_hours = self.start_time.elapsed().as_secs() as f64 / 3600.0;
+        let count = *self.compaction_count.read().await as f64;
+        let compaction_frequency = if elapsed_hours > 0.0 {
+            count / elapsed_hours
+        } else {
+            0.0
+        };
 
-        Ok(crate::core::agent::compaction::CompactionStatistics {
-            total_messages: 0,
-            messages_by_priority: std::collections::HashMap::new(),
-            total_memory_usage: 0,
-            average_message_size: 0,
-            last_compaction_timestamp: 0,
-            compaction_frequency: 0.0,
+        Ok(CompactionStatistics {
+            total_messages,
+            messages_by_priority,
+            total_memory_usage,
+            average_message_size,
+            last_compaction_timestamp,
+            compaction_frequency,
         })
     }
 
     /// Check if should compact
     pub async fn should_compact(&self) -> Result<bool> {
-        // In a real implementation, this would check various conditions to determine
-        // if compaction is needed:
-        // - Total message count
-        // - Memory usage
-        // - Time since last compaction
-        // - Context window limits
+        let config = self.config.read().await.clone();
+        let history = self.message_history.read().await;
+        let total_memory: usize = history.iter().map(|m| m.original_size).sum();
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let last = *self.last_compaction.read().await;
 
-        // For now, we'll return false as this is a minimal implementation
+        if history.len() > config.max_uncompressed_messages {
+            return Ok(true);
+        }
+        if total_memory > config.max_memory_mb * 1_000_000 {
+            return Ok(true);
+        }
+        if config.auto_compaction_enabled
+            && now.saturating_sub(last) > config.compaction_interval_seconds
+        {
+            return Ok(true);
+        }
         Ok(false)
     }
 
     /// Compact messages intelligently
-    pub async fn compact_messages_intelligently(
-        &self,
-    ) -> Result<crate::core::agent::compaction::CompactionResult> {
-        // In a real implementation, this would perform intelligent compaction
-        // by analyzing message importance, semantic content, and context relevance
+    pub async fn compact_messages_intelligently(&self) -> Result<CompactionResult> {
+        let start = Instant::now();
+        let config = self.config.read().await.clone();
+        let mut history = self.message_history.write().await;
+        let mut enhanced = self.enhanced_messages.write().await;
+        let mut messages_compacted = 0usize;
+        let mut original_size = 0usize;
 
-        Ok(crate::core::agent::compaction::CompactionResult {
-            messages_processed: 0,
-            messages_compacted: 0,
-            original_size: 0,
+        while history.len() > config.max_uncompressed_messages {
+            if let Some(msg) = history.pop_front() {
+                original_size += msg.original_size;
+                messages_compacted += 1;
+                if !enhanced.is_empty() {
+                    enhanced.remove(0);
+                }
+            }
+        }
+
+        let processing_time_ms = start.elapsed().as_millis() as u64;
+        if messages_compacted > 0 {
+            let mut last = self.last_compaction.write().await;
+            *last = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            let mut count = self.compaction_count.write().await;
+            *count += 1;
+        }
+
+        Ok(CompactionResult {
+            messages_processed: messages_compacted,
+            messages_compacted,
+            original_size,
             compacted_size: 0,
-            compression_ratio: 1.0,
-            processing_time_ms: 0,
+            compression_ratio: if original_size > 0 { 0.0 } else { 1.0 },
+            processing_time_ms,
         })
     }
 
@@ -194,18 +276,51 @@ impl CompactionEngine {
     pub async fn compact_context(
         &self,
         _context_key: &str,
-        _context_data: &mut std::collections::HashMap<String, serde_json::Value>,
-    ) -> Result<crate::core::agent::compaction::CompactionResult> {
-        // In a real implementation, this would compact the context data
-        // by removing redundant information and summarizing where appropriate
+        context_data: &mut std::collections::HashMap<String, serde_json::Value>,
+    ) -> Result<CompactionResult> {
+        let start = Instant::now();
+        let config = self.config.read().await.clone();
 
-        Ok(crate::core::agent::compaction::CompactionResult {
-            messages_processed: 0,
-            messages_compacted: 0,
-            original_size: 0,
-            compacted_size: 0,
-            compression_ratio: 1.0,
-            processing_time_ms: 0,
+        let original_size: usize = context_data
+            .values()
+            .filter_map(|v| v.as_str().map(|s| s.len()))
+            .sum();
+        let initial_len = context_data.len();
+
+        context_data.retain(|_, v| {
+            v.get("confidence")
+                .and_then(|c| c.as_f64())
+                .map(|c| c >= config.min_context_confidence)
+                .unwrap_or(true)
+        });
+
+        let compacted_size: usize = context_data
+            .values()
+            .filter_map(|v| v.as_str().map(|s| s.len()))
+            .sum();
+        let messages_compacted = initial_len - context_data.len();
+
+        if messages_compacted > 0 {
+            let mut last = self.last_compaction.write().await;
+            *last = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            let mut count = self.compaction_count.write().await;
+            *count += 1;
+        }
+
+        Ok(CompactionResult {
+            messages_processed: initial_len,
+            messages_compacted,
+            original_size,
+            compacted_size,
+            compression_ratio: if original_size > 0 {
+                compacted_size as f64 / original_size as f64
+            } else {
+                1.0
+            },
+            processing_time_ms: start.elapsed().as_millis() as u64,
         })
     }
 }

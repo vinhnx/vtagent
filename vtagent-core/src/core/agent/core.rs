@@ -6,10 +6,10 @@ use crate::core::agent::compaction::CompactionEngine;
 use crate::core::conversation_summarizer::ConversationSummarizer;
 use crate::core::decision_tracker::DecisionTracker;
 use crate::core::error_recovery::{ErrorRecoveryManager, ErrorType};
-use crate::llm::{AnyClient, make_client};
+use crate::llm::{make_client, AnyClient};
 use crate::tools::tree_sitter::{CodeAnalysis, TreeSitterAnalyzer};
-use crate::tools::{ToolRegistry, build_function_declarations};
-use anyhow::{Result, anyhow};
+use crate::tools::{build_function_declarations, ToolRegistry};
+use anyhow::{anyhow, Result};
 use console::style;
 use std::sync::Arc;
 
@@ -211,41 +211,34 @@ impl Agent {
     pub async fn make_intelligent_compaction_decision(
         &self,
     ) -> Result<crate::core::agent::intelligence::CompactionDecision> {
-        // In a real implementation, this would analyze the current context
-        // and make an intelligent decision about whether to compact
-        // based on factors like:
-        // - Context window size
-        // - Message importance
-        // - Semantic relevance
-        // - Memory constraints
+        let stats = self.compaction_engine.get_statistics().await?;
+        let should_compact = self.compaction_engine.should_compact().await?;
+        let strategy = if should_compact {
+            crate::core::agent::intelligence::CompactionStrategy::Aggressive
+        } else {
+            crate::core::agent::intelligence::CompactionStrategy::Conservative
+        };
+        let reasoning = if should_compact {
+            format!("{} messages exceed thresholds", stats.total_messages)
+        } else {
+            "within configured thresholds".to_string()
+        };
 
         Ok(crate::core::agent::intelligence::CompactionDecision {
-            should_compact: false,
-            strategy: crate::core::agent::intelligence::CompactionStrategy::Conservative,
-            reasoning: "Analysis complete - no compaction needed at this time".to_string(),
-            estimated_benefit: 0,
+            should_compact,
+            strategy,
+            reasoning,
+            estimated_benefit: stats.total_memory_usage,
         })
     }
 
     /// Check if compaction is needed
     pub async fn should_compact(&self) -> Result<bool> {
-        // In a real implementation, this would check various conditions:
-        // - Current context size
-        // - Number of messages
-        // - Memory usage
-        // - Time since last compaction
-
-        // Use the compaction engine to make this decision
         self.compaction_engine.should_compact().await
     }
 
     /// Perform intelligent message compaction
-    pub async fn compact_messages(
-        &self,
-    ) -> Result<crate::core::agent::compaction::CompactionResult> {
-        // In a real implementation, this would perform intelligent compaction
-        // by analyzing message importance and context relevance
-
+    pub async fn compact_messages(&self) -> Result<crate::core::agent::types::CompactionResult> {
         self.compaction_engine
             .compact_messages_intelligently()
             .await
@@ -256,10 +249,7 @@ impl Agent {
         &self,
         context_key: &str,
         context_data: &mut std::collections::HashMap<String, serde_json::Value>,
-    ) -> Result<crate::core::agent::compaction::CompactionResult> {
-        // In a real implementation, this would compact the context data
-        // by removing redundant information and summarizing where appropriate
-
+    ) -> Result<crate::core::agent::types::CompactionResult> {
         self.compaction_engine
             .compact_context(context_key, context_data)
             .await
@@ -268,10 +258,7 @@ impl Agent {
     /// Get compaction statistics
     pub async fn get_compaction_stats(
         &self,
-    ) -> Result<crate::core::agent::compaction::CompactionStatistics> {
-        // In a real implementation, this would return actual statistics
-        // about the compaction engine's performance
-
+    ) -> Result<crate::core::agent::types::CompactionStatistics> {
         self.compaction_engine.get_statistics().await
     }
 

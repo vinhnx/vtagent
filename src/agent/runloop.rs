@@ -40,6 +40,27 @@ fn render_tool_output(val: &serde_json::Value) {
     }
 }
 
+async fn llm_tool_status(
+    client: &dyn uni::LLMProvider,
+    model: &str,
+    prompt: &str,
+) -> Option<String> {
+    let req = uni::LLMRequest {
+        messages: vec![uni::Message::user(prompt.to_string())],
+        system_prompt: None,
+        tools: None,
+        model: model.to_string(),
+        max_tokens: Some(60),
+        temperature: Some(0.3),
+        stream: false,
+        tool_choice: Some(uni::ToolChoice::none()),
+        parallel_tool_calls: None,
+        parallel_tool_config: None,
+        reasoning_effort: None,
+    };
+    client.generate(req).await.ok().and_then(|r| r.content)
+}
+
 async fn refine_user_prompt_if_enabled(
     raw: &str,
     cfg: &CoreAgentConfig,
@@ -715,16 +736,28 @@ async fn run_single_agent_loop_unified(
                             },
                             None,
                         );
-                        renderer.line(
-                            MessageStyle::Info,
-                            &format!("Running '{}' to progress task", name),
-                        )?;
+                        let pre_prompt =
+                            format!("Briefly note running the '{name}' tool and why it helps.");
+                        if let Some(msg) =
+                            llm_tool_status(provider_client.as_ref(), &config.model, &pre_prompt)
+                                .await
+                        {
+                            renderer.line(MessageStyle::Info, &msg)?;
+                        }
                         match tool_registry.execute_tool(name, args_val.clone()).await {
                             Ok(tool_output) => {
-                                renderer.line(
-                                    MessageStyle::Info,
-                                    &format!("Tool '{}' completed successfully", name),
-                                )?;
+                                let post_prompt = format!(
+                                    "In one short sentence, confirm '{name}' ran and summarize the result."
+                                );
+                                if let Some(msg) = llm_tool_status(
+                                    provider_client.as_ref(),
+                                    &config.model,
+                                    &post_prompt,
+                                )
+                                .await
+                                {
+                                    renderer.line(MessageStyle::Info, &msg)?;
+                                }
                                 traj.log_tool_call(working_history.len(), name, &args_val, true);
                                 render_tool_output(&tool_output);
                                 if matches!(
@@ -747,10 +780,18 @@ async fn run_single_agent_loop_unified(
                                 );
                             }
                             Err(e) => {
-                                renderer.line(
-                                    MessageStyle::Error,
-                                    &format!("Tool '{}' failed: {e}", name),
-                                )?;
+                                let err_prompt = format!(
+                                    "In one short sentence, note '{name}' failed with {e} and next step."
+                                );
+                                if let Some(msg) = llm_tool_status(
+                                    provider_client.as_ref(),
+                                    &config.model,
+                                    &err_prompt,
+                                )
+                                .await
+                                {
+                                    renderer.line(MessageStyle::Error, &msg)?;
+                                }
                                 traj.log_tool_call(working_history.len(), name, &args_val, false);
                                 let err = serde_json::json!({ "error": e.to_string() });
                                 let content = err.to_string();

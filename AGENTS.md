@@ -218,6 +218,7 @@ if is_valid && is_allowed && is_secure {
 - After execution, summarize the outcome in one sentence, noting errors if any
 - On errors, explain the issue and next step in one sentence
 - Keep messages concise and free of jargon
+- Status messages must come from the LLM for context awareness
 
 ## Tree-sitter Integration
 

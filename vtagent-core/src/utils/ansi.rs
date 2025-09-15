@@ -74,6 +74,24 @@ impl AnsiRenderer {
         self.push(text);
         self.flush(style)
     }
+
+    /// Write a line with an explicit style
+    pub fn line_with_style(&mut self, style: Style, text: &str) -> Result<()> {
+        if self.color {
+            writeln!(self.writer, "{style}{}{Reset}", text)?;
+        } else {
+            writeln!(self.writer, "{}", text)?;
+        }
+        self.writer.flush()?;
+        Ok(())
+    }
+
+    /// Write a raw line without styling
+    pub fn raw_line(&mut self, text: &str) -> Result<()> {
+        writeln!(self.writer, "{}", text)?;
+        self.writer.flush()?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

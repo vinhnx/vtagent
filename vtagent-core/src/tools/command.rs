@@ -60,7 +60,8 @@ impl CommandTool {
             "exit_code": output.status.code(),
             "stdout": stdout,
             "stderr": stderr,
-            "mode": "terminal"
+            "mode": "terminal",
+            "command": input.command.join(" ")
         }))
     }
 

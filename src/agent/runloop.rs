@@ -1,5 +1,9 @@
+use anstyle::{Reset, Style as AnsiStyle};
 use anyhow::{Context, Result};
+use std::collections::HashMap;
+use std::fs;
 use std::io::{self, Write};
+use std::os::unix::fs::PermissionsExt;
 use vtagent_core::config::loader::{ConfigManager, VTAgentConfig};
 use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
 use vtagent_core::utils::ansi::{AnsiRenderer, MessageStyle};
@@ -26,10 +30,17 @@ fn read_prompt_refiner_prompt() -> Option<String> {
 
 fn render_tool_output(val: &serde_json::Value) {
     let mut renderer = AnsiRenderer::stdout();
+    let command = val.get("command").and_then(|v| v.as_str()).unwrap_or("");
     if let Some(stdout) = val.get("stdout").and_then(|v| v.as_str()) {
         if !stdout.trim().is_empty() {
             let _ = renderer.line(MessageStyle::Info, "[stdout]");
-            let _ = renderer.line(MessageStyle::Output, stdout);
+            if command.starts_with("ls") {
+                let _ = render_ls(stdout, &mut renderer);
+            } else if command.starts_with("git") {
+                let _ = render_git(stdout, &mut renderer);
+            } else {
+                let _ = renderer.line(MessageStyle::Output, stdout);
+            }
         }
     }
     if let Some(stderr) = val.get("stderr").and_then(|v| v.as_str()) {
@@ -38,6 +49,70 @@ fn render_tool_output(val: &serde_json::Value) {
             let _ = renderer.line(MessageStyle::Error, stderr);
         }
     }
+}
+
+fn parse_ls_colors() -> HashMap<String, AnsiStyle> {
+    let mut map = HashMap::new();
+    if let Ok(colors) = std::env::var("LS_COLORS") {
+        for entry in colors.split(':') {
+            if let Some((key, val)) = entry.split_once('=') {
+                if let Some(style) = anstyle_ls::parse(val) {
+                    map.insert(key.to_string(), style);
+                }
+            }
+        }
+    }
+    map
+}
+
+fn render_ls(stdout: &str, renderer: &mut AnsiRenderer) -> Result<()> {
+    let styles = parse_ls_colors();
+    for line in stdout.lines() {
+        let mut buf = String::new();
+        for token in line.split_whitespace() {
+            let style = fs::symlink_metadata(token).ok().and_then(|md| {
+                if md.file_type().is_dir() {
+                    styles.get("di").copied()
+                } else if md.file_type().is_symlink() {
+                    styles.get("ln").copied()
+                } else if md.permissions().mode() & 0o111 != 0 {
+                    styles.get("ex").copied()
+                } else {
+                    styles.get("fi").copied()
+                }
+            });
+            if let Some(st) = style {
+                buf.push_str(&format!("{st}{token}{Reset} "));
+            } else {
+                buf.push_str(token);
+                buf.push(' ');
+            }
+        }
+        renderer.raw_line(buf.trim_end())?;
+    }
+    Ok(())
+}
+
+fn render_git(stdout: &str, renderer: &mut AnsiRenderer) -> Result<()> {
+    let add_color = std::env::var("GIT_ADD_COLOR").unwrap_or_else(|_| "green".to_string());
+    let mod_color = std::env::var("GIT_MODIFY_COLOR").unwrap_or_else(|_| "yellow".to_string());
+    let del_color = std::env::var("GIT_DELETE_COLOR").unwrap_or_else(|_| "red".to_string());
+    let add_style = anstyle_git::parse(&add_color).unwrap_or_default();
+    let mod_style = anstyle_git::parse(&mod_color).unwrap_or_default();
+    let del_style = anstyle_git::parse(&del_color).unwrap_or_default();
+    for line in stdout.lines() {
+        let style = if line.starts_with('A') || line.starts_with("??") {
+            add_style
+        } else if line.starts_with('M') || line.starts_with(" M") {
+            mod_style
+        } else if line.starts_with('D') || line.starts_with(" D") {
+            del_style
+        } else {
+            AnsiStyle::new()
+        };
+        renderer.line_with_style(style, line)?;
+    }
+    Ok(())
 }
 
 async fn refine_user_prompt_if_enabled(

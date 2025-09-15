@@ -30,7 +30,7 @@ fn test_provider_auto_detection() {
         Some("anthropic".to_string())
     );
     assert_eq!(
-        factory.provider_from_model("gemini-2.5-flash-lite"),
+        factory.provider_from_model("gemini-2.5-flash-lite-preview-06-17"),
         Some("gemini".to_string())
     );
     assert_eq!(factory.provider_from_model("unknown-model"), None);
@@ -39,7 +39,7 @@ fn test_provider_auto_detection() {
 #[test]
 fn test_unified_client_creation() {
     // Test creating providers directly using the factory
-    let gemini = create_provider_for_model("gemini-2.5-flash-lite", "test_key".to_string());
+    let gemini = create_provider_for_model("gemini-2.5-flash-lite-preview-06-17", "test_key".to_string());
     assert!(gemini.is_ok());
 
     let openai = create_provider_for_model("gpt-5", "test_key".to_string());

@@ -13,6 +13,18 @@ pub enum TaskClass {
     RetrievalHeavy,
 }
 
+impl std::fmt::Display for TaskClass {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TaskClass::Simple => write!(f, "simple"),
+            TaskClass::Standard => write!(f, "standard"),
+            TaskClass::Complex => write!(f, "complex"),
+            TaskClass::CodegenHeavy => write!(f, "codegen_heavy"),
+            TaskClass::RetrievalHeavy => write!(f, "retrieval_heavy"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RouteDecision {
     pub class: TaskClass,
@@ -171,5 +183,19 @@ fn non_empty_or<'a>(value: &'a str, fallback: &'a str) -> &'a str {
         fallback
     } else {
         value
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_task_class_display() {
+        assert_eq!(format!("{}", TaskClass::Simple), "simple");
+        assert_eq!(format!("{}", TaskClass::Standard), "standard");
+        assert_eq!(format!("{}", TaskClass::Complex), "complex");
+        assert_eq!(format!("{}", TaskClass::CodegenHeavy), "codegen_heavy");
+        assert_eq!(format!("{}", TaskClass::RetrievalHeavy), "retrieval_heavy");
     }
 }

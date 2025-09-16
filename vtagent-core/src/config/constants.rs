@@ -138,6 +138,7 @@ pub mod tools {
     pub const SIMPLE_SEARCH: &str = "simple_search";
     pub const BASH: &str = "bash";
     pub const APPLY_PATCH: &str = "apply_patch";
+    pub const SRGN: &str = "srgn";
 
     // Explorer-specific tools
     pub const FILE_METADATA: &str = "file_metadata";

@@ -9,6 +9,7 @@
     "edit_file",
     "bash",
     "apply_patch",
+    "srgn",
     "ast_grep_search"
   ],
   "policies": {
@@ -20,7 +21,8 @@
     "list_files": "allow",
     "edit_file": "allow",
     "run_terminal_cmd": "allow",
-    "read_file": "allow"
+    "read_file": "allow",
+    "srgn": "prompt"
   },
   "constraints": {
     "list_files": {

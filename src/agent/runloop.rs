@@ -40,6 +40,50 @@ fn render_tool_output(val: &serde_json::Value) {
     }
 }
 
+/// Check if we're in a git repository
+fn is_git_repo() -> bool {
+    std::process::Command::new("git")
+        .args(&["rev-parse", "--git-dir"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+/// Show git diff for modified files and prompt for confirmation
+async fn confirm_changes_with_git_diff(modified_files: &[String]) -> Result<bool> {
+    if !is_git_repo() {
+        println!("Not in a git repository; skipping diff confirmation.");
+        return Ok(true); // Proceed without confirmation
+    }
+
+    for file in modified_files {
+        let output = std::process::Command::new("git")
+            .args(&["diff", file])
+            .output()
+            .with_context(|| format!("Failed to run git diff for {}", file))?;
+
+        let diff = String::from_utf8_lossy(&output.stdout);
+        if !diff.is_empty() {
+            println!("Changes to {}:\n{}", file, diff);
+            print!("Apply these changes? (y/n): ");
+            io::stdout().flush()?;
+            let mut input = String::new();
+            io::stdin().read_line(&mut input)?;
+            if !input.trim().eq_ignore_ascii_case("y") {
+                // Revert changes
+                std::process::Command::new("git")
+                    .args(&["checkout", "--", file])
+                    .status()
+                    .with_context(|| format!("Failed to revert {}", file))?;
+                return Ok(false);
+            }
+        }
+    }
+    Ok(true)
+}
+
 #[derive(Clone, Copy)]
 struct ContextTrimConfig {
     max_tokens: usize,
@@ -922,12 +966,27 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
                 match tool_registry.execute_tool(name, args).await {
                     Ok(tool_output) => {
                         render_tool_output(&tool_output);
+                        // Extract modified files from tool output for git diff confirmation
+                        let modified_files: Vec<String> = if let Some(files) = tool_output.get("modified_files").and_then(|v| v.as_array()) {
+                            files.iter().filter_map(|f| f.as_str().map(|s| s.to_string())).collect()
+                        } else {
+                            vec![] // Fallback: assume no files modified or extract from args
+                        };
+
                         if matches!(
                             name,
-                            "write_file" | "edit_file" | "create_file" | "delete_file"
+                            "write_file" | "edit_file" | "create_file" | "delete_file" | "srgn"
                         ) {
                             any_write_effect = true;
                         }
+
+                        // Confirm changes with git diff if files were modified
+                        if !modified_files.is_empty() && confirm_changes_with_git_diff(&modified_files).await? {
+                            renderer.line(MessageStyle::Info, "Changes applied successfully.")?;
+                        } else if !modified_files.is_empty() {
+                            renderer.line(MessageStyle::Info, "Changes discarded.")?;
+                        }
+
                         let fr = FunctionResponse {
                             name: call.name.clone(),
                             response: tool_output,
@@ -1343,12 +1402,27 @@ async fn run_single_agent_loop_unified(
                         Ok(tool_output) => {
                             traj.log_tool_call(working_history.len(), name, &args_val, true);
                             render_tool_output(&tool_output);
+                            // Extract modified files from tool output for git diff confirmation
+                            let modified_files: Vec<String> = if let Some(files) = tool_output.get("modified_files").and_then(|v| v.as_array()) {
+                                files.iter().filter_map(|f| f.as_str().map(|s| s.to_string())).collect()
+                            } else {
+                                vec![] // Fallback: assume no files modified or extract from args
+                            };
+
                             if matches!(
                                 name,
-                                "write_file" | "edit_file" | "create_file" | "delete_file"
+                                "write_file" | "edit_file" | "create_file" | "delete_file" | "srgn"
                             ) {
                                 any_write_effect = true;
                             }
+
+                            // Confirm changes with git diff if files were modified
+                            if !modified_files.is_empty() && confirm_changes_with_git_diff(&modified_files).await? {
+                                renderer.line(MessageStyle::Info, "Changes applied successfully.")?;
+                            } else if !modified_files.is_empty() {
+                                renderer.line(MessageStyle::Info, "Changes discarded.")?;
+                            }
+
                             // Send tool response back (OpenAI expects tool role with tool_call_id)
                             let content =
                                 serde_json::to_string(&tool_output).unwrap_or("{}".to_string());

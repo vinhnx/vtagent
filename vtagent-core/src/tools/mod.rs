@@ -16,6 +16,7 @@ pub mod grep_search;
 pub mod registry;
 pub mod search;
 pub mod simple_search;
+pub mod srgn;
 pub mod traits;
 pub mod tree_sitter;
 pub mod types;
@@ -29,6 +30,7 @@ pub use registry::ToolRegistry;
 pub use simple_search::SimpleSearchTool;
 pub use traits::{Tool, ToolExecutor};
 pub use types::*;
+pub use srgn::SrgnTool;
 
 // Re-export function declarations for external use
 pub use registry::build_function_declarations;

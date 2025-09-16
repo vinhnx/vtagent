@@ -68,9 +68,8 @@ git_log = "allow"
 git_commit = "prompt"
 git_push = "prompt"
 
-# Network and external tools
-fetch_webpage = "prompt"
-run_vscode_command = "prompt"
+# Code modification tools
+srgn = "prompt"
 
 [commands]
 # Allow-list commands (exact matches, executed without confirmation)

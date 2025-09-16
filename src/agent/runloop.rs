@@ -67,6 +67,114 @@ impl ContextTrimOutcome {
     }
 }
 
+fn prune_gemini_tool_responses(history: &mut Vec<Content>, preserve_recent_turns: usize) -> usize {
+    if history.is_empty() {
+        return 0;
+    }
+
+    let keep_from = history.len().saturating_sub(preserve_recent_turns);
+    if keep_from == 0 {
+        return 0;
+    }
+
+    let mut removed = 0usize;
+    let mut index = 0usize;
+    history.retain(|message| {
+        let contains_tool_response = message
+            .parts
+            .iter()
+            .any(|part| matches!(part, Part::FunctionResponse { .. }));
+        let keep = index >= keep_from || !contains_tool_response;
+        if !keep {
+            removed += 1;
+        }
+        index += 1;
+        keep
+    });
+    removed
+}
+
+fn prune_unified_tool_responses(
+    history: &mut Vec<uni::Message>,
+    preserve_recent_turns: usize,
+) -> usize {
+    if history.is_empty() {
+        return 0;
+    }
+
+    let keep_from = history.len().saturating_sub(preserve_recent_turns);
+    if keep_from == 0 {
+        return 0;
+    }
+
+    let mut removed = 0usize;
+    let mut index = 0usize;
+    history.retain(|message| {
+        let contains_tool_payload = message.is_tool_response() || message.has_tool_calls();
+        let keep = index >= keep_from || !contains_tool_payload;
+        if !keep {
+            removed += 1;
+        }
+        index += 1;
+        keep
+    });
+    removed
+}
+
+fn apply_aggressive_trim_gemini(history: &mut Vec<Content>, config: ContextTrimConfig) -> usize {
+    if history.is_empty() {
+        return 0;
+    }
+
+    let keep_turns = config
+        .preserve_recent_turns
+        .min(context_defaults::AGGRESSIVE_PRESERVE_RECENT_TURNS)
+        .max(context_defaults::MIN_PRESERVE_RECENT_TURNS)
+        .min(history.len());
+
+    let remove = history.len().saturating_sub(keep_turns);
+    if remove == 0 {
+        return 0;
+    }
+
+    history.drain(0..remove);
+    remove
+}
+
+fn apply_aggressive_trim_unified(
+    history: &mut Vec<uni::Message>,
+    config: ContextTrimConfig,
+) -> usize {
+    if history.is_empty() {
+        return 0;
+    }
+
+    let keep_turns = config
+        .preserve_recent_turns
+        .min(context_defaults::AGGRESSIVE_PRESERVE_RECENT_TURNS)
+        .max(context_defaults::MIN_PRESERVE_RECENT_TURNS)
+        .min(history.len());
+
+    let remove = history.len().saturating_sub(keep_turns);
+    if remove == 0 {
+        return 0;
+    }
+
+    history.drain(0..remove);
+    remove
+}
+
+fn is_context_overflow_error(message: &str) -> bool {
+    let lower = message.to_lowercase();
+    lower.contains("context length")
+        || lower.contains("context window")
+        || lower.contains("maximum context")
+        || lower.contains("model is overloaded")
+        || lower.contains("reduce the amount")
+        || lower.contains("token limit")
+        || lower.contains("503")
+}
+
 fn load_context_trim_config(vt_cfg: Option<&VTAgentConfig>) -> ContextTrimConfig {
     let context_cfg = vt_cfg.map(|cfg| &cfg.context);
     let max_tokens = std::env::var("VTAGENT_CONTEXT_TOKEN_LIMIT")
@@ -392,6 +500,19 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
         }
 
         conversation_history.push(Content::user_text(input));
+        let pruned_tools = prune_gemini_tool_responses(
+            &mut conversation_history,
+            trim_config.preserve_recent_turns,
+        );
+        if pruned_tools > 0 {
+            renderer.line(
+                MessageStyle::Info,
+                &format!(
+                    "Dropped {} earlier tool responses to conserve context.",
+                    pruned_tools
+                ),
+            )?;
+        }
         let trim_result = enforce_gemini_context_window(&mut conversation_history, trim_config);
         if trim_result.is_trimmed() {
             renderer.line(
@@ -514,21 +635,56 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
             };
             let sys_inst = SystemInstruction::new(&system_prompt);
 
-            let req = GenerateContentRequest {
-                contents: working_history.clone(),
-                tools: Some(tools.clone()),
-                tool_config: Some(ToolConfig::auto()),
-                system_instruction: Some(sys_inst),
-                generation_config: gen_cfg,
-            };
+            let mut attempt_history = working_history.clone();
+            let mut retry_attempts = 0usize;
+            let response = loop {
+                retry_attempts += 1;
+                let _ = enforce_gemini_context_window(&mut attempt_history, trim_config);
 
-            let response = match client.generate(&req).await {
-                Ok(r) => r,
-                Err(e) => {
-                    renderer.line(MessageStyle::Error, &format!("Provider error: {e}"))?;
-                    break 'outer;
+                let req = GenerateContentRequest {
+                    contents: attempt_history.clone(),
+                    tools: Some(tools.clone()),
+                    tool_config: Some(ToolConfig::auto()),
+                    system_instruction: Some(sys_inst.clone()),
+                    generation_config: gen_cfg.clone(),
+                };
+
+                match client.generate(&req).await {
+                    Ok(r) => {
+                        working_history = attempt_history.clone();
+                        break r;
+                    }
+                    Err(e) => {
+                        if is_context_overflow_error(&e.to_string())
+                            && retry_attempts <= context_defaults::CONTEXT_ERROR_RETRY_LIMIT
+                        {
+                            let removed_tool_messages = prune_gemini_tool_responses(
+                                &mut attempt_history,
+                                trim_config.preserve_recent_turns,
+                            );
+                            let removed_turns =
+                                apply_aggressive_trim_gemini(&mut attempt_history, trim_config);
+                            let total_removed = removed_tool_messages + removed_turns;
+                            if total_removed > 0 {
+                                renderer.line(
+                                    MessageStyle::Info,
+                                    &format!(
+                                        "Context overflow detected; removed {} older messages (retry {}/{}).",
+                                        total_removed,
+                                        retry_attempts,
+                                        context_defaults::CONTEXT_ERROR_RETRY_LIMIT,
+                                    ),
+                                )?;
+                                conversation_history.clone_from(&attempt_history);
+                                continue;
+                            }
+                        }
+                        renderer.line(MessageStyle::Error, &format!("Provider error: {e}"))?;
+                        break 'outer;
+                    }
                 }
             };
+
             _final_text = None;
             let mut function_calls: Vec<FunctionCall> = Vec::new();
             let mut response_content: Option<Content> = None;
@@ -617,6 +773,20 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
         }
 
         conversation_history = working_history;
+
+        let pruned_after_turn = prune_gemini_tool_responses(
+            &mut conversation_history,
+            trim_config.preserve_recent_turns,
+        );
+        if pruned_after_turn > 0 {
+            renderer.line(
+                MessageStyle::Info,
+                &format!(
+                    "Dropped {} older tool responses after completion to conserve context.",
+                    pruned_after_turn
+                ),
+            )?;
+        }
 
         let post_trim = enforce_gemini_context_window(&mut conversation_history, trim_config);
         if post_trim.is_trimmed() {
@@ -731,6 +901,19 @@ async fn run_single_agent_loop_unified(
         // Optional prompt refinement for provider-native path
         let refined_user = refine_user_prompt_if_enabled(input, config, vt_cfg).await;
         conversation_history.push(uni::Message::user(refined_user));
+        let pruned_tools = prune_unified_tool_responses(
+            &mut conversation_history,
+            trim_config.preserve_recent_turns,
+        );
+        if pruned_tools > 0 {
+            renderer.line(
+                MessageStyle::Info,
+                &format!(
+                    "Dropped {} earlier tool responses to conserve context.",
+                    pruned_tools
+                ),
+            )?;
+        }
         let trim_result = enforce_unified_context_window(&mut conversation_history, trim_config);
         if trim_result.is_trimmed() {
             renderer.line(
@@ -845,25 +1028,63 @@ async fn run_single_agent_loop_unified(
             let tool_names: Vec<String> = tools.iter().map(|t| t.function.name.clone()).collect();
             ledger.update_available_tools(tool_names);
 
-            let request = uni::LLMRequest {
-                messages: working_history.clone(),
-                system_prompt: Some(system_prompt.clone()),
-                tools: Some(tools.clone()),
-                model: active_model,
-                max_tokens: max_tokens_opt.or(Some(2000)),
-                temperature: Some(0.7),
-                stream: false,
-                tool_choice: Some(uni::ToolChoice::auto()),
-                parallel_tool_calls: None,
-                parallel_tool_config: parallel_cfg_opt,
-                reasoning_effort: vt_cfg.map(|c| c.agent.reasoning_effort.clone()),
-            };
+            let mut attempt_history = working_history.clone();
+            let mut retry_attempts = 0usize;
+            let response = loop {
+                retry_attempts += 1;
+                let _ = enforce_unified_context_window(&mut attempt_history, trim_config);
 
-            let response = match provider_client.generate(request).await {
-                Ok(r) => r,
-                Err(e) => {
-                    renderer.line(MessageStyle::Error, &format!("Provider error: {e}"))?;
-                    continue;
+                let request = uni::LLMRequest {
+                    messages: attempt_history.clone(),
+                    system_prompt: Some(system_prompt.clone()),
+                    tools: Some(tools.clone()),
+                    model: active_model.clone(),
+                    max_tokens: max_tokens_opt.or(Some(2000)),
+                    temperature: Some(0.7),
+                    stream: false,
+                    tool_choice: Some(uni::ToolChoice::auto()),
+                    parallel_tool_calls: None,
+                    parallel_tool_config: parallel_cfg_opt.clone(),
+                    reasoning_effort: vt_cfg.map(|c| c.agent.reasoning_effort.clone()),
+                };
+
+                match provider_client.generate(request).await {
+                    Ok(r) => {
+                        working_history = attempt_history.clone();
+                        break r;
+                    }
+                    Err(e) => {
+                        let error_text = e.to_string();
+                        if is_context_overflow_error(&error_text)
+                            && retry_attempts <= context_defaults::CONTEXT_ERROR_RETRY_LIMIT
+                        {
+                            let removed_tool_messages = prune_unified_tool_responses(
+                                &mut attempt_history,
+                                trim_config.preserve_recent_turns,
+                            );
+                            let removed_turns =
+                                apply_aggressive_trim_unified(&mut attempt_history, trim_config);
+                            let total_removed = removed_tool_messages + removed_turns;
+                            if total_removed > 0 {
+                                renderer.line(
+                                    MessageStyle::Info,
+                                    &format!(
+                                        "Context overflow detected; removed {} older messages (retry {}/{}).",
+                                        total_removed,
+                                        retry_attempts,
+                                        context_defaults::CONTEXT_ERROR_RETRY_LIMIT,
+                                    ),
+                                )?;
+                                conversation_history.clone_from(&attempt_history);
+                                continue;
+                            }
+                        }
+                        renderer.line(
+                            MessageStyle::Error,
+                            &format!("Provider error: {error_text}"),
+                        )?;
+                        continue 'outer;
+                    }
                 }
             };
 
@@ -987,6 +1208,20 @@ async fn run_single_agent_loop_unified(
         // Commit turn transcript (including tool traffic) back to conversation history
         conversation_history = working_history;
 
+        let pruned_after_turn = prune_unified_tool_responses(
+            &mut conversation_history,
+            trim_config.preserve_recent_turns,
+        );
+        if pruned_after_turn > 0 {
+            renderer.line(
+                MessageStyle::Info,
+                &format!(
+                    "Dropped {} older tool responses after completion to conserve context.",
+                    pruned_after_turn
+                ),
+            )?;
+        }
+
         let post_trim = enforce_unified_context_window(&mut conversation_history, trim_config);
         if post_trim.is_trimmed() {
             renderer.line(
@@ -1108,5 +1343,139 @@ mod tests {
             .map(|msg| msg.content.clone())
             .unwrap_or_default();
         assert!(last_content.contains("assistant step 11"));
+    }
+
+    #[test]
+    fn test_prune_gemini_tool_responses_removes_older_entries() {
+        let mut history = vec![
+            Content::user_text("keep0"),
+            Content::user_parts(vec![Part::FunctionResponse {
+                function_response: FunctionResponse {
+                    name: "tool_a".to_string(),
+                    response: serde_json::json!({"output": "value"}),
+                },
+            }]),
+            Content {
+                role: "model".to_string(),
+                parts: vec![Part::Text {
+                    text: "assistant0".to_string(),
+                }],
+            },
+            Content::user_text("keep1"),
+            Content::user_parts(vec![Part::FunctionResponse {
+                function_response: FunctionResponse {
+                    name: "tool_b".to_string(),
+                    response: serde_json::json!({"output": "new"}),
+                },
+            }]),
+            Content {
+                role: "model".to_string(),
+                parts: vec![Part::Text {
+                    text: "assistant1".to_string(),
+                }],
+            },
+        ];
+
+        let removed = prune_gemini_tool_responses(&mut history, 4);
+
+        assert_eq!(removed, 1);
+        assert_eq!(history.len(), 5);
+        assert!(history.iter().any(|msg| {
+            msg.parts
+                .iter()
+                .any(|part| matches!(part, Part::FunctionResponse { .. }))
+        }));
+        assert_eq!(
+            history
+                .last()
+                .and_then(|msg| msg.parts.first())
+                .and_then(|part| part.as_text()),
+            Some("assistant1")
+        );
+    }
+
+    #[test]
+    fn test_prune_unified_tool_responses_respects_recent_history() {
+        let mut history: Vec<uni::Message> = vec![
+            uni::Message::user("keep".to_string()),
+            uni::Message::tool_response("call_1".to_string(), "{\"result\":1}".to_string()),
+            uni::Message::assistant("assistant0".to_string()),
+            uni::Message::user("keep2".to_string()),
+            {
+                let mut msg = uni::Message::assistant("assistant_with_tool".to_string());
+                msg.tool_calls = Some(vec![uni::ToolCall::function(
+                    "call_2".to_string(),
+                    "tool_b".to_string(),
+                    "{}".to_string(),
+                )]);
+                msg
+            },
+            uni::Message::tool_response("call_2".to_string(), "{\"result\":2}".to_string()),
+        ];
+
+        let removed = prune_unified_tool_responses(&mut history, 4);
+
+        assert_eq!(removed, 1);
+        assert!(history.len() >= 4);
+        assert_eq!(history.first().unwrap().content, "keep".to_string());
+        assert!(history.iter().any(|msg| msg.is_tool_response()));
+    }
+
+    #[test]
+    fn test_apply_aggressive_trim_gemini_limits_history() {
+        let mut history: Vec<Content> = (0..14)
+            .map(|i| Content::user_text(format!("message {i}")))
+            .collect();
+        let config = ContextTrimConfig {
+            max_tokens: 120,
+            trim_to_percent: 75,
+            preserve_recent_turns: 12,
+        };
+
+        let removed = apply_aggressive_trim_gemini(&mut history, config);
+
+        let expected_len = context_defaults::AGGRESSIVE_PRESERVE_RECENT_TURNS;
+        assert_eq!(removed, 14 - expected_len);
+        assert_eq!(history.len(), expected_len);
+        let expected_first = format!(
+            "message {}",
+            14 - context_defaults::AGGRESSIVE_PRESERVE_RECENT_TURNS
+        );
+        assert_eq!(
+            history
+                .first()
+                .and_then(|msg| msg.parts.first())
+                .and_then(|part| part.as_text()),
+            Some(expected_first.as_str())
+        );
+    }
+
+    #[test]
+    fn test_apply_aggressive_trim_unified_limits_history() {
+        let mut history: Vec<uni::Message> = (0..15)
+            .map(|i| uni::Message::assistant(format!("assistant step {i}")))
+            .collect();
+        let config = ContextTrimConfig {
+            max_tokens: 140,
+            trim_to_percent: 80,
+            preserve_recent_turns: 10,
+        };
+
+        let removed = apply_aggressive_trim_unified(&mut history, config);
+
+        let expected_len = context_defaults::AGGRESSIVE_PRESERVE_RECENT_TURNS;
+        assert_eq!(removed, 15 - expected_len);
+        assert_eq!(history.len(), expected_len);
+        let expected_first = format!(
+            "assistant step {}",
+            15 - context_defaults::AGGRESSIVE_PRESERVE_RECENT_TURNS
+        );
+        assert!(
+            history
+                .first()
+                .map(|msg| msg.content.clone())
+                .unwrap_or_default()
+                .contains(&expected_first)
+        );
     }
 }

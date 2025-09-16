@@ -7,14 +7,13 @@ defaut use syntext
 
 --
 
-The terminal UI has also been upgraded: tool calls and diffs are better formatted and easier to follow. Approval modes are simplified to three levels: read-only with explicit approvals, auto with full workspace access but requiring approvals outside the workspace, and full access with the ability to read files anywhere and run commands with network access. 
+The terminal UI has also been upgraded: tool calls and diffs are better formatted and easier to follow. Approval modes are simplified to three levels: read-only with explicit approvals, auto with full workspace access but requiring approvals outside the workspace, and full access with the ability to read files anywhere and run commands with network access.
 
 --
 
-
 https://openai.com/index/introducing-upgrades-to-codex/
 
-upgrade codex 
+upgrade codex
 
 --
 https://deepwiki.com/pawurb/hotpath
@@ -796,3 +795,11 @@ If you tell me which path you prefer (subprocess vs embedded vs service), I can 
 
 1. https://github.com/copilot/c/b0ffc926-cf0c-45bf-b6aa-e6d8b01744b0
 2. https://github.com/copilot/c/c8306ebb-788e-400d-a901-9e1ecfae2582
+
+--
+
+fix this, why it doesn't invoke tools call but only print:
+
+user: read the CLAUDE.md file
+agent: call
+print(default_api.read_file(path='CLAUDE.md'))

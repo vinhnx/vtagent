@@ -103,3 +103,29 @@ the agent output seems to be markdown, can you use markdown.rs and termimad crat
 run tests to ensure nothing is broken.
 
 ---
+
+in vtagent-core/src/ui/markdown.rs #file:markdown.rs , Replace HashMap with IndexMap to optimize performance, ensuring ordered key-value storage for faster lookups and insertions in Rust-based applications.
+
+---
+
+Bonus feature: Implement token streaming for real-time response generation. Stream output in plain text during the agent's response, then apply markdown rendering once the full response is complete to enhance user experience without interrupting the flow.
+
+---
+
+https://developers.openai.com/codex/cloud/environments
+
+--
+
+> fix model overloaded
+
+Provider error: API error 503 Service Unavailable: {
+"error": {
+"code": 503,
+"message": "The model is overloaded. Please try again later.",
+"status": "UNAVAILABLE"
+}
+}
+
+---
+
+https://github.com/vinhnx/vtagent/pull/7/files

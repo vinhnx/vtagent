@@ -7,6 +7,7 @@ use super::command::CommandTool;
 use super::file_ops::FileOpsTool;
 use super::search::SearchTool;
 use super::simple_search::SimpleSearchTool;
+use super::srgn::SrgnTool;
 use super::traits::Tool;
 use crate::config::PtyConfig;
 use crate::config::constants::tools;
@@ -189,6 +190,7 @@ pub struct ToolRegistry {
     tool_policy: Option<ToolPolicyManager>,
     pty_config: PtyConfig,
     active_pty_sessions: Arc<AtomicUsize>,
+    srgn_tool: SrgnTool,
 }
 
 impl ToolRegistry {
@@ -206,6 +208,7 @@ impl ToolRegistry {
         let bash_tool = BashTool::new(workspace_root.clone());
         let file_ops_tool = FileOpsTool::new(workspace_root.clone(), grep_search.clone());
         let command_tool = CommandTool::new(workspace_root.clone());
+        let srgn_tool = SrgnTool::new(workspace_root.clone());
 
         // Initialize AST-grep engine
         let ast_grep_engine = match AstGrepEngine::new() {
@@ -236,6 +239,7 @@ impl ToolRegistry {
             tools::EDIT_FILE.to_string(),
             tools::BASH.to_string(),
             tools::APPLY_PATCH.to_string(),
+            tools::SRGN.to_string(),
         ];
 
         // Add AST-grep tool if available
@@ -262,6 +266,7 @@ impl ToolRegistry {
             tool_policy: policy_manager,
             pty_config,
             active_pty_sessions: Arc::new(AtomicUsize::new(0)),
+            srgn_tool,
         }
     }
 
@@ -341,6 +346,7 @@ impl ToolRegistry {
             tools::SIMPLE_SEARCH => self.simple_search_tool.execute(args).await,
             tools::BASH => self.bash_tool.execute(args).await,
             tools::APPLY_PATCH => self.execute_apply_patch(args).await,
+            tools::SRGN => self.srgn_tool.execute(args).await,
             _ => {
                 let error = ToolExecutionError::new(
                     name.to_string(),
@@ -506,6 +512,7 @@ impl ToolRegistry {
             tools::EDIT_FILE.to_string(),
             "simple_search".to_string(),
             "bash".to_string(),
+            tools::SRGN.to_string(),
         ];
 
         // Add AST-grep tool if available
@@ -523,7 +530,8 @@ impl ToolRegistry {
             | tools::LIST_FILES
             | tools::RUN_TERMINAL_CMD
             | tools::READ_FILE
-            | tools::WRITE_FILE => true,
+            | tools::WRITE_FILE
+            | tools::SRGN => true,
             tools::AST_GREP_SEARCH => self.ast_grep_engine.is_some(),
             tools::SIMPLE_SEARCH | tools::BASH => true,
             _ => false,

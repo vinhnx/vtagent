@@ -63,3 +63,15 @@ Provide the complete, compilable code with comments explaining the integration, 
 ===
 
 search for "// TODO: " comments in the codebase and implement the missing functionality. prioritize tasks that enhance core features, improve performance, or fix bugs. ensure code quality with tests and documentation updates as needed.
+
+---
+
+https://github.com/github/spec-kit
+
+https://developer.microsoft.com/blog/spec-driven-development-spec-kit
+https://github.blog/ai-and-ml/generative-ai/spec-driven-development-with-ai-get-started-with-a-new-open-source-toolkit/
+
+--
+
+srgn, a tool for structural code search and transformation using AST patterns.. encourage the vtagent to use srgntool for code modification tasks instead of relying solely on natural language descriptions. srgn allows for precise and reliable code changes by leveraging the structure of the code itself.
+

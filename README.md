@@ -31,6 +31,7 @@ VTAgent is a Rust-based terminal coding agent with modular architecture supporti
 -   **Performance Monitoring**: Real-time metrics and benchmarking capabilities
 -   **Router & Budgets**: Config-driven routing with per-class budgets
 -   **Trajectory Logging**: JSONL logs for route decisions and tool calls
+-   **Code Surgery Tools**: Srgn integration for syntax-aware code manipulation and refactoring
 -   **Research-Preview Features**: Advanced context compression and conversation summarization
 
 ## Quick Start
@@ -396,6 +397,36 @@ vtagent man
 vtagent man chat
 vtagent man chat --output chat.1
 ```
+
+#### `srgn` - Code surgery tool
+
+**Features:**
+• Syntax-aware code manipulation using tree-sitter parsers
+• Multi-language support (Rust, Python, JavaScript/TypeScript, Go, C/C++, C#, HCL)
+• Advanced operations: replace, delete, case conversion, Unicode normalization
+• Language grammar-aware scoping for precise modifications
+• Custom tree-sitter queries for complex patterns
+• Bulk operations across multiple files with glob patterns
+• Dry-run mode for safe testing
+• Parallel processing for high performance
+
+**Usage:** Available through natural language chat interface
+
+**Examples:**
+
+-   "Replace println with eprintln in all Rust files"
+-   "Convert all Python print statements to logging"
+-   "Find all unsafe blocks in Rust code"
+-   "Normalize Unicode characters in documentation"
+-   "Convert ASCII arrows to Unicode arrows"
+-   "Apply German umlaut substitutions"
+
+**Advanced Features:**
+• Custom tree-sitter query support
+• Fail-safe validation with fail-any/fail-none
+• Multi-scope operations with join mode
+• Deterministic output with sorted processing
+• Hidden file and gitignore handling
 
 ## Architecture
 

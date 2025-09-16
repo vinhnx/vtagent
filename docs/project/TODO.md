@@ -1,3 +1,12 @@
+enhace tool output syntax highlight use these crate
+
+anstyle-git for parsing git style descriptions
+anstyle-ls for parsing LS_COLORS style descriptions
+
+defaut use syntext
+
+--
+
 The terminal UI has also been upgraded: tool calls and diffs are better formatted and easier to follow. Approval modes are simplified to three levels: read-only with explicit approvals, auto with full workspace access but requiring approvals outside the workspace, and full access with the ability to read files anywhere and run commands with network access. 
 
 --

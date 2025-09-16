@@ -73,10 +73,32 @@ anstyle-query = "1.0"
 anstream = "0.6"
 sysinfo = "0.37.0"
 syntect = "5.2"
+hotpath = { version = "0.2.5", optional = true }
 
 [features]
 default = ["tool-chat"]
 tool-chat = []
+hotpath = ["dep:hotpath", "hotpath/hotpath", "vtagent-core/hotpath"]
+hotpath-alloc-bytes-total = [
+    "hotpath",
+    "hotpath/hotpath-alloc-bytes-total",
+    "vtagent-core/hotpath-alloc-bytes-total",
+]
+hotpath-alloc-bytes-max = [
+    "hotpath",
+    "hotpath/hotpath-alloc-bytes-max",
+    "vtagent-core/hotpath-alloc-bytes-max",
+]
+hotpath-alloc-count-total = [
+    "hotpath",
+    "hotpath/hotpath-alloc-count-total",
+    "vtagent-core/hotpath-alloc-count-total",
+]
+hotpath-alloc-count-max = [
+    "hotpath",
+    "hotpath/hotpath-alloc-count-max",
+    "vtagent-core/hotpath-alloc-count-max",
+]
 
 [profile.dev]
 split-debuginfo = "unpacked"

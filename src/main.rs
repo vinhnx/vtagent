@@ -8,6 +8,7 @@ use vtagent_core::cli::args::{Cli, Commands};
 use vtagent_core::config::api_keys::{ApiKeySources, get_api_key, load_dotenv};
 use vtagent_core::config::loader::ConfigManager;
 use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
+use vtagent_core::{ProfilerScope, start_profiler};
 
 mod agent;
 mod cli; // local CLI handlers in src/cli // agent runloops (single-agent only)
@@ -22,6 +23,7 @@ async fn main() -> Result<()> {
     // Load configuration (vtagent.toml or defaults)
     let config_manager = ConfigManager::load().context("Failed to load vtagent configuration")?;
     let cfg = config_manager.config();
+    let _profiler_guard = start_profiler(&cfg.telemetry.hotpath, ProfilerScope::MainStartup);
 
     // Resolve provider/model with CLI override
     let provider = args

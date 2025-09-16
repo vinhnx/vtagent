@@ -33,6 +33,7 @@ Contributing to VTAgent? Understand the architecture and development processes:
 -   **[Development Guide](./development/README.md)** - Development environment setup
 -   **[API Documentation](./api/README.md)** - Technical API references
 -   **[Code Standards](./development/code-style.md)** - Coding guidelines and best practices
+-   **[Hotpath Profiling](./telemetry/HOTPATH_PROFILING.md)** - Configure and interpret runtime profiling
 -   **[Codex Cloud Setup](./guides/codex-cloud-setup.md)** - Configure Codex Cloud environments for VTAgent
 
 ### For Organizations

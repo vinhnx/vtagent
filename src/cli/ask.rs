@@ -1,7 +1,8 @@
 use anyhow::Result;
 use console::style;
 use vtagent_core::{
-    config::types::AgentConfig as CoreAgentConfig, llm::make_client, models::ModelId,
+    ProfilerScope, config::types::AgentConfig as CoreAgentConfig, llm::make_client,
+    measure_async_profiler_scope, models::ModelId,
 };
 
 /// Handle the ask command - single prompt, no tools
@@ -17,7 +18,10 @@ pub async fn handle_ask_command(config: &CoreAgentConfig, prompt: &str) -> Resul
     let model_id: ModelId = config.model.parse()?;
 
     let mut client = make_client(config.api_key.clone(), model_id);
-    let resp = client.generate(prompt).await?;
+    let resp = measure_async_profiler_scope(ProfilerScope::SinglePromptGenerate, || async {
+        client.generate(prompt).await
+    })
+    .await?;
     println!("{}", resp.content);
 
     Ok(())

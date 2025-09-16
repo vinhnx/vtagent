@@ -13,6 +13,7 @@ use crate::config::constants::tools;
 use crate::config::loader::ConfigManager;
 use crate::config::types::CapabilityLevel;
 use crate::gemini::FunctionDeclaration;
+use crate::telemetry::profiler::{ProfilerScope, measure_async_scope, measure_sync_scope};
 use crate::tool_policy::{ToolPolicy, ToolPolicyManager};
 use crate::tools::ast_grep::AstGrepEngine;
 use crate::tools::grep_search::{GrepSearchManager, GrepSearchResult};
@@ -285,6 +286,13 @@ impl ToolRegistry {
 
     /// Execute a tool by name with policy checking
     pub async fn execute_tool(&mut self, name: &str, args: Value) -> Result<Value> {
+        measure_async_scope(ProfilerScope::ToolExecution, move || async move {
+            self.execute_tool_inner(name, args).await
+        })
+        .await
+    }
+
+    async fn execute_tool_inner(&mut self, name: &str, args: Value) -> Result<Value> {
         // Check tool policy before execution (if policy manager is available)
         if let Ok(policy_manager) = self.policy_manager_mut() {
             if !policy_manager.should_execute_tool(name)? {
@@ -374,28 +382,30 @@ impl ToolRegistry {
 
     /// Normalize tool outputs for consistent rendering in the CLI
     fn normalize_tool_output(mut val: Value, _name: &str) -> Value {
-        if !val.is_object() {
-            return json!({ "success": true, "result": val });
-        }
-        let obj = val.as_object_mut().unwrap();
-        // Success defaults to true unless explicitly false
-        obj.entry("success").or_insert(json!(true));
-        // Map common 'output' field to stdout when stdout missing
-        if !obj.contains_key("stdout") {
-            if let Some(output) = obj.get("output").and_then(|v| v.as_str()) {
-                obj.insert("stdout".into(), json!(output.trim_end()));
+        measure_sync_scope(ProfilerScope::ToolOutputNormalization, || {
+            if !val.is_object() {
+                return json!({ "success": true, "result": val });
             }
-        } else if let Some(stdout) = obj.get_mut("stdout") {
-            if let Some(s) = stdout.as_str() {
-                *stdout = json!(s.trim_end());
+            let obj = val.as_object_mut().unwrap();
+            // Success defaults to true unless explicitly false
+            obj.entry("success").or_insert(json!(true));
+            // Map common 'output' field to stdout when stdout missing
+            if !obj.contains_key("stdout") {
+                if let Some(output) = obj.get("output").and_then(|v| v.as_str()) {
+                    obj.insert("stdout".into(), json!(output.trim_end()));
+                }
+            } else if let Some(stdout) = obj.get_mut("stdout") {
+                if let Some(s) = stdout.as_str() {
+                    *stdout = json!(s.trim_end());
+                }
             }
-        }
-        if let Some(stderr) = obj.get_mut("stderr") {
-            if let Some(s) = stderr.as_str() {
-                *stderr = json!(s.trim_end());
+            if let Some(stderr) = obj.get_mut("stderr") {
+                if let Some(s) = stderr.as_str() {
+                    *stderr = json!(s.trim_end());
+                }
             }
-        }
-        val
+            val
+        })
     }
 
     async fn execute_apply_patch(&self, args: Value) -> Result<Value> {
@@ -413,86 +423,88 @@ impl ToolRegistry {
 
     /// Apply optional scoped constraints from tool policy to arguments to improve safety
     fn apply_policy_constraints(&self, name: &str, mut args: Value) -> Result<Value> {
-        if let Some(constraints) = self
-            .tool_policy
-            .as_ref()
-            .and_then(|tp| tp.get_constraints(name))
-            .cloned()
-        {
-            let obj = args
-                .as_object_mut()
-                .ok_or_else(|| anyhow!("Error: tool arguments must be an object"))?;
+        measure_sync_scope(ProfilerScope::ToolPolicyConstraints, || {
+            if let Some(constraints) = self
+                .tool_policy
+                .as_ref()
+                .and_then(|tp| tp.get_constraints(name))
+                .cloned()
+            {
+                let obj = args
+                    .as_object_mut()
+                    .ok_or_else(|| anyhow!("Error: tool arguments must be an object"))?;
 
-            // Default response_format
-            if let Some(fmt) = constraints.default_response_format {
-                obj.entry("response_format").or_insert(json!(fmt));
-            }
-
-            // Allowed modes
-            if let Some(allowed) = constraints.allowed_modes {
-                if let Some(mode) = obj.get("mode").and_then(|v| v.as_str()) {
-                    if !allowed.iter().any(|m| m == mode) {
-                        return Err(anyhow!(format!(
-                            "Mode '{}' not allowed by policy for '{}'. Allowed: {}",
-                            mode,
-                            name,
-                            allowed.join(", ")
-                        )));
-                    }
+                // Default response_format
+                if let Some(fmt) = constraints.default_response_format {
+                    obj.entry("response_format").or_insert(json!(fmt));
                 }
-            }
 
-            // Tool-specific caps
-            match name {
-                n if n == tools::LIST_FILES => {
-                    if let Some(cap) = constraints.max_items_per_call {
-                        let requested = obj
-                            .get("max_items")
-                            .and_then(|v| v.as_u64())
-                            .unwrap_or(cap as u64) as usize;
-                        if requested > cap {
-                            obj.insert("max_items".to_string(), json!(cap));
-                            obj.insert(
-                                "_policy_note".to_string(),
-                                json!(format!("Capped max_items to {} by policy", cap)),
-                            );
+                // Allowed modes
+                if let Some(allowed) = constraints.allowed_modes {
+                    if let Some(mode) = obj.get("mode").and_then(|v| v.as_str()) {
+                        if !allowed.iter().any(|m| m == mode) {
+                            return Err(anyhow!(format!(
+                                "Mode '{}' not allowed by policy for '{}'. Allowed: {}",
+                                mode,
+                                name,
+                                allowed.join(", ")
+                            )));
                         }
                     }
                 }
-                n if n == tools::GREP_SEARCH => {
-                    if let Some(cap) = constraints.max_results_per_call {
-                        let requested = obj
-                            .get("max_results")
-                            .and_then(|v| v.as_u64())
-                            .unwrap_or(cap as u64) as usize;
-                        if requested > cap {
-                            obj.insert("max_results".to_string(), json!(cap));
-                            obj.insert(
-                                "_policy_note".to_string(),
-                                json!(format!("Capped max_results to {} by policy", cap)),
-                            );
+
+                // Tool-specific caps
+                match name {
+                    n if n == tools::LIST_FILES => {
+                        if let Some(cap) = constraints.max_items_per_call {
+                            let requested =
+                                obj.get("max_items")
+                                    .and_then(|v| v.as_u64())
+                                    .unwrap_or(cap as u64) as usize;
+                            if requested > cap {
+                                obj.insert("max_items".to_string(), json!(cap));
+                                obj.insert(
+                                    "_policy_note".to_string(),
+                                    json!(format!("Capped max_items to {} by policy", cap)),
+                                );
+                            }
                         }
                     }
-                }
-                n if n == tools::READ_FILE => {
-                    if let Some(cap) = constraints.max_bytes_per_read {
-                        let requested = obj
-                            .get("max_bytes")
-                            .and_then(|v| v.as_u64())
-                            .unwrap_or(cap as u64) as usize;
-                        if requested > cap {
-                            obj.insert("max_bytes".to_string(), json!(cap));
-                            obj.insert(
-                                "_policy_note".to_string(),
-                                json!(format!("Capped max_bytes to {} by policy", cap)),
-                            );
+                    n if n == tools::GREP_SEARCH => {
+                        if let Some(cap) = constraints.max_results_per_call {
+                            let requested =
+                                obj.get("max_results")
+                                    .and_then(|v| v.as_u64())
+                                    .unwrap_or(cap as u64) as usize;
+                            if requested > cap {
+                                obj.insert("max_results".to_string(), json!(cap));
+                                obj.insert(
+                                    "_policy_note".to_string(),
+                                    json!(format!("Capped max_results to {} by policy", cap)),
+                                );
+                            }
                         }
                     }
+                    n if n == tools::READ_FILE => {
+                        if let Some(cap) = constraints.max_bytes_per_read {
+                            let requested =
+                                obj.get("max_bytes")
+                                    .and_then(|v| v.as_u64())
+                                    .unwrap_or(cap as u64) as usize;
+                            if requested > cap {
+                                obj.insert("max_bytes".to_string(), json!(cap));
+                                obj.insert(
+                                    "_policy_note".to_string(),
+                                    json!(format!("Capped max_bytes to {} by policy", cap)),
+                                );
+                            }
+                        }
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
-        }
-        Ok(args)
+            Ok(args)
+        })
     }
 
     /// List available tools

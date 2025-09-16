@@ -5,6 +5,7 @@ use vtagent_core::config::constants::context as context_defaults;
 use vtagent_core::config::loader::{ConfigManager, VTAgentConfig};
 use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
 use vtagent_core::utils::ansi::{AnsiRenderer, MessageStyle};
+use vtagent_core::{ProfilerScope, measure_async_profiler_scope, measure_sync_profiler_scope};
 
 // Single-agent engine with Decision Ledger support
 use vtagent_core::gemini::function_calling::{FunctionCall, FunctionResponse};
@@ -69,57 +70,61 @@ impl ContextTrimOutcome {
 }
 
 fn prune_gemini_tool_responses(history: &mut Vec<Content>, preserve_recent_turns: usize) -> usize {
-    if history.is_empty() {
-        return 0;
-    }
-
-    let keep_from = history.len().saturating_sub(preserve_recent_turns);
-    if keep_from == 0 {
-        return 0;
-    }
-
-    let mut removed = 0usize;
-    let mut index = 0usize;
-    history.retain(|message| {
-        let contains_tool_response = message
-            .parts
-            .iter()
-            .any(|part| matches!(part, Part::FunctionResponse { .. }));
-        let keep = index >= keep_from || !contains_tool_response;
-        if !keep {
-            removed += 1;
+    measure_sync_profiler_scope(ProfilerScope::GeminiToolPrune, || {
+        if history.is_empty() {
+            return 0;
         }
-        index += 1;
-        keep
-    });
-    removed
+
+        let keep_from = history.len().saturating_sub(preserve_recent_turns);
+        if keep_from == 0 {
+            return 0;
+        }
+
+        let mut removed = 0usize;
+        let mut index = 0usize;
+        history.retain(|message| {
+            let contains_tool_response = message
+                .parts
+                .iter()
+                .any(|part| matches!(part, Part::FunctionResponse { .. }));
+            let keep = index >= keep_from || !contains_tool_response;
+            if !keep {
+                removed += 1;
+            }
+            index += 1;
+            keep
+        });
+        removed
+    })
 }
 
 fn prune_unified_tool_responses(
     history: &mut Vec<uni::Message>,
     preserve_recent_turns: usize,
 ) -> usize {
-    if history.is_empty() {
-        return 0;
-    }
-
-    let keep_from = history.len().saturating_sub(preserve_recent_turns);
-    if keep_from == 0 {
-        return 0;
-    }
-
-    let mut removed = 0usize;
-    let mut index = 0usize;
-    history.retain(|message| {
-        let contains_tool_payload = message.is_tool_response() || message.has_tool_calls();
-        let keep = index >= keep_from || !contains_tool_payload;
-        if !keep {
-            removed += 1;
+    measure_sync_profiler_scope(ProfilerScope::UnifiedToolPrune, || {
+        if history.is_empty() {
+            return 0;
         }
-        index += 1;
-        keep
-    });
-    removed
+
+        let keep_from = history.len().saturating_sub(preserve_recent_turns);
+        if keep_from == 0 {
+            return 0;
+        }
+
+        let mut removed = 0usize;
+        let mut index = 0usize;
+        history.retain(|message| {
+            let contains_tool_payload = message.is_tool_response() || message.has_tool_calls();
+            let keep = index >= keep_from || !contains_tool_payload;
+            if !keep {
+                removed += 1;
+            }
+            index += 1;
+            keep
+        });
+        removed
+    })
 }
 
 fn apply_aggressive_trim_gemini(history: &mut Vec<Content>, config: ContextTrimConfig) -> usize {
@@ -364,96 +369,100 @@ fn enforce_gemini_context_window(
     history: &mut Vec<Content>,
     config: ContextTrimConfig,
 ) -> ContextTrimOutcome {
-    if history.is_empty() {
-        return ContextTrimOutcome::default();
-    }
-
-    let tokens_per_message: Vec<usize> = history
-        .iter()
-        .map(approximate_gemini_message_tokens)
-        .collect();
-    let mut total_tokens: usize = tokens_per_message.iter().sum();
-
-    if total_tokens <= config.max_tokens {
-        return ContextTrimOutcome::default();
-    }
-
-    let target_tokens = config.target_tokens();
-    let mut remove_count = 0usize;
-    let mut preserve_boundary = history.len().saturating_sub(config.preserve_recent_turns);
-    if preserve_boundary > history.len().saturating_sub(1) {
-        preserve_boundary = history.len().saturating_sub(1);
-    }
-
-    while remove_count < preserve_boundary && total_tokens > config.max_tokens {
-        total_tokens = total_tokens.saturating_sub(tokens_per_message[remove_count]);
-        remove_count += 1;
-        if total_tokens <= target_tokens {
-            break;
+    measure_sync_profiler_scope(ProfilerScope::GeminiContextTrim, || {
+        if history.is_empty() {
+            return ContextTrimOutcome::default();
         }
-    }
 
-    while remove_count < history.len().saturating_sub(1) && total_tokens > config.max_tokens {
-        total_tokens = total_tokens.saturating_sub(tokens_per_message[remove_count]);
-        remove_count += 1;
-    }
+        let tokens_per_message: Vec<usize> = history
+            .iter()
+            .map(approximate_gemini_message_tokens)
+            .collect();
+        let mut total_tokens: usize = tokens_per_message.iter().sum();
 
-    if remove_count == 0 {
-        return ContextTrimOutcome::default();
-    }
+        if total_tokens <= config.max_tokens {
+            return ContextTrimOutcome::default();
+        }
 
-    history.drain(0..remove_count);
-    ContextTrimOutcome {
-        removed_messages: remove_count,
-    }
+        let target_tokens = config.target_tokens();
+        let mut remove_count = 0usize;
+        let mut preserve_boundary = history.len().saturating_sub(config.preserve_recent_turns);
+        if preserve_boundary > history.len().saturating_sub(1) {
+            preserve_boundary = history.len().saturating_sub(1);
+        }
+
+        while remove_count < preserve_boundary && total_tokens > config.max_tokens {
+            total_tokens = total_tokens.saturating_sub(tokens_per_message[remove_count]);
+            remove_count += 1;
+            if total_tokens <= target_tokens {
+                break;
+            }
+        }
+
+        while remove_count < history.len().saturating_sub(1) && total_tokens > config.max_tokens {
+            total_tokens = total_tokens.saturating_sub(tokens_per_message[remove_count]);
+            remove_count += 1;
+        }
+
+        if remove_count == 0 {
+            return ContextTrimOutcome::default();
+        }
+
+        history.drain(0..remove_count);
+        ContextTrimOutcome {
+            removed_messages: remove_count,
+        }
+    })
 }
 
 fn enforce_unified_context_window(
     history: &mut Vec<uni::Message>,
     config: ContextTrimConfig,
 ) -> ContextTrimOutcome {
-    if history.is_empty() {
-        return ContextTrimOutcome::default();
-    }
-
-    let tokens_per_message: Vec<usize> = history
-        .iter()
-        .map(approximate_unified_message_tokens)
-        .collect();
-    let mut total_tokens: usize = tokens_per_message.iter().sum();
-
-    if total_tokens <= config.max_tokens {
-        return ContextTrimOutcome::default();
-    }
-
-    let target_tokens = config.target_tokens();
-    let mut remove_count = 0usize;
-    let mut preserve_boundary = history.len().saturating_sub(config.preserve_recent_turns);
-    if preserve_boundary > history.len().saturating_sub(1) {
-        preserve_boundary = history.len().saturating_sub(1);
-    }
-
-    while remove_count < preserve_boundary && total_tokens > config.max_tokens {
-        total_tokens = total_tokens.saturating_sub(tokens_per_message[remove_count]);
-        remove_count += 1;
-        if total_tokens <= target_tokens {
-            break;
+    measure_sync_profiler_scope(ProfilerScope::UnifiedContextTrim, || {
+        if history.is_empty() {
+            return ContextTrimOutcome::default();
         }
-    }
 
-    while remove_count < history.len().saturating_sub(1) && total_tokens > config.max_tokens {
-        total_tokens = total_tokens.saturating_sub(tokens_per_message[remove_count]);
-        remove_count += 1;
-    }
+        let tokens_per_message: Vec<usize> = history
+            .iter()
+            .map(approximate_unified_message_tokens)
+            .collect();
+        let mut total_tokens: usize = tokens_per_message.iter().sum();
 
-    if remove_count == 0 {
-        return ContextTrimOutcome::default();
-    }
+        if total_tokens <= config.max_tokens {
+            return ContextTrimOutcome::default();
+        }
 
-    history.drain(0..remove_count);
-    ContextTrimOutcome {
-        removed_messages: remove_count,
-    }
+        let target_tokens = config.target_tokens();
+        let mut remove_count = 0usize;
+        let mut preserve_boundary = history.len().saturating_sub(config.preserve_recent_turns);
+        if preserve_boundary > history.len().saturating_sub(1) {
+            preserve_boundary = history.len().saturating_sub(1);
+        }
+
+        while remove_count < preserve_boundary && total_tokens > config.max_tokens {
+            total_tokens = total_tokens.saturating_sub(tokens_per_message[remove_count]);
+            remove_count += 1;
+            if total_tokens <= target_tokens {
+                break;
+            }
+        }
+
+        while remove_count < history.len().saturating_sub(1) && total_tokens > config.max_tokens {
+            total_tokens = total_tokens.saturating_sub(tokens_per_message[remove_count]);
+            remove_count += 1;
+        }
+
+        if remove_count == 0 {
+            return ContextTrimOutcome::default();
+        }
+
+        history.drain(0..remove_count);
+        ContextTrimOutcome {
+            removed_messages: remove_count,
+        }
+    })
 }
 
 fn approximate_gemini_message_tokens(message: &Content) -> usize {
@@ -506,67 +515,77 @@ async fn refine_user_prompt_if_enabled(
     cfg: &CoreAgentConfig,
     vt_cfg: Option<&VTAgentConfig>,
 ) -> String {
-    if std::env::var("VTAGENT_PROMPT_REFINER_STUB").is_ok() {
-        return format!("[REFINED] {}", raw);
-    }
-    let Some(vtc) = vt_cfg else {
-        return raw.to_string();
-    };
-    if !vtc.agent.refine_prompts_enabled {
-        return raw.to_string();
-    }
-
-    // Provider-aware defaults for refiner model selection
-    let model_provider = cfg
-        .model
-        .parse::<ModelId>()
-        .ok()
-        .map(|m| m.provider())
-        .unwrap_or(Provider::Gemini);
-
-    let refiner_model = if !vtc.agent.refine_prompts_model.is_empty() {
-        vtc.agent.refine_prompts_model.clone()
-    } else {
-        match model_provider {
-            Provider::OpenAI => {
-                vtagent_core::config::constants::models::openai::GPT_5_MINI.to_string()
-            }
-            _ => cfg.model.clone(),
+    measure_async_profiler_scope(ProfilerScope::PromptRefinement, move || async move {
+        if std::env::var("VTAGENT_PROMPT_REFINER_STUB").is_ok() {
+            return format!("[REFINED] {}", raw);
         }
-    };
+        let Some(vtc) = vt_cfg else {
+            return raw.to_string();
+        };
+        if !vtc.agent.refine_prompts_enabled {
+            return raw.to_string();
+        }
 
-    let Ok(refiner) = create_provider_for_model(&refiner_model, cfg.api_key.clone()) else {
-        return raw.to_string();
-    };
+        // Provider-aware defaults for refiner model selection
+        let model_provider = cfg
+            .model
+            .parse::<ModelId>()
+            .ok()
+            .map(|m| m.provider())
+            .unwrap_or(Provider::Gemini);
 
-    let system = read_prompt_refiner_prompt().unwrap_or_else(|| {
-        "You are a prompt refiner. Return only the improved prompt.".to_string()
-    });
-    let req = uni::LLMRequest {
-        messages: vec![uni::Message::user(raw.to_string())],
-        system_prompt: Some(system),
-        tools: None,
-        model: refiner_model,
-        max_tokens: Some(800),
-        temperature: Some(0.3),
-        stream: false,
-        tool_choice: Some(uni::ToolChoice::none()),
-        parallel_tool_calls: None,
-        parallel_tool_config: None,
-        reasoning_effort: Some(vtc.agent.reasoning_effort.clone()),
-    };
+        let refiner_model = if !vtc.agent.refine_prompts_model.is_empty() {
+            vtc.agent.refine_prompts_model.clone()
+        } else {
+            match model_provider {
+                Provider::OpenAI => {
+                    vtagent_core::config::constants::models::openai::GPT_5_MINI.to_string()
+                }
+                _ => cfg.model.clone(),
+            }
+        };
 
-    match refiner
-        .generate(req)
-        .await
-        .map(|r| r.content.unwrap_or_default())
-    {
-        Ok(text) if !text.trim().is_empty() => text,
-        _ => raw.to_string(),
-    }
+        let Ok(refiner) = create_provider_for_model(&refiner_model, cfg.api_key.clone()) else {
+            return raw.to_string();
+        };
+
+        let system = read_prompt_refiner_prompt().unwrap_or_else(|| {
+            "You are a prompt refiner. Return only the improved prompt.".to_string()
+        });
+        let req = uni::LLMRequest {
+            messages: vec![uni::Message::user(raw.to_string())],
+            system_prompt: Some(system),
+            tools: None,
+            model: refiner_model,
+            max_tokens: Some(800),
+            temperature: Some(0.3),
+            stream: false,
+            tool_choice: Some(uni::ToolChoice::none()),
+            parallel_tool_calls: None,
+            parallel_tool_config: None,
+            reasoning_effort: Some(vtc.agent.reasoning_effort.clone()),
+        };
+
+        match refiner
+            .generate(req)
+            .await
+            .map(|r| r.content.unwrap_or_default())
+        {
+            Ok(text) if !text.trim().is_empty() => text,
+            _ => raw.to_string(),
+        }
+    })
+    .await
 }
 
 pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
+    measure_async_profiler_scope(ProfilerScope::AgentRunLoop, || async move {
+        run_single_agent_loop_inner(config).await
+    })
+    .await
+}
+
+async fn run_single_agent_loop_inner(config: &CoreAgentConfig) -> Result<()> {
     // Detect provider from model; fall back to prompt-only for non-Gemini
     let provider = config
         .model
@@ -801,7 +820,13 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
                     generation_config: gen_cfg.clone(),
                 };
 
-                match client.generate(&req).await {
+                let request = req;
+                let response_result =
+                    measure_async_profiler_scope(ProfilerScope::GeminiGenerate, || async {
+                        client.generate(&request).await
+                    })
+                    .await;
+                match response_result {
                     Ok(r) => {
                         working_history = attempt_history.clone();
                         break r;
@@ -1014,6 +1039,17 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
 
 // Unified single-agent tool-calling loop for OpenAI / Anthropic providers
 async fn run_single_agent_loop_unified(
+    config: &CoreAgentConfig,
+    provider: Provider,
+    vt_cfg: Option<&VTAgentConfig>,
+) -> Result<()> {
+    measure_async_profiler_scope(ProfilerScope::UnifiedAgentRunLoop, || async move {
+        run_single_agent_loop_unified_inner(config, provider, vt_cfg).await
+    })
+    .await
+}
+
+async fn run_single_agent_loop_unified_inner(
     config: &CoreAgentConfig,
     _provider: Provider,
     vt_cfg: Option<&VTAgentConfig>,
@@ -1242,7 +1278,12 @@ async fn run_single_agent_loop_unified(
                     reasoning_effort: vt_cfg.map(|c| c.agent.reasoning_effort.clone()),
                 };
 
-                match provider_client.generate(request).await {
+                let response_result =
+                    measure_async_profiler_scope(ProfilerScope::UnifiedGenerate, || async {
+                        provider_client.generate(request).await
+                    })
+                    .await;
+                match response_result {
                     Ok(r) => {
                         working_history = attempt_history.clone();
                         break r;
@@ -1411,7 +1452,12 @@ async fn run_single_agent_loop_unified(
                             parallel_tool_config: None,
                             reasoning_effort: vt_cfg.map(|c| c.agent.reasoning_effort.clone()),
                         };
-                        let rr = provider_client.generate(review_req).await.ok();
+                        let review_result = measure_async_profiler_scope(
+                            ProfilerScope::UnifiedGenerate,
+                            || async { provider_client.generate(review_req).await },
+                        )
+                        .await;
+                        let rr = review_result.ok();
                         if let Some(r) = rr.and_then(|r| r.content) {
                             if !r.trim().is_empty() {
                                 text = r;

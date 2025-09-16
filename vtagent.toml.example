@@ -84,6 +84,14 @@ retrieval_heavy = "gemini-2.5-flash"
 [telemetry]
 trajectory_enabled = true
 
+[telemetry.hotpath]
+# Enable runtime Hotpath summaries when the feature flag is compiled in
+enabled = false
+# Percentiles to report (values between 0 and 100)
+percentiles = [95, 99]
+# Output format for profiler summaries: "table", "json", or "json_pretty"
+report_format = "table"
+
 [context.ledger]
 enabled = true
 max_entries = 12

@@ -45,6 +45,7 @@ pub mod project;
 pub mod prompts;
 pub mod safety;
 pub mod simple_indexer;
+pub mod telemetry;
 pub mod tool_policy;
 pub mod tools;
 pub mod types;
@@ -77,6 +78,11 @@ pub use prompts::{
     generate_lightweight_instruction, generate_specialized_instruction, generate_system_instruction,
 };
 pub use simple_indexer::SimpleIndexer;
+pub use telemetry::profiler::{
+    ProfilerGuard, ProfilerScope, is_profiler_active as is_hotpath_active,
+    measure_async_scope as measure_async_profiler_scope,
+    measure_sync_scope as measure_sync_profiler_scope, start_profiler,
+};
 pub use tool_policy::{ToolPolicy, ToolPolicyManager};
 pub use tools::advanced_search::{AdvancedSearchTool, SearchOptions};
 pub use tools::grep_search::GrepSearchManager;

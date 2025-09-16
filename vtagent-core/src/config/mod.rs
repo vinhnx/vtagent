@@ -21,7 +21,7 @@ pub use core::{AgentConfig, CommandsConfig, SecurityConfig, ToolPolicy, ToolsCon
 pub use defaults::{ContextStoreDefaults, PerformanceDefaults, ScenarioDefaults};
 pub use loader::{ConfigManager, VTAgentConfig};
 pub use router::{ComplexityModelMap, ResourceBudget, RouterConfig};
-pub use telemetry::TelemetryConfig;
+pub use telemetry::{HotpathConfig, HotpathReportFormat, TelemetryConfig};
 
 use serde::{Deserialize, Serialize};
 

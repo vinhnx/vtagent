@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use serde_json::{Map, Number, Value};
 use std::io::{self, Write};
 use vtagent_core::config::constants::context as context_defaults;
 use vtagent_core::config::loader::{ConfigManager, VTAgentConfig};
@@ -206,6 +207,157 @@ fn load_context_trim_config(vt_cfg: Option<&VTAgentConfig>) -> ContextTrimConfig
         trim_to_percent,
         preserve_recent_turns,
     }
+}
+
+const TEXTUAL_TOOL_PREFIXES: &[&str] = &["default_api."];
+
+fn detect_textual_tool_call(text: &str) -> Option<(String, Value)> {
+    for prefix in TEXTUAL_TOOL_PREFIXES {
+        let mut search_start = 0usize;
+        while let Some(offset) = text[search_start..].find(prefix) {
+            let prefix_index = search_start + offset;
+            let start = prefix_index + prefix.len();
+            let tail = &text[start..];
+            let mut name_len = 0usize;
+            for ch in tail.chars() {
+                if ch.is_ascii_alphanumeric() || ch == '_' {
+                    name_len += ch.len_utf8();
+                } else {
+                    break;
+                }
+            }
+            if name_len == 0 {
+                search_start += offset + prefix.len();
+                continue;
+            }
+
+            let name = tail[..name_len].to_string();
+            let after_name = &tail[name_len..];
+            let Some(paren_offset) = after_name.find('(') else {
+                search_start = start;
+                continue;
+            };
+
+            let args_start = start + name_len + paren_offset + 1;
+            let mut depth = 1i32;
+            let mut end: Option<usize> = None;
+            for (rel_idx, ch) in text[args_start..].char_indices() {
+                match ch {
+                    '(' => depth += 1,
+                    ')' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            end = Some(args_start + rel_idx);
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            let Some(args_end) = end else {
+                return None;
+            };
+            let raw_args = &text[args_start..args_end];
+            if let Some(args) = parse_textual_arguments(raw_args) {
+                return Some((name, args));
+            }
+
+            search_start = prefix_index + prefix.len() + name_len;
+        }
+    }
+    None
+}
+
+fn parse_textual_arguments(raw: &str) -> Option<Value> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Some(Value::Object(Map::new()));
+    }
+
+    if let Some(val) = try_parse_json_value(trimmed) {
+        return Some(val);
+    }
+
+    parse_key_value_arguments(trimmed)
+}
+
+fn try_parse_json_value(input: &str) -> Option<Value> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return Some(Value::Object(Map::new()));
+    }
+
+    serde_json::from_str(trimmed).ok().or_else(|| {
+        if trimmed.contains('\'') {
+            let normalized = trimmed.replace('\'', "\"");
+            serde_json::from_str(&normalized).ok()
+        } else {
+            None
+        }
+    })
+}
+
+fn parse_key_value_arguments(input: &str) -> Option<Value> {
+    let mut map = Map::new();
+
+    for segment in input.split(',') {
+        let pair = segment.trim();
+        if pair.is_empty() {
+            continue;
+        }
+
+        let (key_raw, value_raw) = pair.split_once('=').or_else(|| pair.split_once(':'))?;
+
+        let key = key_raw
+            .trim()
+            .trim_matches('"')
+            .trim_matches('\'')
+            .to_string();
+
+        let value = parse_scalar_value(value_raw.trim());
+        map.insert(key, value);
+    }
+
+    if map.is_empty() {
+        None
+    } else {
+        Some(Value::Object(map))
+    }
+}
+
+fn parse_scalar_value(input: &str) -> Value {
+    if let Some(val) = try_parse_json_value(input) {
+        return val;
+    }
+
+    let trimmed = input
+        .trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .to_string();
+    if trimmed.is_empty() {
+        return Value::String(trimmed);
+    }
+
+    match trimmed.to_ascii_lowercase().as_str() {
+        "true" => return Value::Bool(true),
+        "false" => return Value::Bool(false),
+        "null" => return Value::Null,
+        _ => {}
+    }
+
+    if let Ok(int_val) = trimmed.parse::<i64>() {
+        return Value::Number(Number::from(int_val));
+    }
+
+    if let Ok(float_val) = trimmed.parse::<f64>() {
+        if let Some(num) = Number::from_f64(float_val) {
+            return Value::Number(num);
+        }
+    }
+
+    Value::String(trimmed)
 }
 
 fn enforce_gemini_context_window(
@@ -686,17 +838,57 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
             };
 
             _final_text = None;
+            let mut aggregated_text: Vec<String> = Vec::new();
             let mut function_calls: Vec<FunctionCall> = Vec::new();
             let mut response_content: Option<Content> = None;
             if let Some(candidate) = response.candidates.first() {
                 response_content = Some(candidate.content.clone());
                 for part in &candidate.content.parts {
                     match part {
-                        Part::Text { text } => _final_text = Some(text.clone()),
+                        Part::Text { text } => aggregated_text.push(text.clone()),
                         Part::FunctionCall { function_call } => {
                             function_calls.push(function_call.clone())
                         }
                         _ => {}
+                    }
+                }
+            }
+
+            if !aggregated_text.is_empty() {
+                _final_text = Some(aggregated_text.join("\n"));
+            }
+
+            if function_calls.is_empty() {
+                if let Some(text) = _final_text.clone() {
+                    if let Some((name, args)) = detect_textual_tool_call(&text) {
+                        let args_display =
+                            serde_json::to_string(&args).unwrap_or_else(|_| "{}".to_string());
+                        renderer.line(
+                            MessageStyle::Info,
+                            &format!(
+                                "Interpreting textual tool request as {} {}",
+                                &name, &args_display
+                            ),
+                        )?;
+                        let fc = FunctionCall {
+                            name,
+                            args,
+                            id: None,
+                        };
+                        if let Some(ref mut content) = response_content {
+                            content.parts = vec![Part::FunctionCall {
+                                function_call: fc.clone(),
+                            }];
+                        } else {
+                            response_content = Some(Content {
+                                role: "model".to_string(),
+                                parts: vec![Part::FunctionCall {
+                                    function_call: fc.clone(),
+                                }],
+                            });
+                        }
+                        function_calls.push(fc);
+                        _final_text = None;
                     }
                 }
             }
@@ -707,7 +899,9 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
 
             if function_calls.is_empty() {
                 if let Some(text) = _final_text.clone() {
-                    renderer.line(MessageStyle::Response, &text)?;
+                    if !text.trim().is_empty() {
+                        renderer.line(MessageStyle::Response, &text)?;
+                    }
                 }
                 break 'outer;
             }
@@ -1089,79 +1283,105 @@ async fn run_single_agent_loop_unified(
             };
 
             _final_text = response.content.clone();
+            let mut tool_calls = response.tool_calls.clone().unwrap_or_default();
+            let mut interpreted_textual_call = false;
 
-            // Extract tool calls if any
-            if let Some(tool_calls) = response.tool_calls.clone() {
-                if tool_calls.is_empty() {
-                    if let Some(text) = _final_text.clone() {
-                        working_history.push(uni::Message::assistant(text));
+            if tool_calls.is_empty() {
+                if let Some(text) = _final_text.clone() {
+                    if let Some((name, args)) = detect_textual_tool_call(&text) {
+                        let args_display =
+                            serde_json::to_string(&args).unwrap_or_else(|_| "{}".to_string());
+                        renderer.line(
+                            MessageStyle::Info,
+                            &format!(
+                                "Interpreting textual tool request as {} {}",
+                                &name, &args_display
+                            ),
+                        )?;
+                        let call_id = format!("call_textual_{}", working_history.len());
+                        tool_calls.push(uni::ToolCall::function(
+                            call_id.clone(),
+                            name.clone(),
+                            args_display.clone(),
+                        ));
+                        interpreted_textual_call = true;
+                        _final_text = None;
                     }
+                }
+            }
+
+            if tool_calls.is_empty() {
+                if let Some(text) = _final_text.clone() {
+                    working_history.push(uni::Message::assistant(text));
+                }
+            } else {
+                let assistant_text = if interpreted_textual_call {
+                    String::new()
                 } else {
-                    if let Some(text) = _final_text.clone() {
-                        working_history
-                            .push(uni::Message::assistant_with_tools(text, tool_calls.clone()));
-                    }
-                    // Execute each function call
-                    for call in &tool_calls {
-                        let name = call.function.name.as_str();
-                        let args_val = call
-                            .parsed_arguments()
-                            .unwrap_or_else(|_| serde_json::json!({}));
-                        let dec_id = ledger.record_decision(
-                            format!("Execute tool '{}' to progress task", name),
-                            DTAction::ToolCall {
-                                name: name.to_string(),
-                                args: args_val.clone(),
-                                expected_outcome: "Use tool output to decide next step".to_string(),
-                            },
-                            None,
-                        );
-                        match tool_registry.execute_tool(name, args_val.clone()).await {
-                            Ok(tool_output) => {
-                                traj.log_tool_call(working_history.len(), name, &args_val, true);
-                                render_tool_output(&tool_output);
-                                if matches!(
-                                    name,
-                                    "write_file" | "edit_file" | "create_file" | "delete_file"
-                                ) {
-                                    any_write_effect = true;
-                                }
-                                // Send tool response back (OpenAI expects tool role with tool_call_id)
-                                let content =
-                                    serde_json::to_string(&tool_output).unwrap_or("{}".to_string());
-                                working_history
-                                    .push(uni::Message::tool_response(call.id.clone(), content));
-                                ledger.record_outcome(
-                                    &dec_id,
-                                    DecisionOutcome::Success {
-                                        result: "tool_ok".to_string(),
-                                        metrics: Default::default(),
-                                    },
-                                );
+                    _final_text.clone().unwrap_or_default()
+                };
+                working_history.push(uni::Message::assistant_with_tools(
+                    assistant_text,
+                    tool_calls.clone(),
+                ));
+                // Execute each function call
+                for call in &tool_calls {
+                    let name = call.function.name.as_str();
+                    let args_val = call
+                        .parsed_arguments()
+                        .unwrap_or_else(|_| serde_json::json!({}));
+                    let dec_id = ledger.record_decision(
+                        format!("Execute tool '{}' to progress task", name),
+                        DTAction::ToolCall {
+                            name: name.to_string(),
+                            args: args_val.clone(),
+                            expected_outcome: "Use tool output to decide next step".to_string(),
+                        },
+                        None,
+                    );
+                    match tool_registry.execute_tool(name, args_val.clone()).await {
+                        Ok(tool_output) => {
+                            traj.log_tool_call(working_history.len(), name, &args_val, true);
+                            render_tool_output(&tool_output);
+                            if matches!(
+                                name,
+                                "write_file" | "edit_file" | "create_file" | "delete_file"
+                            ) {
+                                any_write_effect = true;
                             }
-                            Err(e) => {
-                                traj.log_tool_call(working_history.len(), name, &args_val, false);
-                                renderer.line(MessageStyle::Error, &format!("Tool error: {e}"))?;
-                                let err = serde_json::json!({ "error": e.to_string() });
-                                let content = err.to_string();
-                                working_history
-                                    .push(uni::Message::tool_response(call.id.clone(), content));
-                                ledger.record_outcome(
-                                    &dec_id,
-                                    DecisionOutcome::Failure {
-                                        error: e.to_string(),
-                                        recovery_attempts: 0,
-                                        context_preserved: true,
-                                    },
-                                );
-                            }
+                            // Send tool response back (OpenAI expects tool role with tool_call_id)
+                            let content =
+                                serde_json::to_string(&tool_output).unwrap_or("{}".to_string());
+                            working_history
+                                .push(uni::Message::tool_response(call.id.clone(), content));
+                            ledger.record_outcome(
+                                &dec_id,
+                                DecisionOutcome::Success {
+                                    result: "tool_ok".to_string(),
+                                    metrics: Default::default(),
+                                },
+                            );
+                        }
+                        Err(e) => {
+                            traj.log_tool_call(working_history.len(), name, &args_val, false);
+                            renderer.line(MessageStyle::Error, &format!("Tool error: {e}"))?;
+                            let err = serde_json::json!({ "error": e.to_string() });
+                            let content = err.to_string();
+                            working_history
+                                .push(uni::Message::tool_response(call.id.clone(), content));
+                            ledger.record_outcome(
+                                &dec_id,
+                                DecisionOutcome::Failure {
+                                    error: e.to_string(),
+                                    recovery_attempts: 0,
+                                    context_preserved: true,
+                                },
+                            );
                         }
                     }
-                    // Continue inner loop to let model use tool results
-                    continue;
                 }
-            } else if let Some(text) = _final_text.clone() {
-                working_history.push(uni::Message::assistant(text));
+                // Continue inner loop to let model use tool results
+                continue;
             }
 
             // If we reach here, no (more) tool calls
@@ -1476,6 +1696,42 @@ mod tests {
                 .map(|msg| msg.content.clone())
                 .unwrap_or_default()
                 .contains(&expected_first)
+        );
+    }
+
+    #[test]
+    fn test_detect_textual_tool_call_parses_python_style_arguments() {
+        let message = "call\nprint(default_api.read_file(path='CLAUDE.md'))";
+        let (name, args) = detect_textual_tool_call(message).expect("should parse");
+        assert_eq!(name, "read_file");
+        assert_eq!(args, serde_json::json!({ "path": "CLAUDE.md" }));
+    }
+
+    #[test]
+    fn test_detect_textual_tool_call_supports_json_payload() {
+        let message =
+            "print(default_api.write_file({\"path\": \"notes.md\", \"content\": \"hi\"}))";
+        let (name, args) = detect_textual_tool_call(message).expect("should parse");
+        assert_eq!(name, "write_file");
+        assert_eq!(
+            args,
+            serde_json::json!({ "path": "notes.md", "content": "hi" })
+        );
+    }
+
+    #[test]
+    fn test_detect_textual_tool_call_handles_boolean_and_numbers() {
+        let message =
+            "default_api.search_workspace(query='todo', max_results=5, include_archived=false)";
+        let (name, args) = detect_textual_tool_call(message).expect("should parse");
+        assert_eq!(name, "search_workspace");
+        assert_eq!(
+            args,
+            serde_json::json!({
+                "query": "todo",
+                "max_results": 5,
+                "include_archived": false
+            })
         );
     }
 }

@@ -12,7 +12,7 @@ use vtagent_core::gemini::{Client as GeminiClient, Content, GenerateContentReque
 use vtagent_core::llm::{factory::create_provider_for_model, provider as uni};
 use vtagent_core::models::{ModelId, Provider};
 use vtagent_core::prompts::read_system_prompt_from_md;
-use vtagent_core::tools::{ToolRegistry, build_function_declarations};
+use vtagent_core::tools::{build_function_declarations, ToolRegistry};
 use vtagent_core::utils::utils::summarize_workspace_languages;
 
 use vtagent_core::core::decision_tracker::{Action as DTAction, DecisionOutcome, DecisionTracker};
@@ -613,11 +613,7 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
             }
         }
 
-        if let Some(last_system) = working_history.last() {
-            if let Some(text) = last_system.parts.first().and_then(|p| p.as_text()) {
-                conversation_history.push(Content::system_text(text.to_string()));
-            }
-        }
+        conversation_history = working_history;
 
         let post_trim = enforce_gemini_context_window(&mut conversation_history, trim_config);
         if post_trim.is_trimmed() {
@@ -985,12 +981,8 @@ async fn run_single_agent_loop_unified(
             break 'outer;
         }
 
-        // Commit assistant response to true conversation history
-        if let Some(last) = working_history.last() {
-            if last.role == uni::MessageRole::Assistant {
-                conversation_history.push(last.clone());
-            }
-        }
+        // Commit turn transcript (including tool traffic) back to conversation history
+        conversation_history = working_history;
 
         let post_trim = enforce_unified_context_window(&mut conversation_history, trim_config);
         if post_trim.is_trimmed() {
@@ -1059,5 +1051,59 @@ mod tests {
         unsafe {
             std::env::remove_var("VTAGENT_PROMPT_REFINER_STUB");
         }
+    }
+
+    #[test]
+    fn test_enforce_gemini_context_window_trims_excess_tokens() {
+        let mut history: Vec<Content> = (0..16)
+            .map(|i| Content::user_text(format!("message {}", i)))
+            .collect();
+        let original_len = history.len();
+        let config = ContextTrimConfig {
+            max_tokens: 24,
+            trim_to_percent: 75,
+            preserve_recent_turns: 4,
+        };
+
+        let outcome = enforce_gemini_context_window(&mut history, config);
+
+        assert!(outcome.is_trimmed());
+        assert_eq!(original_len - history.len(), outcome.removed_messages);
+
+        let remaining_tokens: usize = history.iter().map(approximate_gemini_message_tokens).sum();
+        assert!(remaining_tokens <= config.max_tokens);
+
+        let last_text = history
+            .last()
+            .and_then(|msg| msg.parts.first().and_then(|p| p.as_text()))
+            .unwrap_or_default();
+        assert_eq!(last_text, "message 15");
+    }
+
+    #[test]
+    fn test_enforce_unified_context_window_trims_and_preserves_latest() {
+        let mut history: Vec<uni::Message> = (0..12)
+            .map(|i| uni::Message::assistant(format!("assistant step {}", i)))
+            .collect();
+        let original_len = history.len();
+        let config = ContextTrimConfig {
+            max_tokens: 18,
+            trim_to_percent: 70,
+            preserve_recent_turns: 3,
+        };
+
+        let outcome = enforce_unified_context_window(&mut history, config);
+
+        assert!(outcome.is_trimmed());
+        assert_eq!(original_len - history.len(), outcome.removed_messages);
+
+        let remaining_tokens: usize = history.iter().map(approximate_unified_message_tokens).sum();
+        assert!(remaining_tokens <= config.max_tokens);
+
+        let last_content = history
+            .last()
+            .map(|msg| msg.content.clone())
+            .unwrap_or_default();
+        assert!(last_content.contains("assistant step 11"));
     }
 }

@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use std::io::{self, Write};
+use vtagent_core::config::constants::context as context_defaults;
 use vtagent_core::config::loader::{ConfigManager, VTAgentConfig};
 use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
 use vtagent_core::utils::ansi::{AnsiRenderer, MessageStyle};
@@ -36,6 +37,208 @@ fn render_tool_output(val: &serde_json::Value) {
         let _ = renderer.line(MessageStyle::Error, "[stderr]");
         let _ = renderer.line(MessageStyle::Error, stderr);
     }
+}
+
+#[derive(Clone, Copy)]
+struct ContextTrimConfig {
+    max_tokens: usize,
+    trim_to_percent: u8,
+    preserve_recent_turns: usize,
+}
+
+impl ContextTrimConfig {
+    fn target_tokens(&self) -> usize {
+        let percent = (self.trim_to_percent as u128).clamp(
+            context_defaults::MIN_TRIM_RATIO_PERCENT as u128,
+            context_defaults::MAX_TRIM_RATIO_PERCENT as u128,
+        );
+        ((self.max_tokens as u128) * percent / 100) as usize
+    }
+}
+
+#[derive(Default)]
+struct ContextTrimOutcome {
+    removed_messages: usize,
+}
+
+impl ContextTrimOutcome {
+    fn is_trimmed(&self) -> bool {
+        self.removed_messages > 0
+    }
+}
+
+fn load_context_trim_config(vt_cfg: Option<&VTAgentConfig>) -> ContextTrimConfig {
+    let context_cfg = vt_cfg.map(|cfg| &cfg.context);
+    let max_tokens = std::env::var("VTAGENT_CONTEXT_TOKEN_LIMIT")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|value| *value > 0)
+        .or_else(|| {
+            context_cfg
+                .map(|cfg| cfg.max_context_tokens)
+                .filter(|value| *value > 0)
+        })
+        .unwrap_or(context_defaults::DEFAULT_MAX_TOKENS);
+
+    let trim_to_percent = context_cfg
+        .map(|cfg| cfg.trim_to_percent)
+        .unwrap_or(context_defaults::DEFAULT_TRIM_TO_PERCENT)
+        .clamp(
+            context_defaults::MIN_TRIM_RATIO_PERCENT,
+            context_defaults::MAX_TRIM_RATIO_PERCENT,
+        );
+
+    let preserve_recent_turns = context_cfg
+        .map(|cfg| cfg.preserve_recent_turns)
+        .unwrap_or(context_defaults::DEFAULT_PRESERVE_RECENT_TURNS)
+        .max(context_defaults::MIN_PRESERVE_RECENT_TURNS);
+
+    ContextTrimConfig {
+        max_tokens,
+        trim_to_percent,
+        preserve_recent_turns,
+    }
+}
+
+fn enforce_gemini_context_window(
+    history: &mut Vec<Content>,
+    config: ContextTrimConfig,
+) -> ContextTrimOutcome {
+    if history.is_empty() {
+        return ContextTrimOutcome::default();
+    }
+
+    let tokens_per_message: Vec<usize> = history
+        .iter()
+        .map(approximate_gemini_message_tokens)
+        .collect();
+    let mut total_tokens: usize = tokens_per_message.iter().sum();
+
+    if total_tokens <= config.max_tokens {
+        return ContextTrimOutcome::default();
+    }
+
+    let target_tokens = config.target_tokens();
+    let mut remove_count = 0usize;
+    let mut preserve_boundary = history.len().saturating_sub(config.preserve_recent_turns);
+    if preserve_boundary > history.len().saturating_sub(1) {
+        preserve_boundary = history.len().saturating_sub(1);
+    }
+
+    while remove_count < preserve_boundary && total_tokens > config.max_tokens {
+        total_tokens = total_tokens.saturating_sub(tokens_per_message[remove_count]);
+        remove_count += 1;
+        if total_tokens <= target_tokens {
+            break;
+        }
+    }
+
+    while remove_count < history.len().saturating_sub(1) && total_tokens > config.max_tokens {
+        total_tokens = total_tokens.saturating_sub(tokens_per_message[remove_count]);
+        remove_count += 1;
+    }
+
+    if remove_count == 0 {
+        return ContextTrimOutcome::default();
+    }
+
+    history.drain(0..remove_count);
+    ContextTrimOutcome {
+        removed_messages: remove_count,
+    }
+}
+
+fn enforce_unified_context_window(
+    history: &mut Vec<uni::Message>,
+    config: ContextTrimConfig,
+) -> ContextTrimOutcome {
+    if history.is_empty() {
+        return ContextTrimOutcome::default();
+    }
+
+    let tokens_per_message: Vec<usize> = history
+        .iter()
+        .map(approximate_unified_message_tokens)
+        .collect();
+    let mut total_tokens: usize = tokens_per_message.iter().sum();
+
+    if total_tokens <= config.max_tokens {
+        return ContextTrimOutcome::default();
+    }
+
+    let target_tokens = config.target_tokens();
+    let mut remove_count = 0usize;
+    let mut preserve_boundary = history.len().saturating_sub(config.preserve_recent_turns);
+    if preserve_boundary > history.len().saturating_sub(1) {
+        preserve_boundary = history.len().saturating_sub(1);
+    }
+
+    while remove_count < preserve_boundary && total_tokens > config.max_tokens {
+        total_tokens = total_tokens.saturating_sub(tokens_per_message[remove_count]);
+        remove_count += 1;
+        if total_tokens <= target_tokens {
+            break;
+        }
+    }
+
+    while remove_count < history.len().saturating_sub(1) && total_tokens > config.max_tokens {
+        total_tokens = total_tokens.saturating_sub(tokens_per_message[remove_count]);
+        remove_count += 1;
+    }
+
+    if remove_count == 0 {
+        return ContextTrimOutcome::default();
+    }
+
+    history.drain(0..remove_count);
+    ContextTrimOutcome {
+        removed_messages: remove_count,
+    }
+}
+
+fn approximate_gemini_message_tokens(message: &Content) -> usize {
+    let mut total_chars = message.role.len();
+    for part in &message.parts {
+        match part {
+            Part::Text { text } => {
+                total_chars += text.len();
+            }
+            Part::FunctionCall { function_call } => {
+                total_chars += function_call.name.len();
+                total_chars += serde_json::to_string(&function_call.args)
+                    .map(|value| value.len())
+                    .unwrap_or_default();
+            }
+            Part::FunctionResponse { function_response } => {
+                total_chars += function_response.name.len();
+                total_chars += serde_json::to_string(&function_response.response)
+                    .map(|value| value.len())
+                    .unwrap_or_default();
+            }
+        }
+    }
+
+    total_chars.div_ceil(context_defaults::CHAR_PER_TOKEN_APPROX)
+}
+
+fn approximate_unified_message_tokens(message: &uni::Message) -> usize {
+    let mut total_chars = message.content.len();
+    total_chars += message.role.as_generic_str().len();
+
+    if let Some(tool_calls) = &message.tool_calls {
+        for call in tool_calls {
+            total_chars += call.id.len();
+            total_chars += call.call_type.len();
+            total_chars += call.function.name.len();
+            total_chars += call.function.arguments.len();
+        }
+    }
+
+    if let Some(tool_call_id) = &message.tool_call_id {
+        total_chars += tool_call_id.len();
+    }
+
+    total_chars.div_ceil(context_defaults::CHAR_PER_TOKEN_APPROX)
 }
 
 async fn refine_user_prompt_if_enabled(
@@ -119,6 +322,7 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
     if provider != Provider::Gemini {
         return run_single_agent_loop_unified(config, provider, vt_cfg).await;
     }
+    let trim_config = load_context_trim_config(vt_cfg);
     let mut renderer = AnsiRenderer::stdout();
     renderer.line(MessageStyle::Info, "Interactive chat (tools)")?;
     renderer.line(MessageStyle::Output, &format!("Model: {}", config.model))?;
@@ -188,6 +392,16 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
         }
 
         conversation_history.push(Content::user_text(input));
+        let trim_result = enforce_gemini_context_window(&mut conversation_history, trim_config);
+        if trim_result.is_trimmed() {
+            renderer.line(
+                MessageStyle::Info,
+                &format!(
+                    "Trimmed {} earlier messages to respect the context window (~{} tokens).",
+                    trim_result.removed_messages, trim_config.max_tokens,
+                ),
+            )?;
+        }
 
         // Router decision (LLM if configured)
         let decision = if let Some(vt) = vt_cfg {
@@ -230,6 +444,8 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
             if loop_guard >= max_tool_loops {
                 break 'outer;
             }
+
+            let _ = enforce_gemini_context_window(&mut working_history, trim_config);
 
             // Apply budgets for Gemini-native path as generation_config
             let (gen_cfg, _parallel_any) = if let Some(vt) = vt_cfg {
@@ -403,6 +619,17 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
             }
         }
 
+        let post_trim = enforce_gemini_context_window(&mut conversation_history, trim_config);
+        if post_trim.is_trimmed() {
+            renderer.line(
+                MessageStyle::Info,
+                &format!(
+                    "Trimmed {} earlier messages to respect the context window (~{} tokens).",
+                    post_trim.removed_messages, trim_config.max_tokens,
+                ),
+            )?;
+        }
+
         if let Some(last) = conversation_history.last() {
             if let Some(text) = last.parts.first().and_then(|p| p.as_text()) {
                 let claims_write = text.contains("I've updated")
@@ -457,6 +684,8 @@ async fn run_single_agent_loop_unified(
         .map(|decl| uni::ToolDefinition::function(decl.name, decl.description, decl.parameters))
         .collect();
 
+    let trim_config = load_context_trim_config(vt_cfg);
+
     // Conversation history (provider-agnostic)
     let mut conversation_history: Vec<uni::Message> = vec![];
     let mut ledger = DecisionTracker::new();
@@ -503,6 +732,16 @@ async fn run_single_agent_loop_unified(
         // Optional prompt refinement for provider-native path
         let refined_user = refine_user_prompt_if_enabled(input, config, vt_cfg).await;
         conversation_history.push(uni::Message::user(refined_user));
+        let trim_result = enforce_unified_context_window(&mut conversation_history, trim_config);
+        if trim_result.is_trimmed() {
+            renderer.line(
+                MessageStyle::Info,
+                &format!(
+                    "Trimmed {} earlier messages to respect the context window (~{} tokens).",
+                    trim_result.removed_messages, trim_config.max_tokens,
+                ),
+            )?;
+        }
 
         // Working copy for inner tool loop
         let mut working_history = conversation_history.clone();
@@ -522,6 +761,8 @@ async fn run_single_agent_loop_unified(
             if loop_guard >= max_tool_loops {
                 break 'outer;
             }
+
+            let _ = enforce_unified_context_window(&mut working_history, trim_config);
 
             // Build LLMRequest with router-selected model & budgets
             let decision = if let Some(c) = vt_cfg.filter(|c| c.router.enabled) {
@@ -749,6 +990,17 @@ async fn run_single_agent_loop_unified(
             if last.role == uni::MessageRole::Assistant {
                 conversation_history.push(last.clone());
             }
+        }
+
+        let post_trim = enforce_unified_context_window(&mut conversation_history, trim_config);
+        if post_trim.is_trimmed() {
+            renderer.line(
+                MessageStyle::Info,
+                &format!(
+                    "Trimmed {} earlier messages to respect the context window (~{} tokens).",
+                    post_trim.removed_messages, trim_config.max_tokens,
+                ),
+            )?;
         }
 
         // Post-response guard re: claimed writes without tools

@@ -148,6 +148,30 @@ pub mod tools {
     pub const WILDCARD_ALL: &str = "*";
 }
 
+/// Context window management defaults
+pub mod context {
+    /// Approximate character count per token when estimating context size
+    pub const CHAR_PER_TOKEN_APPROX: usize = 4;
+
+    /// Default maximum context window (in approximate tokens)
+    pub const DEFAULT_MAX_TOKENS: usize = 120_000;
+
+    /// Trim target as a percentage of the maximum token budget
+    pub const DEFAULT_TRIM_TO_PERCENT: u8 = 80;
+
+    /// Minimum allowed trim percentage (prevents overly aggressive retention)
+    pub const MIN_TRIM_RATIO_PERCENT: u8 = 60;
+
+    /// Maximum allowed trim percentage (prevents minimal trimming)
+    pub const MAX_TRIM_RATIO_PERCENT: u8 = 90;
+
+    /// Default number of recent turns to preserve verbatim
+    pub const DEFAULT_PRESERVE_RECENT_TURNS: usize = 12;
+
+    /// Minimum number of recent turns that must remain after trimming
+    pub const MIN_PRESERVE_RECENT_TURNS: usize = 6;
+}
+
 /// Chunking constants for large file handling
 pub mod chunking {
     /// Maximum lines before triggering chunking for read_file

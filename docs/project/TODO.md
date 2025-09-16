@@ -4,21 +4,6 @@ https://github.com/openai/codex/blob/main/codex-rs/core/gpt_5_codex_prompt.md
 
 https://github.com/openai/codex/blob/main/codex-rs/core/prompt.md
 
---
-
-The terminal UI has also been upgraded: tool calls and diffs are better formatted and easier to follow. Approval modes are simplified to three levels: read-only with explicit approvals, auto with full workspace access but requiring approvals outside the workspace, and full access with the ability to read files anywhere and run commands with network access.
-
---
-
-https://openai.com/index/introducing-upgrades-to-codex/
-
-upgrade codex
-
---
-
-integrate https://deepwiki.com/pawurb/hotpath profiler and instrument then fix blocking code.
-A simple Rust profiler that shows exactly where your code spends time
-
 ---
 
 --
@@ -74,3 +59,7 @@ integrates the Hotpath profiler (available at https://deepwiki.com/pawurb/hotpat
 5. Include a main function that runs both the original blocking version and the refactored async version, compares their performance via Hotpath reports, and outputs the results to verify improvements (e.g., reduced blocking time and better throughput).
 
 Provide the complete, compilable code with comments explaining the integration, instrumentation, and fixes. Use Rust 1.75+ and handle errors gracefully with `anyhow` or `thiserror`.
+
+===
+
+search for "// TODO: " comments in the codebase and implement the missing functionality. prioritize tasks that enhance core features, improve performance, or fix bugs. ensure code quality with tests and documentation updates as needed.

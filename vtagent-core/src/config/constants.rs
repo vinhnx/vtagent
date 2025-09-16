@@ -151,10 +151,10 @@ pub mod tools {
 /// Context window management defaults
 pub mod context {
     /// Approximate character count per token when estimating context size
-    pub const CHAR_PER_TOKEN_APPROX: usize = 4;
+    pub const CHAR_PER_TOKEN_APPROX: usize = 3;
 
     /// Default maximum context window (in approximate tokens)
-    pub const DEFAULT_MAX_TOKENS: usize = 120_000;
+    pub const DEFAULT_MAX_TOKENS: usize = 90_000;
 
     /// Trim target as a percentage of the maximum token budget
     pub const DEFAULT_TRIM_TO_PERCENT: u8 = 80;
@@ -170,6 +170,12 @@ pub mod context {
 
     /// Minimum number of recent turns that must remain after trimming
     pub const MIN_PRESERVE_RECENT_TURNS: usize = 6;
+
+    /// Maximum number of recent turns to keep when aggressively reducing context
+    pub const AGGRESSIVE_PRESERVE_RECENT_TURNS: usize = 8;
+
+    /// Maximum number of retry attempts when the provider signals context overflow
+    pub const CONTEXT_ERROR_RETRY_LIMIT: usize = 2;
 }
 
 /// Chunking constants for large file handling

@@ -128,10 +128,5 @@ Provider error: API error 503 Service Unavailable: {
 
 ---
 
-https://github.com/vinhnx/vtagent/pull/7/files
-
----
-
-IMPORTANT: for tool calls, it seems the agent is repeated last tools call command.
-
-for example, turn 1, the agent calls `git status --short`, then turn 2, i ask to run ls -a, but the agent calls `git status --short` again and ls -a, then turn 3, git log -1 the agent calls `git status --short` again and ls -a then `git log -1`.
+check docs/guides/codex-cloud-setup.md
+and setup codex cloud environment for vtagent

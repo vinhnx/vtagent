@@ -12,7 +12,7 @@ use vtagent_core::gemini::{Client as GeminiClient, Content, GenerateContentReque
 use vtagent_core::llm::{factory::create_provider_for_model, provider as uni};
 use vtagent_core::models::{ModelId, Provider};
 use vtagent_core::prompts::read_system_prompt_from_md;
-use vtagent_core::tools::{build_function_declarations, ToolRegistry};
+use vtagent_core::tools::{ToolRegistry, build_function_declarations};
 use vtagent_core::utils::utils::summarize_workspace_languages;
 
 use vtagent_core::core::decision_tracker::{Action as DTAction, DecisionOutcome, DecisionTracker};
@@ -531,7 +531,9 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
             };
             _final_text = None;
             let mut function_calls: Vec<FunctionCall> = Vec::new();
+            let mut response_content: Option<Content> = None;
             if let Some(candidate) = response.candidates.first() {
+                response_content = Some(candidate.content.clone());
                 for part in &candidate.content.parts {
                     match part {
                         Part::Text { text } => _final_text = Some(text.clone()),
@@ -543,12 +545,13 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
                 }
             }
 
+            if let Some(content) = response_content {
+                working_history.push(content);
+            }
+
             if function_calls.is_empty() {
                 if let Some(text) = _final_text.clone() {
                     renderer.line(MessageStyle::Response, &text)?;
-                }
-                if let Some(text) = _final_text {
-                    working_history.push(Content::system_text(text));
                 }
                 break 'outer;
             }

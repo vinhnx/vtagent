@@ -58,3 +58,19 @@ Implement llm vtagent response token streaming for real-time response generation
 check docs/guides/codex-cloud-setup.md
 and setup codex cloud environment for vtagent
 https://developers.openai.com/codex/cloud/environments
+
+---
+
+integrates the Hotpath profiler (available at https://deepwiki.com/pawurb/hotpath), a lightweight tool for pinpointing exactly where your code spends its time. Follow these steps:
+
+1. Set up a basic Rust application (e.g., a simple CLI tool or web server using Tokio for async runtime) that includes some intentionally blocking operations, such as synchronous file I/O, network requests, or CPU-intensive loops, to demonstrate performance bottlenecks.
+
+2. Add Hotpath as a dependency in Cargo.toml and instrument the code using Hotpath's APIs: Wrap key functions or sections with profiling scopes (e.g., `hotpath::scope("function_name")`) to capture timing data for hot paths.
+
+3. Run the profiled application and generate a report to identify blocking code—focus on sections showing high wall-clock time due to synchronous blocking (e.g., `std::fs::read_to_string` or `reqwest::blocking::get`).
+
+4. Refactor the blocking code to make it non-blocking: Convert synchronous operations to asynchronous equivalents (e.g., use `tokio::fs::read_to_string` or `reqwest` async client), offload CPU-bound tasks to worker threads via `tokio::spawn_blocking`, and ensure the main event loop remains responsive.
+
+5. Include a main function that runs both the original blocking version and the refactored async version, compares their performance via Hotpath reports, and outputs the results to verify improvements (e.g., reduced blocking time and better throughput).
+
+Provide the complete, compilable code with comments explaining the integration, instrumentation, and fixes. Use Rust 1.75+ and handle errors gracefully with `anyhow` or `thiserror`.

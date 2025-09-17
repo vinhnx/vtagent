@@ -86,7 +86,6 @@
 //! ```
 
 use super::traits::{FileTool, Tool};
-use super::types::*;
 use crate::utils::vtagentgitignore::should_exclude_file;
 use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
@@ -262,12 +261,18 @@ impl SrgnTool {
         args.push(input.path.clone());
 
         // Handle different input combinations for scope
-        match (&input.scope, &input.language_scope, &input.custom_query, &input.custom_query_file) {
+        match (
+            &input.scope,
+            &input.language_scope,
+            &input.custom_query,
+            &input.custom_query_file,
+        ) {
             // Custom query from file takes highest precedence
             (_, _, _, Some(query_file)) => {
                 // Determine language from scope or default to rust
                 let lang = if let Some(lang_scope) = &input.language_scope {
-                    let parts: Vec<String> = lang_scope.split_whitespace()
+                    let parts: Vec<String> = lang_scope
+                        .split_whitespace()
                         .map(|s| s.to_string())
                         .collect();
                     parts.get(0).unwrap_or(&"rust".to_string()).clone()
@@ -283,7 +288,12 @@ impl SrgnTool {
                     "c" => "--c-query-file",
                     "csharp" | "cs" | "c#" => "--csharp-query-file",
                     "hcl" => "--hcl-query-file",
-                    _ => return Err(anyhow!("Unsupported language for custom query file: {}", lang)),
+                    _ => {
+                        return Err(anyhow!(
+                            "Unsupported language for custom query file: {}",
+                            lang
+                        ));
+                    }
                 };
 
                 args.push(query_flag.to_string());
@@ -293,7 +303,8 @@ impl SrgnTool {
             (_, _, Some(query), None) => {
                 // Determine language from scope or default to rust
                 let lang = if let Some(lang_scope) = &input.language_scope {
-                    let parts: Vec<String> = lang_scope.split_whitespace()
+                    let parts: Vec<String> = lang_scope
+                        .split_whitespace()
                         .map(|s| s.to_string())
                         .collect();
                     parts.get(0).unwrap_or(&"rust".to_string()).clone()
@@ -347,7 +358,10 @@ impl SrgnTool {
                         }
                     }
                 } else {
-                    return Err(anyhow!("Invalid language scope format. Expected 'language scope' or 'language scope~pattern', got: {}", lang_scope));
+                    return Err(anyhow!(
+                        "Invalid language scope format. Expected 'language scope' or 'language scope~pattern', got: {}",
+                        lang_scope
+                    ));
                 }
             }
             // Regular scope
@@ -411,8 +425,8 @@ impl SrgnTool {
     /// Sanitize and validate file path within workspace
     fn validate_path(&self, path: &str) -> Result<PathBuf> {
         let full_path = self.workspace_root.join(path);
-        let canonical = std::fs::canonicalize(&full_path)
-            .with_context(|| format!("Invalid path: {}", path))?;
+        let canonical =
+            std::fs::canonicalize(&full_path).with_context(|| format!("Invalid path: {}", path))?;
         if !canonical.starts_with(&self.workspace_root) {
             return Err(anyhow!("Path '{}' is outside workspace", path));
         }
@@ -429,12 +443,18 @@ impl SrgnTool {
     /// Execute srgn command
     async fn execute_srgn(&self, args: &[String]) -> Result<String> {
         // For file-modifying operations, capture file paths and timestamps for verification
-        let file_paths: Vec<PathBuf> = args.iter()
+        let file_paths: Vec<PathBuf> = args
+            .iter()
             .filter(|arg| arg.contains('.') && !arg.starts_with('-'))
             .map(|arg| self.workspace_root.join(arg))
             .collect();
-        let before_times: Vec<SystemTime> = file_paths.iter()
-            .map(|path| std::fs::metadata(path).and_then(|m| m.modified()).unwrap_or(SystemTime::UNIX_EPOCH))
+        let before_times: Vec<SystemTime> = file_paths
+            .iter()
+            .map(|path| {
+                std::fs::metadata(path)
+                    .and_then(|m| m.modified())
+                    .unwrap_or(SystemTime::UNIX_EPOCH)
+            })
             .collect();
 
         let output = Command::new("srgn")
@@ -461,7 +481,10 @@ impl SrgnTool {
         if !args.contains(&"--dry-run".to_string()) && !file_paths.is_empty() {
             for (i, path) in file_paths.iter().enumerate() {
                 if !self.was_file_modified(path, before_times[i])? {
-                    return Err(anyhow!("File '{}' was not modified as expected", path.display()));
+                    return Err(anyhow!(
+                        "File '{}' was not modified as expected",
+                        path.display()
+                    ));
                 }
             }
         }
@@ -493,7 +516,9 @@ impl SrgnTool {
             }
             SrgnAction::Delete => {
                 if input.scope.is_none() && input.language_scope.is_none() {
-                    return Err(anyhow!("Delete action requires either a scope pattern or language scope"));
+                    return Err(anyhow!(
+                        "Delete action requires either a scope pattern or language scope"
+                    ));
                 }
             }
             _ => {}
@@ -516,7 +541,8 @@ impl Tool for SrgnTool {
         let cmd_args = self.build_command_args(&input)?;
 
         // Extract potential file paths for git diff confirmation
-        let modified_files: Vec<String> = cmd_args.iter()
+        let modified_files: Vec<String> = cmd_args
+            .iter()
             .filter(|arg| arg.contains('.') && !arg.starts_with('-') && !arg.starts_with('*'))
             .map(|arg| arg.clone())
             .collect();

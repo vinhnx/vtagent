@@ -16,23 +16,23 @@ pub mod grep_search;
 pub mod registry;
 pub mod search;
 pub mod simple_search;
+pub mod speckit;
 pub mod srgn;
 pub mod traits;
 pub mod tree_sitter;
 pub mod types;
-pub mod speckit;
 
 // Re-export main types and traits for backward compatibility
 pub use ast_grep_tool::AstGrepTool;
 pub use bash_tool::BashTool;
 pub use cache::FileCache;
 pub use grep_search::GrepSearchManager;
-pub use registry::ToolRegistry;
+pub use registry::{ToolRegistration, ToolRegistry};
 pub use simple_search::SimpleSearchTool;
+pub use speckit::SpeckitTool;
+pub use srgn::SrgnTool;
 pub use traits::{Tool, ToolExecutor};
 pub use types::*;
-pub use srgn::SrgnTool;
-pub use speckit::SpeckitTool;
 
 // Re-export function declarations for external use
 pub use registry::build_function_declarations;

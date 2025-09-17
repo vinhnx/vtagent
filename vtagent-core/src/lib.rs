@@ -81,7 +81,10 @@ pub use tool_policy::{ToolPolicy, ToolPolicyManager};
 pub use tools::advanced_search::{AdvancedSearchTool, SearchOptions};
 pub use tools::grep_search::GrepSearchManager;
 pub use tools::tree_sitter::TreeSitterAnalyzer;
-pub use tools::{ToolRegistry, build_function_declarations, build_function_declarations_for_level};
+pub use tools::{
+    ToolRegistration, ToolRegistry, build_function_declarations,
+    build_function_declarations_for_level,
+};
 pub use ui::diff_renderer::DiffRenderer;
 pub use utils::dot_config::{
     CacheConfig, DotConfig, DotManager, ProviderConfigs, UiConfig, UserPreferences,

@@ -8,6 +8,7 @@ use super::file_ops::FileOpsTool;
 use super::search::SearchTool;
 use super::simple_search::SimpleSearchTool;
 use super::srgn::SrgnTool;
+use super::speckit::SpeckitTool;
 use super::traits::Tool;
 use crate::config::PtyConfig;
 use crate::config::constants::tools;
@@ -191,6 +192,7 @@ pub struct ToolRegistry {
     pty_config: PtyConfig,
     active_pty_sessions: Arc<AtomicUsize>,
     srgn_tool: SrgnTool,
+    speckit_tool: SpeckitTool,
 }
 
 impl ToolRegistry {
@@ -209,6 +211,7 @@ impl ToolRegistry {
         let file_ops_tool = FileOpsTool::new(workspace_root.clone(), grep_search.clone());
         let command_tool = CommandTool::new(workspace_root.clone());
         let srgn_tool = SrgnTool::new(workspace_root.clone());
+        let speckit_tool = SpeckitTool::new(workspace_root.clone());
 
         // Initialize AST-grep engine
         let ast_grep_engine = match AstGrepEngine::new() {
@@ -240,6 +243,7 @@ impl ToolRegistry {
             tools::BASH.to_string(),
             tools::APPLY_PATCH.to_string(),
             tools::SRGN.to_string(),
+            tools::SPECKIT.to_string(),
         ];
 
         // Add AST-grep tool if available
@@ -267,6 +271,7 @@ impl ToolRegistry {
             pty_config,
             active_pty_sessions: Arc::new(AtomicUsize::new(0)),
             srgn_tool,
+            speckit_tool,
         }
     }
 
@@ -347,6 +352,7 @@ impl ToolRegistry {
             tools::BASH => self.bash_tool.execute(args).await,
             tools::APPLY_PATCH => self.execute_apply_patch(args).await,
             tools::SRGN => self.srgn_tool.execute(args).await,
+            tools::SPECKIT => self.speckit_tool.execute(args).await,
             _ => {
                 let error = ToolExecutionError::new(
                     name.to_string(),
@@ -513,6 +519,7 @@ impl ToolRegistry {
             "simple_search".to_string(),
             "bash".to_string(),
             tools::SRGN.to_string(),
+            tools::SPECKIT.to_string(),
         ];
 
         // Add AST-grep tool if available
@@ -531,7 +538,8 @@ impl ToolRegistry {
             | tools::RUN_TERMINAL_CMD
             | tools::READ_FILE
             | tools::WRITE_FILE
-            | tools::SRGN => true,
+            | tools::SRGN
+            | tools::SPECKIT => true,
             tools::AST_GREP_SEARCH => self.ast_grep_engine.is_some(),
             tools::SIMPLE_SEARCH | tools::BASH => true,
             _ => false,
@@ -1549,6 +1557,28 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
                     "input": {"type": "string", "description": "Patch content in Codex patch format"}
                 },
                 "required": ["input"]
+            }),
+        },
+
+        // Speckit tool for spec-driven development
+        FunctionDeclaration {
+            name: tools::SPECKIT.to_string(),
+            description: "Speckit tool for spec-driven development using GitHub's Spec Kit. This tool enables structured development workflows by transforming natural language specifications into executable code, tests, and documentation. Use this tool to initialize spec-driven projects, create detailed specifications, generate implementation plans, and break down work into actionable tasks. The tool supports commands like 'init' for project setup, '/specify' for creating specifications, '/plan' for technical planning, and '/tasks' for task breakdown. Speckit follows a methodology that inverts traditional development: specifications drive code generation rather than merely guiding it. This tool is particularly valuable for greenfield development, feature exploration, and maintaining specification-driven consistency across projects.".to_string(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "command": {
+                        "type": "string",
+                        "description": "Speckit command to execute: 'init', 'check', '/specify', '/plan', '/tasks'",
+                        "enum": ["init", "check", "/specify", "/plan", "/tasks"]
+                    },
+                    "args": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Arguments for the Speckit command. For 'init': project name or use '--here' flag. For '/specify': specification description. For other commands: optional context arguments."
+                    }
+                },
+                "required": ["command"]
             }),
         },
     ]

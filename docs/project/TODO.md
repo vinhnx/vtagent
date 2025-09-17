@@ -1,4 +1,4 @@
-revert and remove speckit
+speckit command plan doesnt work. if not revert and remove speckit
 
 --
 

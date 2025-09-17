@@ -66,12 +66,10 @@ search for "// TODO: " comments in the codebase and implement the missing functi
 
 ---
 
-https://github.com/github/spec-kit
+fetch integrate speckit as new tools and command workflow for vtagent. this is a python package for spec-driven development. it can generate tests, code, and documentation from specifications. see below links for more details. fetch the website and read the docs. then implement the integration. write tests for the new functionality. update docs if necessary. update system prompt if needed. make sure vtagent can use speckit effectively. also add it to the setup script for easy installation.
 
-https://developer.microsoft.com/blog/spec-driven-development-spec-kit
-https://github.blog/ai-and-ml/generative-ai/spec-driven-development-with-ai-get-started-with-a-new-open-source-toolkit/
+https://github.com/github/spec-kit
 
 --
 
-srgn, a tool for structural code search and transformation using AST patterns.. encourage the vtagent to use srgntool for code modification tasks instead of relying solely on natural language descriptions. srgn allows for precise and reliable code changes by leveraging the structure of the code itself.
-
+refactor registry.rs to improve tool registration and management. create a more modular structure for adding new tools. ensure that each tool has clear metadata including name, description, parameters, and usage examples. implement a dynamic loading mechanism to allow tools to be added or removed without modifying the core codebase. write tests to verify the functionality of the registry and the correct loading of tools. update documentation to reflect the new structure and usage guidelines for adding tools.

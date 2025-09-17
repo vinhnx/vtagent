@@ -2,12 +2,18 @@ use crate::config::constants::{model_helpers, models};
 use crate::llm::client::LLMClient;
 use crate::llm::error_display;
 use crate::llm::provider::{
-    FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
+    FinishReason, FunctionCall, LLMError, LLMProvider, LLMRequest, LLMResponse, LLMStream,
+    LLMStreamChunk, Message, MessageRole, ToolCall, Usage,
 };
+use crate::llm::stream;
 use crate::llm::types as llm_types;
 use async_trait::async_trait;
+use futures::StreamExt;
 use reqwest::Client as HttpClient;
+use serde::Deserialize;
 use serde_json::{Value, json};
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 pub struct OpenAIProvider {
     api_key: String,
@@ -68,6 +74,73 @@ impl LLMProvider for OpenAIProvider {
         })?;
 
         self.parse_openai_response(openai_response)
+    }
+
+    async fn stream(&self, request: LLMRequest) -> Result<LLMStream, LLMError> {
+        let openai_request = self.convert_to_openai_format(&request)?;
+
+        let url = format!("{}/chat/completions", self.base_url);
+
+        let response = self
+            .http_client
+            .post(&url)
+            .bearer_auth(&self.api_key)
+            .json(&openai_request)
+            .send()
+            .await
+            .map_err(|e| {
+                let formatted_error =
+                    error_display::format_llm_error("OpenAI", &format!("Network error: {}", e));
+                LLMError::Network(formatted_error)
+            })?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            let formatted_error = error_display::format_llm_error(
+                "OpenAI",
+                &format!("HTTP {}: {}", status, error_text),
+            );
+            return Err(LLMError::Provider(formatted_error));
+        }
+
+        let (sender, receiver) = mpsc::unbounded_channel();
+
+        tokio::spawn(async move {
+            let mut stream_buffer = String::new();
+            let mut aggregator = OpenAIStreamAggregator::default();
+            let mut byte_stream = response.bytes_stream();
+
+            while let Some(chunk_result) = byte_stream.next().await {
+                match chunk_result {
+                    Ok(bytes) => {
+                        let text = String::from_utf8_lossy(&bytes);
+                        stream_buffer.push_str(&text.replace("\r\n", "\n"));
+
+                        for payload in stream::drain_sse_events(&mut stream_buffer) {
+                            if let Err(err) = aggregator.process_event(&payload, &sender) {
+                                let _ = sender.send(Err(err));
+                                return;
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        let formatted_error = error_display::format_llm_error(
+                            "OpenAI",
+                            &format!("Failed to read stream: {}", err),
+                        );
+                        let _ = sender.send(Err(LLMError::Network(formatted_error)));
+                        return;
+                    }
+                }
+            }
+
+            if let Err(err) = aggregator.finish(&sender) {
+                let _ = sender.send(Err(err));
+            }
+        });
+
+        Ok(Box::pin(UnboundedReceiverStream::new(receiver)))
     }
 
     fn supported_models(&self) -> Vec<String> {
@@ -343,5 +416,261 @@ impl LLMClient for OpenAIProvider {
 
     fn model_id(&self) -> &str {
         models::openai::DEFAULT_MODEL
+    }
+}
+
+#[derive(Default)]
+struct OpenAIStreamAggregator {
+    content: String,
+    tool_calls: Vec<OpenAIToolCallBuilder>,
+    finish_reason: Option<FinishReason>,
+    usage: Option<Usage>,
+    done: bool,
+}
+
+impl OpenAIStreamAggregator {
+    fn process_event(
+        &mut self,
+        payload: &str,
+        sender: &mpsc::UnboundedSender<Result<LLMStreamChunk, LLMError>>,
+    ) -> Result<(), LLMError> {
+        if payload.trim() == "[DONE]" {
+            return self.finish(sender);
+        }
+
+        let chunk: OpenAIStreamResponse = serde_json::from_str(payload).map_err(|err| {
+            let formatted = error_display::format_llm_error(
+                "OpenAI",
+                &format!("Failed to parse stream chunk: {}", err),
+            );
+            LLMError::Provider(formatted)
+        })?;
+
+        if let Some(usage) = chunk.usage {
+            self.usage = Some(usage.into());
+        }
+
+        for choice in chunk.choices {
+            if let Some(reason) = choice.finish_reason {
+                self.finish_reason = Some(map_openai_finish_reason(&reason));
+            }
+
+            if let Some(delta) = choice.delta.content {
+                if !delta.is_empty() {
+                    if sender
+                        .send(Ok(LLMStreamChunk {
+                            delta: Some(delta.clone()),
+                            response: None,
+                        }))
+                        .is_err()
+                    {
+                        return Err(receiver_dropped_error("OpenAI"));
+                    }
+                    self.content.push_str(&delta);
+                }
+            }
+
+            for tool_delta in choice.delta.tool_calls.unwrap_or_default() {
+                let index = tool_delta.index.unwrap_or(0) as usize;
+                if self.tool_calls.len() <= index {
+                    self.tool_calls
+                        .resize_with(index + 1, OpenAIToolCallBuilder::default);
+                }
+                let builder = &mut self.tool_calls[index];
+                if let Some(id) = tool_delta.id {
+                    builder.id = Some(id);
+                }
+                if let Some(function) = tool_delta.function {
+                    if let Some(name) = function.name {
+                        builder.name = Some(name);
+                    }
+                    if let Some(arguments) = function.arguments {
+                        builder.arguments.push_str(&arguments);
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn finish(
+        &mut self,
+        sender: &mpsc::UnboundedSender<Result<LLMStreamChunk, LLMError>>,
+    ) -> Result<(), LLMError> {
+        if self.done {
+            return Ok(());
+        }
+        self.done = true;
+
+        let tool_calls = if self.tool_calls.is_empty() {
+            None
+        } else {
+            let converted: Vec<ToolCall> = self
+                .tool_calls
+                .iter()
+                .enumerate()
+                .map(|(idx, builder)| builder.to_tool_call(idx))
+                .collect();
+            Some(converted)
+        };
+
+        let response = LLMResponse {
+            content: if self.content.is_empty() {
+                None
+            } else {
+                Some(self.content.clone())
+            },
+            tool_calls,
+            usage: self.usage.clone(),
+            finish_reason: self.finish_reason.clone().unwrap_or(FinishReason::Stop),
+        };
+
+        sender
+            .send(Ok(LLMStreamChunk {
+                delta: None,
+                response: Some(response),
+            }))
+            .map_err(|_| receiver_dropped_error("OpenAI"))
+    }
+}
+
+#[derive(Default)]
+struct OpenAIToolCallBuilder {
+    id: Option<String>,
+    name: Option<String>,
+    arguments: String,
+}
+
+impl OpenAIToolCallBuilder {
+    fn to_tool_call(&self, index: usize) -> ToolCall {
+        ToolCall {
+            id: self.id.clone().unwrap_or_else(|| format!("call_{}", index)),
+            call_type: "function".to_string(),
+            function: FunctionCall {
+                name: self.name.clone().unwrap_or_default(),
+                arguments: if self.arguments.is_empty() {
+                    "{}".to_string()
+                } else {
+                    self.arguments.clone()
+                },
+            },
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenAIStreamResponse {
+    choices: Vec<OpenAIStreamChoice>,
+    #[serde(default)]
+    usage: Option<OpenAIStreamUsage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenAIStreamChoice {
+    delta: OpenAIStreamDelta,
+    #[serde(default)]
+    finish_reason: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenAIStreamDelta {
+    #[serde(default)]
+    content: Option<String>,
+    #[serde(default)]
+    tool_calls: Option<Vec<OpenAIStreamToolCallDelta>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenAIStreamToolCallDelta {
+    #[serde(default)]
+    index: Option<usize>,
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(default)]
+    function: Option<OpenAIStreamToolFunctionDelta>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenAIStreamToolFunctionDelta {
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    arguments: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenAIStreamUsage {
+    #[serde(default)]
+    prompt_tokens: Option<u32>,
+    #[serde(default)]
+    completion_tokens: Option<u32>,
+    #[serde(default)]
+    total_tokens: Option<u32>,
+}
+
+impl From<OpenAIStreamUsage> for Usage {
+    fn from(value: OpenAIStreamUsage) -> Self {
+        let prompt = value.prompt_tokens.unwrap_or(0);
+        let completion = value.completion_tokens.unwrap_or(0);
+        let total = value.total_tokens.unwrap_or(prompt + completion);
+        Usage {
+            prompt_tokens: prompt,
+            completion_tokens: completion,
+            total_tokens: total,
+        }
+    }
+}
+
+fn map_openai_finish_reason(reason: &str) -> FinishReason {
+    match reason {
+        "stop" => FinishReason::Stop,
+        "length" => FinishReason::Length,
+        "tool_calls" => FinishReason::ToolCalls,
+        "content_filter" => FinishReason::ContentFilter,
+        other => FinishReason::Error(other.to_string()),
+    }
+}
+
+fn receiver_dropped_error(provider: &str) -> LLMError {
+    let formatted = error_display::format_llm_error(provider, "Stream receiver dropped");
+    LLMError::Provider(formatted)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn aggregator_streams_text_and_final_response() {
+        let (sender, mut receiver) = mpsc::unbounded_channel();
+        let mut aggregator = OpenAIStreamAggregator::default();
+
+        aggregator
+            .process_event(
+                r#"{"choices":[{"index":0,"delta":{"content":"Hel"}}]}"#,
+                &sender,
+            )
+            .expect("first chunk");
+        aggregator
+            .process_event(
+                r#"{"choices":[{"index":0,"delta":{"content":"lo"},"finish_reason":"stop"}]}"#,
+                &sender,
+            )
+            .expect("second chunk");
+        aggregator
+            .process_event("[DONE]", &sender)
+            .expect("finalize");
+
+        let first = receiver.recv().await.expect("first event").unwrap();
+        assert_eq!(first.delta.as_deref(), Some("Hel"));
+
+        let second = receiver.recv().await.expect("second event").unwrap();
+        assert_eq!(second.delta.as_deref(), Some("lo"));
+
+        let final_chunk = receiver.recv().await.expect("final response").unwrap();
+        let response = final_chunk.response.expect("response");
+        assert_eq!(response.content.as_deref(), Some("Hello"));
+        assert!(matches!(response.finish_reason, FinishReason::Stop));
     }
 }

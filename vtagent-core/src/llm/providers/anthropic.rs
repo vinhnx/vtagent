@@ -2,12 +2,17 @@ use crate::config::constants::{model_helpers, models};
 use crate::llm::client::LLMClient;
 use crate::llm::error_display;
 use crate::llm::provider::{
-    FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole, ToolCall,
+    FinishReason, FunctionCall, LLMError, LLMProvider, LLMRequest, LLMResponse, LLMStream,
+    LLMStreamChunk, Message, MessageRole, ToolCall, Usage,
 };
+use crate::llm::stream;
 use crate::llm::types as llm_types;
 use async_trait::async_trait;
+use futures::StreamExt;
 use reqwest::Client as HttpClient;
 use serde_json::{Value, json};
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 pub struct AnthropicProvider {
     api_key: String,
@@ -69,6 +74,74 @@ impl LLMProvider for AnthropicProvider {
         })?;
 
         self.parse_anthropic_response(anthropic_response)
+    }
+
+    async fn stream(&self, request: LLMRequest) -> Result<LLMStream, LLMError> {
+        let anthropic_request = self.convert_to_anthropic_format(&request)?;
+
+        let url = format!("{}/messages", self.base_url);
+
+        let response = self
+            .http_client
+            .post(&url)
+            .header("x-api-key", &self.api_key)
+            .header("anthropic-version", "2023-06-01")
+            .json(&anthropic_request)
+            .send()
+            .await
+            .map_err(|e| {
+                let formatted_error =
+                    error_display::format_llm_error("Anthropic", &format!("Network error: {}", e));
+                LLMError::Network(formatted_error)
+            })?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            let formatted_error = error_display::format_llm_error(
+                "Anthropic",
+                &format!("HTTP {}: {}", status, error_text),
+            );
+            return Err(LLMError::Provider(formatted_error));
+        }
+
+        let (sender, receiver) = mpsc::unbounded_channel();
+
+        tokio::spawn(async move {
+            let mut buffer = String::new();
+            let mut aggregator = AnthropicStreamAggregator::default();
+            let mut byte_stream = response.bytes_stream();
+
+            while let Some(chunk_result) = byte_stream.next().await {
+                match chunk_result {
+                    Ok(bytes) => {
+                        let text = String::from_utf8_lossy(&bytes);
+                        buffer.push_str(&text.replace("\r\n", "\n"));
+
+                        for payload in stream::drain_sse_events(&mut buffer) {
+                            if let Err(err) = aggregator.process_event(&payload, &sender) {
+                                let _ = sender.send(Err(err));
+                                return;
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        let formatted_error = error_display::format_llm_error(
+                            "Anthropic",
+                            &format!("Failed to read stream: {}", err),
+                        );
+                        let _ = sender.send(Err(LLMError::Network(formatted_error)));
+                        return;
+                    }
+                }
+            }
+
+            if let Err(err) = aggregator.finish(&sender) {
+                let _ = sender.send(Err(err));
+            }
+        });
+
+        Ok(Box::pin(UnboundedReceiverStream::new(receiver)))
     }
 
     fn supported_models(&self) -> Vec<String> {
@@ -333,5 +406,291 @@ impl LLMClient for AnthropicProvider {
 
     fn model_id(&self) -> &str {
         models::anthropic::DEFAULT_MODEL
+    }
+}
+
+#[derive(Default)]
+struct AnthropicStreamAggregator {
+    content: String,
+    tool_uses: Vec<AnthropicToolUseBuilder>,
+    finish_reason: Option<FinishReason>,
+    usage: Option<Usage>,
+    done: bool,
+}
+
+impl AnthropicStreamAggregator {
+    fn process_event(
+        &mut self,
+        payload: &str,
+        sender: &mpsc::UnboundedSender<Result<LLMStreamChunk, LLMError>>,
+    ) -> Result<(), LLMError> {
+        if payload.trim() == "[DONE]" {
+            return self.finish(sender);
+        }
+
+        let parsed: Value = serde_json::from_str(payload).map_err(|err| {
+            let formatted = error_display::format_llm_error(
+                "Anthropic",
+                &format!("Failed to parse stream chunk: {}", err),
+            );
+            LLMError::Provider(formatted)
+        })?;
+
+        let event_type = parsed.get("type").and_then(|v| v.as_str()).unwrap_or("");
+
+        match event_type {
+            "message_start" => {
+                if let Some(usage) = parsed.get("message").and_then(|msg| msg.get("usage")) {
+                    self.usage = Some(parse_usage(usage));
+                }
+            }
+            "message_delta" => {
+                if let Some(delta) = parsed.get("delta") {
+                    if let Some(reason) = delta.get("stop_reason").and_then(|v| v.as_str()) {
+                        self.finish_reason = Some(map_anthropic_finish_reason(reason));
+                    }
+                }
+                if let Some(usage) = parsed.get("usage") {
+                    self.usage = Some(parse_usage(usage));
+                }
+            }
+            "content_block_start" => {
+                let index = parsed.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                if let Some(block) = parsed.get("content_block") {
+                    if block.get("type").and_then(|v| v.as_str()).unwrap_or("") == "tool_use" {
+                        let builder = self.ensure_tool_builder(index);
+                        builder.id = block
+                            .get("id")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                        builder.name = block
+                            .get("name")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                        if let Some(input) = block.get("input") {
+                            builder.set_input_value(input.clone());
+                        }
+                    }
+                }
+            }
+            "content_block_delta" => {
+                let index = parsed.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                if let Some(delta) = parsed.get("delta") {
+                    match delta.get("type").and_then(|v| v.as_str()).unwrap_or("") {
+                        "text_delta" => {
+                            if let Some(text) = delta.get("text").and_then(|v| v.as_str()) {
+                                if !text.is_empty() {
+                                    if sender
+                                        .send(Ok(LLMStreamChunk {
+                                            delta: Some(text.to_string()),
+                                            response: None,
+                                        }))
+                                        .is_err()
+                                    {
+                                        return Err(receiver_dropped_error("Anthropic"));
+                                    }
+                                    self.content.push_str(text);
+                                }
+                            }
+                        }
+                        "input_json_delta" => {
+                            let builder = self.ensure_tool_builder(index);
+                            if let Some(partial) =
+                                delta.get("partial_json").and_then(|v| v.as_str())
+                            {
+                                builder.append_partial(partial);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            "message_stop" => {
+                if self.finish_reason.is_none() {
+                    self.finish_reason = Some(FinishReason::Stop);
+                }
+            }
+            "error" => {
+                let message = parsed
+                    .get("error")
+                    .and_then(|err| err.get("message"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Streaming error");
+                return Err(LLMError::Provider(error_display::format_llm_error(
+                    "Anthropic",
+                    message,
+                )));
+            }
+            _ => {}
+        }
+
+        Ok(())
+    }
+
+    fn finish(
+        &mut self,
+        sender: &mpsc::UnboundedSender<Result<LLMStreamChunk, LLMError>>,
+    ) -> Result<(), LLMError> {
+        if self.done {
+            return Ok(());
+        }
+        self.done = true;
+
+        let tool_calls = if self.tool_uses.is_empty() {
+            None
+        } else {
+            Some(
+                self.tool_uses
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, builder)| builder.to_tool_call(idx))
+                    .collect::<Vec<_>>(),
+            )
+        };
+
+        let response = LLMResponse {
+            content: if self.content.is_empty() {
+                None
+            } else {
+                Some(self.content.clone())
+            },
+            tool_calls,
+            usage: self.usage.clone(),
+            finish_reason: self.finish_reason.clone().unwrap_or(FinishReason::Stop),
+        };
+
+        sender
+            .send(Ok(LLMStreamChunk {
+                delta: None,
+                response: Some(response),
+            }))
+            .map_err(|_| receiver_dropped_error("Anthropic"))
+    }
+
+    fn ensure_tool_builder(&mut self, index: usize) -> &mut AnthropicToolUseBuilder {
+        if self.tool_uses.len() <= index {
+            self.tool_uses
+                .resize_with(index + 1, AnthropicToolUseBuilder::default);
+        }
+        &mut self.tool_uses[index]
+    }
+}
+
+#[derive(Default)]
+struct AnthropicToolUseBuilder {
+    id: Option<String>,
+    name: Option<String>,
+    input_buffer: String,
+}
+
+impl AnthropicToolUseBuilder {
+    fn set_input_value(&mut self, value: Value) {
+        self.input_buffer = match serde_json::to_string(&value) {
+            Ok(text) => text,
+            Err(_) => "{}".to_string(),
+        };
+    }
+
+    fn append_partial(&mut self, partial: &str) {
+        self.input_buffer.push_str(partial);
+    }
+
+    fn to_tool_call(&self, index: usize) -> ToolCall {
+        ToolCall {
+            id: self
+                .id
+                .clone()
+                .unwrap_or_else(|| format!("tool_use_{}", index)),
+            call_type: "function".to_string(),
+            function: FunctionCall {
+                name: self.name.clone().unwrap_or_default(),
+                arguments: if self.input_buffer.is_empty() {
+                    "{}".to_string()
+                } else {
+                    self.input_buffer.clone()
+                },
+            },
+        }
+    }
+}
+
+fn parse_usage(value: &Value) -> Usage {
+    let prompt = value
+        .get("input_tokens")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0) as u32;
+    let completion = value
+        .get("output_tokens")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0) as u32;
+    Usage {
+        prompt_tokens: prompt,
+        completion_tokens: completion,
+        total_tokens: prompt + completion,
+    }
+}
+
+fn map_anthropic_finish_reason(reason: &str) -> FinishReason {
+    match reason {
+        "end_turn" => FinishReason::Stop,
+        "max_tokens" => FinishReason::Length,
+        "stop_sequence" => FinishReason::Stop,
+        "tool_use" => FinishReason::ToolCalls,
+        other => FinishReason::Error(other.to_string()),
+    }
+}
+
+fn receiver_dropped_error(provider: &str) -> LLMError {
+    let formatted = error_display::format_llm_error(provider, "Stream receiver dropped");
+    LLMError::Provider(formatted)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn aggregator_streams_text_and_finalizes() {
+        let (sender, mut receiver) = mpsc::unbounded_channel();
+        let mut aggregator = AnthropicStreamAggregator::default();
+
+        aggregator
+            .process_event(
+                r#"{"type":"message_start","message":{"usage":{"input_tokens":5,"output_tokens":0}}}"#,
+                &sender,
+            )
+            .expect("start");
+        aggregator
+            .process_event(
+                r#"{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}"#,
+                &sender,
+            )
+            .expect("block start");
+        aggregator
+            .process_event(
+                r#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hi"}}"#,
+                &sender,
+            )
+            .expect("delta");
+        aggregator
+            .process_event(
+                r#"{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":2}}"#,
+                &sender,
+            )
+            .expect("message delta");
+        aggregator
+            .process_event("[DONE]", &sender)
+            .expect("finalize");
+
+        let delta_chunk = receiver.recv().await.expect("delta").unwrap();
+        assert_eq!(delta_chunk.delta.as_deref(), Some("Hi"));
+
+        let final_chunk = receiver.recv().await.expect("final").unwrap();
+        let response = final_chunk.response.expect("response");
+        assert_eq!(response.content.as_deref(), Some("Hi"));
+        assert!(matches!(response.finish_reason, FinishReason::Stop));
+        let usage = response.usage.expect("usage");
+        assert_eq!(usage.prompt_tokens, 5);
+        assert_eq!(usage.completion_tokens, 2);
     }
 }

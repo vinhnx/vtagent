@@ -1,6 +1,8 @@
 use crate::config::constants::streaming;
 use std::env;
 
+const SSE_EVENT_SEPARATOR: &str = "\n\n";
+
 /// Determine the chunk size for streaming outputs.
 ///
 /// The value can be overridden by setting the `VTAGENT_STREAMING_CHARS_PER_CHUNK`
@@ -47,6 +49,53 @@ pub fn chunk_text(content: &str) -> Vec<String> {
     }
 
     chunks
+}
+
+/// Drain complete SSE events from the provided buffer and return their payloads.
+///
+/// The function accumulates data lines from SSE-formatted responses and returns
+/// the extracted payloads without the leading `data:` prefix. Incomplete events
+/// remain in the buffer for subsequent calls.
+pub fn drain_sse_events(buffer: &mut String) -> Vec<String> {
+    let mut events = Vec::new();
+
+    loop {
+        let Some(idx) = buffer.find(SSE_EVENT_SEPARATOR) else {
+            break;
+        };
+
+        let raw_event = buffer[..idx].replace('\r', "");
+        buffer.drain(..idx + SSE_EVENT_SEPARATOR.len());
+
+        if raw_event.trim().is_empty() {
+            continue;
+        }
+
+        if let Some(payload) = extract_event_payload(&raw_event) {
+            if !payload.is_empty() {
+                events.push(payload);
+            }
+        }
+    }
+
+    events
+}
+
+fn extract_event_payload(event: &str) -> Option<String> {
+    let mut data_lines = Vec::new();
+
+    for line in event.lines() {
+        let trimmed = line.trim_end();
+        if let Some(data) = trimmed.strip_prefix("data:") {
+            data_lines.push(data.trim_start());
+        }
+    }
+
+    if data_lines.is_empty() {
+        None
+    } else {
+        Some(data_lines.join("\n"))
+    }
 }
 
 #[cfg(test)]
@@ -97,5 +146,28 @@ mod tests {
         assert_eq!(chunks[0], "stre");
         assert_eq!(chunks[1], "amin");
         assert_eq!(chunks[2], "g");
+    }
+
+    #[test]
+    fn drain_sse_events_extracts_payloads() {
+        let mut buffer = String::new();
+        buffer.push_str("data: one\\n\\n");
+        buffer.push_str("data: two\\n\\n");
+        let events = drain_sse_events(&mut buffer);
+        assert_eq!(events, vec!["one".to_string(), "two".to_string()]);
+        assert!(buffer.is_empty());
+    }
+
+    #[test]
+    fn drain_sse_events_handles_multiline_payloads() {
+        let mut buffer = String::new();
+        buffer.push_str("event: message\r\n");
+        buffer.push_str("data: {\"a\":\"b\"}\r\n\r\n");
+        buffer.push_str("data: [DONE]");
+
+        let mut events = drain_sse_events(&mut buffer);
+        assert_eq!(events.len(), 1);
+        assert_eq!(events.remove(0), "{\"a\":\"b\"}");
+        assert_eq!(buffer, "data: [DONE]");
     }
 }

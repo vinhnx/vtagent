@@ -6,10 +6,10 @@ use crate::core::agent::compaction::CompactionEngine;
 use crate::core::conversation_summarizer::ConversationSummarizer;
 use crate::core::decision_tracker::DecisionTracker;
 use crate::core::error_recovery::{ErrorRecoveryManager, ErrorType};
-use crate::llm::{make_client, AnyClient};
+use crate::llm::{AnyClient, make_client};
 use crate::tools::tree_sitter::{CodeAnalysis, TreeSitterAnalyzer};
-use crate::tools::{build_function_declarations, ToolRegistry};
-use anyhow::{anyhow, Result};
+use crate::tools::{ToolRegistry, build_function_declarations};
+use anyhow::{Result, anyhow};
 use console::style;
 use std::sync::Arc;
 

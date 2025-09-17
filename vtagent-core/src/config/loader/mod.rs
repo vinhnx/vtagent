@@ -37,19 +37,36 @@ pub struct SyntaxHighlightingConfig {
     pub highlight_timeout_ms: u64,
 }
 
-fn default_true() -> bool { true }
-fn default_theme() -> String { "base16-ocean.dark".to_string() }
-fn default_max_file_size() -> usize { 10 }
+fn default_true() -> bool {
+    true
+}
+fn default_theme() -> String {
+    "base16-ocean.dark".to_string()
+}
+fn default_max_file_size() -> usize {
+    10
+}
 fn default_enabled_languages() -> Vec<String> {
     vec![
-        "rust".to_string(), "python".to_string(), "javascript".to_string(),
-        "typescript".to_string(), "go".to_string(), "java".to_string(),
-        "cpp".to_string(), "c".to_string(), "php".to_string(),
-        "html".to_string(), "css".to_string(), "sql".to_string(),
-        "csharp".to_string(), "bash".to_string()
+        "rust".to_string(),
+        "python".to_string(),
+        "javascript".to_string(),
+        "typescript".to_string(),
+        "go".to_string(),
+        "java".to_string(),
+        "cpp".to_string(),
+        "c".to_string(),
+        "php".to_string(),
+        "html".to_string(),
+        "css".to_string(),
+        "sql".to_string(),
+        "csharp".to_string(),
+        "bash".to_string(),
     ]
 }
-fn default_highlight_timeout() -> u64 { 5000 }
+fn default_highlight_timeout() -> u64 {
+    5000
+}
 
 impl Default for SyntaxHighlightingConfig {
     fn default() -> Self {

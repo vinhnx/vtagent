@@ -4,17 +4,17 @@
 //! with theme caching, custom theme loading, and performance optimizations.
 
 use anyhow::{Context, Result};
+use once_cell::sync::Lazy;
 use std::io::BufRead;
 use std::path::Path;
 use std::sync::Arc;
-use once_cell::sync::Lazy;
 
 // Syntax highlighting imports
 use syntect::dumps::{dump_to_file, from_dump_file};
 use syntect::easy::{HighlightFile, HighlightLines};
 use syntect::highlighting::{Style, Theme, ThemeSet};
 use syntect::parsing::SyntaxSet;
-use syntect::util::{as_24_bit_terminal_escaped, LinesWithEndings};
+use syntect::util::{LinesWithEndings, as_24_bit_terminal_escaped};
 
 use vtagent_core::config::loader::VTAgentConfig;
 use vtagent_core::tools::tree_sitter::analyzer::{LanguageSupport, TreeSitterAnalyzer};
@@ -146,25 +146,46 @@ impl EnhancedSyntaxHighlighter {
         if let Some(ts_language) = self.detect_language_with_tree_sitter(content) {
             match ts_language {
                 LanguageSupport::Rust => {
-                    return self.syntax_set.find_syntax_by_extension("rs").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
+                    return self
+                        .syntax_set
+                        .find_syntax_by_extension("rs")
+                        .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
                 }
                 LanguageSupport::Python => {
-                    return self.syntax_set.find_syntax_by_extension("py").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
+                    return self
+                        .syntax_set
+                        .find_syntax_by_extension("py")
+                        .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
                 }
                 LanguageSupport::JavaScript => {
-                    return self.syntax_set.find_syntax_by_extension("js").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
+                    return self
+                        .syntax_set
+                        .find_syntax_by_extension("js")
+                        .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
                 }
                 LanguageSupport::TypeScript => {
-                    return self.syntax_set.find_syntax_by_extension("ts").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
+                    return self
+                        .syntax_set
+                        .find_syntax_by_extension("ts")
+                        .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
                 }
                 LanguageSupport::Go => {
-                    return self.syntax_set.find_syntax_by_extension("go").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
+                    return self
+                        .syntax_set
+                        .find_syntax_by_extension("go")
+                        .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
                 }
                 LanguageSupport::Java => {
-                    return self.syntax_set.find_syntax_by_extension("java").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
+                    return self
+                        .syntax_set
+                        .find_syntax_by_extension("java")
+                        .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
                 }
                 LanguageSupport::Swift => {
-                    return self.syntax_set.find_syntax_by_extension("swift").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
+                    return self
+                        .syntax_set
+                        .find_syntax_by_extension("swift")
+                        .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
                 }
             }
         }
@@ -199,54 +220,112 @@ impl EnhancedSyntaxHighlighter {
     }
 
     /// Detect language using pattern matching (fallback method)
-    fn detect_language_with_patterns<'a>(&'a self, content: &str) -> &'a syntect::parsing::SyntaxReference {
+    fn detect_language_with_patterns<'a>(
+        &'a self,
+        content: &str,
+    ) -> &'a syntect::parsing::SyntaxReference {
         // More sophisticated language detection
         let content_lower = content.to_lowercase();
 
         // Check for shebang lines first
         if content.starts_with("#!") {
             if content.contains("python") {
-                return self.syntax_set.find_syntax_by_extension("py").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
+                return self
+                    .syntax_set
+                    .find_syntax_by_extension("py")
+                    .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
             } else if content.contains("bash") || content.contains("sh") {
-                return self.syntax_set.find_syntax_by_extension("sh").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
+                return self
+                    .syntax_set
+                    .find_syntax_by_extension("sh")
+                    .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
             } else if content.contains("ruby") {
-                return self.syntax_set.find_syntax_by_extension("rb").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
+                return self
+                    .syntax_set
+                    .find_syntax_by_extension("rb")
+                    .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
             } else if content.contains("node") {
-                return self.syntax_set.find_syntax_by_extension("js").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
+                return self
+                    .syntax_set
+                    .find_syntax_by_extension("js")
+                    .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
             }
         }
 
         // Check for common language patterns
         if content.contains("fn ") && content.contains("let ") && content.contains("use ") {
-            self.syntax_set.find_syntax_by_extension("rs").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
-        } else if (content.contains("def ") || content.contains("import ")) && (content.contains("class ") || content.contains(":")) {
-            self.syntax_set.find_syntax_by_extension("py").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
-        } else if content.contains("function") || content.contains("const ") || content.contains("let ") || content.contains("=>") {
-            self.syntax_set.find_syntax_by_extension("js").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
-        } else if content.contains("package ") || content.contains("func ") || content.contains("import ") {
-            self.syntax_set.find_syntax_by_extension("go").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
+            self.syntax_set
+                .find_syntax_by_extension("rs")
+                .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
+        } else if (content.contains("def ") || content.contains("import "))
+            && (content.contains("class ") || content.contains(":"))
+        {
+            self.syntax_set
+                .find_syntax_by_extension("py")
+                .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
+        } else if content.contains("function")
+            || content.contains("const ")
+            || content.contains("let ")
+            || content.contains("=>")
+        {
+            self.syntax_set
+                .find_syntax_by_extension("js")
+                .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
+        } else if content.contains("package ")
+            || content.contains("func ")
+            || content.contains("import ")
+        {
+            self.syntax_set
+                .find_syntax_by_extension("go")
+                .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
         } else if content.contains("public class") || content.contains("import java") {
-            self.syntax_set.find_syntax_by_extension("java").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
+            self.syntax_set
+                .find_syntax_by_extension("java")
+                .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
         } else if content.contains("#include") || content.contains("int main") {
-            self.syntax_set.find_syntax_by_extension("c").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
+            self.syntax_set
+                .find_syntax_by_extension("c")
+                .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
         } else if content.contains("#include") && content.contains("using namespace") {
-            self.syntax_set.find_syntax_by_extension("cpp").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
+            self.syntax_set
+                .find_syntax_by_extension("cpp")
+                .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
         } else if content.contains("<?php") {
-            self.syntax_set.find_syntax_by_extension("php").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
+            self.syntax_set
+                .find_syntax_by_extension("php")
+                .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
         } else if content.contains("<!DOCTYPE html") || content.contains("<html") {
-            self.syntax_set.find_syntax_by_extension("html").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
-        } else if content.contains("SELECT ") || content.contains("FROM ") || content.contains("WHERE ") {
-            self.syntax_set.find_syntax_by_extension("sql").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
-        } else if content.contains("interface ") || content.contains("class ") || content.contains("namespace ") {
-            self.syntax_set.find_syntax_by_extension("cs").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
+            self.syntax_set
+                .find_syntax_by_extension("html")
+                .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
+        } else if content.contains("SELECT ")
+            || content.contains("FROM ")
+            || content.contains("WHERE ")
+        {
+            self.syntax_set
+                .find_syntax_by_extension("sql")
+                .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
+        } else if content.contains("interface ")
+            || content.contains("class ")
+            || content.contains("namespace ")
+        {
+            self.syntax_set
+                .find_syntax_by_extension("cs")
+                .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
         } else {
             // Try to detect by file extension patterns in content
             if content_lower.contains(".rs\"") || content_lower.contains(".rs ") {
-                self.syntax_set.find_syntax_by_extension("rs").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
+                self.syntax_set
+                    .find_syntax_by_extension("rs")
+                    .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
             } else if content_lower.contains(".py\"") || content_lower.contains(".py ") {
-                self.syntax_set.find_syntax_by_extension("py").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
+                self.syntax_set
+                    .find_syntax_by_extension("py")
+                    .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
             } else if content_lower.contains(".js\"") || content_lower.contains(".js ") {
-                self.syntax_set.find_syntax_by_extension("js").unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
+                self.syntax_set
+                    .find_syntax_by_extension("js")
+                    .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text())
             } else {
                 // Default to plain text if no language detected
                 self.syntax_set.find_syntax_plain_text()
@@ -271,12 +350,13 @@ pub struct SyntaxHighlightStats {
 }
 
 /// Global syntax highlighter instance with lazy initialization
-static SYNTAX_HIGHLIGHTER: Lazy<Result<EnhancedSyntaxHighlighter>> = Lazy::new(|| {
-    EnhancedSyntaxHighlighter::new(None)
-});
+static SYNTAX_HIGHLIGHTER: Lazy<Result<EnhancedSyntaxHighlighter>> =
+    Lazy::new(|| EnhancedSyntaxHighlighter::new(None));
 
 /// Create or update syntax highlighter with configuration
-pub fn create_syntax_highlighter_with_config(config: Option<&VTAgentConfig>) -> Result<EnhancedSyntaxHighlighter> {
+pub fn create_syntax_highlighter_with_config(
+    config: Option<&VTAgentConfig>,
+) -> Result<EnhancedSyntaxHighlighter> {
     if let Some(vt_config) = config {
         if vt_config.syntax_highlighting.enabled {
             EnhancedSyntaxHighlighter::new(Some(&vt_config.syntax_highlighting.theme))
@@ -303,7 +383,10 @@ pub fn syntax_highlight_code(content: &str) -> Result<String> {
 }
 
 /// Enhanced version that uses configuration
-pub fn syntax_highlight_code_with_config(content: &str, config: Option<&VTAgentConfig>) -> Result<String> {
+pub fn syntax_highlight_code_with_config(
+    content: &str,
+    config: Option<&VTAgentConfig>,
+) -> Result<String> {
     if let Some(vt_config) = config {
         if !vt_config.syntax_highlighting.enabled {
             return Ok(content.to_string());

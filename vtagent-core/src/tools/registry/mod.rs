@@ -35,7 +35,6 @@ use super::command::CommandTool;
 use super::file_ops::FileOpsTool;
 use super::search::SearchTool;
 use super::simple_search::SimpleSearchTool;
-use super::speckit::SpeckitTool;
 use super::srgn::SrgnTool;
 
 #[cfg(test)]
@@ -59,7 +58,6 @@ pub struct ToolRegistry {
     pty_config: PtyConfig,
     active_pty_sessions: Arc<AtomicUsize>,
     srgn_tool: SrgnTool,
-    speckit_tool: SpeckitTool,
     tool_registrations: Vec<ToolRegistration>,
     tool_lookup: HashMap<&'static str, usize>,
 }
@@ -78,7 +76,6 @@ impl ToolRegistry {
         let file_ops_tool = FileOpsTool::new(workspace_root.clone(), grep_search.clone());
         let command_tool = CommandTool::new(workspace_root.clone());
         let srgn_tool = SrgnTool::new(workspace_root.clone());
-        let speckit_tool = SpeckitTool::new(workspace_root.clone());
 
         let ast_grep_engine = match AstGrepEngine::new() {
             Ok(engine) => Some(Arc::new(engine)),
@@ -109,7 +106,6 @@ impl ToolRegistry {
             pty_config,
             active_pty_sessions: Arc::new(AtomicUsize::new(0)),
             srgn_tool,
-            speckit_tool,
             tool_registrations: Vec::new(),
             tool_lookup: HashMap::new(),
         };

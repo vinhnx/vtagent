@@ -63,11 +63,6 @@ impl ToolRegistry {
         Box::pin(async move { tool.execute(args).await })
     }
 
-    pub(super) fn speckit_executor(&mut self, args: Value) -> BoxFuture<'_, Result<Value>> {
-        let tool = self.speckit_tool.clone();
-        Box::pin(async move { tool.execute(args).await })
-    }
-
     pub(super) async fn execute_apply_patch(&self, args: Value) -> Result<Value> {
         let input = args
             .get("input")

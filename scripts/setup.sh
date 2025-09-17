@@ -102,32 +102,6 @@ install_dev_tools() {
     done
 }
 
-# Install Python development tools
-install_python_tools() {
-    print_status "Installing Python development tools..."
-
-    # Check if uv is installed
-    if ! command -v uv &> /dev/null; then
-        print_status "Installing uv (Python package manager)..."
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        print_success "uv installed"
-    else
-        print_success "uv is already installed"
-    fi
-
-    # Install Speckit for spec-driven development
-    print_status "Installing Speckit (Spec-Driven Development toolkit)..."
-    if uvx --from git+https://github.com/github/spec-kit.git specify --help &> /dev/null; then
-        print_success "Speckit is available via uvx"
-        echo "  Usage: uvx --from git+https://github.com/github/spec-kit.git specify <command>"
-        echo "  Commands: init, check, /specify, /plan, /tasks"
-    else
-        print_warning "Speckit installation check failed (may still work)"
-        echo "  You can install it manually with:"
-        echo "  uvx --from git+https://github.com/github/spec-kit.git specify --help"
-    fi
-}
-
 # Setup git hooks (optional)
 setup_git_hooks() {
     if [ "${1:-}" = "--with-hooks" ]; then
@@ -212,7 +186,6 @@ main() {
     update_rust
     install_components
     install_dev_tools
-    install_python_tools
     setup_git_hooks "$with_hooks"
     verify_installation
 
@@ -225,8 +198,7 @@ main() {
     echo "  • Run './scripts/check.sh' to verify everything works"
     echo "  • Use 'cargo fmt --all' to format your code"
     echo "  • Use 'cargo clippy' to lint your code"
-    echo "  • Try Speckit for spec-driven development:"
-    echo "    uvx --from git+https://github.com/github/spec-kit.git specify init my-project"
+    echo "  • Use 'cargo nextest run' to run tests (or 'cargo test' as fallback)"
     echo ""
     echo "Useful commands:"
     echo "  • Format code: cargo fmt --all"
@@ -258,7 +230,6 @@ This script will:
   • Update Rust toolchain
   • Install rustfmt and clippy components
   • Install development tools (cargo-audit, cargo-outdated, etc.)
-  • Install Python tools including Speckit for spec-driven development
   • Optionally set up git hooks
   • Verify everything works
 

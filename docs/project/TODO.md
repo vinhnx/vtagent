@@ -121,7 +121,7 @@ check dead code vtagent-core/src/tools/registry/builtins.rs
 
 ---
 
-also run cargo clippy to check for dead code and fix any warnings or errors. make sure the codebase is clean and follows best practices. make sure cleanup dead code, and unused files and redundant code and dependencies. ensure code quality and maintainability. write tests. update docs.
+also run cargo check to check for dead code and fix any warnings or errors. make sure the codebase is clean and follows best practices. make sure cleanup dead code, and unused files and redundant code and dependencies. ensure code quality and maintainability. write tests. update docs.
 
 ---
 

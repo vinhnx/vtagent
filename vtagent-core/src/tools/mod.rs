@@ -28,7 +28,6 @@ pub use cache::FileCache;
 pub use grep_search::GrepSearchManager;
 pub use registry::{ToolRegistration, ToolRegistry};
 pub use simple_search::SimpleSearchTool;
-pub use speckit::SpeckitTool;
 pub use srgn::SrgnTool;
 pub use traits::{Tool, ToolExecutor};
 pub use types::*;

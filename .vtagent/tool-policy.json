@@ -11,20 +11,22 @@
     "simple_search",
     "bash",
     "apply_patch",
-    "srgn"
+    "srgn",
+    "speckit"
   ],
   "policies": {
     "grep_search": "allow",
-    "list_files": "prompt",
-    "run_terminal_cmd": "prompt",
-    "read_file": "prompt",
+    "list_files": "allow",
+    "run_terminal_cmd": "allow",
+    "read_file": "allow",
     "write_file": "prompt",
     "edit_file": "prompt",
     "ast_grep_search": "prompt",
     "simple_search": "prompt",
     "bash": "prompt",
     "apply_patch": "prompt",
-    "srgn": "prompt"
+    "srgn": "prompt",
+    "speckit": "prompt"
   },
   "constraints": {
     "list_files": {

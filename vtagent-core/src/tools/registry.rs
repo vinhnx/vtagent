@@ -7,8 +7,8 @@ use super::command::CommandTool;
 use super::file_ops::FileOpsTool;
 use super::search::SearchTool;
 use super::simple_search::SimpleSearchTool;
-use super::srgn::SrgnTool;
 use super::speckit::SpeckitTool;
+use super::srgn::SrgnTool;
 use super::traits::Tool;
 use crate::config::PtyConfig;
 use crate::config::constants::tools;
@@ -19,10 +19,12 @@ use crate::tool_policy::{ToolPolicy, ToolPolicyManager};
 use crate::tools::ast_grep::AstGrepEngine;
 use crate::tools::grep_search::{GrepSearchManager, GrepSearchResult};
 use anyhow::{Context, Result, anyhow};
+use futures::future::BoxFuture;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use shell_words::split;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -193,6 +195,89 @@ pub struct ToolRegistry {
     active_pty_sessions: Arc<AtomicUsize>,
     srgn_tool: SrgnTool,
     speckit_tool: SpeckitTool,
+    tool_registrations: Vec<ToolRegistration>,
+    tool_lookup: HashMap<&'static str, usize>,
+}
+
+type ToolExecutorFn = for<'a> fn(&'a mut ToolRegistry, Value) -> BoxFuture<'a, Result<Value>>;
+
+#[derive(Clone)]
+enum ToolHandler {
+    RegistryFn(ToolExecutorFn),
+    TraitObject(Arc<dyn Tool>),
+}
+
+#[derive(Clone)]
+pub struct ToolRegistration {
+    name: &'static str,
+    capability: CapabilityLevel,
+    uses_pty: bool,
+    expose_in_llm: bool,
+    handler: ToolHandler,
+}
+
+impl ToolRegistration {
+    pub fn new(
+        name: &'static str,
+        capability: CapabilityLevel,
+        uses_pty: bool,
+        executor: ToolExecutorFn,
+    ) -> Self {
+        Self {
+            name,
+            capability,
+            uses_pty,
+            expose_in_llm: true,
+            handler: ToolHandler::RegistryFn(executor),
+        }
+    }
+
+    pub fn from_tool(name: &'static str, capability: CapabilityLevel, tool: Arc<dyn Tool>) -> Self {
+        Self {
+            name,
+            capability,
+            uses_pty: false,
+            expose_in_llm: true,
+            handler: ToolHandler::TraitObject(tool),
+        }
+    }
+
+    pub fn from_tool_instance<T>(name: &'static str, capability: CapabilityLevel, tool: T) -> Self
+    where
+        T: Tool + 'static,
+    {
+        Self::from_tool(name, capability, Arc::new(tool))
+    }
+
+    pub fn with_llm_visibility(mut self, expose: bool) -> Self {
+        self.expose_in_llm = expose;
+        self
+    }
+
+    pub fn with_pty(mut self, uses_pty: bool) -> Self {
+        self.uses_pty = uses_pty;
+        self
+    }
+
+    pub fn name(&self) -> &'static str {
+        self.name
+    }
+
+    pub fn capability(&self) -> CapabilityLevel {
+        self.capability
+    }
+
+    pub fn uses_pty(&self) -> bool {
+        self.uses_pty
+    }
+
+    pub fn expose_in_llm(&self) -> bool {
+        self.expose_in_llm
+    }
+
+    fn handler(&self) -> ToolHandler {
+        self.handler.clone()
+    }
 }
 
 impl ToolRegistry {
@@ -225,40 +310,15 @@ impl ToolRegistry {
         // Initialize policy manager and update available tools
         let policy_manager_result = ToolPolicyManager::new_with_workspace(&workspace_root);
 
-        let (mut policy_manager, _has_policy) = match policy_manager_result {
-            Ok(manager) => (Some(manager), true),
+        let policy_manager = match policy_manager_result {
+            Ok(manager) => Some(manager),
             Err(e) => {
                 eprintln!("Warning: Failed to initialize tool policy manager: {}", e);
-                (None, false)
+                None
             }
         };
 
-        let mut available_tools = vec![
-            tools::GREP_SEARCH.to_string(),
-            tools::LIST_FILES.to_string(),
-            tools::RUN_TERMINAL_CMD.to_string(),
-            tools::READ_FILE.to_string(),
-            tools::WRITE_FILE.to_string(),
-            tools::EDIT_FILE.to_string(),
-            tools::BASH.to_string(),
-            tools::APPLY_PATCH.to_string(),
-            tools::SRGN.to_string(),
-            tools::SPECKIT.to_string(),
-        ];
-
-        // Add AST-grep tool if available
-        if ast_grep_engine.is_some() {
-            available_tools.push(tools::AST_GREP_SEARCH.to_string());
-        }
-
-        // Update available tools in policy manager if available
-        if let Some(ref mut pm) = policy_manager {
-            if let Err(e) = pm.update_available_tools(available_tools) {
-                eprintln!("Warning: Failed to update tool policies: {}", e);
-            }
-        }
-
-        Self {
+        let mut registry = Self {
             workspace_root,
             search_tool,
             simple_search_tool,
@@ -272,7 +332,184 @@ impl ToolRegistry {
             active_pty_sessions: Arc::new(AtomicUsize::new(0)),
             srgn_tool,
             speckit_tool,
+            tool_registrations: Vec::new(),
+            tool_lookup: HashMap::new(),
+        };
+
+        registry.register_builtin_tools();
+        registry
+    }
+
+    fn register_builtin_tools(&mut self) {
+        for registration in Self::builtin_tool_registrations() {
+            if registration.name() == tools::AST_GREP_SEARCH && self.ast_grep_engine.is_none() {
+                continue;
+            }
+
+            let tool_name = registration.name();
+            if let Err(err) = self.register_tool(registration) {
+                eprintln!("Warning: Failed to register tool '{}': {}", tool_name, err);
+            }
         }
+    }
+
+    fn builtin_tool_registrations() -> Vec<ToolRegistration> {
+        vec![
+            ToolRegistration::new(
+                tools::GREP_SEARCH,
+                CapabilityLevel::CodeSearch,
+                false,
+                ToolRegistry::grep_search_executor,
+            ),
+            ToolRegistration::new(
+                tools::LIST_FILES,
+                CapabilityLevel::FileListing,
+                false,
+                ToolRegistry::list_files_executor,
+            ),
+            ToolRegistration::new(
+                tools::RUN_TERMINAL_CMD,
+                CapabilityLevel::Bash,
+                true,
+                ToolRegistry::run_terminal_cmd_executor,
+            ),
+            ToolRegistration::new(
+                tools::READ_FILE,
+                CapabilityLevel::FileReading,
+                false,
+                ToolRegistry::read_file_executor,
+            ),
+            ToolRegistration::new(
+                tools::WRITE_FILE,
+                CapabilityLevel::Editing,
+                false,
+                ToolRegistry::write_file_executor,
+            ),
+            ToolRegistration::new(
+                tools::EDIT_FILE,
+                CapabilityLevel::Editing,
+                false,
+                ToolRegistry::edit_file_executor,
+            ),
+            ToolRegistration::new(
+                tools::AST_GREP_SEARCH,
+                CapabilityLevel::CodeSearch,
+                false,
+                ToolRegistry::ast_grep_executor,
+            ),
+            ToolRegistration::new(
+                tools::SIMPLE_SEARCH,
+                CapabilityLevel::CodeSearch,
+                false,
+                ToolRegistry::simple_search_executor,
+            ),
+            ToolRegistration::new(
+                tools::BASH,
+                CapabilityLevel::CodeSearch,
+                true,
+                ToolRegistry::bash_executor,
+            ),
+            ToolRegistration::new(
+                tools::APPLY_PATCH,
+                CapabilityLevel::Editing,
+                false,
+                ToolRegistry::apply_patch_executor,
+            )
+            .with_llm_visibility(false),
+            ToolRegistration::new(
+                tools::SRGN,
+                CapabilityLevel::CodeSearch,
+                false,
+                ToolRegistry::srgn_executor,
+            ),
+            ToolRegistration::new(
+                tools::SPECKIT,
+                CapabilityLevel::CodeSearch,
+                false,
+                ToolRegistry::speckit_executor,
+            ),
+        ]
+    }
+
+    pub fn register_tool(&mut self, registration: ToolRegistration) -> Result<()> {
+        if self.tool_lookup.contains_key(registration.name()) {
+            return Err(anyhow!(format!(
+                "Tool '{}' is already registered",
+                registration.name()
+            )));
+        }
+
+        let index = self.tool_registrations.len();
+        self.tool_lookup.insert(registration.name(), index);
+        self.tool_registrations.push(registration);
+        self.sync_policy_available_tools();
+        Ok(())
+    }
+
+    fn sync_policy_available_tools(&mut self) {
+        let available = self.available_tools();
+        if let Some(ref mut pm) = self.tool_policy {
+            if let Err(err) = pm.update_available_tools(available) {
+                eprintln!("Warning: Failed to update tool policies: {}", err);
+            }
+        }
+    }
+
+    fn grep_search_executor(&mut self, args: Value) -> BoxFuture<'_, Result<Value>> {
+        let tool = self.search_tool.clone();
+        Box::pin(async move { tool.execute(args).await })
+    }
+
+    fn list_files_executor(&mut self, args: Value) -> BoxFuture<'_, Result<Value>> {
+        let tool = self.file_ops_tool.clone();
+        Box::pin(async move { tool.execute(args).await })
+    }
+
+    fn run_terminal_cmd_executor(&mut self, args: Value) -> BoxFuture<'_, Result<Value>> {
+        let tool = self.command_tool.clone();
+        Box::pin(async move { tool.execute(args).await })
+    }
+
+    fn read_file_executor(&mut self, args: Value) -> BoxFuture<'_, Result<Value>> {
+        let tool = self.file_ops_tool.clone();
+        Box::pin(async move { tool.read_file(args).await })
+    }
+
+    fn write_file_executor(&mut self, args: Value) -> BoxFuture<'_, Result<Value>> {
+        let tool = self.file_ops_tool.clone();
+        Box::pin(async move { tool.write_file(args).await })
+    }
+
+    fn edit_file_executor(&mut self, args: Value) -> BoxFuture<'_, Result<Value>> {
+        Box::pin(async move { self.edit_file(args).await })
+    }
+
+    fn ast_grep_executor(&mut self, args: Value) -> BoxFuture<'_, Result<Value>> {
+        Box::pin(async move { self.execute_ast_grep(args).await })
+    }
+
+    fn simple_search_executor(&mut self, args: Value) -> BoxFuture<'_, Result<Value>> {
+        let tool = self.simple_search_tool.clone();
+        Box::pin(async move { tool.execute(args).await })
+    }
+
+    fn bash_executor(&mut self, args: Value) -> BoxFuture<'_, Result<Value>> {
+        let tool = self.bash_tool.clone();
+        Box::pin(async move { tool.execute(args).await })
+    }
+
+    fn apply_patch_executor(&mut self, args: Value) -> BoxFuture<'_, Result<Value>> {
+        Box::pin(async move { self.execute_apply_patch(args).await })
+    }
+
+    fn srgn_executor(&mut self, args: Value) -> BoxFuture<'_, Result<Value>> {
+        let tool = self.srgn_tool.clone();
+        Box::pin(async move { tool.execute(args).await })
+    }
+
+    fn speckit_executor(&mut self, args: Value) -> BoxFuture<'_, Result<Value>> {
+        let tool = self.speckit_tool.clone();
+        Box::pin(async move { tool.execute(args).await })
     }
 
     /// Set AST-grep engine
@@ -326,9 +563,25 @@ impl ToolRegistry {
             }
         };
 
+        let registration = match self
+            .tool_lookup
+            .get(name)
+            .and_then(|index| self.tool_registrations.get(*index))
+        {
+            Some(registration) => registration,
+            None => {
+                let error = ToolExecutionError::new(
+                    name.to_string(),
+                    ToolErrorType::ToolNotFound,
+                    format!("Unknown tool: {}", name),
+                );
+                return Ok(error.to_json_value());
+            }
+        };
+
         // Check PTY session limits for PTY-based tools
-        let is_pty_tool = matches!(name, tools::RUN_TERMINAL_CMD | tools::BASH);
-        if is_pty_tool {
+        let uses_pty = registration.uses_pty();
+        if uses_pty {
             if let Err(e) = self.start_pty_session() {
                 let error = ToolExecutionError::with_original_error(
                     name.to_string(),
@@ -340,31 +593,14 @@ impl ToolRegistry {
             }
         }
 
-        let result = match name {
-            tools::GREP_SEARCH => self.search_tool.execute(args).await,
-            tools::LIST_FILES => self.file_ops_tool.execute(args).await,
-            tools::RUN_TERMINAL_CMD => self.command_tool.execute(args).await,
-            tools::READ_FILE => self.file_ops_tool.read_file(args).await,
-            tools::WRITE_FILE => self.file_ops_tool.write_file(args).await,
-            tools::EDIT_FILE => self.edit_file(args).await,
-            tools::AST_GREP_SEARCH => self.execute_ast_grep(args).await,
-            tools::SIMPLE_SEARCH => self.simple_search_tool.execute(args).await,
-            tools::BASH => self.bash_tool.execute(args).await,
-            tools::APPLY_PATCH => self.execute_apply_patch(args).await,
-            tools::SRGN => self.srgn_tool.execute(args).await,
-            tools::SPECKIT => self.speckit_tool.execute(args).await,
-            _ => {
-                let error = ToolExecutionError::new(
-                    name.to_string(),
-                    ToolErrorType::ToolNotFound,
-                    format!("Unknown tool: {}", name),
-                );
-                return Ok(error.to_json_value());
-            }
+        let handler = registration.handler();
+        let result = match handler {
+            ToolHandler::RegistryFn(executor) => executor(self, args).await,
+            ToolHandler::TraitObject(tool) => tool.execute(args).await,
         };
 
         // Decrement session count if this was a PTY tool
-        if is_pty_tool {
+        if uses_pty {
             self.end_pty_session();
         }
 
@@ -509,41 +745,15 @@ impl ToolRegistry {
 
     /// List available tools
     pub fn available_tools(&self) -> Vec<String> {
-        let mut tools = vec![
-            tools::GREP_SEARCH.to_string(),
-            tools::LIST_FILES.to_string(),
-            tools::RUN_TERMINAL_CMD.to_string(),
-            tools::READ_FILE.to_string(),
-            tools::WRITE_FILE.to_string(),
-            tools::EDIT_FILE.to_string(),
-            "simple_search".to_string(),
-            "bash".to_string(),
-            tools::SRGN.to_string(),
-            tools::SPECKIT.to_string(),
-        ];
-
-        // Add AST-grep tool if available
-        if self.ast_grep_engine.is_some() {
-            tools.push(tools::AST_GREP_SEARCH.to_string());
-        }
-
-        tools
+        self.tool_registrations
+            .iter()
+            .map(|registration| registration.name().to_string())
+            .collect()
     }
 
     /// Check if a tool exists
     pub fn has_tool(&self, name: &str) -> bool {
-        match name {
-            tools::GREP_SEARCH
-            | tools::LIST_FILES
-            | tools::RUN_TERMINAL_CMD
-            | tools::READ_FILE
-            | tools::WRITE_FILE
-            | tools::SRGN
-            | tools::SPECKIT => true,
-            tools::AST_GREP_SEARCH => self.ast_grep_engine.is_some(),
-            tools::SIMPLE_SEARCH | tools::BASH => true,
-            _ => false,
-        }
+        self.tool_lookup.contains_key(name)
     }
 
     /// Get tool policy manager (mutable reference)
@@ -1586,58 +1796,53 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
 
 /// Build function declarations filtered by capability level
 pub fn build_function_declarations_for_level(level: CapabilityLevel) -> Vec<FunctionDeclaration> {
-    let all_declarations = build_function_declarations();
+    let tool_capabilities: HashMap<&'static str, CapabilityLevel> =
+        ToolRegistry::builtin_tool_registrations()
+            .into_iter()
+            .filter(|registration| registration.expose_in_llm())
+            .map(|registration| (registration.name(), registration.capability()))
+            .collect();
 
-    match level {
-        CapabilityLevel::Basic => vec![],
-        CapabilityLevel::FileReading => all_declarations
-            .into_iter()
-            .filter(|fd| fd.name == "read_file")
-            .collect(),
-        CapabilityLevel::FileListing => all_declarations
-            .into_iter()
-            .filter(|fd| fd.name == tools::LIST_FILES || fd.name == tools::READ_FILE)
-            .collect(),
-        CapabilityLevel::Bash => all_declarations
-            .into_iter()
-            .filter(|fd| {
-                fd.name == tools::LIST_FILES
-                    || fd.name == tools::RUN_TERMINAL_CMD
-                    || fd.name == tools::READ_FILE
-            })
-            .collect(),
-        CapabilityLevel::Editing => all_declarations
-            .into_iter()
-            .filter(|fd| {
-                fd.name == tools::LIST_FILES
-                    || fd.name == tools::READ_FILE
-                    || fd.name == tools::WRITE_FILE
-                    || fd.name == tools::EDIT_FILE
-                    || fd.name == tools::RUN_TERMINAL_CMD
-            })
-            .collect(),
-        CapabilityLevel::CodeSearch => all_declarations
-            .into_iter()
-            .filter(|fd| {
-                fd.name == tools::LIST_FILES
-                    || fd.name == tools::RUN_TERMINAL_CMD
-                    || fd.name == tools::GREP_SEARCH
-                    || fd.name == tools::READ_FILE
-                    || fd.name == tools::WRITE_FILE
-                    || fd.name == tools::EDIT_FILE
-                    || fd.name == tools::AST_GREP_SEARCH
-                    || fd.name == tools::SIMPLE_SEARCH
-                    || fd.name == tools::BASH
-            })
-            .collect(),
-    }
+    build_function_declarations()
+        .into_iter()
+        .filter(|fd| {
+            tool_capabilities
+                .get(fd.name.as_str())
+                .map(|required| level >= *required)
+                .unwrap_or(false)
+        })
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use anyhow::Result;
+    use async_trait::async_trait;
     use serde_json::json;
+    use tempfile::TempDir;
+
+    const CUSTOM_TOOL_NAME: &str = "custom_test_tool";
+
+    struct CustomEchoTool;
+
+    #[async_trait]
+    impl Tool for CustomEchoTool {
+        async fn execute(&self, args: Value) -> Result<Value> {
+            Ok(json!({
+                "success": true,
+                "args": args,
+            }))
+        }
+
+        fn name(&self) -> &'static str {
+            CUSTOM_TOOL_NAME
+        }
+
+        fn description(&self) -> &'static str {
+            "Custom test tool used for registry validation"
+        }
+    }
 
     #[tokio::test]
     async fn run_terminal_cmd_accepts_string() -> Result<()> {
@@ -1646,6 +1851,40 @@ mod tests {
             .run_terminal_cmd(json!({"command": "echo test", "mode": "terminal"}))
             .await?;
         assert_eq!(out["stdout"], "test");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn registers_builtin_tools() -> Result<()> {
+        let temp_dir = TempDir::new()?;
+        let registry = ToolRegistry::new(temp_dir.path().to_path_buf());
+        let available = registry.available_tools();
+
+        assert!(available.contains(&tools::READ_FILE.to_string()));
+        assert!(available.contains(&tools::RUN_TERMINAL_CMD.to_string()));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn allows_registering_custom_tools() -> Result<()> {
+        let temp_dir = TempDir::new()?;
+        let mut registry = ToolRegistry::new(temp_dir.path().to_path_buf());
+
+        registry.register_tool(ToolRegistration::from_tool_instance(
+            CUSTOM_TOOL_NAME,
+            CapabilityLevel::CodeSearch,
+            CustomEchoTool,
+        ))?;
+
+        registry.allow_all_tools().ok();
+
+        let available = registry.available_tools();
+        assert!(available.contains(&CUSTOM_TOOL_NAME.to_string()));
+
+        let response = registry
+            .execute_tool(CUSTOM_TOOL_NAME, json!({"input": "value"}))
+            .await?;
+        assert!(response["success"].as_bool().unwrap_or(false));
         Ok(())
     }
 }

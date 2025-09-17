@@ -65,7 +65,12 @@ mod tests {
                 // This should now return an error for unsupported command
                 if let Some(error) = response.get("error") {
                     println!("Got expected error for unsupported command: {:?}", error);
-                    assert!(error["message"].as_str().unwrap().contains("Unsupported Speckit command"));
+                    assert!(
+                        error["message"]
+                            .as_str()
+                            .unwrap()
+                            .contains("Unsupported Speckit command")
+                    );
                 } else {
                     panic!("Expected error response for unsupported command");
                 }
@@ -96,7 +101,12 @@ mod tests {
                 // This should now return an error for unsupported command
                 if let Some(error) = response.get("error") {
                     println!("Got expected error for unsupported command: {:?}", error);
-                    assert!(error["message"].as_str().unwrap().contains("Unsupported Speckit command"));
+                    assert!(
+                        error["message"]
+                            .as_str()
+                            .unwrap()
+                            .contains("Unsupported Speckit command")
+                    );
                 } else {
                     panic!("Expected error response for unsupported command");
                 }
@@ -126,7 +136,12 @@ mod tests {
                 // This should now return an error for unsupported command
                 if let Some(error) = response.get("error") {
                     println!("Got expected error for unsupported command: {:?}", error);
-                    assert!(error["message"].as_str().unwrap().contains("Unsupported Speckit command"));
+                    assert!(
+                        error["message"]
+                            .as_str()
+                            .unwrap()
+                            .contains("Unsupported Speckit command")
+                    );
                 } else {
                     panic!("Expected error response for unsupported command");
                 }
@@ -179,7 +194,12 @@ mod tests {
         assert!(result.is_ok());
         let response = result.unwrap();
         assert!(response["error"].is_object());
-        assert!(response["error"]["message"].as_str().unwrap().contains("Unsupported Speckit command"));
+        assert!(
+            response["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("Unsupported Speckit command")
+        );
     }
 
     #[tokio::test]
@@ -197,7 +217,12 @@ mod tests {
         assert!(result.is_ok());
         let response = result.unwrap();
         assert!(response["error"].is_object());
-        assert!(response["error"]["message"].as_str().unwrap().contains("Missing required 'command' parameter"));
+        assert!(
+            response["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("Missing required 'command' parameter")
+        );
     }
 
     #[test]
@@ -207,7 +232,10 @@ mod tests {
         let declarations = build_function_declarations();
         let speckit_decl = declarations.iter().find(|d| d.name == "speckit");
 
-        assert!(speckit_decl.is_some(), "Speckit function declaration should be present");
+        assert!(
+            speckit_decl.is_some(),
+            "Speckit function declaration should be present"
+        );
 
         if let Some(decl) = speckit_decl {
             println!("Speckit function declaration found: {}", decl.name);
@@ -218,7 +246,12 @@ mod tests {
             // Check parameters
             let params = &decl.parameters;
             assert!(params["type"].as_str().unwrap() == "object");
-            assert!(params["required"].as_array().unwrap().contains(&json!("command")));
+            assert!(
+                params["required"]
+                    .as_array()
+                    .unwrap()
+                    .contains(&json!("command"))
+            );
         }
     }
 

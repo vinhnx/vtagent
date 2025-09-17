@@ -332,7 +332,10 @@ mod tests {
     #[test]
     fn test_model_string_conversion() {
         // Gemini models
-        assert_eq!(ModelId::Gemini25FlashLite.as_str(), "gemini-2.5-flash-lite-preview-06-17");
+        assert_eq!(
+            ModelId::Gemini25FlashLite.as_str(),
+            "gemini-2.5-flash-lite-preview-06-17"
+        );
         assert_eq!(ModelId::Gemini25Pro.as_str(), "gemini-2.5-pro");
         // OpenAI models
         assert_eq!(ModelId::GPT5.as_str(), "gpt-5");
@@ -346,7 +349,9 @@ mod tests {
     fn test_model_from_string() {
         // Gemini models
         assert_eq!(
-            "gemini-2.5-flash-lite-preview-06-17".parse::<ModelId>().unwrap(),
+            "gemini-2.5-flash-lite-preview-06-17"
+                .parse::<ModelId>()
+                .unwrap(),
             ModelId::Gemini25FlashLite
         );
         assert_eq!(

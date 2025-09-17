@@ -88,8 +88,8 @@ impl TrajectoryLogger {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
     use std::fs;
+    use tempfile::TempDir;
 
     #[test]
     fn test_trajectory_logger_log_route_integration() {
@@ -97,7 +97,12 @@ mod tests {
         let logger = TrajectoryLogger::new(temp_dir.path());
 
         // Test the logging functionality that would be called in the agent loop
-        logger.log_route(1, "gemini-2.5-flash", "standard", "test user input for logging");
+        logger.log_route(
+            1,
+            "gemini-2.5-flash",
+            "standard",
+            "test user input for logging",
+        );
 
         // Check that the log file was created and contains expected content
         let log_path = temp_dir.path().join("logs/trajectory.jsonl");

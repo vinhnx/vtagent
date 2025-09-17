@@ -8,6 +8,7 @@ pub mod error_display;
 pub mod factory;
 pub mod provider;
 pub mod providers;
+pub mod stream;
 pub mod types;
 
 #[cfg(test)]

@@ -6,7 +6,7 @@
 //! - Manage snapshot lifecycle and cleanup
 //! - Support compression and encryption
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;

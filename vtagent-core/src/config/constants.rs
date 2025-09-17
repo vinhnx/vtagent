@@ -148,6 +148,14 @@ pub mod tools {
     pub const WILDCARD_ALL: &str = "*";
 }
 
+/// Streaming configuration constants
+pub mod streaming {
+    pub const CHUNK_SIZE_ENV: &str = "VTAGENT_STREAMING_CHARS_PER_CHUNK";
+    pub const DEFAULT_CHARS_PER_CHUNK: usize = 32;
+    pub const MIN_CHARS_PER_CHUNK: usize = 8;
+    pub const MAX_CHARS_PER_CHUNK: usize = 256;
+}
+
 /// Context window management defaults
 pub mod context {
     /// Approximate character count per token when estimating context size

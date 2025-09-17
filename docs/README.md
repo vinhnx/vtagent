@@ -108,6 +108,11 @@ To tune budgets: add `[router.budgets.<class>]` with max_tokens and max_parallel
 **Trajectory Logs:**
 Logs for trajectory: check `logs/trajectory.jsonl`.
 
+**Real-time Streaming:**
+Interactive agent responses stream incrementally in plain text. Adjust chunk sizing with the
+`VTAGENT_STREAMING_CHARS_PER_CHUNK` environment variable (values are clamped between the configured
+minimum and maximum thresholds).
+
 ### Single-Agent Workflows
 
 ```bash

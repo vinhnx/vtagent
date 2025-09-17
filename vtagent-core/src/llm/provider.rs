@@ -46,9 +46,12 @@
 //! tool_response.validate_for_provider("openai").unwrap();
 //! ```
 
+use crate::llm::stream as llm_stream;
 use async_trait::async_trait;
+use futures::{StreamExt, stream as futures_stream};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use std::pin::Pin;
 
 /// Universal LLM request structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -630,6 +633,16 @@ pub struct LLMResponse {
     pub finish_reason: FinishReason,
 }
 
+/// Streaming chunk produced by providers when generating responses.
+#[derive(Debug, Clone)]
+pub struct LLMStreamChunk {
+    pub delta: Option<String>,
+    pub response: Option<LLMResponse>,
+}
+
+/// Boxed stream type used for incremental provider responses.
+pub type LLMStream = Pin<Box<dyn futures::Stream<Item = Result<LLMStreamChunk, LLMError>> + Send>>;
+
 #[derive(Debug, Clone)]
 pub struct Usage {
     pub prompt_tokens: u32,
@@ -656,13 +669,11 @@ pub trait LLMProvider: Send + Sync {
     async fn generate(&self, request: LLMRequest) -> Result<LLMResponse, LLMError>;
 
     /// Stream completion (optional)
-    async fn stream(
-        &self,
-        request: LLMRequest,
-    ) -> Result<Box<dyn futures::Stream<Item = LLMResponse> + Unpin + Send>, LLMError> {
-        // Default implementation falls back to non-streaming
-        let response = self.generate(request).await?;
-        Ok(Box::new(futures::stream::once(async { response }).boxed()))
+    async fn stream(&self, request: LLMRequest) -> Result<LLMStream, LLMError> {
+        let mut fallback_request = request;
+        fallback_request.stream = false;
+        let response = self.generate(fallback_request).await?;
+        Ok(fallback_stream_from_response(response))
     }
 
     /// Get supported models
@@ -670,6 +681,128 @@ pub trait LLMProvider: Send + Sync {
 
     /// Validate request for this provider
     fn validate_request(&self, request: &LLMRequest) -> Result<(), LLMError>;
+}
+
+fn fallback_stream_from_response(response: LLMResponse) -> LLMStream {
+    let mut items: Vec<Result<LLMStreamChunk, LLMError>> = Vec::new();
+
+    if let Some(content) = response.content.clone() {
+        for chunk in llm_stream::chunk_text(&content) {
+            if !chunk.is_empty() {
+                items.push(Ok(LLMStreamChunk {
+                    delta: Some(chunk),
+                    response: None,
+                }));
+            }
+        }
+    }
+
+    items.push(Ok(LLMStreamChunk {
+        delta: None,
+        response: Some(response),
+    }));
+
+    futures_stream::iter(items).boxed()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::constants::streaming;
+    use async_trait::async_trait;
+    use futures::StreamExt;
+    use std::env;
+
+    const TEST_CONTENT: &str = "incremental streaming";
+
+    struct EnvVarGuard {
+        key: &'static str,
+    }
+
+    impl EnvVarGuard {
+        fn new(key: &'static str, value: &str) -> Self {
+            env::set_var(key, value);
+            Self { key }
+        }
+    }
+
+    impl Drop for EnvVarGuard {
+        fn drop(&mut self) {
+            env::remove_var(self.key);
+        }
+    }
+
+    struct StubProvider;
+
+    #[async_trait]
+    impl LLMProvider for StubProvider {
+        fn name(&self) -> &str {
+            "stub"
+        }
+
+        async fn generate(&self, _request: LLMRequest) -> Result<LLMResponse, LLMError> {
+            Ok(LLMResponse {
+                content: Some(TEST_CONTENT.to_string()),
+                tool_calls: None,
+                usage: None,
+                finish_reason: FinishReason::Stop,
+            })
+        }
+
+        fn supported_models(&self) -> Vec<String> {
+            vec!["stub-model".to_string()]
+        }
+
+        fn validate_request(&self, _request: &LLMRequest) -> Result<(), LLMError> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn fallback_stream_yields_chunks_and_final_message() {
+        let _guard = EnvVarGuard::new(streaming::CHUNK_SIZE_ENV, "6");
+        let provider = StubProvider;
+        let request = LLMRequest {
+            messages: Vec::new(),
+            system_prompt: None,
+            tools: None,
+            model: "stub-model".to_string(),
+            max_tokens: None,
+            temperature: None,
+            stream: true,
+            tool_choice: None,
+            parallel_tool_calls: None,
+            parallel_tool_config: None,
+            reasoning_effort: None,
+        };
+
+        let mut stream = match provider.stream(request).await {
+            Ok(stream) => stream,
+            Err(err) => panic!("stream construction failed: {err}"),
+        };
+
+        let mut collected = String::new();
+        let mut final_content = None;
+
+        while let Some(chunk_result) = stream.next().await {
+            let chunk = match chunk_result {
+                Ok(value) => value,
+                Err(err) => panic!("chunk error: {err}"),
+            };
+            if let Some(delta) = chunk.delta {
+                collected.push_str(&delta);
+            }
+            if let Some(response) = chunk.response {
+                final_content = response.content;
+            }
+        }
+
+        assert_eq!(collected, TEST_CONTENT);
+        match final_content {
+            Some(text) => assert_eq!(text, TEST_CONTENT),
+            None => panic!("missing final response"),
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -698,5 +831,3 @@ impl From<LLMError> for crate::llm::types::LLMError {
         }
     }
 }
-
-use futures::StreamExt;

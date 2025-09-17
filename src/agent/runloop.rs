@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use futures::StreamExt;
 use serde_json::{Map, Number, Value};
 use std::io::{self, Write};
 use vtagent_core::config::constants::context as context_defaults;
@@ -39,6 +40,8 @@ fn render_tool_output(val: &serde_json::Value) {
         let _ = renderer.line(MessageStyle::Error, stderr);
     }
 }
+
+const STREAMING_FALLBACK_ERROR: &str = "Provider error: streaming ended without final response";
 
 #[derive(Clone, Copy)]
 struct ContextTrimConfig {
@@ -1224,6 +1227,7 @@ async fn run_single_agent_loop_unified(
 
             let mut attempt_history = working_history.clone();
             let mut retry_attempts = 0usize;
+            let mut displayed_streaming_text = false;
             let response = loop {
                 retry_attempts += 1;
                 let _ = enforce_unified_context_window(&mut attempt_history, trim_config);
@@ -1235,17 +1239,89 @@ async fn run_single_agent_loop_unified(
                     model: active_model.clone(),
                     max_tokens: max_tokens_opt.or(Some(2000)),
                     temperature: Some(0.7),
-                    stream: false,
+                    stream: true,
                     tool_choice: Some(uni::ToolChoice::auto()),
                     parallel_tool_calls: None,
                     parallel_tool_config: parallel_cfg_opt.clone(),
                     reasoning_effort: vt_cfg.map(|c| c.agent.reasoning_effort.clone()),
                 };
 
-                match provider_client.generate(request).await {
-                    Ok(r) => {
-                        working_history = attempt_history.clone();
-                        break r;
+                match provider_client.stream(request).await {
+                    Ok(mut stream) => {
+                        let mut attempt_displayed = false;
+                        let mut final_response = None;
+                        let mut stream_error: Option<uni::LLMError> = None;
+
+                        while let Some(chunk_result) = stream.next().await {
+                            match chunk_result {
+                                Ok(chunk) => {
+                                    if let Some(delta) = chunk.delta {
+                                        if !delta.is_empty() {
+                                            attempt_displayed = true;
+                                            print!("{delta}");
+                                            let _ = io::stdout().flush();
+                                        }
+                                    }
+                                    if let Some(resp) = chunk.response {
+                                        final_response = Some(resp);
+                                    }
+                                }
+                                Err(err) => {
+                                    stream_error = Some(err);
+                                    break;
+                                }
+                            }
+                        }
+
+                        if attempt_displayed {
+                            println!();
+                        }
+
+                        if let Some(err) = stream_error {
+                            let error_text = err.to_string();
+                            if is_context_overflow_error(&error_text)
+                                && retry_attempts <= context_defaults::CONTEXT_ERROR_RETRY_LIMIT
+                            {
+                                let removed_tool_messages = prune_unified_tool_responses(
+                                    &mut attempt_history,
+                                    trim_config.preserve_recent_turns,
+                                );
+                                let removed_turns = apply_aggressive_trim_unified(
+                                    &mut attempt_history,
+                                    trim_config,
+                                );
+                                let total_removed = removed_tool_messages + removed_turns;
+                                if total_removed > 0 {
+                                    renderer.line(
+                                        MessageStyle::Info,
+                                        &format!(
+                                            "Context overflow detected; removed {} older messages (retry {}/{}).",
+                                            total_removed,
+                                            retry_attempts,
+                                            context_defaults::CONTEXT_ERROR_RETRY_LIMIT,
+                                        ),
+                                    )?;
+                                    conversation_history.clone_from(&attempt_history);
+                                    continue;
+                                }
+                            }
+                            renderer.line(
+                                MessageStyle::Error,
+                                &format!("Provider error: {error_text}"),
+                            )?;
+                            continue 'outer;
+                        }
+
+                        if let Some(resp) = final_response {
+                            working_history = attempt_history.clone();
+                            if attempt_displayed {
+                                displayed_streaming_text = true;
+                            }
+                            break resp;
+                        }
+
+                        renderer.line(MessageStyle::Error, STREAMING_FALLBACK_ERROR)?;
+                        continue 'outer;
                     }
                     Err(e) => {
                         let error_text = e.to_string();
@@ -1386,6 +1462,7 @@ async fn run_single_agent_loop_unified(
 
             // If we reach here, no (more) tool calls
             if let Some(mut text) = _final_text.clone() {
+                let original_text = _final_text.clone();
                 // Optional self-review/refinement pass based on config
                 let do_review = vt_cfg.map(|c| c.agent.enable_self_review).unwrap_or(false);
                 let review_passes = vt_cfg
@@ -1419,7 +1496,16 @@ async fn run_single_agent_loop_unified(
                         }
                     }
                 }
-                renderer.line(MessageStyle::Response, &text)?;
+                let mut should_render = true;
+                if displayed_streaming_text {
+                    if let Some(original) = original_text {
+                        should_render = original != text;
+                    }
+                }
+                if should_render {
+                    renderer.line(MessageStyle::Response, &text)?;
+                }
+                _final_text = Some(text.clone());
                 working_history.push(uni::Message::assistant(text));
             }
             break 'outer;

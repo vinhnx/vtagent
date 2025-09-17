@@ -208,28 +208,6 @@ pub fn build_function_declarations() -> Vec<FunctionDeclaration> {
                 "required": ["input"]
             }),
         },
-
-        // Speckit tool for spec-driven development
-        FunctionDeclaration {
-            name: tools::SPECKIT.to_string(),
-            description: "Speckit tool for spec-driven development using GitHub's Spec Kit. This tool enables structured development workflows by transforming natural language specifications into executable code, tests, and documentation. Use this tool to initialize spec-driven projects, create detailed specifications, generate implementation plans, and break down work into actionable tasks. The tool supports commands like 'init' for project setup, '/specify' for creating specifications, '/plan' for technical planning, and '/tasks' for task breakdown. Speckit follows a methodology that inverts traditional development: specifications drive code generation rather than merely guiding it. This tool is particularly valuable for greenfield development, feature exploration, and maintaining specification-driven consistency across projects.".to_string(),
-            parameters: json!({
-                "type": "object",
-                "properties": {
-                    "command": {
-                        "type": "string",
-                        "description": "Speckit command to execute: 'init', 'check', '/specify', '/plan', '/tasks'",
-                        "enum": ["init", "check", "/specify", "/plan", "/tasks"]
-                    },
-                    "args": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Arguments for the Speckit command. For 'init': project name or use '--here' flag. For '/specify': specification description. For other commands: optional context arguments."
-                    }
-                },
-                "required": ["command"]
-            }),
-        },
     ]
 }
 

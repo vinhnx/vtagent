@@ -50,7 +50,8 @@ impl SpeckitTool {
         cmd.args(&full_args);
         cmd.current_dir(&work_dir);
 
-        let output = cmd.output()
+        let output = cmd
+            .output()
             .await
             .with_context(|| format!("Failed to execute Speckit command: {}", full_command))?;
 
@@ -73,7 +74,9 @@ impl SpeckitTool {
         match command {
             "init" => {
                 if args.is_empty() {
-                    return Err(anyhow::anyhow!("Speckit init requires a project name or --here flag"));
+                    return Err(anyhow::anyhow!(
+                        "Speckit init requires a project name or --here flag"
+                    ));
                 }
             }
             "check" => {
@@ -81,7 +84,9 @@ impl SpeckitTool {
             }
             "/specify" => {
                 if args.is_empty() {
-                    return Err(anyhow::anyhow!("Speckit /specify requires a specification description"));
+                    return Err(anyhow::anyhow!(
+                        "Speckit /specify requires a specification description"
+                    ));
                 }
             }
             "/plan" => {
@@ -104,13 +109,19 @@ impl Tool for SpeckitTool {
         // Validate arguments first
         self.validate_args(&args)?;
 
-        let command = args.get("command")
+        let command = args
+            .get("command")
             .and_then(|c| c.as_str())
             .ok_or_else(|| anyhow::anyhow!("Missing 'command' parameter"))?;
 
-        let speckit_args = args.get("args")
+        let speckit_args = args
+            .get("args")
             .and_then(|a| a.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect::<Vec<String>>())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect::<Vec<String>>()
+            })
             .unwrap_or_default();
 
         // Execute the Speckit command
@@ -136,13 +147,21 @@ impl Tool for SpeckitTool {
             return Err(anyhow::anyhow!("Missing required 'command' parameter"));
         }
 
-        let command = obj.get("command").unwrap().as_str()
+        let command = obj
+            .get("command")
+            .unwrap()
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("'command' must be a string"))?;
 
         // Validate command is supported - only init and check are available
         match command {
             "init" | "check" => {}
-            _ => return Err(anyhow::anyhow!("Unsupported Speckit command: {}. Available commands: init, check", command))
+            _ => {
+                return Err(anyhow::anyhow!(
+                    "Unsupported Speckit command: {}. Available commands: init, check",
+                    command
+                ));
+            }
         }
 
         Ok(())

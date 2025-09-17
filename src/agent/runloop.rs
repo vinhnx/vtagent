@@ -967,8 +967,13 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
                     Ok(tool_output) => {
                         render_tool_output(&tool_output);
                         // Extract modified files from tool output for git diff confirmation
-                        let modified_files: Vec<String> = if let Some(files) = tool_output.get("modified_files").and_then(|v| v.as_array()) {
-                            files.iter().filter_map(|f| f.as_str().map(|s| s.to_string())).collect()
+                        let modified_files: Vec<String> = if let Some(files) =
+                            tool_output.get("modified_files").and_then(|v| v.as_array())
+                        {
+                            files
+                                .iter()
+                                .filter_map(|f| f.as_str().map(|s| s.to_string()))
+                                .collect()
                         } else {
                             vec![] // Fallback: assume no files modified or extract from args
                         };
@@ -981,7 +986,9 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
                         }
 
                         // Confirm changes with git diff if files were modified
-                        if !modified_files.is_empty() && confirm_changes_with_git_diff(&modified_files).await? {
+                        if !modified_files.is_empty()
+                            && confirm_changes_with_git_diff(&modified_files).await?
+                        {
                             renderer.line(MessageStyle::Info, "Changes applied successfully.")?;
                         } else if !modified_files.is_empty() {
                             renderer.line(MessageStyle::Info, "Changes discarded.")?;
@@ -1403,8 +1410,13 @@ async fn run_single_agent_loop_unified(
                             traj.log_tool_call(working_history.len(), name, &args_val, true);
                             render_tool_output(&tool_output);
                             // Extract modified files from tool output for git diff confirmation
-                            let modified_files: Vec<String> = if let Some(files) = tool_output.get("modified_files").and_then(|v| v.as_array()) {
-                                files.iter().filter_map(|f| f.as_str().map(|s| s.to_string())).collect()
+                            let modified_files: Vec<String> = if let Some(files) =
+                                tool_output.get("modified_files").and_then(|v| v.as_array())
+                            {
+                                files
+                                    .iter()
+                                    .filter_map(|f| f.as_str().map(|s| s.to_string()))
+                                    .collect()
                             } else {
                                 vec![] // Fallback: assume no files modified or extract from args
                             };
@@ -1417,8 +1429,11 @@ async fn run_single_agent_loop_unified(
                             }
 
                             // Confirm changes with git diff if files were modified
-                            if !modified_files.is_empty() && confirm_changes_with_git_diff(&modified_files).await? {
-                                renderer.line(MessageStyle::Info, "Changes applied successfully.")?;
+                            if !modified_files.is_empty()
+                                && confirm_changes_with_git_diff(&modified_files).await?
+                            {
+                                renderer
+                                    .line(MessageStyle::Info, "Changes applied successfully.")?;
                             } else if !modified_files.is_empty() {
                                 renderer.line(MessageStyle::Info, "Changes discarded.")?;
                             }

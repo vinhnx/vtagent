@@ -12,7 +12,10 @@ mod text_tools;
 mod tool_output;
 mod unified;
 
-pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
+pub async fn run_single_agent_loop(
+    config: &CoreAgentConfig,
+    skip_confirmations: bool,
+) -> Result<()> {
     let provider = config
         .model
         .parse::<ModelId>()
@@ -24,8 +27,10 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
     let vt_cfg = cfg_manager.as_ref().map(|manager| manager.config());
 
     match provider {
-        Provider::Gemini => gemini::run_single_agent_loop_gemini(config, vt_cfg).await,
-        _ => unified::run_single_agent_loop_unified(config, vt_cfg).await,
+        Provider::Gemini => {
+            gemini::run_single_agent_loop_gemini(config, vt_cfg, skip_confirmations).await
+        }
+        _ => unified::run_single_agent_loop_unified(config, vt_cfg, skip_confirmations).await,
     }
 }
 

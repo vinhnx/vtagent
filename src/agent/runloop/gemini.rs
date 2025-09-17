@@ -25,6 +25,7 @@ use super::tool_output::render_tool_output;
 pub(crate) async fn run_single_agent_loop_gemini(
     config: &CoreAgentConfig,
     vt_cfg: Option<&VTAgentConfig>,
+    skip_confirmations: bool,
 ) -> Result<()> {
     let trim_config = load_context_trim_config(vt_cfg);
     let mut renderer = AnsiRenderer::stdout();
@@ -379,7 +380,8 @@ pub(crate) async fn run_single_agent_loop_gemini(
                         }
 
                         if !modified_files.is_empty()
-                            && confirm_changes_with_git_diff(&modified_files).await?
+                            && confirm_changes_with_git_diff(&modified_files, skip_confirmations)
+                                .await?
                         {
                             renderer.line(MessageStyle::Info, "Changes applied successfully.")?;
                         } else if !modified_files.is_empty() {

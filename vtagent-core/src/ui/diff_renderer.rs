@@ -221,8 +221,8 @@ impl DiffRenderer {
         }
 
         if self.use_colors {
-            let styled_prefix = DiffStyles::apply_style(&style, prefix);
-            let styled_content = DiffStyles::apply_style(&style, &line.content);
+            let styled_prefix = self.colorize(prefix, &style);
+            let styled_content = self.colorize(&line.content, &style);
             result.push_str(&format!("{}{}", styled_prefix, styled_content));
         } else {
             result.push_str(&format!("{}{}", prefix, line.content));
@@ -276,9 +276,9 @@ impl DiffRenderer {
         footer
     }
 
-    fn colorize(&self, text: &str, style: Style) -> String {
+    fn colorize(&self, text: &str, style: &Style) -> String {
         if self.use_colors {
-            DiffStyles::apply_style(&style, text)
+            DiffStyles::apply_style(style, text)
         } else {
             text.to_string()
         }

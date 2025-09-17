@@ -74,3 +74,9 @@ impl CompletionCache {
         }
     }
 }
+
+impl Default for CompletionCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}

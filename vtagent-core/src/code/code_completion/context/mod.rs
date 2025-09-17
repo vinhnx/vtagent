@@ -32,6 +32,6 @@ impl CompletionContext {
 
     /// Check if context is suitable for completion
     pub fn is_completion_suitable(&self) -> bool {
-        !self.prefix.trim().is_empty() && self.prefix.len() >= 1
+        !self.prefix.trim().is_empty()
     }
 }

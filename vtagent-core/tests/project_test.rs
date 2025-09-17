@@ -1,136 +1,124 @@
-//! Test for project management functionality
+//! Tests for simple project management and caching utilities
 
-use std::fs;
 use tempfile::TempDir;
-use vtagent_core::project::{CacheEntry, FileCache, ProjectManager, ProjectMetadata};
+use vtagent_core::project::{SimpleCache, SimpleProjectManager};
 
 #[test]
-fn test_project_manager_creation() {
+fn test_simple_project_manager_initialization() {
     let temp_dir = TempDir::new().expect("Failed to create temp directory");
-    let projects_dir = temp_dir.path().join("projects");
+    let manager = SimpleProjectManager::new(temp_dir.path().to_path_buf());
 
-    let manager = ProjectManager {
-        home_dir: temp_dir.path().to_path_buf(),
-        projects_dir: projects_dir.clone(),
-    };
-
-    assert_eq!(manager.home_dir(), temp_dir.path());
-    assert_eq!(manager.projects_dir(), projects_dir);
-}
-
-#[test]
-fn test_project_structure_creation() {
-    let temp_dir = TempDir::new().expect("Failed to create temp directory");
-    let projects_dir = temp_dir.path().join("projects");
-
-    let manager = ProjectManager {
-        home_dir: temp_dir.path().to_path_buf(),
-        projects_dir: projects_dir.clone(),
-    };
-
-    let project_name = "test-project";
+    // Ensure initialization succeeds and creates the backing directories.
     manager
-        .create_project_structure(project_name)
-        .expect("Failed to create project structure");
+        .init()
+        .expect("Failed to initialize project manager");
 
-    let project_dir = manager.project_dir(project_name);
-    assert!(project_dir.exists());
-    assert!(manager.config_dir(project_name).exists());
-    assert!(manager.cache_dir(project_name).exists());
+    let data_dir = manager.project_data_dir("sample");
+    assert!(data_dir.starts_with(temp_dir.path()));
+    assert!(manager.workspace_root().starts_with(temp_dir.path()));
 }
 
 #[test]
-fn test_project_metadata() {
+fn test_create_and_load_project() {
     let temp_dir = TempDir::new().expect("Failed to create temp directory");
-    let projects_dir = temp_dir.path().join("projects");
-
-    let manager = ProjectManager {
-        home_dir: temp_dir.path().to_path_buf(),
-        projects_dir: projects_dir.clone(),
-    };
-
-    let project_name = "test-project";
-    let metadata = ProjectMetadata::new(project_name.to_string(), "/test/path".to_string());
+    let manager = SimpleProjectManager::new(temp_dir.path().to_path_buf());
+    manager
+        .init()
+        .expect("Failed to initialize project manager");
 
     manager
-        .save_project_metadata(project_name, &metadata)
-        .expect("Failed to save metadata");
-    let loaded_metadata = manager
-        .load_project_metadata(project_name)
-        .expect("Failed to load metadata")
-        .expect("Metadata should exist");
+        .create_project("demo", Some("Demo project"))
+        .expect("Failed to create project");
 
-    assert_eq!(loaded_metadata.name, project_name);
-    assert_eq!(loaded_metadata.root_path, "/test/path");
+    let project = manager
+        .load_project("demo")
+        .expect("Failed to load created project");
+    assert_eq!(project.name, "demo");
+    assert_eq!(project.description.as_deref(), Some("Demo project"));
+
+    let projects = manager.list_projects().expect("Failed to list projects");
+    assert!(projects.contains(&"demo".to_string()));
 }
 
 #[test]
-fn test_project_identification() {
+fn test_project_identification_helpers() {
     let temp_dir = TempDir::new().expect("Failed to create temp directory");
-    let projects_dir = temp_dir.path().join("projects");
+    let manager = SimpleProjectManager::new(temp_dir.path().to_path_buf());
+    manager
+        .init()
+        .expect("Failed to initialize project manager");
 
-    let manager = ProjectManager {
-        home_dir: temp_dir.path().to_path_buf(),
-        projects_dir: projects_dir.clone(),
-    };
-
-    // Test identification from directory name
-    let project_name = manager
-        .identify_project(temp_dir.path())
-        .expect("Failed to identify project");
+    // Without explicit marker falls back to directory name.
+    let inferred = manager
+        .identify_current_project()
+        .expect("Failed to infer project name");
     assert_eq!(
-        project_name,
+        inferred,
         temp_dir.path().file_name().unwrap().to_str().unwrap()
     );
 
-    // Test identification from .project file
-    let metadata = ProjectMetadata::new(
-        "custom-project".to_string(),
-        temp_dir.path().display().to_string(),
-    );
-    let project_file = temp_dir.path().join(".project");
-    let metadata_json =
-        serde_json::to_string_pretty(&metadata).expect("Failed to serialize metadata");
-    fs::write(&project_file, metadata_json).expect("Failed to write .project file");
-
-    let project_name = manager
-        .identify_project(temp_dir.path())
-        .expect("Failed to identify project");
-    assert_eq!(project_name, "custom-project");
+    manager
+        .set_current_project("custom-project")
+        .expect("Failed to set current project");
+    let updated = manager
+        .identify_current_project()
+        .expect("Failed to read marker file");
+    assert_eq!(updated, "custom-project");
 }
 
 #[test]
-fn test_file_cache() {
+fn test_simple_cache_lifecycle() {
     let temp_dir = TempDir::new().expect("Failed to create temp directory");
     let cache_dir = temp_dir.path().join("cache");
+    let cache = SimpleCache::new(cache_dir.clone());
 
-    let cache = FileCache::new(cache_dir.clone()).expect("Failed to create cache");
+    cache.init().expect("Failed to initialize cache");
+    assert!(cache_dir.exists());
 
-    // Test setting and getting cache entries
     cache
-        .set("test_key", "test_value", Some(60))
-        .expect("Failed to set cache entry");
+        .store("greeting", "hello world")
+        .expect("Failed to store data");
+    assert!(cache.exists("greeting"));
 
-    let value: Option<String> = cache.get("test_key").expect("Failed to get cache entry");
-    assert_eq!(value, Some("test_value".to_string()));
+    let loaded = cache.load("greeting").expect("Failed to load data");
+    assert_eq!(loaded, "hello world");
 
-    // Test invalidation
-    cache
-        .invalidate("test_key")
-        .expect("Failed to invalidate cache entry");
+    let entries = cache.list().expect("Failed to list entries");
+    assert!(entries.contains(&"greeting".to_string()));
 
-    let value: Option<String> = cache.get("test_key").expect("Failed to get cache entry");
-    assert_eq!(value, None);
+    cache.clear().expect("Failed to clear cache");
+    assert!(cache.list().unwrap().is_empty());
+}
 
-    // Test cache statistics
-    cache
-        .set("key1", "value1", Some(60))
-        .expect("Failed to set cache entry");
-    cache
-        .set("key2", "value2", Some(60))
-        .expect("Failed to set cache entry");
+#[test]
+fn test_project_update_flow() {
+    let temp_dir = TempDir::new().expect("Failed to create temp directory");
+    let manager = SimpleProjectManager::new(temp_dir.path().to_path_buf());
+    manager
+        .init()
+        .expect("Failed to initialize project manager");
 
-    let (total, expired) = cache.stats().expect("Failed to get cache stats");
-    assert_eq!(total, 2);
-    assert_eq!(expired, 0);
+    manager
+        .create_project("demo", Some("Original"))
+        .expect("Failed to create project");
+
+    let mut project = manager
+        .load_project("demo")
+        .expect("Failed to load project");
+    project.description = Some("Updated description".to_string());
+    project.tags.push("agent".to_string());
+    project
+        .metadata
+        .insert("language".to_string(), "Rust".to_string());
+
+    manager
+        .update_project(&project)
+        .expect("Failed to persist project changes");
+
+    let reloaded = manager
+        .load_project("demo")
+        .expect("Failed to reload project");
+    assert_eq!(reloaded.description.as_deref(), Some("Updated description"));
+    assert!(reloaded.tags.contains(&"agent".to_string()));
+    assert_eq!(reloaded.metadata.get("language"), Some(&"Rust".to_string()));
 }

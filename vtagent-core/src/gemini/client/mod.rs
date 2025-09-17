@@ -158,9 +158,9 @@ impl Client {
             .json(request)
             .send()
             .await
-            .map_err(|e| StreamingError::NetworkError {
-                message: format!("Failed to send request: {}", e),
-                is_retryable: true,
+            .map_err(|e| {
+                let error = anyhow::Error::new(e);
+                self.classify_error(&error)
             })?;
 
         if !response.status().is_success() {

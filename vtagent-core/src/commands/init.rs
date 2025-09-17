@@ -23,7 +23,6 @@ struct ProjectAnalysis {
     // Core project info
     project_name: String,
     languages: Vec<String>,
-    frameworks: Vec<String>,
     build_systems: Vec<String>,
     dependencies: IndexMap<String, Vec<String>>,
 
@@ -107,7 +106,6 @@ async fn analyze_project(
     let mut analysis = ProjectAnalysis {
         project_name,
         languages: Vec::new(),
-        frameworks: Vec::new(),
         build_systems: Vec::new(),
         dependencies: IndexMap::new(),
         source_dirs: Vec::new(),

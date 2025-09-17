@@ -1,7 +1,6 @@
 //! Tests for AST-grep tool integration
 
 use serde_json::json;
-use std::path::PathBuf;
 use vtagent_core::tools::registry::ToolRegistry;
 
 #[cfg(test)]

@@ -24,10 +24,10 @@ pub async fn handle_revert_command(
         data.len()
     );
     println!("Note: full state revert requires a running Agent; printing metadata only.");
-    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&data) {
-        if let Some(meta) = val.get("metadata") {
-            println!("metadata: {}", meta);
-        }
+    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&data)
+        && let Some(meta) = val.get("metadata")
+    {
+        println!("metadata: {}", meta);
     }
     if let Some(p) = partial {
         println!("Requested partial revert: {} (not applied)", p);

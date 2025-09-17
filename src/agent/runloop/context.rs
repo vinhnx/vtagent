@@ -98,8 +98,10 @@ pub(crate) fn apply_aggressive_trim_gemini(
 
     let keep_turns = config
         .preserve_recent_turns
-        .min(context_defaults::AGGRESSIVE_PRESERVE_RECENT_TURNS)
-        .max(context_defaults::MIN_PRESERVE_RECENT_TURNS)
+        .clamp(
+            context_defaults::MIN_PRESERVE_RECENT_TURNS,
+            context_defaults::AGGRESSIVE_PRESERVE_RECENT_TURNS,
+        )
         .min(history.len());
 
     let remove = history.len().saturating_sub(keep_turns);
@@ -121,8 +123,10 @@ pub(crate) fn apply_aggressive_trim_unified(
 
     let keep_turns = config
         .preserve_recent_turns
-        .min(context_defaults::AGGRESSIVE_PRESERVE_RECENT_TURNS)
-        .max(context_defaults::MIN_PRESERVE_RECENT_TURNS)
+        .clamp(
+            context_defaults::MIN_PRESERVE_RECENT_TURNS,
+            context_defaults::AGGRESSIVE_PRESERVE_RECENT_TURNS,
+        )
         .min(history.len());
 
     let remove = history.len().saturating_sub(keep_turns);

@@ -803,8 +803,7 @@ mod tests {
     use std::path::Path;
 
     fn create_test_analyzer() -> TreeSitterAnalyzer {
-        let mut analyzer = TreeSitterAnalyzer::new().expect("Failed to create analyzer");
-        analyzer
+        TreeSitterAnalyzer::new().expect("Failed to create analyzer")
     }
 
     #[test]

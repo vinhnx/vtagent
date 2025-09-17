@@ -37,20 +37,44 @@ impl FeedbackProcessor {
 
     /// Get acceptance rate for a specific pattern
     pub fn get_acceptance_rate(&self, pattern: &str) -> f64 {
-        let relevant_feedback: Vec<_> = self
-            .feedback_history
-            .iter()
-            .filter(|entry| entry.suggestion.contains(pattern))
-            .collect();
+        use std::time::{Duration, SystemTime};
 
-        if relevant_feedback.is_empty() {
-            return 0.5; // Default rate
+        let now = SystemTime::now();
+        let mut weighted_sum = 0.0;
+        let mut total_weight = 0.0;
+
+        for entry in &self.feedback_history {
+            if !entry.suggestion.contains(pattern) {
+                continue;
+            }
+
+            let age_weight = now
+                .duration_since(entry.timestamp)
+                .map(|duration| {
+                    // Recent feedback counts more. Anything older than 30 days is heavily down-weighted.
+                    let thirty_days = Duration::from_secs(60 * 60 * 24 * 30);
+                    1.0 - (duration.as_secs_f64() / thirty_days.as_secs_f64()).min(0.9)
+                })
+                .unwrap_or(1.0);
+
+            let context_weight = if entry.context.is_empty() {
+                0.8
+            } else {
+                // Prefer matches where the usage context was recorded.
+                1.0
+            };
+
+            let weight = age_weight * context_weight;
+            total_weight += weight;
+            if entry.accepted {
+                weighted_sum += weight;
+            }
         }
 
-        let accepted_count = relevant_feedback
-            .iter()
-            .filter(|entry| entry.accepted)
-            .count();
-        accepted_count as f64 / relevant_feedback.len() as f64
+        if total_weight == 0.0 {
+            return 0.5;
+        }
+
+        weighted_sum / total_weight
     }
 }

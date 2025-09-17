@@ -4,9 +4,10 @@ use vtagent_core::gemini::Content;
 
 #[tokio::test]
 async fn compaction_engine_compacts_messages() {
-    let mut config = CompactionConfig::default();
-    config.max_uncompressed_messages = 1;
-    let engine = CompactionEngine::with_config(config);
+    let engine = CompactionEngine::with_config(CompactionConfig {
+        max_uncompressed_messages: 1,
+        ..CompactionConfig::default()
+    });
 
     let msg = Content::user_text("hello world");
     engine

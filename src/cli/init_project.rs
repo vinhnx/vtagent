@@ -152,8 +152,7 @@ async fn migrate_existing_files(
 
     for (name, path) in files_to_migrate {
         let destination = if name.contains("cache") {
-            let dir = _project_manager.cache_dir(_project_name).join(name);
-            dir
+            _project_manager.cache_dir(_project_name).join(name)
         } else if name.contains("vtagent.toml") {
             _project_manager
                 .config_dir(_project_name)

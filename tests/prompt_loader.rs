@@ -151,10 +151,10 @@ fn prompt_directory_structure() {
         if let Ok(entries) = fs::read_dir(expected_dir) {
             let mut prompt_files = Vec::new();
             for entry in entries.flatten() {
-                if let Some(filename) = entry.file_name().to_str() {
-                    if filename.ends_with(".md") {
-                        prompt_files.push(filename.to_string());
-                    }
+                if let Some(filename) = entry.file_name().to_str()
+                    && filename.ends_with(".md")
+                {
+                    prompt_files.push(filename.to_string());
                 }
             }
 

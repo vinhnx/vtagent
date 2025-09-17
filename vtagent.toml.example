@@ -19,6 +19,24 @@ refine_prompts_model = ""
 enable_self_review = false
 max_review_passes = 1
 
+[agent.onboarding]
+enabled = true
+intro_text = "Welcome! I preloaded workspace context so you can focus on decisions."
+include_project_overview = true
+include_language_summary = true
+include_guideline_highlights = true
+guideline_highlight_limit = 3
+usage_tips = [
+    "Share your goal or ask for /status to recap configuration.",
+    "Reference AGENTS.md norms before editing.",
+    "Prefer targeted reads (read_file, grep_search) before modifying code.",
+]
+recommended_actions = [
+    "Request a quick workspace orientation.",
+    "Describe the change you want to pursue next.",
+]
+chat_placeholder = "Describe your next coding goal"
+
 [tools]
 # Default policy for tools: "allow", "prompt", or "deny"
 default_policy = "prompt"
@@ -113,4 +131,3 @@ enabled_languages = [
 
 # Performance settings
 highlight_timeout_ms = 5000
-

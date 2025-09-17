@@ -11,6 +11,12 @@ impl TypeScriptProvider {
     }
 }
 
+impl Default for TypeScriptProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LanguageProvider for TypeScriptProvider {
     fn get_completions(&self, context: &CompletionContext) -> Vec<CompletionSuggestion> {
         let mut suggestions = Vec::new();

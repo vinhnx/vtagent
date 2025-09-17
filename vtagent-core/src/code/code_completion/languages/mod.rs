@@ -51,3 +51,9 @@ impl LanguageRegistry {
         Vec::new()
     }
 }
+
+impl Default for LanguageRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}

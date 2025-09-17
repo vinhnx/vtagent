@@ -74,7 +74,7 @@ impl ContextAnalyzer {
             let mut scopes = Vec::new();
 
             // Find the node at the given line/column position
-            if let Some(node) = self.find_node_at_position(root_node, line, column) {
+            if let Some(node) = Self::find_node_at_position(root_node, line, column) {
                 // Walk up the tree to collect scope information
                 let mut current = Some(node);
                 while let Some(n) = current {
@@ -114,14 +114,12 @@ impl ContextAnalyzer {
             _ => crate::tools::tree_sitter::LanguageSupport::Rust,
         };
 
-        // Clone the language support to avoid moving it
-        let lang_support_clone = lang_support.clone();
-        if let Ok(tree) = self.tree_sitter.parse(source, lang_support_clone) {
+        if let Ok(tree) = self.tree_sitter.parse(source, lang_support) {
             let root_node = tree.root_node();
             let mut imports = Vec::new();
 
             // Walk the tree to find import/require statements
-            self.extract_imports_recursive(root_node, source, &lang_support_clone, &mut imports);
+            Self::extract_imports_recursive(root_node, source, &lang_support, &mut imports);
 
             imports
         } else {
@@ -131,7 +129,6 @@ impl ContextAnalyzer {
 
     /// Recursively extract import statements from the syntax tree
     fn extract_imports_recursive(
-        &mut self,
         node: tree_sitter::Node,
         source: &str,
         language: &crate::tools::tree_sitter::LanguageSupport,
@@ -172,7 +169,7 @@ impl ContextAnalyzer {
         // Recursively process children
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
-            self.extract_imports_recursive(child, source, language, imports);
+            Self::extract_imports_recursive(child, source, language, imports);
         }
     }
 
@@ -199,7 +196,7 @@ impl ContextAnalyzer {
             // Extract all symbols first
             if let Ok(extracted_symbols) =
                 self.tree_sitter
-                    .extract_symbols(&tree, source, lang_support.clone())
+                    .extract_symbols(&tree, source, lang_support)
             {
                 // Filter symbols that appear before the given line
                 for symbol in extracted_symbols {
@@ -222,7 +219,6 @@ impl ContextAnalyzer {
 
     /// Find the node that contains the given line/column position
     fn find_node_at_position<'a>(
-        &self,
         node: tree_sitter::Node<'a>,
         line: usize,
         column: usize,
@@ -242,7 +238,7 @@ impl ContextAnalyzer {
             // Check children first (depth-first)
             let mut cursor = node.walk();
             for child in node.children(&mut cursor) {
-                if let Some(found) = self.find_node_at_position(child, line, column) {
+                if let Some(found) = Self::find_node_at_position(child, line, column) {
                     return Some(found);
                 }
             }
@@ -252,5 +248,11 @@ impl ContextAnalyzer {
         }
 
         None
+    }
+}
+
+impl Default for ContextAnalyzer {
+    fn default() -> Self {
+        Self::new()
     }
 }

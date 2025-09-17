@@ -5,7 +5,6 @@
 //! - Intelligent code completion
 //! - Learning and adaptation systems
 
-use crate::core::agent::compaction::{CompactionConfig, CompactionEngine};
 use crate::tools::tree_sitter::{CodeAnalysis, TreeSitterAnalyzer};
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
@@ -138,19 +137,6 @@ pub struct IntelligenceEngine {
     context: Arc<RwLock<SemanticContext>>,
     pattern_learner: PatternLearner,
     completion_engine: CompletionEngine,
-    compaction_engine: Arc<CompactionEngine>,
-    intelligence_metrics: Arc<RwLock<IntelligenceMetrics>>,
-}
-
-/// Intelligence metrics for performance tracking
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IntelligenceMetrics {
-    pub total_analyses: usize,
-    pub successful_completions: usize,
-    pub context_understanding_score: f64,
-    pub compaction_decisions: usize,
-    pub pattern_recognitions: usize,
-    pub semantic_coverage: f64,
 }
 
 impl IntelligenceEngine {
@@ -173,46 +159,6 @@ impl IntelligenceEngine {
             context,
             pattern_learner: PatternLearner::new(),
             completion_engine: CompletionEngine::new(),
-            compaction_engine: Arc::new(CompactionEngine::new()),
-            intelligence_metrics: Arc::new(RwLock::new(IntelligenceMetrics {
-                total_analyses: 0,
-                successful_completions: 0,
-                context_understanding_score: 0.0,
-                compaction_decisions: 0,
-                pattern_recognitions: 0,
-                semantic_coverage: 0.0,
-            })),
-        })
-    }
-
-    /// Create intelligence engine with custom compaction configuration
-    pub fn with_compaction_config(config: CompactionConfig) -> Result<Self> {
-        let analyzer = TreeSitterAnalyzer::new()
-            .map_err(|e| anyhow!("Failed to initialize tree-sitter analyzer: {}", e))?;
-
-        let context = Arc::new(RwLock::new(SemanticContext {
-            current_file: None,
-            recent_files: Vec::new(),
-            cursor_context: None,
-            symbol_table: HashMap::new(),
-            code_patterns: Vec::new(),
-            dependency_graph: HashMap::new(),
-        }));
-
-        Ok(Self {
-            analyzer,
-            context,
-            pattern_learner: PatternLearner::new(),
-            completion_engine: CompletionEngine::new(),
-            compaction_engine: Arc::new(CompactionEngine::with_config(config)),
-            intelligence_metrics: Arc::new(RwLock::new(IntelligenceMetrics {
-                total_analyses: 0,
-                successful_completions: 0,
-                context_understanding_score: 0.0,
-                compaction_decisions: 0,
-                pattern_recognitions: 0,
-                semantic_coverage: 0.0,
-            })),
         })
     }
 

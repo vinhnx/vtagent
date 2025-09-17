@@ -11,6 +11,7 @@ mod telemetry;
 mod text_tools;
 mod tool_output;
 mod unified;
+mod welcome;
 
 pub async fn run_single_agent_loop(
     config: &CoreAgentConfig,

@@ -36,3 +36,9 @@ impl SuggestionRanker {
         suggestions
     }
 }
+
+impl Default for SuggestionRanker {
+    fn default() -> Self {
+        Self::new()
+    }
+}

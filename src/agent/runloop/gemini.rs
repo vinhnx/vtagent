@@ -1,5 +1,6 @@
 use anyhow::Result;
 use std::io::{self, Write};
+use std::path::Path;
 
 use vtagent_core::config::loader::VTAgentConfig;
 use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
@@ -10,7 +11,6 @@ use vtagent_core::gemini::models::{SystemInstruction, ToolConfig};
 use vtagent_core::gemini::{Client as GeminiClient, Content, GenerateContentRequest, Part, Tool};
 use vtagent_core::tools::{ToolRegistry, build_function_declarations};
 use vtagent_core::utils::ansi::{AnsiRenderer, MessageStyle};
-use vtagent_core::utils::utils::summarize_workspace_languages;
 
 use super::context::{
     apply_aggressive_trim_gemini, enforce_gemini_context_window, load_context_trim_config,
@@ -21,6 +21,7 @@ use super::is_context_overflow_error;
 use super::telemetry::build_trajectory_logger;
 use super::text_tools::detect_textual_tool_call;
 use super::tool_output::render_tool_output;
+use super::welcome::prepare_session_bootstrap;
 
 pub(crate) async fn run_single_agent_loop_gemini(
     config: &CoreAgentConfig,
@@ -28,6 +29,7 @@ pub(crate) async fn run_single_agent_loop_gemini(
     skip_confirmations: bool,
 ) -> Result<()> {
     let trim_config = load_context_trim_config(vt_cfg);
+    let session_bootstrap = prepare_session_bootstrap(config, vt_cfg);
     let mut renderer = AnsiRenderer::stdout();
     renderer.line(MessageStyle::Info, "Interactive chat (tools)")?;
     renderer.line(MessageStyle::Output, &format!("Model: {}", config.model))?;
@@ -35,13 +37,21 @@ pub(crate) async fn run_single_agent_loop_gemini(
         MessageStyle::Output,
         &format!("Workspace: {}", config.workspace.display()),
     )?;
-    if let Some(summary) = summarize_workspace_languages(&config.workspace) {
+    if let Some(summary) = session_bootstrap.language_summary.as_deref() {
         renderer.line(
             MessageStyle::Output,
             &format!("Detected languages: {}", summary),
         )?;
     }
     renderer.line(MessageStyle::Output, "")?;
+
+    if let Some(text) = session_bootstrap.welcome_text.as_ref() {
+        renderer.line(MessageStyle::Response, text)?;
+        renderer.line(MessageStyle::Output, "")?;
+    }
+
+    let placeholder_hint = session_bootstrap.placeholder.clone();
+    let mut placeholder_shown = false;
 
     let mut client = GeminiClient::new(config.api_key.clone(), config.model.clone());
     let traj = build_trajectory_logger(&config.workspace, vt_cfg);
@@ -63,13 +73,22 @@ pub(crate) async fn run_single_agent_loop_gemini(
         .collect();
 
     let mut conversation_history: Vec<Content> = vec![];
-    let _base_system_prompt = read_system_prompt();
+    let base_system_prompt = read_system_prompt(
+        &config.workspace,
+        session_bootstrap.prompt_addendum.as_deref(),
+    );
 
     renderer.line(
         MessageStyle::Info,
         "Type 'exit' to quit, 'help' for commands",
     )?;
     loop {
+        if !placeholder_shown {
+            if let Some(ref hint) = placeholder_hint {
+                renderer.line(MessageStyle::Info, &format!("Suggested input: {}", hint))?;
+            }
+            placeholder_shown = true;
+        }
         print!("> ");
         io::stdout().flush()?;
         let mut input = String::new();
@@ -206,7 +225,6 @@ pub(crate) async fn run_single_agent_loop_gemini(
                 .collect();
             ledger.update_available_tools(tool_names);
 
-            let base_system_prompt = read_system_prompt();
             let system_prompt = if lg_enabled && lg_include {
                 format!(
                     "{}\n\n[Decision Ledger]\n{}",
@@ -214,7 +232,7 @@ pub(crate) async fn run_single_agent_loop_gemini(
                     ledger.render_ledger_brief(lg_max)
                 )
             } else {
-                base_system_prompt
+                base_system_prompt.clone()
             };
             let sys_inst = SystemInstruction::new(&system_prompt);
 
@@ -288,39 +306,38 @@ pub(crate) async fn run_single_agent_loop_gemini(
                 final_text = Some(aggregated_text.join("\n"));
             }
 
-            if function_calls.is_empty() {
-                if let Some(text) = final_text.clone() {
-                    if let Some((name, args)) = detect_textual_tool_call(&text) {
-                        let args_display =
-                            serde_json::to_string(&args).unwrap_or_else(|_| "{}".to_string());
-                        renderer.line(
-                            MessageStyle::Info,
-                            &format!(
-                                "Interpreting textual tool request as {} {}",
-                                &name, &args_display
-                            ),
-                        )?;
-                        let fc = FunctionCall {
-                            name,
-                            args,
-                            id: None,
-                        };
-                        if let Some(ref mut content) = response_content {
-                            content.parts = vec![Part::FunctionCall {
-                                function_call: fc.clone(),
-                            }];
-                        } else {
-                            response_content = Some(Content {
-                                role: "model".to_string(),
-                                parts: vec![Part::FunctionCall {
-                                    function_call: fc.clone(),
-                                }],
-                            });
-                        }
-                        function_calls.push(fc);
-                        final_text = None;
-                    }
+            if function_calls.is_empty()
+                && let Some(text) = final_text.clone()
+                && let Some((name, args)) = detect_textual_tool_call(&text)
+            {
+                let args_display =
+                    serde_json::to_string(&args).unwrap_or_else(|_| "{}".to_string());
+                renderer.line(
+                    MessageStyle::Info,
+                    &format!(
+                        "Interpreting textual tool request as {} {}",
+                        &name, &args_display
+                    ),
+                )?;
+                let fc = FunctionCall {
+                    name,
+                    args,
+                    id: None,
+                };
+                if let Some(ref mut content) = response_content {
+                    content.parts = vec![Part::FunctionCall {
+                        function_call: fc.clone(),
+                    }];
+                } else {
+                    response_content = Some(Content {
+                        role: "model".to_string(),
+                        parts: vec![Part::FunctionCall {
+                            function_call: fc.clone(),
+                        }],
+                    });
                 }
+                function_calls.push(fc);
+                final_text = None;
             }
 
             if let Some(content) = response_content {
@@ -328,10 +345,10 @@ pub(crate) async fn run_single_agent_loop_gemini(
             }
 
             if function_calls.is_empty() {
-                if let Some(text) = final_text.clone() {
-                    if !text.trim().is_empty() {
-                        renderer.line(MessageStyle::Output, &text)?;
-                    }
+                if let Some(text) = final_text.clone()
+                    && !text.trim().is_empty()
+                {
+                    renderer.line(MessageStyle::Output, &text)?;
                 }
                 break 'outer;
             }
@@ -436,18 +453,18 @@ pub(crate) async fn run_single_agent_loop_gemini(
             )?;
         }
 
-        if let Some(last) = conversation_history.last() {
-            if let Some(text) = last.parts.first().and_then(|part| part.as_text()) {
-                let claims_write = text.contains("I've updated")
-                    || text.contains("I have updated")
-                    || text.contains("updated the `");
-                if claims_write && !any_write_effect {
-                    renderer.line(MessageStyle::Output, "")?;
-                    renderer.line(
-                        MessageStyle::Info,
-                        "Note: The assistant mentioned edits but no write tool ran.",
-                    )?;
-                }
+        if let Some(last) = conversation_history.last()
+            && let Some(text) = last.parts.first().and_then(|part| part.as_text())
+        {
+            let claims_write = text.contains("I've updated")
+                || text.contains("I have updated")
+                || text.contains("updated the `");
+            if claims_write && !any_write_effect {
+                renderer.line(MessageStyle::Output, "")?;
+                renderer.line(
+                    MessageStyle::Info,
+                    "Note: The assistant mentioned edits but no write tool ran.",
+                )?;
             }
         }
     }
@@ -455,7 +472,27 @@ pub(crate) async fn run_single_agent_loop_gemini(
     Ok(())
 }
 
-fn read_system_prompt() -> String {
-    vtagent_core::prompts::read_system_prompt_from_md()
-        .unwrap_or_else(|_| "You are a helpful coding assistant for a Rust workspace.".to_string())
+fn read_system_prompt(workspace: &Path, session_addendum: Option<&str>) -> String {
+    let mut prompt = vtagent_core::prompts::read_system_prompt_from_md()
+        .unwrap_or_else(|_| "You are a helpful coding assistant for a Rust workspace.".to_string());
+
+    if let Some(overview) = vtagent_core::utils::utils::build_project_overview(workspace) {
+        prompt.push_str("\n\n## PROJECT OVERVIEW\n");
+        prompt.push_str(&overview.as_prompt_block());
+    }
+
+    if let Some(guidelines) = vtagent_core::prompts::system::read_agent_guidelines(workspace) {
+        prompt.push_str("\n\n## AGENTS.MD GUIDELINES\n");
+        prompt.push_str(&guidelines);
+    }
+
+    if let Some(addendum) = session_addendum {
+        let trimmed = addendum.trim();
+        if !trimmed.is_empty() {
+            prompt.push_str("\n\n");
+            prompt.push_str(trimmed);
+        }
+    }
+
+    prompt
 }

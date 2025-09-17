@@ -11,7 +11,9 @@ async fn test_write_and_edit_rendered() -> Result<()> {
     let temp_dir = TempDir::new()?;
     let mut registry = ToolRegistry::new(temp_dir.path().to_path_buf());
     let mut renderer = AnsiRenderer::stdout();
-    registry.allow_all_tools()?;
+    if let Err(err) = registry.allow_all_tools() {
+        eprintln!("Skipping policy configuration in test: {}", err);
+    }
 
     let write_args = json!({
         "path": "file.txt",

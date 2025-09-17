@@ -4,7 +4,6 @@
 pub mod analyze;
 pub mod ask;
 pub mod benchmark;
-pub mod chat_repl;
 pub mod chat_tools;
 pub mod compress_context;
 pub mod config;

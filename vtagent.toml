@@ -23,10 +23,10 @@ max_review_passes = 1
 
 [agent.onboarding]
 enabled = true
-intro_text = "Welcome! I preloaded workspace context so we can hit the ground running."
-include_project_overview = true
-include_language_summary = true
-include_guideline_highlights = true
+intro_text = "Welcome to VT Code!"
+include_project_overview = false
+include_language_summary = false
+include_guideline_highlights = false
 guideline_highlight_limit = 4
 usage_tips = [
     "Share the outcome you need or ask for a quick /status summary.",

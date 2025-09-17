@@ -76,4 +76,41 @@ https://github.com/github/spec-kit
 
 --
 
-refactor registry.rs to improve tool registration and management. create a more modular structure for adding new tools. ensure that each tool has clear metadata including name, description, parameters, and usage examples. implement a dynamic loading mechanism to allow tools to be added or removed without modifying the core codebase. write tests to verify the functionality of the registry and the correct loading of tools. update documentation to reflect the new structure and usage guidelines for adding tools.
+refactor and modular runloop.rs, the file is too large. extract
+
+--
+
+Large Files in VTAgent Project
+
+1.  vtagent-core/src/tools/registry.rs (~1,890 lines)
+
+    -   Contains the main tool registry that coordinates all tools
+    -   Implements error handling for tool execution
+    -   Defines tool registration and execution mechanisms
+    -   Handles tool policies and constraints
+
+2.  src/agent/runloop.rs (~1,811 lines)
+
+    -   Implements the main agent loop for both Gemini and other providers
+    -   Handles context window management and trimming
+    -   Manages conversation history and tool calling loops
+    -   Includes prompt refinement and self-review features
+
+3.  vtagent-core/src/tools/tree_sitter/analyzer.rs (~888 lines)
+    -   Core tree-sitter analyzer for code parsing and analysis
+    -   Supports multiple languages (Rust, Python, JavaScript, TypeScript, Go, Java)
+    -   Extracts symbols, dependencies, and code metrics
+    -   Handles syntax tree representation and diagnostics
+
+Key Architectural Components
+
+The VTAgent follows a modular architecture with several core components:
+
+1.  Tool System: Centralized in registry.rs with a trait-based approach
+2.  Agent Loop: Implemented in runloop.rs with support for multiple AI providers
+3.  Language Analysis: Using tree-sitter parsers for code understanding
+4.  Configuration Management: TOML-based configuration with sensible defaults
+5.  Security: Comprehensive tool policy system with allow/deny lists
+
+The largest files correspond to the most complex functionality - tool management, agent execution loop, and code analysis - which is typical
+for a coding agent project.

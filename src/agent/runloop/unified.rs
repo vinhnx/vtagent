@@ -129,8 +129,6 @@ pub(crate) async fn run_single_agent_loop_unified(
                 break 'outer;
             }
 
-            let mut final_text: Option<String> = None;
-
             let _ = enforce_unified_context_window(&mut working_history, trim_config);
 
             let decision = if let Some(cfg) = vt_cfg.filter(|cfg| cfg.router.enabled) {
@@ -267,7 +265,7 @@ pub(crate) async fn run_single_agent_loop_unified(
                 }
             };
 
-            final_text = response.content.clone();
+            let mut final_text = response.content.clone();
             let mut tool_calls = response.tool_calls.clone().unwrap_or_default();
             let mut interpreted_textual_call = false;
 

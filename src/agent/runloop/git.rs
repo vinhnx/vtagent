@@ -11,7 +11,14 @@ fn is_git_repo() -> bool {
         .unwrap_or(false)
 }
 
-pub(crate) async fn confirm_changes_with_git_diff(modified_files: &[String]) -> Result<bool> {
+pub(crate) async fn confirm_changes_with_git_diff(
+    modified_files: &[String],
+    skip_confirmations: bool,
+) -> Result<bool> {
+    if skip_confirmations {
+        return Ok(true);
+    }
+
     if !is_git_repo() {
         println!("Not in a git repository; skipping diff confirmation.");
         return Ok(true);

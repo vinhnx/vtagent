@@ -28,6 +28,9 @@ async fn list_files_pagination_and_default_response_format() {
     ).unwrap();
 
     let mut registry = ToolRegistry::new(ws.clone());
+    registry.allow_all_tools().unwrap_or_else(|err| {
+        panic!("tool policy should be available for test: {}", err);
+    });
     let out = registry
         .execute_tool(
             tools::LIST_FILES,

@@ -11,6 +11,12 @@ impl RustProvider {
     }
 }
 
+impl Default for RustProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LanguageProvider for RustProvider {
     fn get_completions(&self, context: &CompletionContext) -> Vec<CompletionSuggestion> {
         let mut suggestions = Vec::new();

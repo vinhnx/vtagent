@@ -196,6 +196,7 @@ impl GrepSearchManager {
 
             // Build the ripgrep command
             let mut cmd = Command::new("rg");
+            cmd.arg("-j").arg(NUM_SEARCH_THREADS.get().to_string());
 
             // Add the search pattern
             cmd.arg(&query);

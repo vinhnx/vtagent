@@ -46,9 +46,7 @@ pub(crate) fn detect_textual_tool_call(text: &str) -> Option<(String, Value)> {
                 }
             }
 
-            let Some(args_end) = end else {
-                return None;
-            };
+            let args_end = end?;
             let raw_args = &text[args_start..args_end];
             if let Some(args) = parse_textual_arguments(raw_args) {
                 return Some((name, args));
@@ -142,10 +140,10 @@ fn parse_scalar_value(input: &str) -> Value {
         return Value::Number(Number::from(int_val));
     }
 
-    if let Ok(float_val) = trimmed.parse::<f64>() {
-        if let Some(num) = Number::from_f64(float_val) {
-            return Value::Number(num);
-        }
+    if let Ok(float_val) = trimmed.parse::<f64>()
+        && let Some(num) = Number::from_f64(float_val)
+    {
+        return Value::Number(num);
     }
 
     Value::String(trimmed)

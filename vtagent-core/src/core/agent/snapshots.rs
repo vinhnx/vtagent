@@ -628,7 +628,6 @@ mod tests {
 
     #[test]
     fn test_checksum_calculation() {
-        let temp_dir = TempDir::new().unwrap();
         let config = SnapshotConfig::default();
         let manager = SnapshotManager::new(config);
 

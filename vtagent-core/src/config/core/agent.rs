@@ -40,6 +40,10 @@ pub struct AgentConfig {
     /// Optional model override for the refiner (empty = auto pick efficient sibling)
     #[serde(default)]
     pub refine_prompts_model: String,
+
+    /// Session onboarding and welcome message configuration
+    #[serde(default)]
+    pub onboarding: AgentOnboardingConfig,
 }
 
 impl Default for AgentConfig {
@@ -54,6 +58,7 @@ impl Default for AgentConfig {
             refine_prompts_enabled: default_refine_prompts_enabled(),
             refine_prompts_max_passes: default_refine_max_passes(),
             refine_prompts_model: String::new(),
+            onboarding: AgentOnboardingConfig::default(),
         }
     }
 }
@@ -85,4 +90,102 @@ fn default_refine_prompts_enabled() -> bool {
 
 fn default_refine_max_passes() -> usize {
     1
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AgentOnboardingConfig {
+    /// Toggle onboarding message rendering
+    #[serde(default = "default_onboarding_enabled")]
+    pub enabled: bool,
+
+    /// Introductory text shown at session start
+    #[serde(default = "default_intro_text")]
+    pub intro_text: String,
+
+    /// Whether to include project overview in onboarding message
+    #[serde(default = "default_show_project_overview")]
+    pub include_project_overview: bool,
+
+    /// Whether to include language summary in onboarding message
+    #[serde(default = "default_show_language_summary")]
+    pub include_language_summary: bool,
+
+    /// Whether to include AGENTS.md highlights in onboarding message
+    #[serde(default = "default_show_guideline_highlights")]
+    pub include_guideline_highlights: bool,
+
+    /// Maximum number of guideline bullets to surface
+    #[serde(default = "default_guideline_highlight_limit")]
+    pub guideline_highlight_limit: usize,
+
+    /// Tips for collaborating with the agent effectively
+    #[serde(default = "default_usage_tips")]
+    pub usage_tips: Vec<String>,
+
+    /// Recommended follow-up actions to display
+    #[serde(default = "default_recommended_actions")]
+    pub recommended_actions: Vec<String>,
+
+    /// Placeholder suggestion for the chat input bar
+    #[serde(default = "default_chat_placeholder")]
+    pub chat_placeholder: String,
+}
+
+impl Default for AgentOnboardingConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_onboarding_enabled(),
+            intro_text: default_intro_text(),
+            include_project_overview: default_show_project_overview(),
+            include_language_summary: default_show_language_summary(),
+            include_guideline_highlights: default_show_guideline_highlights(),
+            guideline_highlight_limit: default_guideline_highlight_limit(),
+            usage_tips: default_usage_tips(),
+            recommended_actions: default_recommended_actions(),
+            chat_placeholder: default_chat_placeholder(),
+        }
+    }
+}
+
+fn default_onboarding_enabled() -> bool {
+    true
+}
+
+fn default_intro_text() -> String {
+    "Let's get oriented. I preloaded workspace context so we can move fast.".to_string()
+}
+
+fn default_show_project_overview() -> bool {
+    true
+}
+
+fn default_show_language_summary() -> bool {
+    false
+}
+
+fn default_show_guideline_highlights() -> bool {
+    true
+}
+
+fn default_guideline_highlight_limit() -> usize {
+    3
+}
+
+fn default_usage_tips() -> Vec<String> {
+    vec![
+        "Describe your current coding goal or ask for a quick status overview.".to_string(),
+        "Reference AGENTS.md guidelines when proposing changes.".to_string(),
+        "Prefer asking for targeted file reads or diffs before editing.".to_string(),
+    ]
+}
+
+fn default_recommended_actions() -> Vec<String> {
+    vec![
+        "Review the highlighted guidelines and share the task you want to tackle.".to_string(),
+        "Ask for a workspace tour if you need more context.".to_string(),
+    ]
+}
+
+fn default_chat_placeholder() -> String {
+    "Describe your next coding step (e.g., \"audit router config\")".to_string()
 }

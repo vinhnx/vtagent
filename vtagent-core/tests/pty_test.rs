@@ -1,6 +1,5 @@
 use serde_json::json;
 use std::path::PathBuf;
-use tokio;
 use vtagent_core::tools::ToolRegistry;
 
 #[tokio::test]

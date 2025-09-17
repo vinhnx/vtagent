@@ -1,7 +1,6 @@
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::atomic::AtomicU64;
 use std::time::{Duration, Instant};
 
 /// Performance metrics for different operations
@@ -28,7 +27,6 @@ pub static PROFILER: Lazy<Arc<PerformanceProfiler>> =
 pub struct PerformanceProfiler {
     metrics: Arc<dashmap::DashMap<String, PerformanceMetrics>>,
     active_operations: Arc<dashmap::DashMap<String, Instant>>,
-    total_memory_start: AtomicU64,
 }
 
 impl PerformanceProfiler {
@@ -36,7 +34,6 @@ impl PerformanceProfiler {
         Self {
             metrics: Arc::new(dashmap::DashMap::new()),
             active_operations: Arc::new(dashmap::DashMap::new()),
-            total_memory_start: AtomicU64::new(0),
         }
     }
 

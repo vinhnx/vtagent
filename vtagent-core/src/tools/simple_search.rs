@@ -16,7 +16,6 @@ use tokio::{process::Command, time::timeout};
 #[derive(Clone)]
 pub struct SimpleSearchTool {
     indexer: SimpleIndexer,
-    workspace_root: PathBuf,
 }
 
 impl SimpleSearchTool {
@@ -27,10 +26,7 @@ impl SimpleSearchTool {
             eprintln!("Warning: Failed to initialize indexer: {}", e);
         });
 
-        Self {
-            indexer,
-            workspace_root,
-        }
+        Self { indexer }
     }
 
     /// Execute command and capture its stdout
@@ -343,20 +339,6 @@ impl SimpleSearchTool {
             "lines": lines,
             "mode": "pty",
             "pty_enabled": true
-        }))
-    }
-
-    /// Index files in directory
-    async fn index(&mut self, args: Value) -> Result<Value> {
-        let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
-
-        let path_buf = PathBuf::from(path);
-        self.indexer.index_directory(&path_buf)?;
-
-        Ok(json!({
-            "command": "index",
-            "path": path,
-            "status": "completed"
         }))
     }
 }

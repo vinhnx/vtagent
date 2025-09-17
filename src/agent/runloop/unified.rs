@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use std::io::{self, Write};
+use std::path::Path;
 
 use vtagent_core::config::loader::VTAgentConfig;
 use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
@@ -8,7 +9,6 @@ use vtagent_core::core::router::{Router, TaskClass};
 use vtagent_core::llm::{factory::create_provider_for_model, provider as uni};
 use vtagent_core::tools::{ToolRegistry, build_function_declarations};
 use vtagent_core::utils::ansi::{AnsiRenderer, MessageStyle};
-use vtagent_core::utils::utils::summarize_workspace_languages;
 
 use super::context::{
     apply_aggressive_trim_unified, enforce_unified_context_window, load_context_trim_config,
@@ -20,12 +20,14 @@ use super::prompt::refine_user_prompt_if_enabled;
 use super::telemetry::build_trajectory_logger;
 use super::text_tools::detect_textual_tool_call;
 use super::tool_output::render_tool_output;
+use super::welcome::prepare_session_bootstrap;
 
 pub(crate) async fn run_single_agent_loop_unified(
     config: &CoreAgentConfig,
     vt_cfg: Option<&VTAgentConfig>,
     skip_confirmations: bool,
 ) -> Result<()> {
+    let session_bootstrap = prepare_session_bootstrap(config, vt_cfg);
     let mut renderer = AnsiRenderer::stdout();
     renderer.line(MessageStyle::Info, "Interactive chat (tools)")?;
     renderer.line(MessageStyle::Output, &format!("Model: {}", config.model))?;
@@ -33,13 +35,21 @@ pub(crate) async fn run_single_agent_loop_unified(
         MessageStyle::Output,
         &format!("Workspace: {}", config.workspace.display()),
     )?;
-    if let Some(summary) = summarize_workspace_languages(&config.workspace) {
+    if let Some(summary) = session_bootstrap.language_summary.as_deref() {
         renderer.line(
             MessageStyle::Output,
             &format!("Detected languages: {}", summary),
         )?;
     }
     renderer.line(MessageStyle::Output, "")?;
+
+    if let Some(text) = session_bootstrap.welcome_text.as_ref() {
+        renderer.line(MessageStyle::Response, text)?;
+        renderer.line(MessageStyle::Output, "")?;
+    }
+
+    let placeholder_hint = session_bootstrap.placeholder.clone();
+    let mut placeholder_shown = false;
 
     let provider_client = create_provider_for_model(&config.model, config.api_key.clone())
         .context("Failed to initialize provider client")?;
@@ -56,14 +66,22 @@ pub(crate) async fn run_single_agent_loop_unified(
     let mut conversation_history: Vec<uni::Message> = vec![];
     let mut ledger = DecisionTracker::new();
     let traj = build_trajectory_logger(&config.workspace, vt_cfg);
-
-    let _system_prompt = read_system_prompt();
+    let base_system_prompt = read_system_prompt(
+        &config.workspace,
+        session_bootstrap.prompt_addendum.as_deref(),
+    );
 
     renderer.line(
         MessageStyle::Info,
         "Type 'exit' to quit, 'help' for commands",
     )?;
     loop {
+        if !placeholder_shown {
+            if let Some(ref hint) = placeholder_hint {
+                renderer.line(MessageStyle::Info, &format!("Suggested input: {}", hint))?;
+            }
+            placeholder_shown = true;
+        }
         print!("> ");
         io::stdout().flush()?;
         let mut input = String::new();
@@ -187,7 +205,6 @@ pub(crate) async fn run_single_agent_loop_unified(
                 .collect();
             ledger.update_available_tools(tool_names);
 
-            let base_system_prompt = read_system_prompt();
             let system_prompt = if lg_enabled && lg_include {
                 format!(
                     "{}\n\n[Decision Ledger]\n{}",
@@ -195,7 +212,7 @@ pub(crate) async fn run_single_agent_loop_unified(
                     ledger.render_ledger_brief(lg_max)
                 )
             } else {
-                base_system_prompt
+                base_system_prompt.clone()
             };
 
             let mut attempt_history = working_history.clone();
@@ -262,34 +279,33 @@ pub(crate) async fn run_single_agent_loop_unified(
             let mut tool_calls = response.tool_calls.clone().unwrap_or_default();
             let mut interpreted_textual_call = false;
 
-            if tool_calls.is_empty() {
-                if let Some(text) = final_text.clone() {
-                    if let Some((name, args)) = detect_textual_tool_call(&text) {
-                        let args_display =
-                            serde_json::to_string(&args).unwrap_or_else(|_| "{}".to_string());
-                        renderer.line(
-                            MessageStyle::Info,
-                            &format!(
-                                "Interpreting textual tool request as {} {}",
-                                &name, &args_display
-                            ),
-                        )?;
-                        let call_id = format!("call_textual_{}", working_history.len());
-                        tool_calls.push(uni::ToolCall::function(
-                            call_id.clone(),
-                            name.clone(),
-                            args_display.clone(),
-                        ));
-                        interpreted_textual_call = true;
-                        final_text = None;
-                    }
-                }
+            if tool_calls.is_empty()
+                && let Some(text) = final_text.clone()
+                && let Some((name, args)) = detect_textual_tool_call(&text)
+            {
+                let args_display =
+                    serde_json::to_string(&args).unwrap_or_else(|_| "{}".to_string());
+                renderer.line(
+                    MessageStyle::Info,
+                    &format!(
+                        "Interpreting textual tool request as {} {}",
+                        &name, &args_display
+                    ),
+                )?;
+                let call_id = format!("call_textual_{}", working_history.len());
+                tool_calls.push(uni::ToolCall::function(
+                    call_id.clone(),
+                    name.clone(),
+                    args_display.clone(),
+                ));
+                interpreted_textual_call = true;
+                final_text = None;
             }
 
-            if tool_calls.is_empty() {
-                if let Some(text) = final_text.clone() {
-                    working_history.push(uni::Message::assistant(text));
-                }
+            if tool_calls.is_empty()
+                && let Some(text) = final_text.clone()
+            {
+                working_history.push(uni::Message::assistant(text));
             } else {
                 let assistant_text = if interpreted_textual_call {
                     String::new()
@@ -411,10 +427,10 @@ pub(crate) async fn run_single_agent_loop_unified(
                             reasoning_effort: vt_cfg.map(|cfg| cfg.agent.reasoning_effort.clone()),
                         };
                         let rr = provider_client.generate(review_req).await.ok();
-                        if let Some(r) = rr.and_then(|result| result.content) {
-                            if !r.trim().is_empty() {
-                                text = r;
-                            }
+                        if let Some(r) = rr.and_then(|result| result.content)
+                            && !r.trim().is_empty()
+                        {
+                            text = r;
                         }
                     }
                 }
@@ -442,19 +458,19 @@ pub(crate) async fn run_single_agent_loop_unified(
             )?;
         }
 
-        if let Some(last) = conversation_history.last() {
-            if last.role == uni::MessageRole::Assistant {
-                let text = &last.content;
-                let claims_write = text.contains("I've updated")
-                    || text.contains("I have updated")
-                    || text.contains("updated the `");
-                if claims_write && !any_write_effect {
-                    renderer.line(MessageStyle::Output, "")?;
-                    renderer.line(
-                        MessageStyle::Info,
-                        "Note: The assistant mentioned edits but no write tool ran.",
-                    )?;
-                }
+        if let Some(last) = conversation_history.last()
+            && last.role == uni::MessageRole::Assistant
+        {
+            let text = &last.content;
+            let claims_write = text.contains("I've updated")
+                || text.contains("I have updated")
+                || text.contains("updated the `");
+            if claims_write && !any_write_effect {
+                renderer.line(MessageStyle::Output, "")?;
+                renderer.line(
+                    MessageStyle::Info,
+                    "Note: The assistant mentioned edits but no write tool ran.",
+                )?;
             }
         }
     }
@@ -462,7 +478,27 @@ pub(crate) async fn run_single_agent_loop_unified(
     Ok(())
 }
 
-fn read_system_prompt() -> String {
-    vtagent_core::prompts::read_system_prompt_from_md()
-        .unwrap_or_else(|_| "You are a helpful coding assistant for a Rust workspace.".to_string())
+fn read_system_prompt(workspace: &Path, session_addendum: Option<&str>) -> String {
+    let mut prompt = vtagent_core::prompts::read_system_prompt_from_md()
+        .unwrap_or_else(|_| "You are a helpful coding assistant for a Rust workspace.".to_string());
+
+    if let Some(overview) = vtagent_core::utils::utils::build_project_overview(workspace) {
+        prompt.push_str("\n\n## PROJECT OVERVIEW\n");
+        prompt.push_str(&overview.as_prompt_block());
+    }
+
+    if let Some(guidelines) = vtagent_core::prompts::system::read_agent_guidelines(workspace) {
+        prompt.push_str("\n\n## AGENTS.MD GUIDELINES\n");
+        prompt.push_str(&guidelines);
+    }
+
+    if let Some(addendum) = session_addendum {
+        let trimmed = addendum.trim();
+        if !trimmed.is_empty() {
+            prompt.push_str("\n\n");
+            prompt.push_str(trimmed);
+        }
+    }
+
+    prompt
 }

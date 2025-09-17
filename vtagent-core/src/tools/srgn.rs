@@ -446,8 +446,8 @@ impl SrgnTool {
         let file_paths: Vec<PathBuf> = args
             .iter()
             .filter(|arg| arg.contains('.') && !arg.starts_with('-'))
-            .map(|arg| self.workspace_root.join(arg))
-            .collect();
+            .map(|arg| self.validate_path(arg))
+            .collect::<Result<Vec<_>>>()?;
         let before_times: Vec<SystemTime> = file_paths
             .iter()
             .map(|path| {

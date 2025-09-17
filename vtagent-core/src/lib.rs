@@ -108,14 +108,12 @@ mod tests {
     fn test_module_structure() {
         // Test that all modules can be imported
         // This is a compile-time test that ensures module structure is correct
-        assert!(true);
     }
 
     #[test]
     fn test_version_consistency() {
         // Test that version information is consistent across modules
         // This would be more meaningful with actual version checking
-        assert!(true);
     }
 
     #[tokio::test]

@@ -149,6 +149,10 @@ impl VtagentGitignore {
 
         for pattern in &self.patterns {
             if pattern.pattern.matches(&path_str) {
+                if pattern.original.ends_with('/') && file_path.is_file() {
+                    // Directory-only rules should not exclude individual files.
+                    continue;
+                }
                 if pattern.negated {
                     // Negation pattern - include this file
                     excluded = false;

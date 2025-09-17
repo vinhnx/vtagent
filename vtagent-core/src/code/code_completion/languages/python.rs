@@ -11,6 +11,12 @@ impl PythonProvider {
     }
 }
 
+impl Default for PythonProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LanguageProvider for PythonProvider {
     fn get_completions(&self, context: &CompletionContext) -> Vec<CompletionSuggestion> {
         let mut suggestions = Vec::new();

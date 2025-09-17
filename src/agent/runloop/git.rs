@@ -3,7 +3,7 @@ use std::io::{self, Write};
 
 fn is_git_repo() -> bool {
     std::process::Command::new("git")
-        .args(&["rev-parse", "--git-dir"])
+        .args(["rev-parse", "--git-dir"])
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .status()
@@ -26,7 +26,7 @@ pub(crate) async fn confirm_changes_with_git_diff(
 
     for file in modified_files {
         let output = std::process::Command::new("git")
-            .args(&["diff", file])
+            .args(["diff", file])
             .output()
             .with_context(|| format!("Failed to run git diff for {}", file))?;
 
@@ -39,7 +39,7 @@ pub(crate) async fn confirm_changes_with_git_diff(
             io::stdin().read_line(&mut input)?;
             if !input.trim().eq_ignore_ascii_case("y") {
                 std::process::Command::new("git")
-                    .args(&["checkout", "--", file])
+                    .args(["checkout", "--", file])
                     .status()
                     .with_context(|| format!("Failed to revert {}", file))?;
                 return Ok(false);

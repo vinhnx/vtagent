@@ -31,29 +31,26 @@ impl RateLimiter {
 
     /// Check if we can make an API request, blocking if necessary
     pub async fn wait_for_api_request(&self) -> Result<()> {
-        let mut request_times = self.request_times.lock().unwrap();
+        loop {
+            let wait_time = {
+                let mut request_times = self.request_times.lock().unwrap();
 
-        // Remove old requests (older than 1 minute)
-        let one_minute_ago = Instant::now() - Duration::from_secs(60);
-        request_times.retain(|&time| time > one_minute_ago);
-
-        // If we're at the limit, wait until the oldest request expires
-        if request_times.len() >= self.requests_per_minute {
-            let oldest_request = request_times[0];
-            let wait_time = Duration::from_secs(60) - oldest_request.elapsed();
-
-            if wait_time > Duration::from_secs(0) {
-                tokio::time::sleep(wait_time).await;
-                // After waiting, remove expired requests again
-                let one_minute_ago = Instant::now() - Duration::from_secs(60);
+                let now = Instant::now();
+                let one_minute_ago = now - Duration::from_secs(60);
                 request_times.retain(|&time| time > one_minute_ago);
+
+                if request_times.len() < self.requests_per_minute {
+                    request_times.push(now);
+                    return Ok(());
+                }
+
+                Duration::from_secs(60).saturating_sub(request_times[0].elapsed())
+            };
+
+            if !wait_time.is_zero() {
+                tokio::time::sleep(wait_time).await;
             }
         }
-
-        // Add current request time
-        request_times.push(Instant::now());
-
-        Ok(())
     }
 
     /// Check if we can make a tool call

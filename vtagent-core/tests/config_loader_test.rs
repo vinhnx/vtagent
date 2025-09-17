@@ -1,9 +1,8 @@
 //! Test for configuration loading with home directory support
 
 use std::fs;
-use std::path::Path;
 use tempfile::TempDir;
-use vtagent_core::config::{ConfigManager, VTAgentConfig};
+use vtagent_core::config::VTAgentConfig;
 
 #[test]
 fn test_load_config_from_home_directory() {
@@ -50,12 +49,4 @@ human_in_the_loop = false
     let home_gitignore_path = vtagent_dir.join(".vtagentgitignore");
     assert!(home_config_path.exists());
     assert!(home_gitignore_path.exists());
-}
-
-#[test]
-fn test_get_home_dir() {
-    // Test that the get_home_dir function works (basic test)
-    let home_dir = ConfigManager::get_home_dir();
-    // This should return Some on most systems
-    assert!(home_dir.is_some());
 }

@@ -421,9 +421,6 @@ pub enum PromptOptimizationError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::llm::provider::{
-        FinishReason, LLMError, LLMProvider, LLMRequest, LLMResponse, Message, MessageRole,
-    };
 
     #[test]
     fn test_prompt_hash() {
@@ -456,32 +453,5 @@ mod tests {
         let retrieved = cache.get("test_hash");
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().usage_count, 1);
-    }
-
-    // Mock provider for testing
-    struct MockProvider;
-
-    #[async_trait::async_trait]
-    impl LLMProvider for MockProvider {
-        fn name(&self) -> &str {
-            "mock"
-        }
-
-        async fn generate(&self, _request: LLMRequest) -> Result<LLMResponse, LLMError> {
-            Ok(LLMResponse {
-                content: Some("Optimized prompt".to_string()),
-                tool_calls: None,
-                usage: None,
-                finish_reason: FinishReason::Stop,
-            })
-        }
-
-        fn supported_models(&self) -> Vec<String> {
-            vec!["mock".to_string()]
-        }
-
-        fn validate_request(&self, _request: &LLMRequest) -> Result<(), LLMError> {
-            Ok(())
-        }
     }
 }

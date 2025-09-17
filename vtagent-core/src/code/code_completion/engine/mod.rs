@@ -6,7 +6,6 @@ pub use suggestions::CompletionSuggestion;
 
 use crate::code::code_completion::context::CompletionContext;
 use crate::code::code_completion::learning::CompletionLearningData;
-use crate::tools::tree_sitter::TreeSitterAnalyzer;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -31,7 +30,6 @@ pub enum CompletionKind {
 
 /// Code completion engine
 pub struct CompletionEngine {
-    analyzers: HashMap<String, TreeSitterAnalyzer>,
     suggestion_cache: Arc<RwLock<HashMap<String, Vec<CompletionSuggestion>>>>,
     learning_data: Arc<RwLock<CompletionLearningData>>,
     performance_stats: Arc<RwLock<CompletionStats>>,
@@ -48,23 +46,7 @@ pub struct CompletionStats {
 
 impl CompletionEngine {
     pub fn new() -> Self {
-        let mut analyzers = HashMap::new();
-
-        // Initialize tree-sitter analyzers for supported languages
-        if let Ok(analyzer) = TreeSitterAnalyzer::new() {
-            analyzers.insert("rust".to_string(), analyzer);
-        }
-
-        if let Ok(analyzer) = TreeSitterAnalyzer::new() {
-            analyzers.insert("python".to_string(), analyzer);
-        }
-
-        if let Ok(analyzer) = TreeSitterAnalyzer::new() {
-            analyzers.insert("javascript".to_string(), analyzer);
-        }
-
         Self {
-            analyzers,
             suggestion_cache: Arc::new(RwLock::new(HashMap::new())),
             learning_data: Arc::new(RwLock::new(CompletionLearningData::default())),
             performance_stats: Arc::new(RwLock::new(CompletionStats::default())),
@@ -248,6 +230,12 @@ impl CompletionEngine {
             ],
             _ => vec![],
         }
+    }
+}
+
+impl Default for CompletionEngine {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

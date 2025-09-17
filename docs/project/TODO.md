@@ -114,3 +114,15 @@ The VTAgent follows a modular architecture with several core components:
 
 The largest files correspond to the most complex functionality - tool management, agent execution loop, and code analysis - which is typical
 for a coding agent project.
+
+--
+
+check dead code vtagent-core/src/tools/registry/builtins.rs
+
+---
+
+also run cargo clippy to check for dead code and fix any warnings or errors. make sure the codebase is clean and follows best practices. make sure cleanup dead code, and unused files and redundant code and dependencies. ensure code quality and maintainability. write tests. update docs.
+
+---
+
+check all files under vtagent-core/src/tools/registry/ are not linked. this is important. we have refactor these files before. make sure they used. update docs if necessary. write tests if needed.

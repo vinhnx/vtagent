@@ -16,7 +16,6 @@ pub mod grep_search;
 pub mod registry;
 pub mod search;
 pub mod simple_search;
-pub mod speckit;
 pub mod srgn;
 pub mod traits;
 pub mod tree_sitter;

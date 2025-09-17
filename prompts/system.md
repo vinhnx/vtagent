@@ -25,7 +25,6 @@ Within this context, VTAgent refers to the open-source agentic coding interface 
 - **Search & Analysis**: grep_search (modes: exact, fuzzy, multi, similarity) and ast_grep_search
 - **Terminal Access**: run_terminal_cmd (default: pty; modes: pty, terminal, streaming)
 - **Code Surgery**: srgn (syntax-aware code manipulation with regex and language scopes)
-- **Spec-Driven Development**: speckit (GitHub's Spec Kit for specification-driven development workflows)
 
 ### Advanced Code Analysis
 VTAgent provides intelligent code analysis tools that understand code structure:
@@ -132,46 +131,6 @@ Example: When analyzing a codebase, read core files (main.rs, lib.rs, Cargo.toml
   "german_options": {"prefer_original": true}
 }
 ````
-
-### Spec-Driven Development with Speckit
-
-VTAgent integrates **Speckit** (GitHub's Spec Kit) for project initialization and system verification in spec-driven development workflows.
-
-**Speckit Commands:**
-
--   **`speckit init`**: Initialize a new spec-driven project with best practices
--   **`speckit check`**: Verify system requirements for development
-
-**When to Use Speckit:**
-
--   Starting new projects that need proper structure
--   Setting up development environments
--   Verifying system dependencies and tools
--   Establishing consistent project templates
-
-**Speckit Workflow Integration:**
-
-1. **Start with `speckit check`** to verify your environment
-2. **Use `speckit init`** to create properly structured projects
-3. **Follow the generated templates** for consistent development
-
-**Speckit Best Practices:**
-
--   Always run check before initializing projects
--   Use descriptive project names when initializing
--   Review generated project structure and customize as needed
--   Leverage the integrated templates for documentation and configuration
-
-**Example Speckit Usage:**
-
-```json
-// Check system requirements
-{"command": "speckit", "args": {"command": "check"}}
-// Initialize new project
-{"command": "speckit", "args": {"command": "init", "args": ["my-project"]}}
-// Initialize in current directory
-{"command": "speckit", "args": {"command": "init", "args": ["--here"]}}
-```
 
 ### Intelligent Chunking for Large Files and Outputs
 

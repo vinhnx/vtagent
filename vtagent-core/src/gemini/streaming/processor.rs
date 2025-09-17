@@ -10,6 +10,7 @@ use crate::gemini::streaming::{
 use crate::llm::stream;
 use futures::stream::StreamExt;
 use reqwest::Response;
+use std::collections::HashMap;
 use std::time::Instant;
 use tokio::time::{Duration, timeout};
 
@@ -38,6 +39,7 @@ impl Default for StreamingConfig {
 pub struct StreamingProcessor {
     config: StreamingConfig,
     metrics: StreamingMetrics,
+    candidate_text: HashMap<usize, String>,
 }
 
 impl StreamingProcessor {
@@ -46,6 +48,7 @@ impl StreamingProcessor {
         Self {
             config: StreamingConfig::default(),
             metrics: StreamingMetrics::default(),
+            candidate_text: HashMap::new(),
         }
     }
 
@@ -54,6 +57,7 @@ impl StreamingProcessor {
         Self {
             config,
             metrics: StreamingMetrics::default(),
+            candidate_text: HashMap::new(),
         }
     }
 
@@ -80,6 +84,7 @@ impl StreamingProcessor {
     {
         self.metrics.request_start_time = Some(Instant::now());
         self.metrics.total_requests += 1;
+        self.candidate_text.clear();
 
         // Get the response stream
         let mut stream = response.bytes_stream();
@@ -368,35 +373,57 @@ impl StreamingProcessor {
 
     /// Process a streaming candidate and extract content
     fn process_candidate<F>(
-        &self,
+        &mut self,
         candidate: &StreamingCandidate,
         on_chunk: &mut F,
     ) -> Result<bool, StreamingError>
     where
         F: FnMut(&str) -> Result<(), StreamingError>,
     {
-        let mut _has_valid_content = false;
+        let mut has_valid_content = false;
+        let index = candidate.index.unwrap_or(0);
+        let entry = self.candidate_text.entry(index).or_default();
+        let mut aggregated = entry.clone();
 
-        // Process each part of the content
         for part in &candidate.content.parts {
             match part {
                 Part::Text { text } => {
-                    if !text.trim().is_empty() {
-                        on_chunk(text)?;
-                        _has_valid_content = true;
+                    if text.is_empty() {
+                        continue;
                     }
+
+                    has_valid_content = true;
+
+                    if text == &aggregated {
+                        continue;
+                    }
+
+                    if text.starts_with(&aggregated) {
+                        let delta = &text[aggregated.len()..];
+                        if !delta.is_empty() {
+                            on_chunk(delta)?;
+                            aggregated.push_str(delta);
+                        }
+                        continue;
+                    }
+
+                    if aggregated.starts_with(text) {
+                        aggregated = text.clone();
+                        continue;
+                    }
+
+                    on_chunk(text)?;
+                    aggregated.push_str(text);
                 }
-                Part::FunctionCall { .. } => {
-                    // Function calls are handled separately in the tool execution flow
-                    _has_valid_content = true;
-                }
-                Part::FunctionResponse { .. } => {
-                    _has_valid_content = true;
+                Part::FunctionCall { .. } | Part::FunctionResponse { .. } => {
+                    has_valid_content = true;
                 }
             }
         }
 
-        Ok(_has_valid_content)
+        *entry = aggregated;
+
+        Ok(has_valid_content)
     }
 
     /// Get current streaming metrics
@@ -419,6 +446,118 @@ impl Default for StreamingProcessor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::gemini::models::{Content, Part};
+    use crate::gemini::streaming::StreamingCandidate;
+
+    fn base_candidate(text: &str) -> StreamingCandidate {
+        StreamingCandidate {
+            content: Content {
+                role: "model".to_string(),
+                parts: vec![Part::Text {
+                    text: text.to_string(),
+                }],
+            },
+            finish_reason: None,
+            index: Some(0),
+        }
+    }
+
+    #[test]
+    fn process_candidate_emits_incremental_chunks_for_cumulative_text() {
+        let mut processor = StreamingProcessor::new();
+        let mut emitted: Vec<String> = Vec::new();
+        let mut on_chunk = |chunk: &str| -> Result<(), StreamingError> {
+            emitted.push(chunk.to_string());
+            Ok(())
+        };
+
+        let mut candidate = base_candidate("Hel");
+        assert!(
+            processor
+                .process_candidate(&candidate, &mut on_chunk)
+                .expect("first chunk succeeds")
+        );
+        assert_eq!(emitted, vec!["Hel".to_string()]);
+        emitted.clear();
+
+        candidate.content.parts = vec![Part::Text {
+            text: "Hello".to_string(),
+        }];
+        assert!(
+            processor
+                .process_candidate(&candidate, &mut on_chunk)
+                .expect("second chunk succeeds")
+        );
+        assert_eq!(emitted, vec!["lo".to_string()]);
+        emitted.clear();
+
+        candidate.content.parts = vec![Part::Text {
+            text: "Hello world".to_string(),
+        }];
+        assert!(
+            processor
+                .process_candidate(&candidate, &mut on_chunk)
+                .expect("third chunk succeeds")
+        );
+        assert_eq!(emitted, vec![" world".to_string()]);
+        assert_eq!(
+            processor.candidate_text.get(&0).map(String::as_str),
+            Some("Hello world"),
+        );
+    }
+
+    #[test]
+    fn process_candidate_handles_delta_only_payloads() {
+        let mut processor = StreamingProcessor::new();
+        let mut emitted: Vec<String> = Vec::new();
+        let mut on_chunk = |chunk: &str| -> Result<(), StreamingError> {
+            emitted.push(chunk.to_string());
+            Ok(())
+        };
+
+        let first = base_candidate("Hello");
+        assert!(
+            processor
+                .process_candidate(&first, &mut on_chunk)
+                .expect("delta chunk succeeds")
+        );
+
+        let second = base_candidate(" world");
+        assert!(
+            processor
+                .process_candidate(&second, &mut on_chunk)
+                .expect("delta append succeeds")
+        );
+
+        assert_eq!(emitted, vec!["Hello".to_string(), " world".to_string()]);
+        assert_eq!(
+            processor.candidate_text.get(&0).map(String::as_str),
+            Some("Hello world"),
+        );
+    }
+
+    #[test]
+    fn process_candidate_preserves_whitespace_chunks() {
+        let mut processor = StreamingProcessor::new();
+        let mut emitted: Vec<String> = Vec::new();
+        let mut on_chunk = |chunk: &str| -> Result<(), StreamingError> {
+            emitted.push(chunk.to_string());
+            Ok(())
+        };
+
+        let whitespace = base_candidate(" ");
+        assert!(
+            processor
+                .process_candidate(&whitespace, &mut on_chunk)
+                .expect("whitespace chunk succeeds")
+        );
+
+        assert_eq!(emitted, vec![" ".to_string()]);
+        assert_eq!(
+            processor.candidate_text.get(&0).map(String::as_str),
+            Some(" "),
+        );
+    }
 
     #[test]
     fn test_streaming_processor_creation() {

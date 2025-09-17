@@ -85,6 +85,6 @@ pub(super) fn builtin_tool_registrations() -> Vec<ToolRegistration> {
             CapabilityLevel::CodeSearch,
             false,
             ToolRegistry::srgn_executor,
-        )
+        ),
     ]
 }

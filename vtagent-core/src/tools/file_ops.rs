@@ -37,7 +37,8 @@ impl FileOpsTool {
 
         let mut all_items = Vec::new();
         if base.is_file() {
-            let metadata = tokio::fs::metadata(&base).await
+            let metadata = tokio::fs::metadata(&base)
+                .await
                 .with_context(|| format!("Failed to read metadata for file: {}", input.path))?;
             all_items.push(json!({
                 "name": base.file_name().unwrap().to_string_lossy(),
@@ -47,10 +48,14 @@ impl FileOpsTool {
                 "modified": metadata.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs())
             }));
         } else if base.is_dir() {
-            let mut entries = tokio::fs::read_dir(&base).await
+            let mut entries = tokio::fs::read_dir(&base)
+                .await
                 .with_context(|| format!("Failed to read directory: {}", input.path))?;
-            while let Some(entry) = entries.next_entry().await
-                .with_context(|| format!("Failed to read directory entry in: {}", input.path))? {
+            while let Some(entry) = entries
+                .next_entry()
+                .await
+                .with_context(|| format!("Failed to read directory entry in: {}", input.path))?
+            {
                 let path = entry.path();
                 let name = entry.file_name().to_string_lossy().to_string();
 
@@ -61,7 +66,9 @@ impl FileOpsTool {
                     continue;
                 }
 
-                let metadata = entry.metadata().await
+                let metadata = entry
+                    .metadata()
+                    .await
                     .with_context(|| format!("Failed to read metadata for: {}", path.display()))?;
                 all_items.push(json!({
                     "name": name,
@@ -178,10 +185,7 @@ impl FileOpsTool {
     async fn execute_recursive_search(&self, input: &ListInput) -> Result<Value> {
         // Allow recursive listing without pattern by defaulting to "*" (match all)
         let default_pattern = "*".to_string();
-        let pattern = input
-            .name_pattern
-            .as_ref()
-            .unwrap_or(&default_pattern);
+        let pattern = input.name_pattern.as_ref().unwrap_or(&default_pattern);
         let search_path = self.workspace_root.join(&input.path);
 
         let mut items = Vec::new();
@@ -365,7 +369,8 @@ impl FileOpsTool {
                     self.count_lines_with_tree_sitter(candidate_path).await? > chunk_lines
                 } else {
                     // Use default threshold
-                    self.count_lines_with_tree_sitter(candidate_path).await? > crate::config::constants::chunking::MAX_LINES_THRESHOLD
+                    self.count_lines_with_tree_sitter(candidate_path).await?
+                        > crate::config::constants::chunking::MAX_LINES_THRESHOLD
                 };
 
                 let (content, truncated, total_lines) = if should_chunk {
@@ -381,7 +386,8 @@ impl FileOpsTool {
 
                     let result = self.read_file_chunked(candidate_path, &input).await?;
                     // Log chunking operation
-                    self.log_chunking_operation(candidate_path, result.1, result.2).await?;
+                    self.log_chunking_operation(candidate_path, result.1, result.2)
+                        .await?;
                     result
                 } else {
                     let content = if let Some(max_bytes) = input.max_bytes {
@@ -423,7 +429,8 @@ impl FileOpsTool {
                 }
 
                 // Log chunking operation
-                self.log_chunking_operation(candidate_path, truncated, total_lines).await?;
+                self.log_chunking_operation(candidate_path, truncated, total_lines)
+                    .await?;
 
                 return Ok(result);
             }
@@ -451,7 +458,8 @@ impl FileOpsTool {
 
         // Check if content needs chunking
         let content_size = input.content.len();
-        let should_chunk = content_size > crate::config::constants::chunking::MAX_WRITE_CONTENT_SIZE;
+        let should_chunk =
+            content_size > crate::config::constants::chunking::MAX_WRITE_CONTENT_SIZE;
 
         if should_chunk {
             return self.write_file_chunked(&file_path, &input).await;
@@ -494,7 +502,8 @@ impl FileOpsTool {
         }
 
         // Log write operation
-        self.log_write_operation(&file_path, content_size, false).await?;
+        self.log_write_operation(&file_path, content_size, false)
+            .await?;
 
         Ok(json!({
             "success": true,
@@ -570,7 +579,8 @@ impl FileOpsTool {
         }
 
         // Log chunked write operation
-        self.log_write_operation(file_path, total_size, true).await?;
+        self.log_write_operation(file_path, total_size, true)
+            .await?;
 
         Ok(json!({
             "success": true,
@@ -584,7 +594,12 @@ impl FileOpsTool {
     }
 
     /// Log write operations for debugging
-    async fn log_write_operation(&self, file_path: &Path, bytes_written: usize, chunked: bool) -> Result<()> {
+    async fn log_write_operation(
+        &self,
+        file_path: &Path,
+        bytes_written: usize,
+        chunked: bool,
+    ) -> Result<()> {
         let log_entry = json!({
             "operation": if chunked { "write_file_chunked" } else { "write_file" },
             "file_path": file_path.to_string_lossy(),
@@ -594,7 +609,10 @@ impl FileOpsTool {
             "timestamp": chrono::Utc::now().to_rfc3339()
         });
 
-        info!("File write operation: {}", serde_json::to_string(&log_entry)?);
+        info!(
+            "File write operation: {}",
+            serde_json::to_string(&log_entry)?
+        );
         Ok(())
     }
 }
@@ -772,7 +790,11 @@ impl FileOpsTool {
     }
 
     /// Read file with chunking (first N + last N lines)
-    async fn read_file_chunked(&self, file_path: &Path, input: &Input) -> Result<(String, bool, Option<usize>)> {
+    async fn read_file_chunked(
+        &self,
+        file_path: &Path,
+        input: &Input,
+    ) -> Result<(String, bool, Option<usize>)> {
         let content = tokio::fs::read_to_string(file_path).await?;
         let lines: Vec<&str> = content.lines().collect();
         let total_lines = lines.len();
@@ -826,7 +848,12 @@ impl FileOpsTool {
     }
 
     /// Log chunking operations for debugging
-    async fn log_chunking_operation(&self, file_path: &Path, truncated: bool, total_lines: Option<usize>) -> Result<()> {
+    async fn log_chunking_operation(
+        &self,
+        file_path: &Path,
+        truncated: bool,
+        total_lines: Option<usize>,
+    ) -> Result<()> {
         if truncated {
             let log_entry = json!({
                 "operation": "read_file_chunked",
@@ -836,7 +863,10 @@ impl FileOpsTool {
                 "timestamp": chrono::Utc::now().to_rfc3339()
             });
 
-            info!("File chunking operation: {}", serde_json::to_string(&log_entry)?);
+            info!(
+                "File chunking operation: {}",
+                serde_json::to_string(&log_entry)?
+            );
         }
         Ok(())
     }

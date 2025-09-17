@@ -4,7 +4,7 @@
 //! including retry mechanisms with exponential backoff and fallback strategies.
 
 use crate::config::models::ModelId;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 use tokio::time::sleep;

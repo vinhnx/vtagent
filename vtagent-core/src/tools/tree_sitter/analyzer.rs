@@ -810,12 +810,16 @@ mod tests {
     #[test]
     fn test_analyzer_creation() {
         let analyzer = create_test_analyzer();
-        assert!(analyzer
-            .supported_languages
-            .contains(&LanguageSupport::Rust));
-        assert!(analyzer
-            .supported_languages
-            .contains(&LanguageSupport::Python));
+        assert!(
+            analyzer
+                .supported_languages
+                .contains(&LanguageSupport::Rust)
+        );
+        assert!(
+            analyzer
+                .supported_languages
+                .contains(&LanguageSupport::Python)
+        );
     }
 
     #[test]
@@ -834,9 +838,11 @@ mod tests {
         }
 
         // Test unknown extension should return error
-        assert!(analyzer
-            .detect_language_from_path(Path::new("file.unknown"))
-            .is_err());
+        assert!(
+            analyzer
+                .detect_language_from_path(Path::new("file.unknown"))
+                .is_err()
+        );
     }
 
     #[test]

@@ -7,6 +7,7 @@ use crate::gemini::models::Part;
 use crate::gemini::streaming::{
     StreamingCandidate, StreamingError, StreamingMetrics, StreamingResponse,
 };
+use crate::llm::stream;
 use futures::stream::StreamExt;
 use reqwest::Response;
 use std::time::Instant;
@@ -196,19 +197,18 @@ impl StreamingProcessor {
         F: FnMut(&str) -> Result<(), StreamingError>,
     {
         let mut _has_valid_content = false;
-        let mut processed_chars = 0;
 
-        // Process complete lines in the buffer
-        while let Some(newline_pos) = buffer[processed_chars..].find('\n') {
-            let line_end = processed_chars + newline_pos;
-            let line = &buffer[processed_chars..line_end].trim();
-            processed_chars = line_end + 1; // +1 to skip the newline
+        // First handle SSE-style payloads.
+        let original_len = buffer.len();
+        let mut scratch = buffer.clone();
+        let events = stream::drain_sse_events(&mut scratch);
+        let consumed = original_len.saturating_sub(scratch.len());
+        if consumed > 0 {
+            buffer.drain(..consumed);
+        }
 
-            if line.is_empty() {
-                continue;
-            }
-
-            match self.process_line(line, accumulated_response, on_chunk) {
+        for payload in events {
+            match self.process_payload(&payload, accumulated_response, on_chunk) {
                 Ok(valid) => {
                     if valid {
                         _has_valid_content = true;
@@ -218,9 +218,27 @@ impl StreamingProcessor {
             }
         }
 
-        // Remove processed content from buffer
-        if processed_chars > 0 {
-            *buffer = buffer[processed_chars..].to_string();
+        // Handle newline-delimited JSON payloads (fallback for non-SSE streams).
+        loop {
+            if let Some(newline_idx) = buffer.find('\n') {
+                let line = buffer[..newline_idx].replace('\r', "");
+                buffer.drain(..=newline_idx);
+                let trimmed = line.trim();
+                if trimmed.is_empty() {
+                    continue;
+                }
+
+                match self.process_payload(trimmed, accumulated_response, on_chunk) {
+                    Ok(valid) => {
+                        if valid {
+                            _has_valid_content = true;
+                        }
+                    }
+                    Err(e) => return Err(e),
+                }
+            } else {
+                break;
+            }
         }
 
         Ok(_has_valid_content)
@@ -238,10 +256,96 @@ impl StreamingProcessor {
     {
         let mut _has_valid_content = false;
 
-        // Process the remaining buffer as a single line
-        let line = buffer.trim();
-        if !line.is_empty() {
-            match self.process_line(line, accumulated_response, on_chunk) {
+        if buffer.trim().is_empty() {
+            buffer.clear();
+            return Ok(false);
+        }
+
+        // Ensure any trailing SSE payload is processed.
+        if buffer.contains("data:") && !buffer.contains("\n\n") {
+            buffer.push_str("\n\n");
+        }
+
+        match self.process_buffer(buffer, accumulated_response, on_chunk) {
+            Ok(valid) => {
+                if valid {
+                    _has_valid_content = true;
+                }
+            }
+            Err(e) => return Err(e),
+        }
+
+        if !buffer.trim().is_empty() {
+            let remaining = buffer.trim().to_string();
+            buffer.clear();
+            match self.process_payload(&remaining, accumulated_response, on_chunk) {
+                Ok(valid) => {
+                    if valid {
+                        _has_valid_content = true;
+                    }
+                }
+                Err(e) => return Err(e),
+            }
+        } else {
+            buffer.clear();
+        }
+
+        Ok(_has_valid_content)
+    }
+
+    /// Process a JSON payload extracted from the stream
+    fn process_payload<F>(
+        &mut self,
+        payload: &str,
+        accumulated_response: &mut StreamingResponse,
+        on_chunk: &mut F,
+    ) -> Result<bool, StreamingError>
+    where
+        F: FnMut(&str) -> Result<(), StreamingError>,
+    {
+        let trimmed = payload.trim();
+        if trimmed.is_empty() || trimmed == "[DONE]" {
+            return Ok(false);
+        }
+
+        let value: serde_json::Value =
+            serde_json::from_str(trimmed).map_err(|err| StreamingError::ParseError {
+                message: format!("Failed to parse streaming payload: {}", err),
+                raw_response: trimmed.to_string(),
+            })?;
+
+        if let Some(error_value) = value.get("error") {
+            let status_code = error_value
+                .get("code")
+                .and_then(|code| code.as_u64())
+                .map(|code| code as u16)
+                .unwrap_or(500);
+
+            let message = error_value
+                .get("message")
+                .and_then(|msg| msg.as_str())
+                .map(str::to_string)
+                .unwrap_or_else(|| error_value.to_string());
+
+            let is_retryable = matches!(status_code, 429 | 500 | 502 | 503 | 504);
+
+            return Err(StreamingError::ApiError {
+                status_code,
+                message,
+                is_retryable,
+            });
+        }
+
+        let response: StreamingResponse =
+            serde_json::from_value(value).map_err(|err| StreamingError::ParseError {
+                message: format!("Failed to deserialize streaming payload: {}", err),
+                raw_response: trimmed.to_string(),
+            })?;
+
+        let mut _has_valid_content = false;
+
+        for candidate in &response.candidates {
+            match self.process_candidate(candidate, on_chunk) {
                 Ok(valid) => {
                     if valid {
                         _has_valid_content = true;
@@ -251,61 +355,12 @@ impl StreamingProcessor {
             }
         }
 
-        // Clear the buffer
-        buffer.clear();
+        if !response.candidates.is_empty() {
+            accumulated_response.candidates = response.candidates.clone();
+        }
 
-        Ok(_has_valid_content)
-    }
-
-    /// Process a single line of streaming response
-    fn process_line<F>(
-        &mut self,
-        line: &str,
-        accumulated_response: &mut StreamingResponse,
-        on_chunk: &mut F,
-    ) -> Result<bool, StreamingError>
-    where
-        F: FnMut(&str) -> Result<(), StreamingError>,
-    {
-        let mut _has_valid_content = false;
-
-        // Try to parse the line as a JSON object
-        match serde_json::from_str::<StreamingResponse>(line) {
-            Ok(response) => {
-                // Process the response
-                if let Some(candidate) = response.candidates.first() {
-                    match self.process_candidate(candidate, on_chunk) {
-                        Ok(valid) => {
-                            if valid {
-                                _has_valid_content = true;
-                            }
-
-                            // Add to accumulated response
-                            accumulated_response.candidates.extend(response.candidates);
-                            if response.usage_metadata.is_some() {
-                                accumulated_response.usage_metadata = response.usage_metadata;
-                            }
-                        }
-                        Err(e) => return Err(e),
-                    }
-                }
-            }
-            Err(parse_err) => {
-                // If parsing fails, it might be a partial response or non-JSON content
-                // We'll try to extract text content manually
-                if let Some(text) = self.extract_text_from_line(line) {
-                    if !text.trim().is_empty() {
-                        on_chunk(&text)?;
-                        _has_valid_content = true;
-                    }
-                } else {
-                    // Log the parsing error but don't fail immediately
-                    eprintln!(
-                        "Warning: Failed to parse streaming line as JSON: {}",
-                        parse_err
-                    );
-                }
-            }
+        if response.usage_metadata.is_some() {
+            accumulated_response.usage_metadata = response.usage_metadata.clone();
         }
 
         Ok(_has_valid_content)
@@ -342,54 +397,6 @@ impl StreamingProcessor {
         }
 
         Ok(_has_valid_content)
-    }
-
-    /// Extract text content from a line that might not be valid JSON
-    fn extract_text_from_line(&self, line: &str) -> Option<String> {
-        // Simple extraction of text content between quotes
-        // This is a fallback for cases where the line isn't valid JSON
-        let mut extracted = String::new();
-        let mut in_quotes = false;
-        let mut escape_next = false;
-        let mut current_field = String::new();
-
-        for ch in line.chars() {
-            if escape_next {
-                current_field.push(ch);
-                escape_next = false;
-                continue;
-            }
-
-            match ch {
-                '\\' => {
-                    escape_next = true;
-                    current_field.push(ch);
-                }
-                '"' => {
-                    if in_quotes {
-                        // End of quoted string
-                        extracted.push_str(&current_field);
-                        current_field.clear();
-                        in_quotes = false;
-                    } else {
-                        // Start of quoted string
-                        current_field.clear();
-                        in_quotes = true;
-                    }
-                }
-                _ => {
-                    if in_quotes {
-                        current_field.push(ch);
-                    }
-                }
-            }
-        }
-
-        if extracted.is_empty() {
-            None
-        } else {
-            Some(extracted)
-        }
     }
 
     /// Get current streaming metrics
@@ -437,5 +444,90 @@ mod tests {
     fn test_streaming_config_default() {
         let config = StreamingConfig::default();
         assert_eq!(config.buffer_size, 1024);
+    }
+
+    #[test]
+    fn process_buffer_emits_chunks_for_sse_payloads() {
+        let mut processor = StreamingProcessor::new();
+        let mut buffer = String::from(
+            "data: {\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"Hel\"}]}}]}\n\n",
+        );
+        let mut aggregated = StreamingResponse {
+            candidates: Vec::new(),
+            usage_metadata: None,
+        };
+        let mut collected = Vec::new();
+
+        {
+            let mut on_chunk = |chunk: &str| {
+                collected.push(chunk.to_string());
+                Ok(())
+            };
+
+            let has_valid = processor
+                .process_buffer(&mut buffer, &mut aggregated, &mut on_chunk)
+                .expect("processor should not error");
+
+            assert!(has_valid);
+        }
+
+        assert!(buffer.is_empty());
+        assert_eq!(collected, vec![String::from("Hel")]);
+        assert_eq!(aggregated.candidates.len(), 1);
+    }
+
+    #[test]
+    fn process_buffer_ignores_done_events() {
+        let mut processor = StreamingProcessor::new();
+        let mut buffer = String::from("data: [DONE]\n\n");
+        let mut aggregated = StreamingResponse {
+            candidates: Vec::new(),
+            usage_metadata: None,
+        };
+        let mut collected = Vec::new();
+
+        let mut on_chunk = |chunk: &str| {
+            collected.push(chunk.to_string());
+            Ok(())
+        };
+
+        let has_valid = processor
+            .process_buffer(&mut buffer, &mut aggregated, &mut on_chunk)
+            .expect("processor should not error");
+
+        assert!(!has_valid);
+        assert!(buffer.is_empty());
+        assert!(collected.is_empty());
+        assert!(aggregated.candidates.is_empty());
+    }
+
+    #[test]
+    fn process_remaining_buffer_handles_plain_json() {
+        let mut processor = StreamingProcessor::new();
+        let mut buffer = String::from(
+            "{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"Complete\"}]}}]}",
+        );
+        let mut aggregated = StreamingResponse {
+            candidates: Vec::new(),
+            usage_metadata: None,
+        };
+        let mut collected = Vec::new();
+
+        {
+            let mut on_chunk = |chunk: &str| {
+                collected.push(chunk.to_string());
+                Ok(())
+            };
+
+            let has_valid = processor
+                .process_remaining_buffer(&mut buffer, &mut aggregated, &mut on_chunk)
+                .expect("processor should not error");
+
+            assert!(has_valid);
+        }
+
+        assert!(buffer.is_empty());
+        assert_eq!(collected, vec![String::from("Complete")]);
+        assert_eq!(aggregated.candidates.len(), 1);
     }
 }

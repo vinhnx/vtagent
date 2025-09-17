@@ -85,12 +85,6 @@ pub(super) fn builtin_tool_registrations() -> Vec<ToolRegistration> {
             CapabilityLevel::CodeSearch,
             false,
             ToolRegistry::srgn_executor,
-        ),
-        ToolRegistration::new(
-            tools::SPECKIT,
-            CapabilityLevel::CodeSearch,
-            false,
-            ToolRegistry::speckit_executor,
-        ),
+        )
     ]
 }

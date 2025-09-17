@@ -32,6 +32,7 @@ VTAgent is a Rust-based terminal coding agent with modular architecture supporti
 -   **Router & Budgets**: Config-driven routing with per-class budgets
 -   **Trajectory Logging**: JSONL logs for route decisions and tool calls
 -   **Code Surgery Tools**: Srgn integration for syntax-aware code manipulation and refactoring
+-   **Spec-Driven Development**: Speckit integration for project initialization and system verification
 -   **Research-Preview Features**: Advanced context compression and conversation summarization
 
 ## Quick Start

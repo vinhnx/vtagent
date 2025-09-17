@@ -14,7 +14,8 @@ use vtagent_core::{
 };
 use vtagent_core::gemini::function_calling::{FunctionCall, FunctionResponse};
 use vtagent_core::gemini::models::ToolConfig;
-use serde_json::json;
+use serde_json::{json, Value};
+use vtagent_core::utils::ansi::{AnsiRenderer, MessageStyle};
 
 // Import syntax highlighting module
 use crate::agent::syntax;
@@ -85,11 +86,27 @@ pub async fn handle_chat_command(config: &CoreAgentConfig, skip_confirmations: b
                 println!("Available commands:");
                 println!("  exit/quit - Exit the chat");
                 println!("  help - Show this help message");
+                println!("  speckit init [name] - Initialize spec-driven project");
+                println!("  speckit check - Verify system requirements");
                 println!("  Any other text will be sent to the AI assistant");
                 continue;
             }
             "" => continue,
             _ => {}
+        }
+
+        // Handle Speckit commands directly in the agent
+        if let Some(speckit_result) = handle_speckit_command(input, &mut tool_registry).await {
+            match speckit_result {
+                Ok(result) => {
+                    println!("{}", style("Speckit Command Result:").green().bold());
+                    render_tool_output(&result);
+                }
+                Err(e) => {
+                    println!("{}", style(format!("Speckit Error: {}", e)).red());
+                }
+            }
+            continue;
         }
 
         // Add user message to history
@@ -390,4 +407,90 @@ fn parse_unified_diff(input: &str) -> Option<Vec<DiffFile>> {
         }
     }
     if files.is_empty() { None } else { Some(files) }
+}
+
+/// Handle Speckit commands directly in the agent
+async fn handle_speckit_command(input: &str, tool_registry: &mut ToolRegistry) -> Option<Result<Value>> {
+    let input = input.trim();
+
+    // Check for speckit subcommands (only init and check are available)
+    if input.starts_with("speckit ") {
+        let speckit_args = input.strip_prefix("speckit ").unwrap_or("").trim();
+
+        if speckit_args.starts_with("init") {
+            let project_name = speckit_args.strip_prefix("init").unwrap_or("").trim();
+            let args = if project_name.is_empty() {
+                serde_json::json!({
+                    "command": "init",
+                    "args": ["--here"]
+                })
+            } else {
+                serde_json::json!({
+                    "command": "init",
+                    "args": [project_name]
+                })
+            };
+
+            return Some(tool_registry.execute_tool("speckit", args).await);
+        }
+
+        if speckit_args == "check" {
+            let args = serde_json::json!({
+                "command": "check"
+            });
+
+            return Some(tool_registry.execute_tool("speckit", args).await);
+        }
+    }
+
+    None
+}
+
+/// Render tool output with proper formatting
+fn render_tool_output(val: &serde_json::Value) {
+    let mut renderer = AnsiRenderer::stdout();
+
+    // Handle Speckit-specific output formatting
+    if let Some(success) = val.get("success").and_then(|v| v.as_bool()) {
+        if success {
+            let _ = renderer.line(MessageStyle::Success, "✓ Command completed successfully");
+        } else {
+            let _ = renderer.line(MessageStyle::Error, "✗ Command failed");
+        }
+    }
+
+    if let Some(stdout) = val.get("stdout").and_then(|v| v.as_str())
+        && !stdout.trim().is_empty()
+    {
+        let _ = renderer.line(MessageStyle::Info, "[Output]");
+        let _ = renderer.line(MessageStyle::Output, stdout);
+    }
+
+    if let Some(stderr) = val.get("stderr").and_then(|v| v.as_str())
+        && !stderr.trim().is_empty()
+    {
+        let _ = renderer.line(MessageStyle::Error, "[Error Output]");
+        let _ = renderer.line(MessageStyle::Error, stderr);
+    }
+
+    if let Some(exit_code) = val.get("exit_code").and_then(|v| v.as_i64()) {
+        if exit_code != 0 {
+            let _ = renderer.line(MessageStyle::Error, &format!("Exit code: {}", exit_code));
+        }
+    }
+
+    if let Some(working_dir) = val.get("working_directory").and_then(|v| v.as_str()) {
+        let _ = renderer.line(MessageStyle::Info, &format!("Working directory: {}", working_dir));
+    }
+
+    // Handle error objects
+    if let Some(error) = val.get("error").and_then(|v| v.as_object()) {
+        let _ = renderer.line(MessageStyle::Error, "[Error]");
+        if let Some(message) = error.get("message").and_then(|v| v.as_str()) {
+            let _ = renderer.line(MessageStyle::Error, message);
+        }
+        if let Some(error_type) = error.get("error_type").and_then(|v| v.as_str()) {
+            let _ = renderer.line(MessageStyle::Error, &format!("Type: {}", error_type));
+        }
+    }
 }

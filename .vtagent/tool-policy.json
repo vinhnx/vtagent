@@ -10,6 +10,7 @@
     "bash",
     "apply_patch",
     "srgn",
+    "speckit",
     "ast_grep_search"
   ],
   "policies": {
@@ -22,7 +23,8 @@
     "edit_file": "allow",
     "run_terminal_cmd": "allow",
     "read_file": "allow",
-    "srgn": "prompt"
+    "srgn": "prompt",
+    "speckit": "allow"
   },
   "constraints": {
     "list_files": {

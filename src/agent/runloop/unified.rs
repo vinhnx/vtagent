@@ -85,19 +85,11 @@ pub(crate) async fn run_single_agent_loop_unified(
 
         let refined_user = refine_user_prompt_if_enabled(input, config, vt_cfg).await;
         conversation_history.push(uni::Message::user(refined_user));
-        let pruned_tools = prune_unified_tool_responses(
+        let _pruned_tools = prune_unified_tool_responses(
             &mut conversation_history,
             trim_config.preserve_recent_turns,
         );
-        if pruned_tools > 0 {
-            renderer.line(
-                MessageStyle::Info,
-                &format!(
-                    "Dropped {} earlier tool responses to conserve context.",
-                    pruned_tools
-                ),
-            )?;
-        }
+        // Removed: Tool response pruning message
         let trim_result = enforce_unified_context_window(&mut conversation_history, trim_config);
         if trim_result.is_trimmed() {
             renderer.line(
@@ -434,20 +426,11 @@ pub(crate) async fn run_single_agent_loop_unified(
 
         conversation_history = working_history;
 
-        let pruned_after_turn = prune_unified_tool_responses(
+        let _pruned_after_turn = prune_unified_tool_responses(
             &mut conversation_history,
             trim_config.preserve_recent_turns,
         );
-        if pruned_after_turn > 0 {
-            renderer.line(
-                MessageStyle::Info,
-                &format!(
-                    "Dropped {} older tool responses after completion to conserve context.",
-                    pruned_after_turn
-                ),
-            )?;
-        }
-
+        // Removed: Tool response pruning message after completion
         let post_trim = enforce_unified_context_window(&mut conversation_history, trim_config);
         if post_trim.is_trimmed() {
             renderer.line(

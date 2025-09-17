@@ -4,9 +4,7 @@
 pub mod analyze;
 pub mod ask;
 pub mod benchmark;
-#[cfg(not(feature = "tool-chat"))]
 pub mod chat_repl;
-#[cfg(feature = "tool-chat")]
 pub mod chat_tools;
 pub mod compress_context;
 pub mod config;
@@ -23,9 +21,7 @@ pub mod trajectory;
 pub use analyze::handle_analyze_command;
 pub use ask::handle_ask_command as handle_ask_single_command;
 pub use benchmark::handle_benchmark_command;
-#[cfg(not(feature = "tool-chat"))]
-pub use chat_repl::handle_chat_command;
-#[cfg(feature = "tool-chat")]
+// Use the modular runloop by default
 pub use chat_tools::handle_chat_command;
 pub use compress_context::handle_compress_context_command;
 pub use config::handle_config_command;

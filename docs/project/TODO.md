@@ -1,7 +1,3 @@
-speckit command plan doesnt work. if not revert and remove speckit
-
---
-
 https://github.com/openai/codex/blob/main/codex-rs/core/gpt_5_codex_prompt.md
 
 --
@@ -64,19 +60,7 @@ integrates the Hotpath profiler (available at https://deepwiki.com/pawurb/hotpat
 
 Provide the complete, compilable code with comments explaining the integration, instrumentation, and fixes. Use Rust 1.75+ and handle errors gracefully with `anyhow` or `thiserror`.
 
-===
-
-search for "// TODO: " comments in the codebase and implement the missing functionality. prioritize tasks that enhance core features, improve performance, or fix bugs. ensure code quality with tests and documentation updates as needed.
-
 ---
-
-fetch integrate speckit as new tools and command workflow for vtagent. this is a python package for spec-driven development. it can generate tests, code, and documentation from specifications. see below links for more details. fetch the website and read the docs. then implement the integration. write tests for the new functionality. update docs if necessary. update system prompt if needed. make sure vtagent can use speckit effectively. also add it to the setup script for easy installation.
-
-https://github.com/github/spec-kit
-
---
-
-refactor and modular runloop.rs, the file is too large. extract
 
 --
 
@@ -114,10 +98,6 @@ The VTAgent follows a modular architecture with several core components:
 
 The largest files correspond to the most complex functionality - tool management, agent execution loop, and code analysis - which is typical
 for a coding agent project.
-
---
-
-check dead code vtagent-core/src/tools/registry/builtins.rs
 
 ---
 

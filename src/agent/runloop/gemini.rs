@@ -90,19 +90,11 @@ pub(crate) async fn run_single_agent_loop_gemini(
         }
 
         conversation_history.push(Content::user_text(input));
-        let pruned_tools = prune_gemini_tool_responses(
+        let _pruned_tools = prune_gemini_tool_responses(
             &mut conversation_history,
             trim_config.preserve_recent_turns,
         );
-        if pruned_tools > 0 {
-            renderer.line(
-                MessageStyle::Info,
-                &format!(
-                    "Dropped {} earlier tool responses to conserve context.",
-                    pruned_tools
-                ),
-            )?;
-        }
+        // Removed: Tool response pruning message
         let trim_result = enforce_gemini_context_window(&mut conversation_history, trim_config);
         if trim_result.is_trimmed() {
             renderer.line(
@@ -338,7 +330,7 @@ pub(crate) async fn run_single_agent_loop_gemini(
             if function_calls.is_empty() {
                 if let Some(text) = final_text.clone() {
                     if !text.trim().is_empty() {
-                        renderer.line(MessageStyle::Response, &text)?;
+                        renderer.line(MessageStyle::Output, &text)?;
                     }
                 }
                 break 'outer;
@@ -428,20 +420,11 @@ pub(crate) async fn run_single_agent_loop_gemini(
 
         conversation_history = working_history;
 
-        let pruned_after_turn = prune_gemini_tool_responses(
+        let _pruned_after_turn = prune_gemini_tool_responses(
             &mut conversation_history,
             trim_config.preserve_recent_turns,
         );
-        if pruned_after_turn > 0 {
-            renderer.line(
-                MessageStyle::Info,
-                &format!(
-                    "Dropped {} older tool responses after completion to conserve context.",
-                    pruned_after_turn
-                ),
-            )?;
-        }
-
+        // Removed: Tool response pruning message after completion
         let post_trim = enforce_gemini_context_window(&mut conversation_history, trim_config);
         if post_trim.is_trimmed() {
             renderer.line(

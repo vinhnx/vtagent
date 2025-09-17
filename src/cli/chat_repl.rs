@@ -44,7 +44,7 @@ pub async fn handle_chat_command(
             .generate(msg)
             .await
             .context("LLM generation failed")?;
-        renderer.line(MessageStyle::Response, &resp.content)?;
+        renderer.raw_line(&resp.content)?;
     }
 
     Ok(())

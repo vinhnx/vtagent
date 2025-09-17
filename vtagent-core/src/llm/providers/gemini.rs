@@ -441,6 +441,75 @@ fn map_streaming_error(err: StreamingError) -> LLMError {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn convert_streaming_response_uses_aggregated_text_for_function_calls() {
+        let stream_response = StreamingResponse {
+            candidates: vec![StreamingCandidate {
+                content: Content {
+                    role: "model".to_string(),
+                    parts: vec![Part::FunctionCall {
+                        function_call: FunctionCall {
+                            name: "write_file".to_string(),
+                            args: json!({ "path": "src/lib.rs" }),
+                            id: Some("call-1".to_string()),
+                        },
+                    }],
+                },
+                finish_reason: Some("FUNCTION_CALL".to_string()),
+                index: Some(0),
+            }],
+            usage_metadata: None,
+        };
+
+        let chunk = GeminiProvider::convert_streaming_response(
+            stream_response,
+            "Use the write_file tool to apply changes.",
+        )
+        .expect("conversion succeeds");
+
+        assert!(chunk.delta.is_none());
+        let response = chunk.response.expect("final response available");
+        assert_eq!(
+            response.content.as_deref(),
+            Some("Use the write_file tool to apply changes."),
+        );
+        assert!(matches!(response.finish_reason, FinishReason::ToolCalls));
+        let calls = response.tool_calls.expect("tool call propagated");
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].function.name, "write_file");
+    }
+
+    #[test]
+    fn convert_streaming_response_preserves_model_text() {
+        let stream_response = StreamingResponse {
+            candidates: vec![StreamingCandidate {
+                content: Content {
+                    role: "model".to_string(),
+                    parts: vec![Part::Text {
+                        text: "Hello from Gemini".to_string(),
+                    }],
+                },
+                finish_reason: Some("STOP".to_string()),
+                index: Some(0),
+            }],
+            usage_metadata: None,
+        };
+
+        let chunk = GeminiProvider::convert_streaming_response(stream_response, "ignored")
+            .expect("conversion succeeds");
+
+        assert!(chunk.delta.is_none());
+        let response = chunk.response.expect("response populated");
+        assert_eq!(response.content.as_deref(), Some("Hello from Gemini"));
+        assert!(matches!(response.finish_reason, FinishReason::Stop));
+    }
+}
+
 #[async_trait]
 impl LLMClient for GeminiProvider {
     async fn generate(&mut self, prompt: &str) -> Result<llm_types::LLMResponse, LLMError> {

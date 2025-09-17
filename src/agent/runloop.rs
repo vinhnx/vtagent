@@ -41,6 +41,18 @@ fn render_tool_output(val: &serde_json::Value) {
     }
 }
 
+fn render_plain_response(text: &str) -> Result<()> {
+    if text.trim().is_empty() {
+        return Ok(());
+    }
+    let mut stdout = io::stdout();
+    writeln!(&mut stdout, "{}", text).context("Failed to write agent response to stdout")?;
+    stdout
+        .flush()
+        .context("Failed to flush agent response to stdout")?;
+    Ok(())
+}
+
 const STREAMING_FALLBACK_ERROR: &str = "Provider error: streaming ended without final response";
 
 #[derive(Clone, Copy)]
@@ -902,9 +914,7 @@ pub async fn run_single_agent_loop(config: &CoreAgentConfig) -> Result<()> {
 
             if function_calls.is_empty() {
                 if let Some(text) = _final_text.clone() {
-                    if !text.trim().is_empty() {
-                        renderer.line(MessageStyle::Response, &text)?;
-                    }
+                    render_plain_response(&text)?;
                 }
                 break 'outer;
             }
@@ -1275,6 +1285,7 @@ async fn run_single_agent_loop_unified(
 
                         if attempt_displayed {
                             println!();
+                            io::stdout().flush().ok();
                         }
 
                         if let Some(err) = stream_error {
@@ -1503,7 +1514,7 @@ async fn run_single_agent_loop_unified(
                     }
                 }
                 if should_render {
-                    renderer.line(MessageStyle::Response, &text)?;
+                    render_plain_response(&text)?;
                 }
                 _final_text = Some(text.clone());
                 working_history.push(uni::Message::assistant(text));

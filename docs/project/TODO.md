@@ -1,3 +1,7 @@
+revert and remove speckit
+
+--
+
 https://github.com/openai/codex/blob/main/codex-rs/core/gpt_5_codex_prompt.md
 
 --

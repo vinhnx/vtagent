@@ -39,7 +39,7 @@ pub async fn handle_init_command(workspace: &Path, force: bool, run: bool) -> Re
             verbose: false,
             theme: DEFAULT_THEME_ID.to_string(),
         };
-        handle_chat_command(&config, false)
+        handle_chat_command(&config, false, false)
             .await
             .with_context(|| "failed to start chat session")?;
     }

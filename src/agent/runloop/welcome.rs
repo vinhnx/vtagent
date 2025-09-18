@@ -115,6 +115,9 @@ fn render_welcome_text(
         }
     }
 
+    push_usage_tips(&mut lines, &onboarding_cfg.usage_tips);
+    push_recommended_actions(&mut lines, &onboarding_cfg.recommended_actions);
+
     lines.join("\n")
 }
 
@@ -191,12 +194,71 @@ fn build_prompt_addendum(
         }
     }
 
+    push_prompt_usage_tips(&mut lines, &onboarding_cfg.usage_tips);
+    push_prompt_recommended_actions(&mut lines, &onboarding_cfg.recommended_actions);
+
     let content = lines.join("\n");
     if content.trim() == "## SESSION CONTEXT" {
         None
     } else {
         Some(content)
     }
+}
+
+fn push_usage_tips(lines: &mut Vec<String>, tips: &[String]) {
+    let entries = collect_non_empty_entries(tips);
+    if entries.is_empty() {
+        return;
+    }
+
+    push_section_header(lines, "Usage tips:");
+    for tip in entries {
+        lines.push(format!("  - {}", tip));
+    }
+}
+
+fn push_recommended_actions(lines: &mut Vec<String>, actions: &[String]) {
+    let entries = collect_non_empty_entries(actions);
+    if entries.is_empty() {
+        return;
+    }
+
+    push_section_header(lines, "Suggested Next Actions:");
+    for action in entries {
+        lines.push(format!("  - {}", action));
+    }
+}
+
+fn push_prompt_usage_tips(lines: &mut Vec<String>, tips: &[String]) {
+    let entries = collect_non_empty_entries(tips);
+    if entries.is_empty() {
+        return;
+    }
+
+    lines.push("### Usage Tips".to_string());
+    for tip in entries {
+        lines.push(format!("- {}", tip));
+    }
+}
+
+fn push_prompt_recommended_actions(lines: &mut Vec<String>, actions: &[String]) {
+    let entries = collect_non_empty_entries(actions);
+    if entries.is_empty() {
+        return;
+    }
+
+    lines.push("### Suggested Next Actions".to_string());
+    for action in entries {
+        lines.push(format!("- {}", action));
+    }
+}
+
+fn collect_non_empty_entries(items: &[String]) -> Vec<&str> {
+    items
+        .iter()
+        .map(|item| item.trim())
+        .filter(|item| !item.is_empty())
+        .collect()
 }
 
 #[cfg(test)]

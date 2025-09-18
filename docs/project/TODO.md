@@ -1,6 +1,4 @@
-
 Available through homebrew, npm, and direct binary downloads from GitHub releases,
-
 
 --
 
@@ -148,6 +146,8 @@ Allow the agent to use 'list_files'? yes
 ---
 
 add --full-auto mode, where the agent can run without any user intervention, including tool permission requests. This mode should be used with caution, as it allows the agent to make decisions autonomously. Ensure that users are aware of the risks and provide clear documentation on how to use this mode safely. Consider implementing additional safeguards, such as limiting the types of tools that can be used in full-auto mode or requiring a specific configuration file that outlines acceptable behaviors. full approve of tool calls.
+
+Status: Implemented via the new `--full-auto` flag (see docs/guides/full_auto_mode.md for safeguards and usage).
 
 ---
 

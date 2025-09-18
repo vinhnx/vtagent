@@ -140,11 +140,11 @@ async fn main() -> Result<()> {
     // Dispatch to appropriate command handler
     match args.command.unwrap_or(Commands::Chat) {
         Commands::Chat => {
-            handle_chat_command(&config, args.skip_confirmations).await?;
+            handle_chat_command(&config, args.skip_confirmations, false).await?;
         }
         Commands::ChatVerbose => {
             println!("{}", style("Verbose chat mode selected").blue().bold());
-            handle_chat_command(&config, args.skip_confirmations).await?;
+            handle_chat_command(&config, args.skip_confirmations, false).await?;
         }
         Commands::Ask { prompt } => {
             let prompt_text = prompt.join(" ");

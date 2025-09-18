@@ -9,6 +9,8 @@ pub const DEFAULT_THEME_ID: &str = "ciapre-dark";
 
 const MIN_CONTRAST: f64 = 4.5;
 
+const WELCOME_TOOL_COLOR: RgbColor = RgbColor(0x38, 0x3B, 0x73);
+
 /// Palette describing UI colors for the terminal experience.
 #[derive(Clone, Debug)]
 pub struct ThemePalette {
@@ -51,12 +53,7 @@ impl ThemePalette {
             MIN_CONTRAST,
             &[lighten(secondary, 0.2), text_color, fallback_light],
         );
-        let tool_color = ensure_contrast(
-            darken(secondary, 0.2),
-            background,
-            MIN_CONTRAST,
-            &[info_color, text_color, lighten(secondary, 0.1)],
-        );
+        let tool_color = WELCOME_TOOL_COLOR;
         let response_color = ensure_contrast(
             text_color,
             background,
@@ -81,7 +78,7 @@ impl ThemePalette {
             error: Self::style_from(alert_color, true),
             output: Self::style_from(text_color, false),
             response: Self::style_from(response_color, false),
-            tool: Self::style_from(tool_color, true),
+            tool: Style::new().fg_color(Some(Color::Rgb(tool_color))).bold(),
             user: Self::style_from(user_color, false),
             primary: Self::style_from(primary, false),
             secondary: Self::style_from(secondary, false),
@@ -198,28 +195,16 @@ pub fn active_styles() -> ThemeStyles {
     ACTIVE.read().styles.clone()
 }
 
-fn compute_banner_color(palette: &ThemePalette) -> RgbColor {
-    let base = darken(palette.foreground, 0.25);
-    let fallback_primary = darken(palette.primary_accent, 0.15);
-    let fallback_secondary = darken(palette.secondary_accent, 0.3);
-    ensure_contrast(
-        base,
-        palette.background,
-        MIN_CONTRAST,
-        &[fallback_primary, fallback_secondary, palette.foreground],
-    )
-}
-
 /// Slightly darkened accent color for banner-like copy.
 pub fn banner_color() -> RgbColor {
-    let guard = ACTIVE.read();
-    compute_banner_color(&guard.palette)
+    WELCOME_TOOL_COLOR
 }
 
 /// Slightly darkened accent style for banner-like copy.
 pub fn banner_style() -> Style {
-    let guard = ACTIVE.read();
-    ThemePalette::style_from(compute_banner_color(&guard.palette), false)
+    Style::new()
+        .fg_color(Some(Color::Rgb(WELCOME_TOOL_COLOR)))
+        .bold()
 }
 
 /// Enumerate available theme identifiers.
@@ -289,10 +274,6 @@ fn mix(color: RgbColor, target: RgbColor, ratio: f64) -> RgbColor {
 
 fn lighten(color: RgbColor, ratio: f64) -> RgbColor {
     mix(color, RgbColor(0xFF, 0xFF, 0xFF), ratio)
-}
-
-fn darken(color: RgbColor, ratio: f64) -> RgbColor {
-    mix(color, RgbColor(0x00, 0x00, 0x00), ratio)
 }
 
 /// Resolve a theme identifier from configuration or CLI input.

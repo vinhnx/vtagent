@@ -5,7 +5,6 @@ Welcome to the comprehensive documentation for **VTCode**, a Rust-based terminal
 ## 🚀 Quick Installation
 
 [![Crates.io](https://img.shields.io/crates/v/vtcode.svg)](https://crates.io/crates/vtcode)
-[![npm](https://img.shields.io/npm/v/vtcode.svg)](https://www.npmjs.com/package/vtcode)
 [![Homebrew](https://img.shields.io/badge/dynamic/json?url=https://formulae.brew.sh/api/formula/vtcode.json&query=$.versions.stable&label=homebrew)](https://formulae.brew.sh/formula/vtcode)
 [![GitHub release](https://img.shields.io/github/release/vinhnx/vtcode.svg)](https://github.com/vinhnx/vtcode/releases)
 
@@ -18,14 +17,6 @@ cargo install vtcode
 ```
 
 📚 [API Documentation](https://docs.rs/vtcode) | 📦 [Crates.io](https://crates.io/crates/vtcode)
-
-#### npm (Cross-platform)
-
-```bash
-npm install -g vtcode
-```
-
-📦 [npm Package](https://www.npmjs.com/package/vtcode)
 
 #### Homebrew (macOS)
 

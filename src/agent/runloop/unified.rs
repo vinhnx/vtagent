@@ -261,7 +261,7 @@ pub(crate) async fn run_single_agent_loop_unified(
                     "I reached the configured tool-call limit of {} for this turn and paused further tool execution. Increase `tools.max_tool_loops` in vtcode.toml if you need more, then ask me to continue.",
                     max_tool_loops
                 );
-                renderer.line(MessageStyle::Response, &notice)?;
+                renderer.line(MessageStyle::Error, &notice)?;
                 ensure_turn_bottom_gap(&mut renderer, &mut bottom_gap_applied)?;
                 working_history.push(uni::Message::assistant(notice));
                 break 'outer;

@@ -780,6 +780,8 @@ default_policy = "prompt"
 max_tool_loops = 100
 ```
 
+When a turn hits this guard, the chat UI now surfaces a clear error explaining that tool execution stopped and points you to `[tools].max_tool_loops` in `vtagent.toml` so you can raise the limit before retrying.
+
 ### Distribution & Releases
 
 VTCode supports multiple distribution channels for easy installation:

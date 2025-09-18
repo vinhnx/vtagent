@@ -618,7 +618,9 @@ main() {
     print_info "Distribution Summary:"
     if [[ "$skip_crates" != "true" ]]; then
         print_info "  - Published to crates.io: https://crates.io/crates/vtcode"
-        print_info "  - docs.rs updated: https://docs.rs/vtcode"
+        print_info "  - docs.rs updated: https://docs.rs/vtcode/$version"
+        print_info "  - docs.rs core updated: https://docs.rs/vtcode-core/$version"
+        print_info "  - Note: docs.rs may take 10-30 minutes to show updated documentation"
     fi
     if [[ "$skip_homebrew" != "true" ]]; then
         print_info "  - Homebrew formula updated (manual step required)"

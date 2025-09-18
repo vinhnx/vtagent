@@ -2,7 +2,6 @@
 
 [![tool-eval](https://github.com/vinhnx/vtcode/actions/workflows/tool-eval.yml/badge.svg)](https://github.com/vinhnx/vtcode/actions/workflows/tool-eval.yml)
 [![Crates.io](https://img.shields.io/crates/v/vtcode.svg)](https://crates.io/crates/vtcode)
-[![npm](https://img.shields.io/npm/v/vtcode.svg)](https://www.npmjs.com/package/vtcode)
 [![Homebrew](https://img.shields.io/badge/dynamic/json?url=https://formulae.brew.sh/api/formula/vtcode.json&query=$.versions.stable&label=homebrew)](https://formulae.brew.sh/formula/vtcode)
 [![GitHub release](https://img.shields.io/github/release/vinhnx/vtcode.svg)](https://github.com/vinhnx/vtcode/releases)
 [![docs.rs](https://img.shields.io/docsrs/vtcode)](https://docs.rs/vtcode)
@@ -45,7 +44,7 @@ VTCode is a Rust-based terminal coding agent with modular architecture supportin
 
 ### Prerequisites
 
-**For pre-built installations (Cargo, Homebrew, npm):** None - binaries are ready to use.
+**For pre-built installations (Cargo, Homebrew):** None - binaries are ready to use.
 
 **For building from source:**
 
@@ -84,17 +83,6 @@ brew install vinhnx/tap/vtcode
 
 -   **Tap Repository**: [vinhnx/homebrew-tap](https://github.com/vinhnx/homebrew-tap)
 -   **Formula**: [vtcode.rb](https://github.com/vinhnx/homebrew-tap/blob/main/vtcode.rb)
-
-#### 📦 npm (Cross-platform)
-
-[![npm](https://img.shields.io/npm/v/vtcode.svg)](https://www.npmjs.com/package/vtcode)
-
-```bash
-npm install -g vtcode
-```
-
--   **Package**: [npmjs.com/package/vtcode](https://www.npmjs.com/package/vtcode)
--   **Installation includes**: Pre-built binaries for your platform
 
 #### 📥 Pre-built Binaries
 
@@ -845,7 +833,7 @@ The project uses an automated release script that handles publishing to multiple
 ./scripts/release.sh --patch --dry-run
 
 # Skip certain distribution channels
-./scripts/release.sh --patch --skip-npm --skip-homebrew
+./scripts/release.sh --patch --skip-homebrew
 ```
 
 #### Distribution Channels
@@ -857,15 +845,11 @@ VTCode is available through multiple package managers for easy installation:
     - **API Docs**: [docs.rs/vtcode](https://docs.rs/vtcode)
     - **Source**: [crates.io/crates/vtcode](https://crates.io/crates/vtcode)
 
-2. **📦 [npm](https://www.npmjs.com/package/vtcode)**: `npm install -g vtcode`
-
-    - **Package**: [npmjs.com/package/vtcode](https://www.npmjs.com/package/vtcode)
-
-3. **🍺 [Homebrew](https://formulae.brew.sh/formula/vtcode)**: `brew install vinhnx/tap/vtcode`
+2. **🍺 [Homebrew](https://formulae.brew.sh/formula/vtcode)**: `brew install vinhnx/tap/vtcode`
 
     - **Tap**: [vinhnx/homebrew-tap](https://github.com/vinhnx/homebrew-tap)
 
-4. **📥 [GitHub Releases](https://github.com/vinhnx/vtcode/releases)**: Pre-built binaries
+3. **📥 [GitHub Releases](https://github.com/vinhnx/vtcode/releases)**: Pre-built binaries
     - **Linux x64, macOS x64/ARM64, Windows x64**
     - **Direct download**: [github.com/vinhnx/vtcode/releases](https://github.com/vinhnx/vtcode/releases)
 

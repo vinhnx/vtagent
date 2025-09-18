@@ -230,3 +230,7 @@ Set up Homebrew tap (optional):
 
 Create vinhnx/homebrew-tap repository
 Add formula from vtcode.rb
+
+---
+
+update README guide, read the codebase and docs for context and update content with latest information.

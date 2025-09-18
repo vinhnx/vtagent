@@ -75,9 +75,26 @@ npm whoami
 
 For macOS distribution via Homebrew:
 
-1. Create a Homebrew tap repository: `vinhnx/homebrew-tap`
-2. Add the VTCode formula to that repository
-3. Users can then install with: `brew install vinhnx/tap/vtcode`
+#### Automated Setup (Recommended)
+
+The release script now includes automated Homebrew formula updates:
+
+```bash
+# The release script will automatically update your Homebrew formula
+./scripts/release.sh --patch
+
+# Or use the dedicated update script
+./scripts/update-homebrew-formula.sh 0.8.1 vinhnx/homebrew-tap
+```
+
+#### Manual Setup
+
+If you prefer manual control:
+
+1. Create a tap repository: `YOUR_USERNAME/homebrew-tap`
+2. Add the formula from `homebrew/vtcode.rb`
+3. Update SHA256 hashes after each release
+4. See [Homebrew Setup Guide](homebrew-setup-guide.md) for detailed instructions
 
 ## Distribution Channels
 

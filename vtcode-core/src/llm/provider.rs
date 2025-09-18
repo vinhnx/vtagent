@@ -646,6 +646,14 @@ pub enum FinishReason {
     Error(String),
 }
 
+/// Token for streaming responses
+#[derive(Debug, Clone)]
+pub struct StreamToken {
+    pub text: String,
+    pub is_final: bool,
+    pub finish_reason: Option<String>,
+}
+
 /// Universal LLM provider trait
 #[async_trait]
 pub trait LLMProvider: Send + Sync {
@@ -663,6 +671,21 @@ pub trait LLMProvider: Send + Sync {
         // Default implementation falls back to non-streaming
         let response = self.generate(request).await?;
         Ok(Box::new(futures::stream::once(async { response }).boxed()))
+    }
+
+    /// Stream tokens for real-time display with animation support
+    async fn stream_tokens(
+        &self,
+        request: LLMRequest,
+    ) -> Result<Box<dyn futures::Stream<Item = Result<StreamToken, LLMError>> + Unpin + Send>, LLMError> {
+        // Default implementation falls back to non-streaming
+        let response = self.generate(request).await?;
+        let token = StreamToken {
+            text: response.content.unwrap_or_default(),
+            is_final: true,
+            finish_reason: Some("STOP".to_string()),
+        };
+        Ok(Box::new(futures::stream::once(async { Ok(token) }).boxed()))
     }
 
     /// Get supported models

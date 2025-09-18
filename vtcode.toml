@@ -207,12 +207,17 @@ enabled = true
 heuristic_classification = true
 llm_router_model = ""
 
-[router.models]
-simple = "gemini-2.5-flash-lite"
-standard = "gemini-2.5-flash"
-complex = "gemini-2.5-pro"
-codegen_heavy = "gemini-2.5-flash"
-retrieval_heavy = "gemini-2.5-flash"
+[ui]
+# Terminal streaming configuration
+[ui.streaming]
+# Enable token streaming with animation
+enabled = true
+# Typing animation delay between characters (milliseconds)
+typing_delay_ms = 50
+# Whether to show typing animation by default
+animation_enabled = false
+# Prefix for AI responses in streaming mode
+response_prefix = "VTAgent: "
 
 [telemetry]
 # Enable trajectory logging to logs/trajectory.jsonl

@@ -6,6 +6,7 @@
 pub mod diff_renderer;
 pub mod markdown;
 pub mod spinner;
+pub mod streaming;
 pub mod styled;
 pub mod terminal;
 pub mod theme;
@@ -13,6 +14,7 @@ pub mod user_confirmation;
 
 pub use markdown::*;
 pub use spinner::*;
+pub use streaming::*;
 pub use styled::*;
 pub use terminal::*;
 pub use theme::*;

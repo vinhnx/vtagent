@@ -3,14 +3,19 @@ use crate::llm::client::LLMClient;
 use crate::llm::error_display;
 use crate::llm::provider::{
     FinishReason, FunctionCall, LLMError, LLMProvider, LLMRequest, LLMResponse, Message,
-    MessageRole, ToolCall,
+    MessageRole, ToolCall, StreamToken,
 };
 use crate::llm::types as llm_types;
+use crate::gemini::{Client as GeminiClient};
 use async_trait::async_trait;
 use reqwest::Client as HttpClient;
 use serde_json::{Value, json};
+use futures::StreamExt;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 
 pub struct GeminiProvider {
+    gemini_client: GeminiClient,
     api_key: String,
     http_client: HttpClient,
     base_url: String,
@@ -24,6 +29,7 @@ impl GeminiProvider {
 
     pub fn with_model(api_key: String, model: String) -> Self {
         Self {
+            gemini_client: GeminiClient::new(api_key.clone(), model.clone()),
             api_key,
             http_client: HttpClient::new(),
             base_url: "https://generativelanguage.googleapis.com/v1beta".to_string(),
@@ -96,6 +102,53 @@ impl LLMProvider for GeminiProvider {
             return Err(LLMError::InvalidRequest(formatted_error));
         }
         Ok(())
+    }
+
+    async fn stream_tokens(
+        &self,
+        request: LLMRequest,
+    ) -> Result<Box<dyn futures::Stream<Item = Result<crate::llm::provider::StreamToken, LLMError>> + Unpin + Send>, LLMError> {
+        let gemini_request_value = self.convert_to_gemini_format(&request)?;
+
+        // Deserialize the Value back to GenerateContentRequest
+        let gemini_request: crate::gemini::GenerateContentRequest = serde_json::from_value(gemini_request_value)
+            .map_err(|e| LLMError::Provider(format!("Failed to deserialize request: {}", e)))?;
+
+        // Create our own streaming implementation to avoid lifetime issues
+        let (tx, rx) = mpsc::channel(100);
+        let http_client = self.http_client.clone();
+        let api_key = self.api_key.clone();
+        let model = self.model.clone();
+        let gemini_request_clone = gemini_request.clone();
+
+        tokio::spawn(async move {
+            let url = format!(
+                "https://generativelanguage.googleapis.com/v1beta/models/{}:streamGenerateContent?key={}",
+                model, api_key
+            );
+
+            match serde_json::to_value(&gemini_request_clone) {
+                Ok(request_json) => {
+                    let result = Self::fetch_streaming_tokens_static(http_client, url, request_json, tx).await;
+                    if let Err(e) = result {
+                        eprintln!("Streaming tokens error: {}", e);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Failed to serialize request: {}", e);
+                }
+            }
+        });
+
+        let stream = ReceiverStream::new(rx).map(|result| {
+            result.map(|token| crate::llm::provider::StreamToken {
+                text: token.text,
+                is_final: token.is_final,
+                finish_reason: token.finish_reason,
+            }).map_err(|e| LLMError::Provider(format!("Streaming error: {}", e)))
+        });
+
+        Ok(Box::new(stream))
     }
 }
 
@@ -511,5 +564,139 @@ impl LLMClient for GeminiProvider {
 
     fn model_id(&self) -> &str {
         &self.model
+    }
+}
+
+impl GeminiProvider {
+    async fn fetch_streaming_tokens_static(
+        http_client: HttpClient,
+        url: String,
+        request: Value,
+        tx: mpsc::Sender<Result<StreamToken, Box<dyn std::error::Error + Send>>>,
+    ) -> Result<(), Box<dyn std::error::Error + Send>> {
+        let response = http_client
+            .post(&url)
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("API Error {}: {}", status, error_text),
+            )));
+        }
+
+        let mut stream = response.bytes_stream();
+        let mut buffer = Vec::new();
+        let mut token_count = 0;
+
+        while let Some(chunk) = stream.next().await {
+            match chunk {
+                Ok(bytes) => {
+                    buffer.extend_from_slice(&bytes);
+
+                    // Process complete JSON objects from buffer
+                    while let Some(end_pos) = Self::find_json_boundary_static(&buffer) {
+                        let json_bytes = buffer.drain(..end_pos).collect::<Vec<_>>();
+
+                        // Skip empty lines or non-JSON content
+                        let json_str = String::from_utf8_lossy(&json_bytes).to_string();
+                        if json_str.trim().is_empty() || !json_str.trim_start().starts_with('{') {
+                            continue;
+                        }
+
+                        match serde_json::from_str::<Value>(&json_str) {
+                            Ok(json_value) => {
+                                // Extract candidates
+                                if let Some(candidates) = json_value.get("candidates").and_then(|c| c.as_array()) {
+                                    for candidate in candidates {
+                                        if let Some(content) = candidate.get("content") {
+                                            if let Some(parts) = content.get("parts").and_then(|p| p.as_array()) {
+                                                for part in parts {
+                                                    if let Some(text) = part.get("text").and_then(|t| t.as_str()) {
+                                                        let is_final = candidate.get("finishReason").is_some();
+                                                        let finish_reason = candidate
+                                                            .get("finishReason")
+                                                            .and_then(|fr| fr.as_str())
+                                                            .map(|s| s.to_string());
+
+                                                        let token = StreamToken {
+                                                            text: text.to_string(),
+                                                            is_final,
+                                                            finish_reason,
+                                                        };
+
+                                                        token_count += 1;
+                                                        if tx.send(Ok(token)).await.is_err() {
+                                                            return Ok(());
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to parse JSON: {} - Content: {}", e, json_str);
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(Box::new(e))).await;
+                    break;
+                }
+            }
+        }
+
+        // Send final token if we haven't already
+        let _ = tx.send(Ok(StreamToken {
+            text: String::new(),
+            is_final: true,
+            finish_reason: Some("STOP".to_string()),
+        })).await;
+
+        Ok(())
+    }
+
+    fn find_json_boundary_static(buffer: &[u8]) -> Option<usize> {
+        let s = String::from_utf8_lossy(buffer);
+        let mut brace_count = 0;
+        let mut in_string = false;
+        let mut escape_next = false;
+        let mut start_found = false;
+
+        for (i, c) in s.char_indices() {
+            if escape_next {
+                escape_next = false;
+                continue;
+            }
+
+            match c {
+                '"' if !escape_next => in_string = !in_string,
+                '\\' if in_string => escape_next = true,
+                '{' if !in_string => {
+                    brace_count += 1;
+                    start_found = true;
+                }
+                '}' if !in_string => {
+                    brace_count -= 1;
+                    if start_found && brace_count == 0 {
+                        return Some(i + c.len_utf8());
+                    }
+                }
+                '\n' if !start_found => {
+                    // Skip to next line if we haven't found a JSON start
+                    return Some(i + c.len_utf8());
+                }
+                _ => {}
+            }
+        }
+        None
     }
 }

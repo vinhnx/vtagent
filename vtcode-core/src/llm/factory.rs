@@ -1,5 +1,6 @@
 use super::providers::{AnthropicProvider, GeminiProvider, OpenAIProvider};
 use crate::llm::provider::{LLMError, LLMProvider};
+use crate::config::constants::models;
 use std::collections::HashMap;
 
 /// LLM provider factory and registry
@@ -25,7 +26,8 @@ impl LLMFactory {
             "gemini",
             Box::new(|config: ProviderConfig| {
                 let api_key = config.api_key.unwrap_or_default();
-                Box::new(GeminiProvider::new(api_key)) as Box<dyn LLMProvider>
+                let model = config.model.unwrap_or_else(|| models::GEMINI_2_5_FLASH_LITE.to_string());
+                Box::new(GeminiProvider::with_model(api_key, model)) as Box<dyn LLMProvider>
             }),
         );
 

@@ -1,35 +1,33 @@
-[workspace]
-# Process all packages in the workspace
-# We have vtcode and vtcode-core
+# Cargo-release configuration for VTCode
+# See: https://github.com/crate-ci/cargo-release
 
-[package.vtcode]
-# Main package configuration
-publish = true
-
-[package.vtcode-core]
-# Core library configuration
-publish = true
-
-[git]
 # Git configuration
-commit = true
-tag = true
 push = true
+push-remote = "origin"
+sign-commit = false
+sign-tag = false
 
-[hooks]
-# Pre-release hooks
-pre-release = []
-
-# Post-release hooks
-post-release = []
-
-[publish]
 # Publishing configuration
 registry = "crates.io"
 verify = true
 
-[release]
-# General release settings
+# Release settings
 shared-version = true
 consolidate-commits = true
 allow-branch = ["main"]
+
+# Tag configuration
+tag = true
+tag-name = "v{{version}}"
+tag-prefix = ""
+tag-message = "Release {{crate_name}} v{{version}}"
+
+# Pre-release hooks (if needed)
+pre-release-hook = []
+
+# Features (if needed)
+enable-features = []
+enable-all-features = false
+
+# Version bumping
+dependent-version = "upgrade"

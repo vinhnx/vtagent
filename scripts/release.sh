@@ -557,11 +557,11 @@ main() {
 
     # 1. Update version in all package files
     update_version "$version"
-    local files_to_commit="Cargo.toml"
+    local files_to_commit="Cargo.toml vtcode-core/Cargo.toml"
 
     if [ -n "$core_version" ]; then
         update_core_version "$core_version"
-        files_to_commit="$files_to_commit vtcode-core/Cargo.toml"
+        # vtcode-core/Cargo.toml is already in files_to_commit
     fi
 
     # 2. Commit version changes FIRST (before publishing)

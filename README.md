@@ -39,14 +39,44 @@ VTCode is a Rust-based terminal coding agent with modular architecture supportin
 
 ### Prerequisites
 
+**For pre-built installations (Cargo, Homebrew, npm):** None - binaries are ready to use.
+
+**For building from source:**
+
 -   Rust 1.75+ (stable)
--   API key for your preferred LLM provider:
-    -   `GEMINI_API_KEY` or `GOOGLE_API_KEY` for Gemini
-    -   `OPENAI_API_KEY` for OpenAI
-    -   `ANTHROPIC_API_KEY` for Anthropic
-    -   `DEEPSEEK_API_KEY` for DeepSeek
+
+**API Keys (required for all installation methods):**
+
+-   `GEMINI_API_KEY` or `GOOGLE_API_KEY` for Gemini
+-   `OPENAI_API_KEY` for OpenAI
+-   `ANTHROPIC_API_KEY` for Anthropic
+-   `DEEPSEEK_API_KEY` for DeepSeek
 
 ### Installation
+
+#### Option 1: Cargo (crates.io) - Recommended for Rust developers
+
+```bash
+cargo install vtcode
+```
+
+#### Option 2: Homebrew (macOS)
+
+```bash
+brew install vinhnx/tap/vtcode
+```
+
+#### Option 3: npm (Cross-platform)
+
+```bash
+npm install -g vtcode
+```
+
+#### Option 4: Pre-built binaries
+
+Download the latest release from [GitHub Releases](https://github.com/vinhnx/vtcode/releases) for your platform.
+
+#### Option 5: Build from source
 
 ```bash
 # Clone the repository
@@ -749,3 +779,51 @@ Example:
 default_policy = "prompt"
 max_tool_loops = 100
 ```
+
+### Distribution & Releases
+
+VTCode supports multiple distribution channels for easy installation:
+
+#### Release Process
+
+The project uses an automated release script that handles publishing to multiple package managers:
+
+```bash
+# Create a patch release (increments 0.1.0 → 0.1.1)
+./scripts/release.sh --patch
+
+# Create a minor release (increments 0.1.0 → 0.2.0)
+./scripts/release.sh --minor
+
+# Create a major release (increments 0.1.0 → 1.0.0)
+./scripts/release.sh --major
+
+# Release a specific version
+./scripts/release.sh 1.0.0
+
+# Dry run to see what would happen
+./scripts/release.sh --patch --dry-run
+
+# Skip certain distribution channels
+./scripts/release.sh --patch --skip-npm --skip-homebrew
+```
+
+#### Distribution Channels
+
+1. **Cargo (crates.io)**: `cargo install vtcode`
+2. **npm**: `npm install -g vtcode`
+3. **Homebrew**: `brew install vinhnx/tap/vtcode`
+4. **GitHub Releases**: Pre-built binaries for all platforms
+
+#### Setup for Distribution
+
+To set up publishing to these channels:
+
+```bash
+# Run the setup script for guidance
+./scripts/setup-distribution.sh
+
+# Follow the prompts to set up authentication for each channel
+```
+
+For detailed setup instructions, see: [Distribution Setup Guide](docs/project/DISTRIBUTION_SETUP_GUIDE.md)

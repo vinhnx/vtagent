@@ -2,6 +2,32 @@
 name = "vtcode"
 version = "0.8.0"
 edition = "2024"
+authors = ["vinhnx <vinhnx@users.noreply.github.com>"]
+description = "A Rust-based terminal coding agent with modular architecture supporting multiple LLM providers"
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/vinhnx/vtcode"
+repository = "https://github.com/vinhnx/vtcode"
+keywords = [
+    "ai",
+    "coding",
+    "agent",
+    "llm",
+    "cli",
+    "terminal",
+    "rust",
+    "automation",
+]
+categories = ["command-line-utilities", "development-tools", "api-bindings"]
+exclude = [
+    "target/",
+    ".github/",
+    "docs/",
+    "scripts/",
+    "screenshots/",
+    "logs/",
+    "prompts/",
+]
 default-run = "vtcode"
 
 [workspace]

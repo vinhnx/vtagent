@@ -28,7 +28,7 @@
 //!
 //! [llm.providers.gemini]
 //! api_key = "your-key"
-//! model = "gemini-2.0-flash-exp"
+//! model = "gemini-2.5-flash"
 //!
 //! [security]
 //! workspace_root = "/path/to/project"

@@ -100,7 +100,7 @@ default = []
 swift = ["tree-sitter-swift"]
 
 [dependencies.tree-sitter-swift]
-version = "0.8.2"
+version = "leave blank to skip"
 optional = true
 
 [workspace]

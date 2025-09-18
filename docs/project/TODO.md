@@ -205,14 +205,3 @@ explore https://github.com/rust-cli/anstyle/tree/main/crates/anstyle-syntect to 
 can we let the agent output text as ansi codes directly, and not markdown, so we can render it directly in terminal with colors and styles? check if the model can do that.
 
 --
-
-▌ when max_tool_loops limit is reached in moddile runloop
-▌ chat agent work flow. show error and let user know to
-▌ ucheck and adjust max_tool_loops config and guide theme
-
-==
-
-▌ in --full-auto, show a warning and indicate current
-▌ mode is Full Auto in welcome message
-
----

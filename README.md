@@ -1,6 +1,12 @@
 # VTCode - Coding Agent
 
 [![tool-eval](https://github.com/vinhnx/vtcode/actions/workflows/tool-eval.yml/badge.svg)](https://github.com/vinhnx/vtcode/actions/workflows/tool-eval.yml)
+[![Crates.io](https://img.shields.io/crates/v/vtcode.svg)](https://crates.io/crates/vtcode)
+[![npm](https://img.shields.io/npm/v/vtcode.svg)](https://www.npmjs.com/package/vtcode)
+[![Homebrew](https://img.shields.io/badge/dynamic/json?url=https://formulae.brew.sh/api/formula/vtcode.json&query=$.versions.stable&label=homebrew)](https://formulae.brew.sh/formula/vtcode)
+[![GitHub release](https://img.shields.io/github/release/vinhnx/vtcode.svg)](https://github.com/vinhnx/vtcode/releases)
+[![docs.rs](https://img.shields.io/docsrs/vtcode)](https://docs.rs/vtcode)
+[![docs.rs](https://img.shields.io/docsrs/vtcode-core)](https://docs.rs/vtcode-core)
 
 VTCode is a Rust-based terminal coding agent with modular architecture supporting multiple LLM providers (Gemini, OpenAI, Anthropic, DeepSeek) and tree-sitter parsers for 6+ languages. It provides a reliable, context-aware coding experience through intelligent tool integration and sophisticated prompt engineering.
 
@@ -54,29 +60,54 @@ VTCode is a Rust-based terminal coding agent with modular architecture supportin
 
 ### Installation
 
-#### Option 1: Cargo (crates.io) - Recommended for Rust developers
+Choose the installation method that best fits your needs:
+
+#### 🚀 Cargo (crates.io) - Recommended for Rust developers
+
+[![Crates.io](https://img.shields.io/crates/v/vtcode.svg)](https://crates.io/crates/vtcode)
+[![docs.rs](https://img.shields.io/docsrs/vtcode)](https://docs.rs/vtcode)
 
 ```bash
 cargo install vtcode
 ```
 
-#### Option 2: Homebrew (macOS)
+-   **Documentation**: [docs.rs/vtcode](https://docs.rs/vtcode)
+-   **Source**: [crates.io/crates/vtcode](https://crates.io/crates/vtcode)
+
+#### 🍺 Homebrew (macOS)
+
+[![Homebrew](https://img.shields.io/badge/dynamic/json?url=https://formulae.brew.sh/api/formula/vtcode.json&query=$.versions.stable&label=homebrew)](https://formulae.brew.sh/formula/vtcode)
 
 ```bash
 brew install vinhnx/tap/vtcode
 ```
 
-#### Option 3: npm (Cross-platform)
+-   **Tap Repository**: [vinhnx/homebrew-tap](https://github.com/vinhnx/homebrew-tap)
+-   **Formula**: [vtcode.rb](https://github.com/vinhnx/homebrew-tap/blob/main/vtcode.rb)
+
+#### 📦 npm (Cross-platform)
+
+[![npm](https://img.shields.io/npm/v/vtcode.svg)](https://www.npmjs.com/package/vtcode)
 
 ```bash
 npm install -g vtcode
 ```
 
-#### Option 4: Pre-built binaries
+-   **Package**: [npmjs.com/package/vtcode](https://www.npmjs.com/package/vtcode)
+-   **Installation includes**: Pre-built binaries for your platform
 
-Download the latest release from [GitHub Releases](https://github.com/vinhnx/vtcode/releases) for your platform.
+#### 📥 Pre-built Binaries
 
-#### Option 5: Build from source
+[![GitHub release](https://img.shields.io/github/release/vinhnx/vtcode.svg)](https://github.com/vinhnx/vtcode/releases)
+
+Download the latest release from [GitHub Releases](https://github.com/vinhnx/vtcode/releases) for your platform:
+
+-   **Linux x64**: `vtcode-linux-x64.tar.gz`
+-   **macOS x64**: `vtcode-macos-x64.tar.gz`
+-   **macOS ARM64**: `vtcode-macos-arm64.tar.gz`
+-   **Windows x64**: `vtcode-windows-x64.zip`
+
+#### 🛠️ Build from Source
 
 ```bash
 # Clone the repository
@@ -90,6 +121,13 @@ cargo build --release
 ./run.sh              # Production build + run
 ./run-debug.sh        # Development build + run
 ```
+
+### 📚 Documentation
+
+-   **API Documentation**: [docs.rs/vtcode](https://docs.rs/vtcode) | [docs.rs/vtcode-core](https://docs.rs/vtcode-core)
+-   **User Guide**: [docs/user-guide/](docs/user-guide/)
+-   **Configuration**: [docs/project/](docs/project/)
+-   **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ### Basic Usage
 
@@ -812,20 +850,26 @@ The project uses an automated release script that handles publishing to multiple
 
 #### Distribution Channels
 
-1. **Cargo (crates.io)**: `cargo install vtcode`
-2. **npm**: `npm install -g vtcode`
-3. **Homebrew**: `brew install vinhnx/tap/vtcode`
-4. **GitHub Releases**: Pre-built binaries for all platforms
+VTCode is available through multiple package managers for easy installation:
 
-#### Setup for Distribution
+1. **🚀 [Cargo (crates.io)](https://crates.io/crates/vtcode)**: `cargo install vtcode`
 
-To set up publishing to these channels:
+    - **API Docs**: [docs.rs/vtcode](https://docs.rs/vtcode)
+    - **Source**: [crates.io/crates/vtcode](https://crates.io/crates/vtcode)
 
-```bash
-# Run the setup script for guidance
-./scripts/setup-distribution.sh
+2. **📦 [npm](https://www.npmjs.com/package/vtcode)**: `npm install -g vtcode`
 
-# Follow the prompts to set up authentication for each channel
-```
+    - **Package**: [npmjs.com/package/vtcode](https://www.npmjs.com/package/vtcode)
 
-For detailed setup instructions, see: [Distribution Setup Guide](docs/project/DISTRIBUTION_SETUP_GUIDE.md)
+3. **🍺 [Homebrew](https://formulae.brew.sh/formula/vtcode)**: `brew install vinhnx/tap/vtcode`
+
+    - **Tap**: [vinhnx/homebrew-tap](https://github.com/vinhnx/homebrew-tap)
+
+4. **📥 [GitHub Releases](https://github.com/vinhnx/vtcode/releases)**: Pre-built binaries
+    - **Linux x64, macOS x64/ARM64, Windows x64**
+    - **Direct download**: [github.com/vinhnx/vtcode/releases](https://github.com/vinhnx/vtcode/releases)
+
+#### Core Library
+
+-   **vtcode-core**: [crates.io/crates/vtcode-core](https://crates.io/crates/vtcode-core)
+-   **API Docs**: [docs.rs/vtcode-core](https://docs.rs/vtcode-core)

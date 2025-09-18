@@ -168,11 +168,17 @@ update_version() {
 update_core_version() {
     local new_version=$1
 
-    # Update vtcode-core Cargo.toml only
-    sed -i.bak "s/^version = \".*\"/version = \"$new_version\"/" vtcode-core/Cargo.toml
-    rm vtcode-core/Cargo.toml.bak
-
-    print_success "Updated vtcode-core version to $new_version"
+    # Update only the package version line in vtcode-core/Cargo.toml
+    # Find the line number of the package version and update only that line
+    local line_num=$(grep -n "^version = " vtcode-core/Cargo.toml | head -1 | cut -d: -f1)
+    if [ -n "$line_num" ]; then
+        sed -i.bak "${line_num}s/version = \".*\"/version = \"$new_version\"/" vtcode-core/Cargo.toml
+        rm vtcode-core/Cargo.toml.bak
+        print_success "Updated vtcode-core version to $new_version"
+    else
+        print_error "Could not find version line in vtcode-core/Cargo.toml"
+        return 1
+    fi
 }
 
 # Function to validate package metadata
@@ -506,14 +512,22 @@ main() {
         core_version="$version"
         print_info "vtcode-core will be bumped to $core_version (dry-run)"
     else
-        # Interactive mode - prompt for core version
-        echo
-        read -p "Enter new vtcode-core version (leave blank to skip): " core_version
-        if [ -n "$core_version" ]; then
-            print_info "vtcode-core will be bumped to $core_version"
-        else
-            print_warning "Skipping vtcode-core version bump"
-        fi
+        # Interactive mode - prompt for core version with validation
+        while true; do
+            echo
+            read -p "Enter new vtcode-core version (leave blank to skip): " core_version_input
+            if [ -z "$core_version_input" ]; then
+                print_warning "Skipping vtcode-core version bump"
+                core_version=""
+                break
+            elif [[ "$core_version_input" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]]; then
+                core_version="$core_version_input"
+                print_info "vtcode-core will be bumped to $core_version"
+                break
+            else
+                print_error "Invalid version format. Please use semantic versioning (e.g., 1.2.3, 1.2.3-alpha.1)"
+            fi
+        done
     fi
 
     # Confirm release

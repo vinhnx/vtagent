@@ -731,13 +731,12 @@ Licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 -   **Config key**: `[tools].max_tool_loops`
 -   **Purpose**: Prevents infinite tool-calling cycles by limiting how many tool→respond iterations the agent performs per user turn.
--   **Default**: `6`
--   **Env override**: `VTAGENT_MAX_TOOL_LOOPS`
+-   **Default**: `100`
 
 Example:
 
 ```toml
 [tools]
 default_policy = "prompt"
-max_tool_loops = 4  # override with VTAGENT_MAX_TOOL_LOOPS
+max_tool_loops = 100
 ```

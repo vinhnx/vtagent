@@ -37,10 +37,9 @@ values so they are only available during setup.
 | `GEMINI_API_KEY`, `GOOGLE_API_KEY` | Secret | Primary Gemini provider credentials used by the default configuration. |
 | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | Secret | Optional provider keys when switching models. |
 | `VTAGENT_CONTEXT_TOKEN_LIMIT` | Environment variable | Limits the context window when tasks need smaller token budgets. |
-| `VTAGENT_MAX_TOOL_LOOPS` | Environment variable | Caps nested tool calls to prevent runaway loops during automated runs. |
 
 Secrets are stripped from the environment before the agent phase, so persist anything the agent
-must read (for example `VTAGENT_MAX_TOOL_LOOPS`) as a regular environment variable.
+must read as a regular environment variable.
 
 ## 4. Recommended setup script
 

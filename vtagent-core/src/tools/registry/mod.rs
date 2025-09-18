@@ -20,6 +20,7 @@ use builtins::register_builtin_tools;
 use utils::normalize_tool_output;
 
 use crate::config::PtyConfig;
+use crate::config::ToolsConfig;
 use crate::tool_policy::ToolPolicyManager;
 use crate::tools::ast_grep::AstGrepEngine;
 use crate::tools::grep_search::GrepSearchManager;
@@ -151,6 +152,14 @@ impl ToolRegistry {
     }
 
     pub async fn initialize_async(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn apply_config_policies(&mut self, tools_config: &ToolsConfig) -> Result<()> {
+        if let Ok(policy_manager) = self.policy_manager_mut() {
+            policy_manager.apply_tools_config(tools_config)?;
+        }
+
         Ok(())
     }
 

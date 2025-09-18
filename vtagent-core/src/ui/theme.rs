@@ -7,6 +7,8 @@ use std::collections::HashMap;
 /// Identifier for the default theme.
 pub const DEFAULT_THEME_ID: &str = "ciapre-dark";
 
+const MIN_CONTRAST: f64 = 4.5;
+
 /// Palette describing UI colors for the terminal experience.
 #[derive(Clone, Debug)]
 pub struct ThemePalette {
@@ -27,7 +29,6 @@ impl ThemePalette {
     }
 
     fn build_styles(&self) -> ThemeStyles {
-        const MIN_CONTRAST: f64 = 4.5;
         let primary = self.primary_accent;
         let background = self.background;
         let secondary = self.secondary_accent;
@@ -195,6 +196,30 @@ pub fn active_theme_label() -> String {
 /// Get the current styles cloned from the active theme.
 pub fn active_styles() -> ThemeStyles {
     ACTIVE.read().styles.clone()
+}
+
+fn compute_banner_color(palette: &ThemePalette) -> RgbColor {
+    let base = darken(palette.foreground, 0.25);
+    let fallback_primary = darken(palette.primary_accent, 0.15);
+    let fallback_secondary = darken(palette.secondary_accent, 0.3);
+    ensure_contrast(
+        base,
+        palette.background,
+        MIN_CONTRAST,
+        &[fallback_primary, fallback_secondary, palette.foreground],
+    )
+}
+
+/// Slightly darkened accent color for banner-like copy.
+pub fn banner_color() -> RgbColor {
+    let guard = ACTIVE.read();
+    compute_banner_color(&guard.palette)
+}
+
+/// Slightly darkened accent style for banner-like copy.
+pub fn banner_style() -> Style {
+    let guard = ACTIVE.read();
+    ThemePalette::style_from(compute_banner_color(&guard.palette), false)
 }
 
 /// Enumerate available theme identifiers.

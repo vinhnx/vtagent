@@ -5,13 +5,19 @@
 //! user control overwhich tools the agent can use.
 
 use anyhow::{Context, Result};
-use console::style;
-use dialoguer::Confirm;
+use console::{Color as ConsoleColor, Style as ConsoleStyle, style};
+use dialoguer::{Confirm, theme::ColorfulTheme};
 use indexmap::IndexMap;
 use is_terminal::IsTerminal;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use crate::ui::theme;
+use crate::utils::ansi::{AnsiRenderer, MessageStyle};
+
+use crate::config::constants::tools;
+use crate::config::core::tools::{ToolPolicy as ConfigToolPolicy, ToolsConfig};
 
 const AUTO_ALLOW_TOOLS: &[&str] = &["run_terminal_cmd", "bash"];
 
@@ -156,14 +162,16 @@ impl ToolPolicyManager {
     fn get_workspace_config_path(workspace_root: &PathBuf) -> Result<PathBuf> {
         let workspace_vtagent_dir = workspace_root.join(".vtagent");
 
-        // Check if workspace has a .vtagent/tool-policy.json file
-        let workspace_policy_path = workspace_vtagent_dir.join("tool-policy.json");
-        if workspace_policy_path.exists() {
-            return Ok(workspace_policy_path);
+        if !workspace_vtagent_dir.exists() {
+            fs::create_dir_all(&workspace_vtagent_dir).with_context(|| {
+                format!(
+                    "Failed to create workspace policy directory at {}",
+                    workspace_vtagent_dir.display()
+                )
+            })?;
         }
 
-        // Fall back to home directory
-        Self::get_config_path()
+        Ok(workspace_vtagent_dir.join("tool-policy.json"))
     }
 
     /// Load existing config or create new one with all tools as "prompt"
@@ -278,6 +286,49 @@ impl ToolPolicyManager {
         config
     }
 
+    fn apply_config_policy(&mut self, tool_name: &str, policy: ConfigToolPolicy) {
+        let runtime_policy = match policy {
+            ConfigToolPolicy::Allow => ToolPolicy::Allow,
+            ConfigToolPolicy::Prompt => ToolPolicy::Prompt,
+            ConfigToolPolicy::Deny => ToolPolicy::Deny,
+        };
+
+        self.config
+            .policies
+            .insert(tool_name.to_string(), runtime_policy);
+    }
+
+    fn resolve_config_policy(tools_config: &ToolsConfig, tool_name: &str) -> ConfigToolPolicy {
+        if let Some(policy) = tools_config.policies.get(tool_name) {
+            return policy.clone();
+        }
+
+        match tool_name {
+            tools::LIST_FILES => tools_config
+                .policies
+                .get("list_dir")
+                .or_else(|| tools_config.policies.get("list_directory"))
+                .cloned(),
+            _ => None,
+        }
+        .unwrap_or_else(|| tools_config.default_policy.clone())
+    }
+
+    /// Apply policies defined in vtagent.toml to the runtime policy manager
+    pub fn apply_tools_config(&mut self, tools_config: &ToolsConfig) -> Result<()> {
+        if self.config.available_tools.is_empty() {
+            return Ok(());
+        }
+
+        for tool in self.config.available_tools.clone() {
+            let config_policy = Self::resolve_config_policy(tools_config, &tool);
+            self.apply_config_policy(&tool, config_policy);
+        }
+
+        Self::apply_auto_allow_defaults(&mut self.config);
+        self.save_config()
+    }
+
     /// Update the tool list and save configuration
     pub fn update_available_tools(&mut self, tools: Vec<String>) -> Result<()> {
         let current_tools: std::collections::HashSet<_> =
@@ -345,79 +396,105 @@ impl ToolPolicyManager {
 
     /// Prompt user for tool execution permission
     fn prompt_user_for_tool(&mut self, tool_name: &str) -> Result<bool> {
-        if !std::io::stdin().is_terminal() || !std::io::stdout().is_terminal() {
-            println!(
-                "{}",
-                style(format!(
-                    "Non-interactive environment detected. Auto-approving '{}' tool.",
-                    tool_name
-                ))
-                .yellow()
+        let interactive = std::io::stdin().is_terminal() && std::io::stdout().is_terminal();
+        let mut renderer = AnsiRenderer::stdout();
+        let banner_style = theme::banner_style();
+
+        if !interactive {
+            let message = format!(
+                "Non-interactive environment detected. Auto-approving '{}' tool.",
+                tool_name
             );
+            renderer.line_with_style(banner_style, &message)?;
             return Ok(true);
         }
 
-        println!(
-            "{}",
-            style(format!("Tool Permission Request: {}", tool_name))
-                .yellow()
-                .bold()
-        );
-        println!("The agent wants to use the '{}' tool.", tool_name);
-        println!();
-        println!("This decision applies to the current request only.");
-        println!("Update the policy file or use CLI flags to change the default.");
-        println!();
+        let header = format!("Tool Permission Request: {}", tool_name);
+        renderer.line_with_style(banner_style, &header)?;
+        renderer.line_with_style(
+            banner_style,
+            &format!("The agent wants to use the '{}' tool.", tool_name),
+        )?;
+        renderer.line_with_style(banner_style, "")?;
+        renderer.line_with_style(
+            banner_style,
+            "This decision applies to the current request only.",
+        )?;
+        renderer.line_with_style(
+            banner_style,
+            "Update the policy file or use CLI flags to change the default.",
+        )?;
+        renderer.line_with_style(banner_style, "")?;
 
         if AUTO_ALLOW_TOOLS.contains(&tool_name) {
-            println!(
-                "{}",
-                style(format!(
+            renderer.line_with_style(
+                banner_style,
+                &format!(
                     "Auto-approving '{}' tool (default trusted tool).",
                     tool_name
-                ))
-                .yellow()
-            );
+                ),
+            )?;
             return Ok(true);
         }
 
-        if !std::io::stdin().is_terminal() || !std::io::stdout().is_terminal() {
-            println!(
-                "{}",
-                style(format!(
-                    "Non-interactive environment detected. Auto-approving '{}' tool.",
-                    tool_name
-                ))
-                .yellow()
-            );
-            return Ok(true);
-        }
+        let rgb = theme::banner_color();
+        let to_ansi_256 = |value: u8| -> u8 {
+            if value < 48 {
+                0
+            } else if value < 114 {
+                1
+            } else {
+                ((value - 35) / 40).min(5)
+            }
+        };
+        let rgb_to_index = |r: u8, g: u8, b: u8| -> u8 {
+            let r_idx = to_ansi_256(r);
+            let g_idx = to_ansi_256(g);
+            let b_idx = to_ansi_256(b);
+            16 + 36 * r_idx + 6 * g_idx + b_idx
+        };
+        let color_index = rgb_to_index(rgb.0, rgb.1, rgb.2);
+        let dialog_color = ConsoleColor::Color256(color_index);
+        let tinted_style = ConsoleStyle::new().for_stderr().fg(dialog_color);
 
-        // Try to prompt user, but handle non-interactive environments
-        match Confirm::new()
-            .with_prompt(format!("Allow the agent to use '{}'?", tool_name))
+        let mut dialog_theme = ColorfulTheme::default();
+        dialog_theme.prompt_style = tinted_style;
+        dialog_theme.prompt_prefix = style("—".to_string()).for_stderr().fg(dialog_color);
+        dialog_theme.prompt_suffix = style("—".to_string()).for_stderr().fg(dialog_color);
+        dialog_theme.hint_style = ConsoleStyle::new().for_stderr().fg(dialog_color);
+        dialog_theme.defaults_style = dialog_theme.hint_style.clone();
+        dialog_theme.success_prefix = style("✓".to_string()).for_stderr().fg(dialog_color);
+        dialog_theme.success_suffix = style("·".to_string()).for_stderr().fg(dialog_color);
+        dialog_theme.error_prefix = style("✗".to_string()).for_stderr().fg(dialog_color);
+        dialog_theme.error_style = ConsoleStyle::new().for_stderr().fg(dialog_color);
+        dialog_theme.values_style = ConsoleStyle::new().for_stderr().fg(dialog_color);
+
+        let prompt_text = format!("Allow the agent to use '{}'?", tool_name);
+
+        match Confirm::with_theme(&dialog_theme)
+            .with_prompt(prompt_text)
             .default(false)
             .interact()
         {
             Ok(confirmed) => {
-                if confirmed {
-                    println!(
-                        "{}",
-                        style(format!("✓ Approved: '{}' tool will run now", tool_name)).green()
-                    );
+                let message = if confirmed {
+                    format!("✓ Approved: '{}' tool will run now", tool_name)
                 } else {
-                    println!(
-                        "{}",
-                        style(format!("✗ Denied: '{}' tool will not run", tool_name)).red()
-                    );
-                }
+                    format!("✗ Denied: '{}' tool will not run", tool_name)
+                };
+                let style = if confirmed {
+                    MessageStyle::Tool
+                } else {
+                    MessageStyle::Error
+                };
+                renderer.line(style, &message)?;
                 Ok(confirmed)
             }
             Err(e) => {
-                println!(
-                    "{}",
-                    style(format!("Failed to read confirmation: {}", e)).red()
-                );
+                renderer.line(
+                    MessageStyle::Error,
+                    &format!("Failed to read confirmation: {}", e),
+                )?;
                 Ok(false)
             }
         }

@@ -241,17 +241,13 @@ impl AgentRunner {
         let mut warnings = Vec::new();
         let mut has_completed = false;
 
-        // Determine max loops: env > config > default(6)
+        // Determine max loops via configuration
         let cfg = ConfigManager::load()
             .or_else(|_| ConfigManager::load_from_workspace("."))
             .or_else(|_| ConfigManager::load_from_file("vtagent.toml"))
             .map(|cm| cm.config().clone())
             .unwrap_or_default();
-        let max_tool_loops = std::env::var("VTAGENT_MAX_TOOL_LOOPS")
-            .ok()
-            .and_then(|s| s.parse::<usize>().ok())
-            .filter(|&n| n > 0)
-            .unwrap_or_else(|| cfg.tools.max_tool_loops.max(1));
+        let max_tool_loops = cfg.tools.max_tool_loops.max(1);
 
         // Agent execution loop uses global tool loop guard
         for turn in 0..max_tool_loops {

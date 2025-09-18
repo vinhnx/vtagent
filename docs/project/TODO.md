@@ -86,71 +86,6 @@ explore and use parking_lot for better performance in multithreaded scenarios. R
 
 ---
 
-check max tool call limit and handle it gracefully. it seems the agent stop calling tool after several steps?
-
-❯ show me the main subscription logic and flow
-[TOOL] list_files {"max_items":1000,"path":"apps/web"}
-Tool Permission Request: list_files
-The agent wants to use the 'list_files' tool.
-
-This decision applies to the current request only.
-Update the policy file or use CLI flags to change the default.
-
-Allow the agent to use 'list_files'? yes
-✓ Approved: 'list_files' tool will run now
-[TOOL] list_files {"max_items":1000,"path":"apps/web/app"}
-Tool Permission Request: list_files
-The agent wants to use the 'list_files' tool.
-
-This decision applies to the current request only.
-Update the policy file or use CLI flags to change the default.
-
-Allow the agent to use 'list_files'? yes
-✓ Approved: 'list_files' tool will run now
-[TOOL] list_files {"path":"apps/web/app/subscription"}
-Tool Permission Request: list_files
-The agent wants to use the 'list_files' tool.
-
-This decision applies to the current request only.
-Update the policy file or use CLI flags to change the default.
-
-Allow the agent to use 'list_files'? yes
-✓ Approved: 'list_files' tool will run now
-[TOOL] list_files {"path":"apps/web/app/subscription/components"}
-Tool Permission Request: list_files
-The agent wants to use the 'list_files' tool.
-
-This decision applies to the current request only.
-Update the policy file or use CLI flags to change the default.
-
-Allow the agent to use 'list_files'? yes
-✓ Approved: 'list_files' tool will run now
-[TOOL] list_files {"path":"apps/web/app/pricing"}
-Tool Permission Request: list_files
-The agent wants to use the 'list_files' tool.
-
-This decision applies to the current request only.
-Update the policy file or use CLI flags to change the default.
-
-Allow the agent to use 'list_files'? yes
-✓ Approved: 'list_files' tool will run now
-
----
-
-add --full-auto mode, where the agent can run without any user intervention, including tool permission requests. This mode should be used with caution, as it allows the agent to make decisions autonomously. Ensure that users are aware of the risks and provide clear documentation on how to use this mode safely. Consider implementing additional safeguards, such as limiting the types of tools that can be used in full-auto mode or requiring a specific configuration file that outlines acceptable behaviors. full approve of tool calls.
-
-Status: Implemented via the new `--full-auto` flag (see docs/guides/full_auto_mode.md for safeguards and usage).
-
----
-
-check dead code: vtcode-core/src/core/agent/runner.rs
-
-I reached the configured tool-call limit of 30 for this turn and paused further tool execution. Increase `tools.max_tool_loops` in vtcode.toml if you need more, then ask me to continue.
-
--> remove VTCODE_MAX_TOOL_LOOPS env, and read from vtcode.toml only.
-
----
-
 ✓ Allow the agent to use 'read_file'? · yes
 ✓ Approved: 'read_file' tool will run now
 [TOOL] list_files {"path":"packages/ai"}
@@ -236,3 +171,31 @@ Long-term Vision
 -   Engineers becoming more generalist with design and product skills enabling single engineers to own large product spaces, with potential for new programming languages designed to be less footgun-y for LLMs to use and Tony Stark/Jarvis collaboration model where humans talk to agent coworkers building individual parts while maintaining control over direction even if agents become smarter at programming
 
 https://www.reddit.com/r/OpenAI/comments/1nhust6/ama_with_the_codex_team/
+
+---
+
+keyboard navigation to scroll up and down the chat history, and move to cursor in chat message input e.g. using arrow keys or j/k for vim-style navigation. also allow ctrl+arrow to move by word, home/end to move to start/end of line, and page up/down to scroll by page in chat history.
+
+---
+
+add escape key to cancel current run, double cancel to halt chat session.
+
+---
+
+on control-c, briefly token summarize and tools used before exiting.
+
+---
+
+add https://github.com/rust-cli/anstyle/blob/main/crates/anstyle-git to handle ansi git color codes in `run_terminal_cmd` tool call output if git is used as a tool.
+
+---
+
+add https://github.com/rust-cli/anstyle/blob/main/crates/anstyle-ls to handle ansi ls color codes in `list_files` tool call output if ls is used as a tool.
+
+---
+
+explore https://github.com/rust-cli/anstyle/tree/main/crates/anstyle-syntect to enhance or replace current `syntect` package we are using. enhance tools output with syntax highlighting for code snippets in tool call outputs.
+
+---
+
+`colorchoice-clap` check https://github.com/rust-cli/anstyle/tree/main/crates/colorchoice-clap to handle color choice in clap.

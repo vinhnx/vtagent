@@ -11,6 +11,7 @@ pub struct AgentConfig {
     pub api_key: String,
     pub workspace: std::path::PathBuf,
     pub verbose: bool,
+    pub theme: String,
 }
 
 /// Workshop agent capability levels

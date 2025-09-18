@@ -10,9 +10,9 @@ pub fn style_llm_error(message: &str) -> String {
     // Use a rich red color for LLM errors
     format!(
         "{}{}{}",
-        Styles::error().render(),
+        Styles::render(&Styles::error()),
         message,
-        Styles::error().render_reset()
+        Styles::render_reset()
     )
 }
 
@@ -21,9 +21,9 @@ pub fn style_llm_warning(message: &str) -> String {
     // Use an amber color for LLM warnings
     format!(
         "{}{}{}",
-        Styles::warning().render(),
+        Styles::render(&Styles::warning()),
         message,
-        Styles::warning().render_reset()
+        Styles::render_reset()
     )
 }
 
@@ -32,9 +32,9 @@ pub fn style_llm_success(message: &str) -> String {
     // Use a vibrant green color for LLM success messages
     format!(
         "{}{}{}",
-        Styles::success().render(),
+        Styles::render(&Styles::success()),
         message,
-        Styles::success().render_reset()
+        Styles::render_reset()
     )
 }
 
@@ -45,36 +45,36 @@ pub fn style_provider_name(provider: &str) -> String {
             // Deep blue for Gemini
             format!(
                 "{}{}{}",
-                Styles::info().render(),
+                Styles::render(&Styles::info()),
                 provider,
-                Styles::info().render_reset()
+                Styles::render_reset()
             )
         }
         "openai" => {
             // Bright orange for OpenAI (using yellow as approximation)
             format!(
                 "{}{}{}",
-                Styles::warning().render(),
+                Styles::render(&Styles::warning()),
                 provider,
-                Styles::warning().render_reset()
+                Styles::render_reset()
             )
         }
         "anthropic" => {
             // Anthropic's brand purple (using magenta as approximation)
             format!(
                 "{}{}{}",
-                Styles::code().render(),
+                Styles::render(&Styles::code()),
                 provider,
-                Styles::code().render_reset()
+                Styles::render_reset()
             )
         }
         _ => {
             // Default styling for other providers
             format!(
                 "{}{}{}",
-                Styles::debug().render(),
+                Styles::render(&Styles::debug()),
                 provider,
-                Styles::debug().render_reset()
+                Styles::render_reset()
             )
         }
     };

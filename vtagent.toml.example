@@ -19,6 +19,9 @@ refine_prompts_model = ""
 enable_self_review = false
 max_review_passes = 1
 
+# UI theme applied to ANSI output (options: "ciapre-dark", "ciapre-blue")
+theme = "ciapre-dark"
+
 [agent.onboarding]
 enabled = true
 intro_text = "Welcome! I preloaded workspace context so you can focus on decisions."

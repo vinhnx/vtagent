@@ -81,6 +81,9 @@ cargo run -- chat
 
 # Inspect the workspace root recognized by the agent
 echo "Workspace root: $WORKSPACE_DIR"
+
+# Launch with an alternate UI theme (ANSI palette)
+cargo run -- chat --theme ciapre-blue
 ```
 
 ### Workspace-Aware Operations
@@ -92,6 +95,28 @@ VTAgent automatically treats the directory referenced by `WORKSPACE_DIR` as its 
 -   Perform project indexing (directory scans, metadata extraction, dependency inspection) before large tasks to align with the live codebase.
 -   Request confirmation before touching paths outside `WORKSPACE_DIR` or when downloading untrusted content.
 -   Launch against a different project directory with `vtagent /path/to/project`; alternatively pass `--workspace-dir` (alias: `--workspace`) to other commands.
+
+### UI Themes
+
+VTAgent ships with extensible ANSI themes to improve readability in different terminal setups. The default theme is **ciapre-dark**.
+
+-   **CLI override:** `cargo run -- chat --theme ciapre-blue`
+-   **Config file:** set `theme = "ciapre-dark"` under `[agent]` in `vtagent.toml`
+-   **In-chat command:** type `/theme ciapre-blue` to switch without restarting
+-   **Discover themes:** `/list-themes` lists available palettes; `/help` shows all slash commands
+
+Themes are validated for contrast and map accent, background, foreground, and alert colors across the interface.
+
+### Slash Commands
+
+Use leading slash commands during chat to trigger common actions instantly:
+
+-   `/help` – Quick reference of supported commands
+-   `/list-themes` – Show available ANSI themes
+-   `/theme <id>` – Switch the active theme (persists across sessions)
+-   `/command <program> [args...]` – Run a shell command via `run_terminal_cmd`
+
+Commands run without leaving the chat loop, and tool executions honor the same safety policies as automatic tool calls.
 
 ## Router & Budgets
 

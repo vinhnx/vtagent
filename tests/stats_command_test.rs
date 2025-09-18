@@ -3,7 +3,7 @@ use tempfile::TempDir;
 use tokio::time::{Duration, sleep};
 use vtagent_core::{
     Agent, config::constants::models::google::GEMINI_2_5_FLASH_LITE, config::types::AgentConfig,
-    handle_stats_command,
+    handle_stats_command, ui::theme::DEFAULT_THEME_ID,
 };
 
 #[tokio::test]
@@ -15,6 +15,7 @@ async fn test_handle_stats_command_returns_agent_metrics() -> Result<()> {
         api_key: "test_key".to_string(),
         workspace: temp_dir.path().to_path_buf(),
         verbose: false,
+        theme: DEFAULT_THEME_ID.to_string(),
     };
     let mut agent = Agent::new(config)?;
     agent.update_session_stats(5, 3, 1);

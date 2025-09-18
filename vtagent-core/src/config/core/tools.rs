@@ -25,9 +25,12 @@ pub struct ToolsConfig {
 
 impl Default for ToolsConfig {
     fn default() -> Self {
+        let mut policies = IndexMap::new();
+        policies.insert("run_terminal_cmd".to_string(), ToolPolicy::Allow);
+        policies.insert("bash".to_string(), ToolPolicy::Allow);
         Self {
             default_policy: default_tool_policy(),
-            policies: IndexMap::new(),
+            policies,
             max_tool_loops: default_max_tool_loops(),
         }
     }

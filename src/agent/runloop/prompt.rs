@@ -87,6 +87,7 @@ mod tests {
             api_key: "test".to_string(),
             workspace: std::env::current_dir().unwrap(),
             verbose: false,
+            theme: vtagent_core::ui::theme::DEFAULT_THEME_ID.to_string(),
         };
 
         let mut vt = VTAgentConfig::default();

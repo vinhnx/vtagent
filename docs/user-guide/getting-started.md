@@ -130,6 +130,17 @@ cd /path/to/your/project
 
 ## Configuration
 
+### Quick Slash Commands
+
+During chat you can lead with `/` to trigger built-in actions without leaving the session:
+
+- `/help` — list supported commands
+- `/list-themes` — show available ANSI themes
+- `/theme <id>` — switch the active theme
+- `/command <program> [args...]` — run a shell command via `run_terminal_cmd`
+
+Slash commands execute immediately and respect the same tool policies configured in `vtagent.toml`.
+
 VTAgent uses a comprehensive TOML configuration system. The `init` command creates a `vtagent.toml` file with sensible defaults.
 
 ### Basic Configuration

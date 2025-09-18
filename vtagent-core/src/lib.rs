@@ -88,7 +88,7 @@ pub use tools::{
 pub use ui::diff_renderer::DiffRenderer;
 pub use utils::dot_config::{
     CacheConfig, DotConfig, DotManager, ProviderConfigs, UiConfig, UserPreferences,
-    initialize_dot_folder, load_user_config, save_user_config,
+    initialize_dot_folder, load_user_config, save_user_config, update_theme_preference,
 };
 pub use utils::vtagentgitignore::initialize_vtagent_gitignore;
 

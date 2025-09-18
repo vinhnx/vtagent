@@ -72,9 +72,10 @@ pub(super) fn builtin_tool_registrations() -> Vec<ToolRegistration> {
         ToolRegistration::new(
             tools::BASH,
             CapabilityLevel::CodeSearch,
-            true,
+            false,
             ToolRegistry::bash_executor,
-        ),
+        )
+        .with_llm_visibility(false),
         ToolRegistration::new(
             tools::APPLY_PATCH,
             CapabilityLevel::Editing,

@@ -284,3 +284,4 @@ if is_valid && is_allowed && is_secure {
 -   Don't create examples, make tests instead. THIS IS IMPORTANT!
 -   Prefer to use nextest over cargo test. THIS IS IMPORTANT!
 -   Always use anyhow::Context to add context to errors. THIS IS IMPORTANT!
+-   Testing: for headless testing without user input, use `cargo run -- ask "Output the word 'test' in red color"` Single Prompt Mode.

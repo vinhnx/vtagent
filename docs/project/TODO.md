@@ -161,3 +161,7 @@ if not found, search for other similar packages.
 read docs/guides/codex-cloud-setup.md
 then fetch https://developers.openai.com/codex/cloud/environments
 setup codex cloud environment for vtcode
+
+---
+
+check git stash@{1}: On main: streaming. apply only streaming implementation

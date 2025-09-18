@@ -3,7 +3,7 @@
 <h1>VT Code</h1>
 
 [![Rust](https://img.shields.io/badge/Rust-BF4545?logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![Next.js](https://img.shields.io/badge/Next.js-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
+[![Crates.io](https://img.shields.io/badge/Next.js-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
 [![Deployed on Fly.io](https://img.shields.io/badge/Deployed%20on-Fly.io-blueviolet)](https://fly.io)
 [![CI](https://github.com/vinhnx/vtchat/actions/workflows/ci.yml/badge.svg)](https://github.com/vinhnx/vtchat/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/vinhnx/vtchat/branch/main/graph/badge.svg)](https://codecov.io/gh/vinhnx/vtchat)

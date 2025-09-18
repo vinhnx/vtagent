@@ -156,3 +156,83 @@ I reached the configured tool-call limit of 30 for this turn and paused further 
 [TOOL] list_files {"path":"packages/ai"}
 
 tool call policy doesn't seem to work, it keeps asking for permission even I already approve it. Check and fix it.
+
+---
+
+Summary of AMA with the Codex Team on Reddit on 2025-09-17
+
+Internal Usage & Team Workflow
+
+-   Team members use Codex to build Codex itself, with designers directly merging PRs and one engineer using it for 99% of their changes to Codex specifically, with goal of not typing single line of code by hand next year
+
+-   Product team members use Codex for languages they're not strong in like Rust, often starting tasks on mobile between meetings then using VS Code extension to pull down work
+
+-   Engineers prototype large features with ~5 turns of prompting to build multiple versions quickly and understand scope, using mix of CLI and VS Code extension to parallelize work and review code snippets in real time
+
+-   Team uses it for one-off internal tools, visualization, monitoring, training data generation, and designer splits time 70/30 between Codex and design tooling to reduce gap between idea and execution
+
+Platform Availability & Technical Limitations
+
+-   Available through homebrew, npm, and direct binary downloads from GitHub releases, with plans to improve Windows support but no PyPi package available due to significant work required for every package manager
+
+-   Would love to support more IDEs like JetBrains but huge amount of work remains on core experience
+
+-   The team is shipping UI improvements but acknowledges terminal output readability issues, as different terminals render outputs differently - more improvements are coming
+
+Usage Limits & Pricing Structure
+
+-   Product lacks UI to show approaching limits which team is working to improve
+
+-   Rate limits reset every 5 hours and weekly
+
+-   No free tier available and no current plans for mid-tier between Plus and Pro though many users request one
+
+-   Batch API-style usage for Codex web during unused GPU capacity discussed as great idea but not prioritized
+
+Model Capabilities & Configuration
+
+-   GPT-5-Codex model is specifically optimized for coding tasks with focused training on diverse coding environments, making separate specialized models for frontend/backend potentially unnecessary since coding tasks span multiple domains
+
+-   Works well with large codebases using grep instead of dedicated indexing, can be prompted to work longer/faster and produce multi-page detailed implementation plans with different specification levels
+
+-   Codex web chooses best configuration for tasks without allowing model or reasoning selection
+
+-   GPT-5-high recommended for planning with more general world knowledge, GPT-5-Codex for technical refactors
+
+-   No plans to allow system prompt editing though users can modify AGENTS[.]md for coding-adjacent tasks like data analysis or non-coding tasks
+
+Features & User Experience
+
+-   CLI supports web search with --search flag coming to IDE extension soon with prompt caching issues being resolved, potentially with full browser automation in the future
+
+-   VS Code extension supports drag & drop when holding shift key, has auto context feature and enables mixing local and cloud work
+
+-   File tagging with @ requested for folders not just individual files
+
+-   Voice mode for terminal/IDE interaction - team would find it very cool to provide native support after seeing exciting open source community demos hacking together voice and coding agents
+
+-   Can try local models with ollama using --oss flag though not first-class experience yet, with any future gpt-oss versions expected to work much better than current 20B model
+
+Planning & Agent Development
+
+-   Currently has Chat/Plan mode in IDE extension and read-only mode in CLI, working on dedicated plan mode with team landing on giving users more control over execution rather than having model do its own planning
+
+-   Sub-agents are a fantastic way of preserving context for longer complex tasks but nothing actively being worked on right now
+
+-   Conversation compacting for longer work coming soon and users able to ask Codex to create plans in markdown files for review and editing, with ability to prompt for multi-page documents where model will work for extended periods
+
+Integration & Workflow Improvements
+
+-   Team would love to build ChatGPT mobile app integration to trigger Codex agents from chat and enable conversation transfer between ChatGPT and Codex with UX still being worked out, plus MCP server integration for Codex web hopefully soon
+
+-   GPT-5-Codex Pro might be coming (responded to the question with eyes emoji)
+
+Long-term Vision
+
+-   Team excited about world where non-coders build and deploy apps without touching IDE or terminal but Codex currently focused on professional software engineers rather than complete deployment handling
+
+-   Team hopes Codex becomes as ubiquitous as compilers fading into background, with abstraction level rising so engineers work at system level rather than code level where simple CRUD endpoints are nearly all written by Codex
+
+-   Engineers becoming more generalist with design and product skills enabling single engineers to own large product spaces, with potential for new programming languages designed to be less footgun-y for LLMs to use and Tony Stark/Jarvis collaboration model where humans talk to agent coworkers building individual parts while maintaining control over direction even if agents become smarter at programming
+
+https://www.reddit.com/r/OpenAI/comments/1nhust6/ama_with_the_codex_team/

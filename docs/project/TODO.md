@@ -232,3 +232,7 @@ Add formula from vtcode.rb
 ---
 
 update README guide, read the codebase and docs for context and update content with latest information.
+
+--
+
+https://github.com/assert-rs/assert_cmd

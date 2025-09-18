@@ -2,8 +2,7 @@
 
 <h1>VT Code</h1>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Rust](https://img.shields.io/badge/Rust-BF4545?logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
 [![Deployed on Fly.io](https://img.shields.io/badge/Deployed%20on-Fly.io-blueviolet)](https://fly.io)
 [![CI](https://github.com/vinhnx/vtchat/actions/workflows/ci.yml/badge.svg)](https://github.com/vinhnx/vtchat/actions/workflows/ci.yml)

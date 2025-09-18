@@ -33,6 +33,32 @@ cargo login
 3. Add a new repository secret named `CRATES_IO_TOKEN`
 4. Paste your crates.io API token as the value
 
+### 4. docs.rs Documentation (Automatic)
+
+**docs.rs** automatically generates and hosts documentation for all Rust crates published to crates.io.
+
+#### What Gets Generated
+
+-   **API Documentation**: Complete Rustdoc documentation for public APIs
+-   **Source Code Links**: Direct links to source code on GitHub
+-   **Search Functionality**: Full-text search across documentation
+-   **Cross-references**: Links between related types and functions
+
+#### URLs for VTCode
+
+-   **Main Package**: https://docs.rs/vtcode
+-   **Core Library**: https://docs.rs/vtcode-core
+-   **Latest Version**: Automatically updated when new versions are published
+
+#### Badge Integration
+
+Add these badges to your README:
+
+```markdown
+[![docs.rs](https://img.shields.io/docsrs/vtcode)](https://docs.rs/vtcode)
+[![docs.rs](https://img.shields.io/docsrs/vtcode-core)](https://docs.rs/vtcode-core)
+```
+
 ### 2. npm Setup (Optional)
 
 If you want to publish to npm:

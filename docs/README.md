@@ -2,6 +2,43 @@
 
 Welcome to the comprehensive documentation for **VTCode**, a Rust-based terminal coding agent with modular architecture supporting multiple LLM providers and advanced code analysis capabilities.
 
+## 🚀 Quick Installation
+
+[![Crates.io](https://img.shields.io/crates/v/vtcode.svg)](https://crates.io/crates/vtcode)
+[![npm](https://img.shields.io/npm/v/vtcode.svg)](https://www.npmjs.com/package/vtcode)
+[![Homebrew](https://img.shields.io/badge/dynamic/json?url=https://formulae.brew.sh/api/formula/vtcode.json&query=$.versions.stable&label=homebrew)](https://formulae.brew.sh/formula/vtcode)
+[![GitHub release](https://img.shields.io/github/release/vinhnx/vtcode.svg)](https://github.com/vinhnx/vtcode/releases)
+
+### Choose Your Installation Method
+
+#### Cargo (Recommended)
+
+```bash
+cargo install vtcode
+```
+
+📚 [API Documentation](https://docs.rs/vtcode) | 📦 [Crates.io](https://crates.io/crates/vtcode)
+
+#### npm (Cross-platform)
+
+```bash
+npm install -g vtcode
+```
+
+📦 [npm Package](https://www.npmjs.com/package/vtcode)
+
+#### Homebrew (macOS)
+
+```bash
+brew install vinhnx/tap/vtcode
+```
+
+🍺 [Homebrew Formula](https://formulae.brew.sh/formula/vtcode)
+
+#### Pre-built Binaries
+
+Download from [GitHub Releases](https://github.com/vinhnx/vtcode/releases) for Linux, macOS, or Windows.
+
 ## What Makes VTCode Special
 
 VTCode represents a modern approach to AI-powered software development, featuring:

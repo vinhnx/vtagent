@@ -223,3 +223,10 @@ add
 
 download links to the README and docs.
 also add github readme badges for these package managers.
+
+---
+
+Set up Homebrew tap (optional):
+
+Create vinhnx/homebrew-tap repository
+Add formula from vtcode.rb

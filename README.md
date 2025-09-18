@@ -84,6 +84,9 @@ echo "Workspace root: $WORKSPACE_DIR"
 
 # Launch with an alternate UI theme (ANSI palette)
 cargo run -- chat --theme ciapre-blue
+
+# Run with autonomous approvals (requires configuration safeguards)
+cargo run -- chat --full-auto
 ```
 
 ### Workspace-Aware Operations
@@ -174,6 +177,12 @@ To tune budgets: add `[router.budgets.<class>]` with max_tokens and max_parallel
 ### Trajectory Logs
 
 Logs for trajectory: check `logs/trajectory.jsonl`.
+
+### Full-Auto Mode
+
+-   Requires enabling `[automation.full_auto]` in `vtagent.toml` and creating the acknowledgement profile.
+-   Launch with `--full-auto` to skip confirmation prompts and rely on the configured tool allow-list.
+-   See [docs/guides/full_auto_mode.md](docs/guides/full_auto_mode.md) for safeguards and recommended setup.
 
 ## Available Models & Providers
 

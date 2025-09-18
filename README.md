@@ -1,7 +1,7 @@
 # VTCode - Terminal Coding Agent
 
 [![Crates.io](https://img.shields.io/crates/v/vtcode.svg)](https://crates.io/crates/vtcode)
-[![Homebrew](https://img.shields.io/badge/dynamic/json?url=https://formulae.brew.sh/api/formula/vtcode.json&query=$.versions.stable&label=homebrew)](https://formulae.brew.sh/formula/vtcode)
+[![Homebrew](https://img.shields.io/badge/homebrew-v0.8.2-orange)](https://github.com/vinhnx/homebrew-tap)
 [![GitHub release](https://img.shields.io/github/release/vinhnx/vtcode.svg)](https://github.com/vinhnx/vtcode/releases)
 [![docs.rs](https://img.shields.io/docsrs/vtcode)](https://docs.rs/vtcode)
 
@@ -20,11 +20,77 @@ cargo install vtcode
 **Homebrew (macOS):**
 
 ```bash
-brew install vinhnx/tap/vtcode
+# Add the tap
+brew tap vinhnx/homebrew-tap
+
+# Install VTCode
+brew install vtcode
+
+# Verify installation
+vtcode --version
 ```
 
 **Pre-built Binaries:**
 Download from [GitHub Releases](https://github.com/vinhnx/vtcode/releases)
+
+#### Homebrew Installation Details
+
+The Homebrew formula supports both Intel and Apple Silicon Macs:
+
+-   **Apple Silicon (M1/M2/M3)**: Native `aarch64-apple-darwin` binary
+-   **Intel Macs**: `x86_64-apple-darwin` binary (when available)
+
+**Supported macOS Versions:**
+
+-   macOS 12.0+ (Monterey and later)
+-   Both Intel and Apple Silicon architectures
+
+**Uninstall:**
+
+```bash
+brew uninstall vtcode
+brew untap vinhnx/homebrew-tap  # Optional: remove the tap
+```
+
+#### Troubleshooting Homebrew Installation
+
+**If you encounter issues:**
+
+1. **Update Homebrew:**
+
+```bash
+brew update
+```
+
+2. **Clear Homebrew cache:**
+
+```bash
+brew cleanup
+```
+
+3. **Re-tap the repository:**
+
+```bash
+brew untap vinhnx/homebrew-tap
+brew tap vinhnx/homebrew-tap
+```
+
+4. **Check formula:**
+
+```bash
+brew info vtcode
+```
+
+5. **Manual installation (if needed):**
+
+```bash
+# Download the binary directly
+curl -L -o vtcode.tar.gz https://github.com/vinhnx/vtcode/releases/download/v0.8.2/vtcode-v0.8.2-aarch64-apple-darwin.tar.gz
+
+# Extract and install
+tar -xzf vtcode.tar.gz
+sudo mv vtcode /usr/local/bin/
+```
 
 ### 2. Configure API Key
 

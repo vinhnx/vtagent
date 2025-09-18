@@ -7,7 +7,7 @@
 
 A Rust-based terminal coding agent with modular architecture supporting multiple LLM providers (Gemini, OpenAI, Anthropic, DeepSeek) and tree-sitter parsers for 6+ languages.
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Install
 
@@ -115,12 +115,12 @@ vtcode chat
 vtcode --workspace-dir /path/to/project chat
 ```
 
-## 📋 Requirements
+## Requirements
 
 -   **Rust 1.75+** (for building from source)
 -   **API Key** from one of: Gemini, OpenAI, Anthropic, or DeepSeek
 
-## ⚙️ Configuration
+## Configuration
 
 VTCode uses `vtcode.toml` for configuration. Key settings:
 
@@ -134,7 +134,7 @@ max_conversation_turns = 150
 human_in_the_loop = true  # Require confirmation for destructive actions
 ```
 
-## 🎯 Key Features
+## Key Features
 
 -   **Multi-Provider LLM Support** - Gemini, OpenAI, Anthropic, DeepSeek
 -   **Advanced Code Analysis** - Tree-sitter parsers for Rust, Python, JavaScript, TypeScript, Go, Java
@@ -143,7 +143,7 @@ human_in_the_loop = true  # Require confirmation for destructive actions
 -   **Context Engineering** - Full conversation history with intelligent management
 -   **Decision Ledger** - Structured record of agent decisions for consistency
 
-## 📚 Documentation
+## Documentation
 
 -   **API Docs**: [docs.rs/vtcode](https://docs.rs/vtcode)
 -   **User Guide**: [docs/](docs/)
@@ -168,10 +168,10 @@ cargo clippy
 cargo fmt
 ```
 
-## 🤝 Contributing
+## Contributing
 
 Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-## 📄 License
+## License
 
 MIT License - see [LICENSE](LICENSE) for details.

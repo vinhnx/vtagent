@@ -1,0 +1,35 @@
+[workspace]
+# Process all packages in the workspace
+# We have vtcode and vtcode-core
+
+[package.vtcode]
+# Main package configuration
+publish = true
+
+[package.vtcode-core]
+# Core library configuration
+publish = true
+
+[git]
+# Git configuration
+commit = true
+tag = true
+push = true
+
+[hooks]
+# Pre-release hooks
+pre-release = []
+
+# Post-release hooks
+post-release = []
+
+[publish]
+# Publishing configuration
+registry = "crates.io"
+verify = true
+
+[release]
+# General release settings
+shared-version = true
+consolidate-commits = true
+allow-branch = ["main"]

@@ -1,7 +1,7 @@
 //! CLI argument parsing and configuration
 
 use crate::config::models::ModelId;
-use clap::{ColorChoice, Parser, Subcommand};
+use clap::{ColorChoice, Parser, Subcommand, ValueHint};
 use std::path::PathBuf;
 
 /// Main CLI structure for vtagent with advanced features
@@ -13,6 +13,14 @@ use std::path::PathBuf;
     color = ColorChoice::Auto
 )]
 pub struct Cli {
+    /// Optional positional path to run vtagent against a different workspace
+    #[arg(
+        value_name = "WORKSPACE",
+        value_hint = ValueHint::DirPath,
+        global = true
+    )]
+    pub workspace_path: Option<PathBuf>,
+
     /// LLM Model ID with latest model support
     ///
     /// Available providers & models:
@@ -46,7 +54,13 @@ pub struct Cli {
     ///
     /// Security: All file operations restricted to this path
     /// Default: Current directory
-    #[arg(long, global = true)]
+    #[arg(
+        long,
+        global = true,
+        alias = "workspace-dir",
+        value_name = "PATH",
+        value_hint = ValueHint::DirPath
+    )]
     pub workspace: Option<PathBuf>,
 
     /// **Enable tree-sitter code analysis**
@@ -565,6 +579,7 @@ pub struct SecurityConfig {
 impl Default for Cli {
     fn default() -> Self {
         Self {
+            workspace_path: None,
             model: Some(ModelId::default().as_str().to_string()),
             provider: Some("gemini".to_string()),
             api_key_env: "GEMINI_API_KEY".to_string(),

@@ -15,6 +15,8 @@ pub(super) fn register_builtin_tools(registry: &mut ToolRegistry) {
             eprintln!("Warning: Failed to register tool '{}': {}", tool_name, err);
         }
     }
+
+    registry.sync_policy_available_tools();
 }
 
 pub(super) fn builtin_tool_registrations() -> Vec<ToolRegistration> {

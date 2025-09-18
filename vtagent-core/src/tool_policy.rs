@@ -10,7 +10,7 @@ use dialoguer::Confirm;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Tool execution policy
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -175,13 +175,63 @@ impl ToolPolicyManager {
                 return Ok(Self::convert_from_alternative(alt_config));
             }
 
-            // Fall back to standard format
-            serde_json::from_str(&content).context("Failed to parse tool policy config")
+            // Fall back to standard format with graceful recovery on parse errors
+            match serde_json::from_str(&content) {
+                Ok(config) => Ok(config),
+                Err(parse_err) => {
+                    eprintln!(
+                        "Warning: Invalid tool policy config at {} ({}). Resetting to defaults.",
+                        config_path.display(),
+                        parse_err
+                    );
+                    Self::reset_to_default(config_path)
+                }
+            }
         } else {
             // Create new config with empty tools list
             let config = ToolPolicyConfig::default();
             Ok(config)
         }
+    }
+
+    fn reset_to_default(config_path: &PathBuf) -> Result<ToolPolicyConfig> {
+        let backup_path = config_path.with_extension("json.bak");
+
+        if let Err(err) = fs::rename(config_path, &backup_path) {
+            eprintln!(
+                "Warning: Unable to back up invalid tool policy config ({}). {}",
+                config_path.display(),
+                err
+            );
+        } else {
+            eprintln!(
+                "Backed up invalid tool policy config to {}",
+                backup_path.display()
+            );
+        }
+
+        let default_config = ToolPolicyConfig::default();
+        Self::write_config(config_path.as_path(), &default_config)?;
+        Ok(default_config)
+    }
+
+    fn write_config(path: &Path, config: &ToolPolicyConfig) -> Result<()> {
+        if let Some(parent) = path.parent() {
+            if !parent.exists() {
+                fs::create_dir_all(parent).with_context(|| {
+                    format!(
+                        "Failed to create directory for tool policy config at {}",
+                        parent.display()
+                    )
+                })?;
+            }
+        }
+
+        let serialized = serde_json::to_string_pretty(config)
+            .context("Failed to serialize tool policy config")?;
+
+        fs::write(path, serialized)
+            .with_context(|| format!("Failed to write tool policy config: {}", path.display()))
     }
 
     /// Convert alternative format to standard format
@@ -209,11 +259,11 @@ impl ToolPolicyManager {
     /// Update the tool list and save configuration
     pub fn update_available_tools(&mut self, tools: Vec<String>) -> Result<()> {
         let current_tools: std::collections::HashSet<_> =
-            self.config.available_tools.iter().collect();
-        let new_tools: std::collections::HashSet<_> = tools.iter().collect();
+            self.config.policies.keys().cloned().collect();
+        let new_tools: std::collections::HashSet<_> = tools.iter().cloned().collect();
 
         // Add new tools as "prompt" - use itertools to find tools not in current set
-        for tool in tools.iter().filter(|tool| !current_tools.contains(tool)) {
+        for tool in tools.iter().filter(|tool| !current_tools.contains(*tool)) {
             self.config
                 .policies
                 .insert(tool.clone(), ToolPolicy::Prompt);
@@ -224,7 +274,7 @@ impl ToolPolicyManager {
             .config
             .policies
             .keys()
-            .filter(|tool| !new_tools.contains(tool))
+            .filter(|tool| !new_tools.contains(*tool))
             .cloned()
             .collect();
 
@@ -371,12 +421,7 @@ impl ToolPolicyManager {
 
     /// Save configuration to file
     fn save_config(&self) -> Result<()> {
-        let content = serde_json::to_string_pretty(&self.config)
-            .context("Failed to serialize tool policy config")?;
-
-        fs::write(&self.config_path, content).context("Failed to write tool policy config")?;
-
-        Ok(())
+        Self::write_config(&self.config_path, &self.config)
     }
 
     /// Print current policy status

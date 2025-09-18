@@ -125,7 +125,6 @@ impl ToolRegistry {
         let index = self.tool_registrations.len();
         self.tool_lookup.insert(registration.name(), index);
         self.tool_registrations.push(registration);
-        self.sync_policy_available_tools();
         Ok(())
     }
 
@@ -283,6 +282,8 @@ mod tests {
             CapabilityLevel::CodeSearch,
             CustomEchoTool,
         ))?;
+
+        registry.sync_policy_available_tools();
 
         registry.allow_all_tools().ok();
 

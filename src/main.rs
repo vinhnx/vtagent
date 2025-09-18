@@ -2,8 +2,9 @@
 //!
 //! Thin binary entry point that delegates to modular CLI handlers.
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use clap::Parser;
+use std::path::PathBuf;
 use vtagent_core::cli::args::{Cli, Commands};
 use vtagent_core::config::api_keys::{ApiKeySources, get_api_key, load_dotenv};
 use vtagent_core::config::loader::ConfigManager;
@@ -19,8 +20,33 @@ async fn main() -> Result<()> {
 
     let args = Cli::parse();
 
-    // Load configuration (vtagent.toml or defaults)
-    let config_manager = ConfigManager::load().context("Failed to load vtagent configuration")?;
+    // Resolve workspace (default: current dir, canonicalized when present)
+    let workspace_override = args
+        .workspace_path
+        .clone()
+        .or_else(|| args.workspace.clone());
+
+    let workspace = resolve_workspace_path(workspace_override)
+        .context("Failed to resolve workspace directory")?;
+
+    if let Some(path) = &args.workspace_path {
+        if !workspace.exists() {
+            bail!(
+                "Workspace path '{}' does not exist. Initialize it first or provide an existing directory.",
+                path.display()
+            );
+        }
+    }
+
+    cli::set_workspace_env(&workspace);
+
+    // Load configuration (vtagent.toml or defaults) from resolved workspace
+    let config_manager = ConfigManager::load_from_workspace(&workspace).with_context(|| {
+        format!(
+            "Failed to load vtagent configuration for workspace {}",
+            workspace.display()
+        )
+    })?;
     let cfg = config_manager.config();
 
     // Resolve provider/model with CLI override
@@ -32,12 +58,6 @@ async fn main() -> Result<()> {
         .model
         .clone()
         .unwrap_or_else(|| cfg.agent.default_model.clone());
-
-    // Resolve workspace (default: current dir)
-    let workspace = args
-        .workspace
-        .clone()
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
 
     // Resolve API key for chosen provider
     let api_key = get_api_key(&provider, &ApiKeySources::default())
@@ -119,4 +139,25 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn resolve_workspace_path(workspace_arg: Option<PathBuf>) -> Result<PathBuf> {
+    let cwd = std::env::current_dir().context("Failed to determine current working directory")?;
+
+    let mut resolved = match workspace_arg {
+        Some(path) if path.is_absolute() => path,
+        Some(path) => cwd.join(path),
+        None => cwd,
+    };
+
+    if resolved.exists() {
+        resolved = resolved.canonicalize().with_context(|| {
+            format!(
+                "Failed to canonicalize workspace path {}",
+                resolved.display()
+            )
+        })?;
+    }
+
+    Ok(resolved)
 }

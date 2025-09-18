@@ -19,6 +19,7 @@ VTAgent is a Rust-based terminal coding agent with modular architecture supporti
 -   **Intelligent Tool Suite**: File operations, search, terminal commands, and PTY integration
 -   **Configuration Management**: TOML-based configuration with comprehensive policies
 -   **Safety & Security**: Path validation, command policies, and human-in-the-loop controls
+-   **Workspace-First Automation**: Reads, writes, indexing, and shell execution anchored to `WORKSPACE_DIR` for project-aware actions
 
 ### Key Features
 
@@ -66,6 +67,9 @@ cargo build --release
 # Set your API key
 export GEMINI_API_KEY=your_api_key_here
 
+# Confirm the workspace root the agent should treat as primary context
+export WORKSPACE_DIR="$(pwd)"
+
 # Initialize VTAgent in your project
 ./run.sh init  # Creates vtagent.toml and .vtagentgitignore
 
@@ -74,7 +78,20 @@ export GEMINI_API_KEY=your_api_key_here
 
 # Or run specific commands
 cargo run -- chat
+
+# Inspect the workspace root recognized by the agent
+echo "Workspace root: $WORKSPACE_DIR"
 ```
+
+### Workspace-Aware Operations
+
+VTAgent automatically treats the directory referenced by `WORKSPACE_DIR` as its primary context:
+
+-   Read, write, and refactor files relative to the workspace without extra configuration.
+-   Run shell commands and scripts inside the workspace, benefiting from PTY integration for interactive sessions.
+-   Perform project indexing (directory scans, metadata extraction, dependency inspection) before large tasks to align with the live codebase.
+-   Request confirmation before touching paths outside `WORKSPACE_DIR` or when downloading untrusted content.
+-   Launch against a different project directory with `vtagent /path/to/project`; alternatively pass `--workspace-dir` (alias: `--workspace`) to other commands.
 
 ## Router & Budgets
 

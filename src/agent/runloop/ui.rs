@@ -1,5 +1,6 @@
 use anyhow::Result;
 use chrono::Local;
+use pathdiff::diff_paths;
 use sysinfo::System;
 use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
 use vtagent_core::tool_policy::{ToolPolicy, ToolPolicyManager};
@@ -13,36 +14,19 @@ pub(crate) fn render_session_banner(
     config: &CoreAgentConfig,
     session_bootstrap: &SessionBootstrap,
 ) -> Result<()> {
-    const VT_ASCII: &[&str] = &[
-        r"__      _______          _____          _           ",
-        r"\ \    / /__   __|        / ____|        | |          ",
-        r" \ \  / /   | |   ______ | |     ___   __| | ___  ___ ",
-        r"  \ \/ /    | |  |______|| |    / _ \ / _` |/ _ \/ __|",
-        r"   \  /     | |          | |___| (_) | (_| |  __/\__ \",
-        r"    \/      |_|           \_____/\___/ \__,_|\___||___/",
-    ];
+    let styles = theme::active_styles();
+    renderer.line_with_style(styles.primary, "Welcome to VT Code!")?;
 
-    for line in VT_ASCII {
-        renderer.line(MessageStyle::Info, line)?;
-    }
-    renderer.line(MessageStyle::Output, "")?;
-
-    renderer.line(MessageStyle::Info, "Interactive chat (tools)")?;
-    renderer.line(MessageStyle::Output, &format!("Model: {}", config.model))?;
-    renderer.line(
-        MessageStyle::Output,
-        &format!("Workspace: {}", config.workspace.display()),
-    )?;
-    renderer.line(
-        MessageStyle::Output,
-        &format!("Theme: {}", theme::active_theme_label()),
-    )?;
+    let mut bullets = Vec::new();
+    bullets.push(format!("- Model: {}", config.model));
+    bullets.push(format!("- Workspace: {}", config.workspace.display()));
+    bullets.push(format!("- Theme: {}", theme::active_theme_label()));
 
     let now = Local::now();
-    renderer.line(
-        MessageStyle::Output,
-        &format!("Local time: {}", now.format("%Y-%m-%d %H:%M:%S %Z")),
-    )?;
+    bullets.push(format!(
+        "- Local time: {}",
+        now.format("%Y-%m-%d %H:%M:%S %Z")
+    ));
 
     let mut sys = System::new_all();
     sys.refresh_all();
@@ -55,17 +39,11 @@ pub(crate) fn render_session_banner(
         .max(1);
     let total_mem_gb = sys.total_memory() as f64 / 1024.0 / 1024.0;
     let used_mem_gb = sys.used_memory() as f64 / 1024.0 / 1024.0;
-    renderer.line(
-        MessageStyle::Output,
-        &format!("System: {} (kernel {})", os_label, kernel),
-    )?;
-    renderer.line(
-        MessageStyle::Output,
-        &format!(
-            "Resources: {:.1} GB used / {:.1} GB total, {} cores",
-            used_mem_gb, total_mem_gb, cpu_count
-        ),
-    )?;
+    bullets.push(format!("- System: {} · kernel {}", os_label, kernel));
+    bullets.push(format!(
+        "- Resources: {:.1}/{:.1} GB RAM · {} cores",
+        used_mem_gb, total_mem_gb, cpu_count
+    ));
 
     match ToolPolicyManager::new_with_workspace(&config.workspace) {
         Ok(manager) => {
@@ -80,28 +58,25 @@ pub(crate) fn render_session_banner(
                     ToolPolicy::Deny => deny += 1,
                 }
             }
-            let policy_line = format!(
-                "Tool policy: allow {}, prompt {}, deny {} ({})",
-                allow,
-                prompt,
-                deny,
-                manager.config_path().display()
-            );
-            renderer.line(MessageStyle::Output, &policy_line)?;
+            let policy_path = diff_paths(manager.config_path(), &config.workspace)
+                .and_then(|p| p.to_str().map(|s| s.to_string()))
+                .unwrap_or_else(|| manager.config_path().display().to_string());
+            bullets.push(format!(
+                "- Tool policy: allow {} · prompt {} · deny {} ({})",
+                allow, prompt, deny, policy_path
+            ));
         }
         Err(err) => {
-            renderer.line(
-                MessageStyle::Error,
-                &format!("Tool policy unavailable: {}", err),
-            )?;
+            bullets.push(format!("- Tool policy: unavailable ({})", err));
         }
     }
 
     if let Some(summary) = session_bootstrap.language_summary.as_deref() {
-        renderer.line(
-            MessageStyle::Output,
-            &format!("Detected languages: {}", summary),
-        )?;
+        bullets.push(format!("- Languages: {}", summary));
+    }
+
+    for line in bullets {
+        renderer.line(MessageStyle::Output, &line)?;
     }
 
     renderer.line(MessageStyle::Output, "")?;

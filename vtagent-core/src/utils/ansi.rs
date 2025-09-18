@@ -13,6 +13,7 @@ pub enum MessageStyle {
     Output,
     Response,
     Tool,
+    User,
 }
 
 impl MessageStyle {
@@ -24,6 +25,7 @@ impl MessageStyle {
             Self::Output => styles.output,
             Self::Response => styles.response,
             Self::Tool => styles.tool,
+            Self::User => styles.user,
         }
     }
 

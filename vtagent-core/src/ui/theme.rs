@@ -62,6 +62,12 @@ impl ThemePalette {
             MIN_CONTRAST,
             &[lighten(text_color, 0.15), fallback_light],
         );
+        let user_color = ensure_contrast(
+            lighten(primary, 0.25),
+            background,
+            MIN_CONTRAST,
+            &[lighten(secondary, 0.15), info_color, text_color],
+        );
         let alert_color = ensure_contrast(
             self.alert,
             background,
@@ -75,6 +81,7 @@ impl ThemePalette {
             output: Self::style_from(text_color, false),
             response: Self::style_from(response_color, false),
             tool: Self::style_from(tool_color, true),
+            user: Self::style_from(user_color, false),
             primary: Self::style_from(primary, false),
             secondary: Self::style_from(secondary, false),
             background: Color::Rgb(background),
@@ -91,6 +98,7 @@ pub struct ThemeStyles {
     pub output: Style,
     pub response: Style,
     pub tool: Style,
+    pub user: Style,
     pub primary: Style,
     pub secondary: Style,
     pub background: Color,

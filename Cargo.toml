@@ -22,7 +22,7 @@ exclude = [
 default-run = "vtcode"
 
 [workspace]
-members = []
+members = ["tools"]
 
 [workspace.lints]
 rust = {}

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use console::style;
 use std::fs;
-use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
+use vtcode_core::config::types::AgentConfig as CoreAgentConfig;
 
 pub async fn handle_revert_command(
     config: &CoreAgentConfig,

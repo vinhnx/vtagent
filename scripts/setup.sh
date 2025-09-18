@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# vtagent Development Environment Setup Script
+# vtcode Development Environment Setup Script
 # This script sets up the development environment with all necessary tools
 
 set -e
 
-echo "Setting up vtagent Development Environment..."
+echo "Setting up vtcode Development Environment..."
 echo "=============================================="
 
 # Colors for output
@@ -172,7 +172,7 @@ verify_installation() {
 # Main function
 main() {
     echo ""
-    echo "This script will set up your development environment for vtagent."
+    echo "This script will set up your development environment for vtcode."
     echo ""
 
     # Parse arguments
@@ -217,7 +217,7 @@ main() {
 # Help function
 show_help() {
     cat << EOF
-vtagent Development Environment Setup Script
+vtcode Development Environment Setup Script
 
 Usage: $0 [OPTIONS]
 
@@ -242,7 +242,7 @@ After running this script, you can use:
 To configure API keys:
   • Copy .env.example to .env and add your actual API keys
   • Or set environment variables directly
-  • Or configure in vtagent.toml (less secure)
+  • Or configure in vtcode.toml (less secure)
 
 EOF
 }

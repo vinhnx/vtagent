@@ -1,4 +1,4 @@
-# VTAgent System Prompt - Codex Enhanced
+# VTCode System Prompt - Codex Enhanced
 
 ## AVAILABLE TOOLS
 - **File Operations**: list_files, read_file, write_file, edit_file, delete_file
@@ -230,4 +230,4 @@ rp_search "api_key\s*=\s*[\"'][^\"']+[\"']"
 - **Completeness**: Include all necessary information for remediation
 - **Actionability**: Provide concrete steps for fixing issues
 
-This enhanced system prompt maintains VTAgent's existing capabilities while incorporating Codex's structured output patterns, security-first methodology, and systematic approach to vulnerability analysis and remediation.
+This enhanced system prompt maintains VTCode's existing capabilities while incorporating Codex's structured output patterns, security-first methodology, and systematic approach to vulnerability analysis and remediation.

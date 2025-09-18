@@ -1,7 +1,7 @@
 //! Comprehensive tool call verification for all LLM providers
 
 use serde_json::json;
-use vtagent_core::llm::{
+use vtcode_core::llm::{
     provider::{
         LLMProvider, LLMRequest, Message, MessageRole, ToolCall, ToolChoice, ToolDefinition,
     },

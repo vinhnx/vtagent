@@ -1,8 +1,8 @@
-# Codex Cloud Environment Setup for VTAgent
+# Codex Cloud Environment Setup for VTCode
 
 This guide explains how to provision a Codex Cloud environment that can build and test
-VTAgent reliably. It summarizes the task lifecycle, recommends setup and maintenance
-scripts, and highlights the environment variables that VTAgent expects.
+VTCode reliably. It summarizes the task lifecycle, recommends setup and maintenance
+scripts, and highlights the environment variables that VTCode expects.
 
 ## 1. Understand the Codex task lifecycle
 
@@ -20,9 +20,9 @@ append them to `~/.bashrc` inside the script instead of relying on `export`.
 
 ## 2. Configure the environment in Codex settings
 
-1. Open **Codex ➝ Settings ➝ Environments** and create (or edit) an environment for VTAgent.
+1. Open **Codex ➝ Settings ➝ Environments** and create (or edit) an environment for VTCode.
 2. Select the `universal` base image. It already includes Rust and common build tooling, which
-    aligns with VTAgent’s Rust workspace defined in `Cargo.toml`.
+    aligns with VTCode’s Rust workspace defined in `Cargo.toml`.
 3. Set the default branch or commit that Codex should check out when starting tasks.
 4. Decide whether the agent should have network access during the task phase. The default is
     disabled; enable limited or full access only if the task requires it.
@@ -36,7 +36,7 @@ values so they are only available during setup.
 | --- | --- | --- |
 | `GEMINI_API_KEY`, `GOOGLE_API_KEY` | Secret | Primary Gemini provider credentials used by the default configuration. |
 | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | Secret | Optional provider keys when switching models. |
-| `VTAGENT_CONTEXT_TOKEN_LIMIT` | Environment variable | Limits the context window when tasks need smaller token budgets. |
+| `VTCODE_CONTEXT_TOKEN_LIMIT` | Environment variable | Limits the context window when tasks need smaller token budgets. |
 
 Secrets are stripped from the environment before the agent phase, so persist anything the agent
 must read as a regular environment variable.
@@ -89,7 +89,7 @@ Use the **Reset cache** button in the environment if dependency changes require 
 
 ## 6. Repository configuration reminders
 
-- Copy `vtagent.toml.example` to `vtagent.toml` in your repository and adjust provider settings
+- Copy `vtcode.toml.example` to `vtcode.toml` in your repository and adjust provider settings
     (model IDs, API key environment variables, tool policies) before launching a Codex task.
 - Keep project-level setup scripts such as `scripts/setup.sh` aligned with the Codex setup script
     so local and cloud environments behave consistently.

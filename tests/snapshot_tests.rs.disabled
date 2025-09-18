@@ -11,9 +11,9 @@ use std::collections::HashMap;
 use tempfile::TempDir;
 use tokio::test;
 
-use vtagent_core::agent::snapshots::*;
-use vtagent_core::gemini::Content;
-use vtagent_core::types::*;
+use vtcode_core::agent::snapshots::*;
+use vtcode_core::gemini::Content;
+use vtcode_core::types::*;
 
 /// Test basic snapshot creation and loading
 #[tokio::test]

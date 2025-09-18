@@ -1,7 +1,7 @@
 use anyhow::Result;
-use vtagent_core::config::loader::ConfigManager;
-use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
-use vtagent_core::models::{ModelId, Provider};
+use vtcode_core::config::loader::ConfigManager;
+use vtcode_core::config::types::AgentConfig as CoreAgentConfig;
+use vtcode_core::models::{ModelId, Provider};
 
 mod context;
 mod gemini;

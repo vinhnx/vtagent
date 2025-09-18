@@ -1,6 +1,6 @@
 # Development Scripts
 
-This directory contains scripts to help with development, testing, and maintaining the vtagent codebase.
+This directory contains scripts to help with development, testing, and maintaining the vtcode codebase.
 
 ## Available Scripts
 
@@ -57,7 +57,7 @@ Runs comprehensive code quality checks (same as CI pipeline).
 
 ### `release.sh` - Release Management
 
-Creates releases for VTAgent using changelogithub integration.
+Creates releases for VTCode using changelogithub integration.
 
 ```bash
 # Create a specific version release
@@ -113,7 +113,7 @@ For new developers:
 
    ```bash
    git clone <repository-url>
-   cd vtagent
+   cd vtcode
    ```
 
 2. **Set up development environment**
@@ -147,11 +147,11 @@ For new developers:
 
 ## API Key Configuration
 
-vtagent supports multiple ways to configure API keys, with the following priority:
+vtcode supports multiple ways to configure API keys, with the following priority:
 
 1. **Environment variables** (highest priority) - Most secure
 2. **.env file** - Convenient for development
-3. **Configuration file** (vtagent.toml) - Least secure, but convenient
+3. **Configuration file** (vtcode.toml) - Least secure, but convenient
 
 Example `.env` file:
 ```bash
@@ -160,7 +160,7 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here
 OPENAI_API_KEY=your_openai_api_key_here
 ```
 
-Example `vtagent.toml` configuration:
+Example `vtcode.toml` configuration:
 ```toml
 [agent]
 gemini_api_key = "your_gemini_api_key_here"

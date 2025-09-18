@@ -1,5 +1,5 @@
 #!/usr/bin/env rust-script
-//! A tool to help migrate from console::style to anstyle in VTAgent
+//! A tool to help migrate from console::style to anstyle in VTCode
 //!
 //! USAGE:
 //!   rust-script anstyle-migration-tool.rs <file>
@@ -50,7 +50,7 @@ fn main() -> io::Result<()> {
 
 fn update_imports(contents: String) -> String {
     let import_re = Regex::new(r#"use console::style;"#).unwrap();
-    import_re.replace(&contents, "use vtagent_core::ui::styled::*;").to_string()
+    import_re.replace(&contents, "use vtcode_core::ui::styled::*;").to_string()
 }
 
 fn update_style_calls(contents: String) -> String {

@@ -1,7 +1,7 @@
 //! Comprehensive tests for LLM providers refactor
 
 use serde_json::json;
-use vtagent_core::llm::{
+use vtcode_core::llm::{
     factory::{LLMFactory, create_provider_for_model},
     provider::{LLMProvider, LLMRequest, Message, MessageRole, ToolCall, ToolDefinition},
     providers::{AnthropicProvider, GeminiProvider, OpenAIProvider},
@@ -270,8 +270,8 @@ fn test_anthropic_tool_message_handling() {
 
 #[test]
 fn test_backward_compatibility() {
-    use vtagent_core::llm::make_client;
-    use vtagent_core::models::ModelId;
+    use vtcode_core::llm::make_client;
+    use vtcode_core::models::ModelId;
 
     // Test that the old make_client function still works
     let model = ModelId::from_str("gemini-2.5-flash-lite-preview-06-17").unwrap();

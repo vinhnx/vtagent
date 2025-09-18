@@ -3,7 +3,7 @@
 
 use serde_json::json;
 use std::path::PathBuf;
-use vtagent_core::tools::ToolRegistry;
+use vtcode_core::tools::ToolRegistry;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

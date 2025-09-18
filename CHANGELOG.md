@@ -1,6 +1,6 @@
-# Changelog - vtagent
+# Changelog - vtcode
 
-All notable changes to vtagent will be documented in this file.
+All notable changes to vtcode will be documented in this file.
 
 ## [Unreleased] - Latest Improvements
 
@@ -67,7 +67,7 @@ All notable changes to vtagent will be documented in this file.
 
 #### Two-Way Configuration Synchronization
 
-- **Smart Config Generation**: `vtagent config` now reads existing `vtagent.toml` and preserves customizations
+- **Smart Config Generation**: `vtcode config` now reads existing `vtcode.toml` and preserves customizations
 - **Complete Template Generation**: Ensures all configuration sections are present, even missing ones
 - **Bidirectional Sync**: Generated configs always match your actual configuration state
 - **Fallback Safety**: Uses system defaults when no configuration file exists
@@ -177,4 +177,4 @@ This release incorporates insights from Anthropic's engineering approach that ac
 - **Context Preservation**: Never lose important information during failures
 - **Decision Transparency**: Complete audit trail of agent actions
 
-These improvements position vtagent as a state-of-the-art coding assistant with exceptional transparency, reliability, and performance on complex software engineering tasks.
+These improvements position vtcode as a state-of-the-art coding assistant with exceptional transparency, reliability, and performance on complex software engineering tasks.

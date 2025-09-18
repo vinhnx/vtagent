@@ -1,5 +1,5 @@
 use serde_json::Value;
-use vtagent_core::utils::ansi::{AnsiRenderer, MessageStyle};
+use vtcode_core::utils::ansi::{AnsiRenderer, MessageStyle};
 
 pub(crate) fn render_tool_output(val: &Value) {
     let mut renderer = AnsiRenderer::stdout();

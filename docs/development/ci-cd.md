@@ -1,6 +1,6 @@
 # CI/CD and Code Quality
 
-This document describes the CI/CD pipeline and code quality tools used in the vtagent project.
+This document describes the CI/CD pipeline and code quality tools used in the vtcode project.
 
 ## GitHub Actions Workflows
 
@@ -222,8 +222,8 @@ Configure branch protection rules in GitHub:
 Add these badges to your README:
 
 ```markdown
-[![CI](https://github.com/yourusername/vtagent/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/vtagent/actions/workflows/ci.yml)
-[![Code Quality](https://github.com/yourusername/vtagent/actions/workflows/code-quality.yml/badge.svg)](https://github.com/yourusername/vtagent/actions/workflows/code-quality.yml)
+[![CI](https://github.com/yourusername/vtcode/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/vtcode/actions/workflows/ci.yml)
+[![Code Quality](https://github.com/yourusername/vtcode/actions/workflows/code-quality.yml/badge.svg)](https://github.com/yourusername/vtcode/actions/workflows/code-quality.yml)
 ```
 
 ## Troubleshooting

@@ -1,7 +1,7 @@
 use std::fs;
 use tempfile::tempdir;
-use vtagent_core::tools::tree_sitter::analyzer::Position;
-use vtagent_core::tools::tree_sitter::refactoring::{
+use vtcode_core::tools::tree_sitter::analyzer::Position;
+use vtcode_core::tools::tree_sitter::refactoring::{
     CodeChange, RefactoringEngine, RefactoringKind, RefactoringOperation, TextRange,
 };
 

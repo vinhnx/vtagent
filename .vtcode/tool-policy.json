@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "available_tools": [
+    "grep_search",
+    "list_files",
+    "run_terminal_cmd",
+    "read_file",
+    "write_file",
+    "edit_file",
+    "ast_grep_search",
+    "simple_search",
+    "bash",
+    "apply_patch",
+    "srgn"
+  ],
+  "policies": {
+    "grep_search": "allow",
+    "list_files": "allow",
+    "run_terminal_cmd": "allow",
+    "read_file": "allow",
+    "write_file": "prompt",
+    "edit_file": "allow",
+    "ast_grep_search": "allow",
+    "simple_search": "prompt",
+    "bash": "allow",
+    "apply_patch": "prompt",
+    "srgn": "prompt"
+  },
+  "constraints": {
+    "list_files": {
+      "allowed_modes": null,
+      "max_results_per_call": null,
+      "max_items_per_call": 500,
+      "default_response_format": "concise",
+      "max_bytes_per_read": null
+    },
+    "grep_search": {
+      "allowed_modes": null,
+      "max_results_per_call": 200,
+      "max_items_per_call": null,
+      "default_response_format": "concise",
+      "max_bytes_per_read": null
+    },
+    "read_file": {
+      "allowed_modes": null,
+      "max_results_per_call": null,
+      "max_items_per_call": null,
+      "default_response_format": null,
+      "max_bytes_per_read": 200000
+    },
+    "run_terminal_cmd": {
+      "allowed_modes": [
+        "terminal"
+      ],
+      "max_results_per_call": null,
+      "max_items_per_call": null,
+      "default_response_format": "concise",
+      "max_bytes_per_read": null
+    }
+  }
+}

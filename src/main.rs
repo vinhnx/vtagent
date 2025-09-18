@@ -1,16 +1,16 @@
-//! VTAgent - Research-preview Rust coding agent
+//! VTCode - Research-preview Rust coding agent
 //!
 //! Thin binary entry point that delegates to modular CLI handlers.
 
 use anyhow::{Context, Result, anyhow, bail};
 use clap::Parser;
 use std::path::PathBuf;
-use vtagent_core::cli::args::{Cli, Commands};
-use vtagent_core::config::api_keys::{ApiKeySources, get_api_key, load_dotenv};
-use vtagent_core::config::loader::ConfigManager;
-use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
-use vtagent_core::ui::theme::{self as ui_theme, DEFAULT_THEME_ID};
-use vtagent_core::{initialize_dot_folder, load_user_config, update_theme_preference};
+use vtcode_core::cli::args::{Cli, Commands};
+use vtcode_core::config::api_keys::{ApiKeySources, get_api_key, load_dotenv};
+use vtcode_core::config::loader::ConfigManager;
+use vtcode_core::config::types::AgentConfig as CoreAgentConfig;
+use vtcode_core::ui::theme::{self as ui_theme, DEFAULT_THEME_ID};
+use vtcode_core::{initialize_dot_folder, load_user_config, update_theme_preference};
 
 mod agent;
 mod cli; // local CLI handlers in src/cli // agent runloops (single-agent only)
@@ -42,10 +42,10 @@ async fn main() -> Result<()> {
 
     cli::set_workspace_env(&workspace);
 
-    // Load configuration (vtagent.toml or defaults) from resolved workspace
+    // Load configuration (vtcode.toml or defaults) from resolved workspace
     let config_manager = ConfigManager::load_from_workspace(&workspace).with_context(|| {
         format!(
-            "Failed to load vtagent configuration for workspace {}",
+            "Failed to load vtcode configuration for workspace {}",
             workspace.display()
         )
     })?;
@@ -139,11 +139,11 @@ async fn main() -> Result<()> {
 
     match &args.command {
         Some(Commands::ToolPolicy { command }) => {
-            vtagent_core::cli::tool_policy_commands::handle_tool_policy_command(command.clone())
+            vtcode_core::cli::tool_policy_commands::handle_tool_policy_command(command.clone())
                 .await?;
         }
         Some(Commands::Models { command }) => {
-            vtagent_core::cli::models_commands::handle_models_command(&args, command).await?;
+            vtcode_core::cli::models_commands::handle_models_command(&args, command).await?;
         }
         Some(Commands::Chat) => {
             cli::handle_chat_command(&core_cfg, skip_confirmations, args.full_auto).await?;

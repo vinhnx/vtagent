@@ -1,11 +1,11 @@
 use std::fs;
 use std::path::Path;
 
-use vtagent_core::config::core::AgentOnboardingConfig;
-use vtagent_core::config::loader::VTAgentConfig;
-use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
-use vtagent_core::ui::styled::Styles;
-use vtagent_core::utils::utils::{
+use vtcode_core::config::core::AgentOnboardingConfig;
+use vtcode_core::config::loader::VTCodeConfig;
+use vtcode_core::config::types::AgentConfig as CoreAgentConfig;
+use vtcode_core::ui::styled::Styles;
+use vtcode_core::utils::utils::{
     ProjectOverview, build_project_overview, summarize_workspace_languages,
 };
 
@@ -19,7 +19,7 @@ pub(crate) struct SessionBootstrap {
 
 pub(crate) fn prepare_session_bootstrap(
     runtime_cfg: &CoreAgentConfig,
-    vt_cfg: Option<&VTAgentConfig>,
+    vt_cfg: Option<&VTCodeConfig>,
 ) -> SessionBootstrap {
     let onboarding_cfg = vt_cfg
         .map(|cfg| cfg.agent.onboarding.clone())
@@ -283,7 +283,7 @@ mod tests {
         .unwrap();
         fs::write(tmp.path().join("README.md"), "Demo workspace\n").unwrap();
 
-        let mut vt_cfg = VTAgentConfig::default();
+        let mut vt_cfg = VTCodeConfig::default();
         vt_cfg.agent.onboarding.include_language_summary = false;
         vt_cfg.agent.onboarding.guideline_highlight_limit = 2;
         vt_cfg.agent.onboarding.usage_tips = vec!["Tip one".into()];
@@ -291,12 +291,12 @@ mod tests {
         vt_cfg.agent.onboarding.chat_placeholder = "Type your plan".into();
 
         let runtime_cfg = CoreAgentConfig {
-            model: vtagent_core::config::constants::models::google::GEMINI_2_5_FLASH_LITE
+            model: vtcode_core::config::constants::models::google::GEMINI_2_5_FLASH_LITE
                 .to_string(),
             api_key: "test".to_string(),
             workspace: tmp.path().to_path_buf(),
             verbose: false,
-            theme: vtagent_core::ui::theme::DEFAULT_THEME_ID.to_string(),
+            theme: vtcode_core::ui::theme::DEFAULT_THEME_ID.to_string(),
         };
 
         let bootstrap = prepare_session_bootstrap(&runtime_cfg, Some(&vt_cfg));

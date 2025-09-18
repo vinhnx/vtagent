@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# VTAgent Release Script
-# This script helps create releases for VTAgent using changelogithub
+# VTCode Release Script
+# This script helps create releases for VTCode using changelogithub
 
 set -e
 
@@ -88,7 +88,7 @@ push_tag() {
 # Function to show usage
 show_usage() {
     cat << EOF
-VTAgent Release Script
+VTCode Release Script
 
 USAGE:
     $0 [OPTIONS] [VERSION]
@@ -258,7 +258,7 @@ main() {
 
     print_success "Release $version created successfully!"
     print_info "GitHub Actions will now create the release with changelog"
-    print_info "Check https://github.com/vinhnx/vtagent/releases for the release"
+    print_info "Check https://github.com/vinhnx/vtcode/releases for the release"
 }
 
 # Run main function

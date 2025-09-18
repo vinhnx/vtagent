@@ -3,7 +3,7 @@
 use anyhow::Result;
 use serde_json::json;
 use tempfile::TempDir;
-use vtagent_core::tools::ToolRegistry;
+use vtcode_core::tools::ToolRegistry;
 
 #[tokio::main]
 async fn main() -> Result<()> {

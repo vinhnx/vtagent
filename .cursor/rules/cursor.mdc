@@ -2,10 +2,10 @@
 alwaysApply: true
 ---
 
-# Cursor Rules for vtagent - Rust Code Analysis Tool
+# Cursor Rules for vtcode - Rust Code Analysis Tool
 
 ## Project Context
-This is a Rust project called "vtagent" that appears to be a code analysis tool with tree-sitter support for multiple programming languages (Rust, Python, JavaScript, TypeScript, Go, Java).
+This is a Rust project called "vtcode" that appears to be a code analysis tool with tree-sitter support for multiple programming languages (Rust, Python, JavaScript, TypeScript, Go, Java).
 
 ## Code Style and Standards
 

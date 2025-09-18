@@ -1,6 +1,6 @@
 # Decision Ledger
 
-VTAgent maintains a compact, structured record of key decisions during a session and injects it into the system prompt each turn. This improves reliability by keeping implicit choices explicit and visible to the model.
+VTCode maintains a compact, structured record of key decisions during a session and injects it into the system prompt each turn. This improves reliability by keeping implicit choices explicit and visible to the model.
 
 - What’s tracked: current goal, major tool calls (name + args preview), compression/recovery events, and brief outcomes.
 - Where it appears: a `[Decision Ledger]` section is appended to the system prompt for each model turn.

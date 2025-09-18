@@ -1,10 +1,10 @@
 #!/bin/bash
-# VTAgent End-to-End Tool Call Testing Script
+# VTCode End-to-End Tool Call Testing Script
 # Tests various tool calls to ensure they work correctly
 
 set -e
 
-echo "🧪 VTAgent End-to-End Tool Call Testing"
+echo "🧪 VTCode End-to-End Tool Call Testing"
 echo "======================================="
 
 # Colors for output
@@ -50,9 +50,9 @@ echo -e "\nTesting tool functionality..."
 
 # Test file operations
 run_test "List Directory" "ls -la /tmp" "true"
-run_test "Create Test File" "echo 'test content' > /tmp/vtagent_test.txt" "true"
-run_test "Read Test File" "cat /tmp/vtagent_test.txt" "true"
-run_test "File Exists Check" "test -f /tmp/vtagent_test.txt" "true"
+run_test "Create Test File" "echo 'test content' > /tmp/vtcode_test.txt" "true"
+run_test "Read Test File" "cat /tmp/vtcode_test.txt" "true"
+run_test "File Exists Check" "test -f /tmp/vtcode_test.txt" "true"
 
 # Test search tools
 run_test "Grep Search" "grep -r 'fn main' src/ 2>/dev/null || true" "true"
@@ -65,7 +65,7 @@ run_test "JSON Parse Test" "echo '{\"test\": \"value\"}' | python3 -m json.tool 
 run_test "Network Test" "curl -s --max-time 5 https://httpbin.org/status/200 > /dev/null" "true"
 
 # Cleanup
-run_test "Cleanup Test Files" "rm -f /tmp/vtagent_test.txt" "true"
+run_test "Cleanup Test Files" "rm -f /tmp/vtcode_test.txt" "true"
 
 echo -e "\n📊 Test Results"
 echo "==============="
@@ -74,7 +74,7 @@ echo "Tests Passed: $TESTS_PASSED"
 echo "Success Rate: $((TESTS_PASSED * 100 / TESTS_RUN))%"
 
 if [ $TESTS_PASSED -eq $TESTS_RUN ]; then
-    echo -e "\n${GREEN}🎉 All tests passed! VT Agent tools are working correctly.${NC}"
+    echo -e "\n${GREEN}🎉 All tests passed! VTCode tools are working correctly.${NC}"
     exit 0
 else
     echo -e "\n${RED}⚠️  Some tests failed. Please check the output above.${NC}"

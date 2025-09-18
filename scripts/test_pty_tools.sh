@@ -1,10 +1,10 @@
 #!/bin/bash
-# VTAgent Tools Focused Test
+# VTCode Tools Focused Test
 # Tests availability and basic functionality of external tools
 
 set -e
 
-echo "🧪 VTAgent Tools Test"
+echo "🧪 VTCode Tools Test"
 echo "===================="
 
 # Colors
@@ -52,10 +52,10 @@ echo "============================"
 
 #! Following tests renumbered after removal of PTY checks
 # Test 4: Ripgrep functionality
-run_test "Ripgrep Functionality" "echo 'test content' > /tmp/vtagent_test.txt && rg 'test' /tmp/vtagent_test.txt && rm /tmp/vtagent_test.txt" "test content"
+run_test "Ripgrep Functionality" "echo 'test content' > /tmp/vtcode_test.txt && rg 'test' /tmp/vtcode_test.txt && rm /tmp/vtcode_test.txt" "test content"
 
 # Test 5: AST-grep functionality
-run_test "AST Grep Functionality" "echo 'fn test() {}' > /tmp/vtagent_test.rs && ast-grep --lang rust --pattern 'fn \$A() {}' /tmp/vtagent_test.rs && rm /tmp/vtagent_test.rs" "fn test()"
+run_test "AST Grep Functionality" "echo 'fn test() {}' > /tmp/vtcode_test.rs && ast-grep --lang rust --pattern 'fn \$A() {}' /tmp/vtcode_test.rs && rm /tmp/vtcode_test.rs" "fn test()"
 
 echo -e "\nTesting Code Structure"
 echo "========================="

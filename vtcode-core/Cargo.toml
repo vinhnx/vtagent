@@ -8,7 +8,7 @@ license = "MIT"
 readme = "../README.md"
 homepage = "https://github.com/vinhnx/vtcode"
 repository = "https://github.com/vinhnx/vtcode"
-keywords = ["ai", "coding", "agent", "llm", "library", "rust"]
+keywords = ["ai", "coding", "agent", "llm", "rust"]
 categories = ["development-tools", "api-bindings"]
 
 [dependencies]

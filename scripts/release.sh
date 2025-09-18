@@ -108,6 +108,11 @@ get_current_version() {
     grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/'
 }
 
+# Function to get current version from vtcode-core/Cargo.toml
+get_core_version() {
+    grep '^version = ' vtcode-core/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/'
+}
+
 # Function to update version in Cargo.toml files
 update_version() {
     local new_version=$1
@@ -259,12 +264,12 @@ update_homebrew_formula() {
     print_info "4. Users can then run: brew install vinhnx/tap/vtcode"
 }
 
-# Function to update version in vtagent-core/Cargo.toml
+# Function to update version in vtcode-core/Cargo.toml
 update_core_version() {
     local new_version=$1
-    sed -i.bak "s/^version = \".*\"/version = \"$new_version\"/" vtagent-core/Cargo.toml
-    rm vtagent-core/Cargo.toml.bak
-    print_success "Updated vtagent-core version to $new_version"
+    sed -i.bak "s/^version = \".*\"/version = \"$new_version\"/" vtcode-core/Cargo.toml
+    rm vtcode-core/Cargo.toml.bak
+    print_success "Updated vtcode-core version to $new_version"
 }
 
 # Function to create git tag
@@ -437,7 +442,7 @@ main() {
     local current_version=$(get_current_version)
     print_info "Current version: $current_version"
     local current_core_version=$(get_core_version)
-    print_info "Current vtagent-core version: $current_core_version"
+    print_info "Current vtcode-core version: $current_core_version"
 
     # Determine new version
     if [ -n "$increment_type" ]; then
@@ -486,14 +491,21 @@ main() {
         exit 0
     fi
 
-    # Prompt for core version update
+    # Handle core version update
     local core_version=""
-    echo
-    read -p "Enter new vtagent-core version (leave blank to skip): " core_version
-    if [ -n "$core_version" ]; then
-        print_info "vtagent-core will be bumped to $core_version"
+    if [ "$dry_run" = true ]; then
+        # In dry-run mode, use the same version as main package
+        core_version="$version"
+        print_info "vtcode-core will be bumped to $core_version (dry-run)"
     else
-        print_warning "Skipping vtagent-core version bump"
+        # Interactive mode - prompt for core version
+        echo
+        read -p "Enter new vtcode-core version (leave blank to skip): " core_version
+        if [ -n "$core_version" ]; then
+            print_info "vtcode-core will be bumped to $core_version"
+        else
+            print_warning "Skipping vtcode-core version bump"
+        fi
     fi
 
     # Confirm release
@@ -521,7 +533,7 @@ main() {
 
     if [ -n "$core_version" ]; then
         update_core_version "$core_version"
-        files_to_commit="$files_to_commit vtagent-core/Cargo.toml"
+        files_to_commit="$files_to_commit vtcode-core/Cargo.toml"
     fi
 
     # Publish to different providers

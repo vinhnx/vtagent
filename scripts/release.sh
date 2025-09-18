@@ -153,13 +153,19 @@ get_core_version() {
 update_version() {
     local new_version=$1
 
-    # Update main Cargo.toml
-    sed -i.bak "s/^version = \".*\"/version = \"$new_version\"/" Cargo.toml
-    rm Cargo.toml.bak
+    # Update main Cargo.toml package version only
+    local line_num_main=$(grep -n "^version = " Cargo.toml | head -1 | cut -d: -f1)
+    if [ -n "$line_num_main" ]; then
+        sed -i.bak "${line_num_main}s/version = \".*\"/version = \"$new_version\"/" Cargo.toml
+        rm Cargo.toml.bak
+    fi
 
-    # Update vtcode-core Cargo.toml
-    sed -i.bak "s/^version = \".*\"/version = \"$new_version\"/" vtcode-core/Cargo.toml
-    rm vtcode-core/Cargo.toml.bak
+    # Update vtcode-core Cargo.toml package version only
+    local line_num_core=$(grep -n "^version = " vtcode-core/Cargo.toml | head -1 | cut -d: -f1)
+    if [ -n "$line_num_core" ]; then
+        sed -i.bak "${line_num_core}s/version = \".*\"/version = \"$new_version\"/" vtcode-core/Cargo.toml
+        rm vtcode-core/Cargo.toml.bak
+    fi
 
     print_success "Updated version to $new_version in all package files"
 }
@@ -512,22 +518,23 @@ main() {
         core_version="$version"
         print_info "vtcode-core will be bumped to $core_version (dry-run)"
     else
-        # Interactive mode - prompt for core version with validation
-        while true; do
-            echo
-            read -p "Enter new vtcode-core version (leave blank to skip): " core_version_input
-            if [ -z "$core_version_input" ]; then
-                print_warning "Skipping vtcode-core version bump"
-                core_version=""
-                break
-            elif [[ "$core_version_input" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]]; then
-                core_version="$core_version_input"
-                print_info "vtcode-core will be bumped to $core_version"
-                break
-            else
-                print_error "Invalid version format. Please use semantic versioning (e.g., 1.2.3, 1.2.3-alpha.1)"
-            fi
-        done
+        # Interactive mode - prompt for core version with default
+        echo
+        read -p "Enter new vtcode-core version (default: $version, leave blank to skip): " core_version_input
+        if [ -z "$core_version_input" ]; then
+            print_warning "Skipping vtcode-core version bump"
+            core_version=""
+        elif [[ "$core_version_input" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]]; then
+            core_version="$core_version_input"
+            print_info "vtcode-core will be bumped to $core_version"
+        elif [ "$core_version_input" = "default" ] || [ "$core_version_input" = "d" ]; then
+            core_version="$version"
+            print_info "vtcode-core will be bumped to $core_version (using default)"
+        else
+            print_error "Invalid version format. Please use semantic versioning (e.g., 1.2.3, 1.2.3-alpha.1) or 'default' to use $version"
+            print_info "Skipping vtcode-core version bump due to invalid input"
+            core_version=""
+        fi
     fi
 
     # Confirm release

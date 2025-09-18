@@ -1,3 +1,5 @@
+Available through homebrew, npm, and direct binary downloads from GitHub releases,
+
 --
 
 https://deepwiki.com/crate-ci/cargo-release

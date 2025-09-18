@@ -164,6 +164,17 @@ update_version() {
     print_success "Updated version to $new_version in all package files"
 }
 
+# Function to update vtcode-core version only
+update_core_version() {
+    local new_version=$1
+
+    # Update vtcode-core Cargo.toml only
+    sed -i.bak "s/^version = \".*\"/version = \"$new_version\"/" vtcode-core/Cargo.toml
+    rm vtcode-core/Cargo.toml.bak
+
+    print_success "Updated vtcode-core version to $new_version"
+}
+
 # Function to validate package metadata
 validate_metadata() {
     print_info "Validating package metadata..."

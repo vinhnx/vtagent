@@ -46,6 +46,10 @@ All notable changes to vtcode will be documented in this file.
 - **Flexible Methodology**: Adaptable problem-solving approaches
 - **Quality First**: Emphasize correctness over speed
 
+### **Release Automation**
+
+- **Coordinated Version Bumps**: `scripts/release.sh` now prompts maintainers to bump the `vtagent-core` crate alongside the main binary, keeping release metadata synchronized.
+
 ### **Transparency & Observability**
 
 #### Verbose Mode Enhancements

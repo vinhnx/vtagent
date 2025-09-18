@@ -259,6 +259,14 @@ update_homebrew_formula() {
     print_info "4. Users can then run: brew install vinhnx/tap/vtcode"
 }
 
+# Function to update version in vtagent-core/Cargo.toml
+update_core_version() {
+    local new_version=$1
+    sed -i.bak "s/^version = \".*\"/version = \"$new_version\"/" vtagent-core/Cargo.toml
+    rm vtagent-core/Cargo.toml.bak
+    print_success "Updated vtagent-core version to $new_version"
+}
+
 # Function to create git tag
 create_tag() {
     local version=$1
@@ -425,9 +433,11 @@ main() {
         exit 1
     fi
 
-    # Get current version
+    # Get current versions
     local current_version=$(get_current_version)
     print_info "Current version: $current_version"
+    local current_core_version=$(get_core_version)
+    print_info "Current vtagent-core version: $current_core_version"
 
     # Determine new version
     if [ -n "$increment_type" ]; then
@@ -476,6 +486,16 @@ main() {
         exit 0
     fi
 
+    # Prompt for core version update
+    local core_version=""
+    echo
+    read -p "Enter new vtagent-core version (leave blank to skip): " core_version
+    if [ -n "$core_version" ]; then
+        print_info "vtagent-core will be bumped to $core_version"
+    else
+        print_warning "Skipping vtagent-core version bump"
+    fi
+
     # Confirm release
     echo
     print_warning "This will create a release for version $version"
@@ -497,6 +517,12 @@ main() {
 
     # Update version in all package files
     update_version "$version"
+    local files_to_commit="Cargo.toml"
+
+    if [ -n "$core_version" ]; then
+        update_core_version "$core_version"
+        files_to_commit="$files_to_commit vtagent-core/Cargo.toml"
+    fi
 
     # Publish to different providers
     if [[ "$skip_crates" != "true" ]]; then

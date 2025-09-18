@@ -1,6 +1,6 @@
 [package]
-name = "vtcode-core"
-version = "0.1.0"
+name = "vtagent-core"
+version = "0.2.0"
 edition = "2024"
 authors = ["vinhnx <vinhnx@users.noreply.github.com>"]
 description = "Core library for VTCode - a Rust-based terminal coding agent"

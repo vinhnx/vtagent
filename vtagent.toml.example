@@ -46,8 +46,7 @@ default_policy = "prompt"
 
 # Maximum inner tool-call loops per user turn
 # Prevents infinite tool-calling cycles during chat
-# Env override: VTAGENT_MAX_TOOL_LOOPS
-max_tool_loops = 30
+max_tool_loops = 100
 
 # Override default policy for specific tools
 [tools.policies]

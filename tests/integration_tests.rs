@@ -1,5 +1,8 @@
 use serde_json::json;
 use tempfile::TempDir;
+use vtagent_core::config::constants::tools;
+use vtagent_core::config::loader::ConfigManager;
+use vtagent_core::tool_policy::ToolPolicy as RuntimeToolPolicy;
 use vtagent_core::tools::ToolRegistry;
 
 #[cfg(test)]
@@ -59,6 +62,43 @@ mod integration_tests {
 
         let response: serde_json::Value = result.unwrap();
         assert_eq!(response["content"], test_content);
+    }
+
+    #[tokio::test]
+    async fn test_tools_config_overrides_policies() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace = temp_dir.path();
+        std::env::set_current_dir(workspace).unwrap();
+
+        let config_contents = r#"
+[tools]
+default_policy = "deny"
+
+[tools.policies]
+read_file = "allow"
+"#;
+
+        std::fs::write(workspace.join("vtagent.toml"), config_contents).unwrap();
+        std::fs::write(workspace.join("sample.txt"), "hello world").unwrap();
+
+        let mut registry = ToolRegistry::new(workspace.to_path_buf());
+        registry.initialize_async().await.unwrap();
+
+        let cfg_manager = ConfigManager::load_from_workspace(workspace).unwrap();
+        registry
+            .apply_config_policies(&cfg_manager.config().tools)
+            .unwrap();
+
+        assert_eq!(
+            registry.get_tool_policy(tools::READ_FILE),
+            RuntimeToolPolicy::Allow
+        );
+
+        let result = registry
+            .execute_tool(tools::READ_FILE, json!({ "path": "sample.txt" }))
+            .await
+            .unwrap();
+        assert!(result["success"].as_bool().unwrap_or(false));
     }
 
     #[tokio::test]

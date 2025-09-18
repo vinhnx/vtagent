@@ -2,6 +2,7 @@ use anyhow::Result;
 use std::io;
 use std::path::Path;
 
+use vtagent_core::config::constants::defaults;
 use vtagent_core::config::loader::VTAgentConfig;
 use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
 use vtagent_core::core::decision_tracker::{Action as DTAction, DecisionOutcome, DecisionTracker};
@@ -38,6 +39,14 @@ fn persist_theme_preference(renderer: &mut AnsiRenderer, theme_id: &str) -> Resu
     Ok(())
 }
 
+fn ensure_turn_bottom_gap(renderer: &mut AnsiRenderer, applied: &mut bool) -> Result<()> {
+    if !*applied {
+        renderer.line(MessageStyle::Output, "")?;
+        *applied = true;
+    }
+    Ok(())
+}
+
 pub(crate) async fn run_single_agent_loop_gemini(
     config: &CoreAgentConfig,
     vt_cfg: Option<&VTAgentConfig>,
@@ -62,6 +71,14 @@ pub(crate) async fn run_single_agent_loop_gemini(
 
     let mut tool_registry = ToolRegistry::new(config.workspace.clone());
     tool_registry.initialize_async().await?;
+    if let Some(cfg) = vt_cfg {
+        if let Err(err) = tool_registry.apply_config_policies(&cfg.tools) {
+            eprintln!(
+                "Warning: Failed to apply tool policies from config: {}",
+                err
+            );
+        }
+    }
     let function_declarations = build_function_declarations();
     let tools = vec![Tool {
         function_declarations,
@@ -179,8 +196,6 @@ pub(crate) async fn run_single_agent_loop_gemini(
             }
         }
 
-        renderer.line(MessageStyle::User, input)?;
-
         conversation_history.push(Content::user_text(input));
         let _pruned_tools = prune_gemini_tool_responses(
             &mut conversation_history,
@@ -221,22 +236,35 @@ pub(crate) async fn run_single_agent_loop_gemini(
         }
 
         let mut working_history = conversation_history.clone();
-        let max_tool_loops = std::env::var("VTAGENT_MAX_TOOL_LOOPS")
-            .ok()
-            .and_then(|value| value.parse::<usize>().ok())
+        let max_tool_loops = vt_cfg
+            .map(|cfg| cfg.tools.max_tool_loops)
             .filter(|&value| value > 0)
-            .or_else(|| {
-                vt_cfg
-                    .map(|cfg| cfg.tools.max_tool_loops)
-                    .filter(|&value| value > 0)
-            })
-            .unwrap_or(6);
+            .unwrap_or(defaults::DEFAULT_MAX_TOOL_LOOPS);
         let mut loop_guard = 0usize;
         let mut any_write_effect = false;
+        let mut bottom_gap_applied = false;
 
         'outer: loop {
+            if loop_guard == 0 {
+                renderer.line(MessageStyle::Output, "")?;
+            }
             loop_guard += 1;
             if loop_guard >= max_tool_loops {
+                if !bottom_gap_applied {
+                    renderer.line(MessageStyle::Output, "")?;
+                }
+                let notice = format!(
+                    "I reached the configured tool-call limit of {} for this turn and paused further tool execution. Increase `tools.max_tool_loops` in vtagent.toml if you need more, then ask me to continue.",
+                    max_tool_loops
+                );
+                renderer.line(MessageStyle::Response, &notice)?;
+                ensure_turn_bottom_gap(&mut renderer, &mut bottom_gap_applied)?;
+                let notice_content = Content {
+                    role: "model".to_string(),
+                    parts: vec![Part::Text { text: notice }],
+                };
+                working_history.push(notice_content.clone());
+                conversation_history.push(notice_content);
                 break 'outer;
             }
 
@@ -377,6 +405,7 @@ pub(crate) async fn run_single_agent_loop_gemini(
                                 })
                                 .unwrap_or_else(|| "Command completed successfully.".to_string());
                             renderer.line(MessageStyle::Response, &reply)?;
+                            ensure_turn_bottom_gap(&mut renderer, &mut bottom_gap_applied)?;
                             conversation_history.push(Content {
                                 role: "model".to_string(),
                                 parts: vec![Part::Text { text: reply }],
@@ -385,6 +414,7 @@ pub(crate) async fn run_single_agent_loop_gemini(
                         } else {
                             renderer
                                 .line(MessageStyle::Error, &format!("Provider error: {error}"))?;
+                            ensure_turn_bottom_gap(&mut renderer, &mut bottom_gap_applied)?;
                             break 'outer;
                         }
                     }
@@ -455,6 +485,7 @@ pub(crate) async fn run_single_agent_loop_gemini(
                 {
                     renderer.line(MessageStyle::Response, &text)?;
                 }
+                ensure_turn_bottom_gap(&mut renderer, &mut bottom_gap_applied)?;
                 break 'outer;
             }
 

@@ -112,6 +112,7 @@ pub mod defaults {
     pub const DEFAULT_PROVIDER: &str = "gemini";
     pub const DEFAULT_API_KEY_ENV: &str = "GEMINI_API_KEY";
     pub const DEFAULT_THEME: &str = "ciapre-dark";
+    pub const DEFAULT_MAX_TOOL_LOOPS: usize = 100;
 }
 
 /// Message role constants to avoid hardcoding strings

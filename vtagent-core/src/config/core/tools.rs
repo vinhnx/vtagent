@@ -1,6 +1,8 @@
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
+use crate::config::constants::defaults;
+
 /// Tools configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ToolsConfig {
@@ -18,7 +20,6 @@ pub struct ToolsConfig {
     /// many back-and-forths the agent will perform executing tools and
     /// re-asking the model before returning a final answer.
     ///
-    /// Can be overridden by env var `VTAGENT_MAX_TOOL_LOOPS`.
     #[serde(default = "default_max_tool_loops")]
     pub max_tool_loops: usize,
 }
@@ -53,5 +54,5 @@ fn default_tool_policy() -> ToolPolicy {
 }
 
 fn default_max_tool_loops() -> usize {
-    6
+    defaults::DEFAULT_MAX_TOOL_LOOPS
 }

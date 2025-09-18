@@ -5,7 +5,7 @@ use sysinfo::System;
 use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
 use vtagent_core::tool_policy::{ToolPolicy, ToolPolicyManager};
 use vtagent_core::ui::theme;
-use vtagent_core::utils::ansi::{AnsiRenderer, MessageStyle};
+use vtagent_core::utils::ansi::AnsiRenderer;
 
 use super::welcome::SessionBootstrap;
 
@@ -14,8 +14,11 @@ pub(crate) fn render_session_banner(
     config: &CoreAgentConfig,
     session_bootstrap: &SessionBootstrap,
 ) -> Result<()> {
-    let styles = theme::active_styles();
-    renderer.line_with_style(styles.primary, "Welcome to VT Code!")?;
+    let banner_style = theme::banner_style();
+    renderer.line_with_style(
+        banner_style,
+        "Welcome to VT Code, how can I help you today?",
+    )?;
 
     let mut bullets = Vec::new();
     bullets.push(format!("- Model: {}", config.model));
@@ -76,10 +79,10 @@ pub(crate) fn render_session_banner(
     }
 
     for line in bullets {
-        renderer.line(MessageStyle::Output, &line)?;
+        renderer.line_with_style(banner_style, &line)?;
     }
 
-    renderer.line(MessageStyle::Output, "")?;
+    renderer.line_with_style(banner_style, "")?;
 
     Ok(())
 }

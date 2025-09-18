@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use std::io;
 use std::path::Path;
 
-use vtagent_core::config::constants::tools;
+use vtagent_core::config::constants::{defaults, tools};
 use vtagent_core::config::loader::VTAgentConfig;
 use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
 use vtagent_core::core::decision_tracker::{Action as DTAction, DecisionOutcome, DecisionTracker};
@@ -38,6 +38,14 @@ fn persist_theme_preference(renderer: &mut AnsiRenderer, theme_id: &str) -> Resu
     Ok(())
 }
 
+fn ensure_turn_bottom_gap(renderer: &mut AnsiRenderer, applied: &mut bool) -> Result<()> {
+    if !*applied {
+        renderer.line(MessageStyle::Output, "")?;
+        *applied = true;
+    }
+    Ok(())
+}
+
 pub(crate) async fn run_single_agent_loop_unified(
     config: &CoreAgentConfig,
     vt_cfg: Option<&VTAgentConfig>,
@@ -60,6 +68,14 @@ pub(crate) async fn run_single_agent_loop_unified(
 
     let mut tool_registry = ToolRegistry::new(config.workspace.clone());
     tool_registry.initialize_async().await?;
+    if let Some(cfg) = vt_cfg {
+        if let Err(err) = tool_registry.apply_config_policies(&cfg.tools) {
+            eprintln!(
+                "Warning: Failed to apply tool policies from config: {}",
+                err
+            );
+        }
+    }
     let declarations = build_function_declarations();
     let tools: Vec<uni::ToolDefinition> = declarations
         .into_iter()
@@ -177,8 +193,6 @@ pub(crate) async fn run_single_agent_loop_unified(
             }
         }
 
-        renderer.line(MessageStyle::User, input)?;
-
         let refined_user = refine_user_prompt_if_enabled(input, config, vt_cfg).await;
         conversation_history.push(uni::Message::user(refined_user));
         let _pruned_tools = prune_unified_tool_responses(
@@ -198,24 +212,32 @@ pub(crate) async fn run_single_agent_loop_unified(
         }
 
         let mut working_history = conversation_history.clone();
-        let max_tool_loops = std::env::var("VTAGENT_MAX_TOOL_LOOPS")
-            .ok()
-            .and_then(|value| value.parse::<usize>().ok())
+        let max_tool_loops = vt_cfg
+            .map(|cfg| cfg.tools.max_tool_loops)
             .filter(|&value| value > 0)
-            .or_else(|| {
-                vt_cfg
-                    .map(|cfg| cfg.tools.max_tool_loops)
-                    .filter(|&value| value > 0)
-            })
-            .unwrap_or(6);
+            .unwrap_or(defaults::DEFAULT_MAX_TOOL_LOOPS);
 
         let mut loop_guard = 0usize;
         let mut any_write_effect = false;
         let mut last_tool_stdout: Option<String> = None;
+        let mut bottom_gap_applied = false;
 
         'outer: loop {
+            if loop_guard == 0 {
+                renderer.line(MessageStyle::Output, "")?;
+            }
             loop_guard += 1;
             if loop_guard >= max_tool_loops {
+                if !bottom_gap_applied {
+                    renderer.line(MessageStyle::Output, "")?;
+                }
+                let notice = format!(
+                    "I reached the configured tool-call limit of {} for this turn and paused further tool execution. Increase `tools.max_tool_loops` in vtagent.toml if you need more, then ask me to continue.",
+                    max_tool_loops
+                );
+                renderer.line(MessageStyle::Response, &notice)?;
+                ensure_turn_bottom_gap(&mut renderer, &mut bottom_gap_applied)?;
+                working_history.push(uni::Message::assistant(notice));
                 break 'outer;
             }
 
@@ -360,6 +382,7 @@ pub(crate) async fn run_single_agent_loop_unified(
                             let reply = derive_recent_tool_output(&working_history)
                                 .unwrap_or_else(|| "Command completed successfully.".to_string());
                             renderer.line(MessageStyle::Response, &reply)?;
+                            ensure_turn_bottom_gap(&mut renderer, &mut bottom_gap_applied)?;
                             working_history.push(uni::Message::assistant(reply));
                             let _ = last_tool_stdout.take();
                             break 'outer;
@@ -515,6 +538,10 @@ pub(crate) async fn run_single_agent_loop_unified(
                                             "Command completed successfully.".to_string()
                                         });
                                         renderer.line(MessageStyle::Response, &reply)?;
+                                        ensure_turn_bottom_gap(
+                                            &mut renderer,
+                                            &mut bottom_gap_applied,
+                                        )?;
                                         working_history.push(uni::Message::assistant(reply));
                                         let _ = last_tool_stdout.take();
                                         break 'outer;
@@ -656,9 +683,12 @@ pub(crate) async fn run_single_agent_loop_unified(
 
                 if !suppress_response {
                     renderer.line(MessageStyle::Response, &text)?;
+                    ensure_turn_bottom_gap(&mut renderer, &mut bottom_gap_applied)?;
                 }
                 working_history.push(uni::Message::assistant(text));
                 let _ = last_tool_stdout.take();
+            } else {
+                ensure_turn_bottom_gap(&mut renderer, &mut bottom_gap_applied)?;
             }
             break 'outer;
         }

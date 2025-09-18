@@ -70,12 +70,6 @@ encourage the agent to use /tmp to store temporary files and clean them up after
 
 --
 
-integrates the Hotpath profiler (available at https://deepwiki.com/pawurb/hotpath), a lightweight tool for pinpointing exactly where your code spends its time
-
---
-
----
-
 ✓ Allow the agent to use 'read_file'? · yes
 ✓ Approved: 'read_file' tool will run now
 [TOOL] list_files {"path":"packages/ai"}

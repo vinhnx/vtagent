@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# vtagent Code Quality Check Script
+# vtcode Code Quality Check Script
 # This script runs the same checks as our CI pipeline
 
 set -e
 
-echo "Running vtagent Code Quality Checks..."
+echo "Running vtcode Code Quality Checks..."
 echo "========================================"
 
 # Colors for output
@@ -207,7 +207,7 @@ case "${1:-}" in
         run_docs
         ;;
     "help"|"-h"|"--help")
-        echo "vtagent Code Quality Check Script"
+        echo "vtcode Code Quality Check Script"
         echo ""
         echo "Usage: $0 [COMMAND]"
         echo ""

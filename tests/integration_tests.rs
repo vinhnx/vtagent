@@ -1,9 +1,9 @@
 use serde_json::json;
 use tempfile::TempDir;
-use vtagent_core::config::constants::tools;
-use vtagent_core::config::loader::ConfigManager;
-use vtagent_core::tool_policy::ToolPolicy as RuntimeToolPolicy;
-use vtagent_core::tools::ToolRegistry;
+use vtcode_core::config::constants::tools;
+use vtcode_core::config::loader::ConfigManager;
+use vtcode_core::tool_policy::ToolPolicy as RuntimeToolPolicy;
+use vtcode_core::tools::ToolRegistry;
 
 #[cfg(test)]
 mod integration_tests {
@@ -78,7 +78,7 @@ default_policy = "deny"
 read_file = "allow"
 "#;
 
-        std::fs::write(workspace.join("vtagent.toml"), config_contents).unwrap();
+        std::fs::write(workspace.join("vtcode.toml"), config_contents).unwrap();
         std::fs::write(workspace.join("sample.txt"), "hello world").unwrap();
 
         let mut registry = ToolRegistry::new(workspace.to_path_buf());

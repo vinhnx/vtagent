@@ -2,8 +2,8 @@
 
 The Router enables dynamic model and engine selection based on task complexity, aligning with agentic best practices (routing, resource awareness, and prioritization).
 
-- Config: `vtagent.toml` → `[router]` section.
-- No hardcoded model IDs: values should match `vtagent-core/src/config/constants.rs` and the authoritative `docs/models.json`.
+- Config: `vtcode.toml` → `[router]` section.
+- No hardcoded model IDs: values should match `vtcode-core/src/config/constants.rs` and the authoritative `docs/models.json`.
 
 ## Keys
 
@@ -31,4 +31,4 @@ Per‑class resource hints used by future tuning (max tokens, parallel tool limi
 
 ## Tests
 
-See `vtagent-core/tests/router_test.rs` for classification and mapping tests. Run with `cargo nextest run`.
+See `vtcode-core/tests/router_test.rs` for classification and mapping tests. Run with `cargo nextest run`.

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use console::style;
-use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
-use vtagent_core::core::agent::snapshots::{SnapshotConfig, SnapshotManager};
+use vtcode_core::config::types::AgentConfig as CoreAgentConfig;
+use vtcode_core::core::agent::snapshots::{SnapshotConfig, SnapshotManager};
 
 pub async fn handle_snapshots_command(config: &CoreAgentConfig) -> Result<()> {
     println!("{}", style("Available Snapshots").blue().bold());

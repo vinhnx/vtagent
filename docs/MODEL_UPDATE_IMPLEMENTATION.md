@@ -2,12 +2,12 @@
 
 ## Overview
 
-This document details the comprehensive implementation of model updates for VTAgent as of September 2025, adding 47 new models across 2 new providers and updating all existing providers with their latest releases.
+This document details the comprehensive implementation of model updates for VTCode as of September 2025, adding 47 new models across 2 new providers and updating all existing providers with their latest releases.
 
 ## Implementation Approach
 
 ### Objective
-Update the VTAgent codebase to focus on the latest and most capable AI models as of September 2025, removing outdated or less relevant providers and models while maintaining backward compatibility.
+Update the VTCode codebase to focus on the latest and most capable AI models as of September 2025, removing outdated or less relevant providers and models while maintaining backward compatibility.
 
 ### Models to Keep
 
@@ -135,10 +135,10 @@ Update the VTAgent codebase to focus on the latest and most capable AI models as
 ## Configuration Updates
 
 ### Updated Files
-- `vtagent-core/src/config/models.rs` - Main model definitions
-- `vtagent-core/src/config/constants.rs` - Updated constants
-- `vtagent-core/src/llm/client.rs` - Provider factory updates
-- `vtagent.toml.example` - Configuration examples
+- `vtcode-core/src/config/models.rs` - Main model definitions
+- `vtcode-core/src/config/constants.rs` - Updated constants
+- `vtcode-core/src/llm/client.rs` - Provider factory updates
+- `vtcode.toml.example` - Configuration examples
 
 ### Model Organization
 - Type-safe enum with future-ready models
@@ -168,7 +168,7 @@ Update the VTAgent codebase to focus on the latest and most capable AI models as
 - **Groq** (18 models): Latest 2025 models
 
 #### 4. Configuration Updates
-- Updated `vtagent.toml.example` with all 67 models
+- Updated `vtcode.toml.example` with all 67 models
 - Updated constants and defaults
 - Fixed model string mappings
 - Updated fallback and provider-specific defaults
@@ -195,9 +195,9 @@ Update the VTAgent codebase to focus on the latest and most capable AI models as
 - **Cost Optimization**: New preview and lite models for efficiency
 
 ## Files Modified
-- `vtagent-core/src/config/models.rs` (partial)
-- `vtagent-core/src/config/constants.rs` (complete)
-- `vtagent.toml.example` (complete)
+- `vtcode-core/src/config/models.rs` (partial)
+- `vtcode-core/src/config/constants.rs` (complete)
+- `vtcode.toml.example` (complete)
 - Various utility files need model name updates
 
 ## Next Steps

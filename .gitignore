@@ -734,7 +734,7 @@ $RECYCLE.BIN/
 .tmp/
 .temp/
 
-# Custom ignores for vtagent
+# Custom ignores for vtcode
 *.session
 *.conversation
 *.context

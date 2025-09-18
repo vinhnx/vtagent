@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# VTAgent Modular Architecture Validation Script
+# VTCode Modular Architecture Validation Script
 # This script validates that the refactoring was successful
 
-echo "🔍 VTAgent Modular Architecture Validation"
+echo "🔍 VTCode Modular Architecture Validation"
 echo "=========================================="
 
 # Test compilation
@@ -21,19 +21,19 @@ echo "📊 Module Statistics:"
 echo "--------------------"
 
 # Count gemini modules
-gemini_modules=$(find vtagent-core/src/gemini -name "*.rs" | wc -l)
+gemini_modules=$(find vtcode-core/src/gemini -name "*.rs" | wc -l)
 echo "Gemini modules: $gemini_modules"
 
 # Count config modules
-config_modules=$(find vtagent-core/src/config -name "*.rs" | wc -l)
+config_modules=$(find vtcode-core/src/config -name "*.rs" | wc -l)
 echo "Config modules: $config_modules"
 
 # Count code_completion modules
-completion_modules=$(find vtagent-core/src/code_completion -name "*.rs" | wc -l)
+completion_modules=$(find vtcode-core/src/code_completion -name "*.rs" | wc -l)
 echo "Code completion modules: $completion_modules"
 
 # Count code_quality modules
-quality_modules=$(find vtagent-core/src/code_quality -name "*.rs" | wc -l)
+quality_modules=$(find vtcode-core/src/code_quality -name "*.rs" | wc -l)
 echo "Code quality modules: $quality_modules"
 
 # Count CLI modules
@@ -41,11 +41,11 @@ cli_modules=$(find src/cli -name "*.rs" 2>/dev/null | wc -l)
 echo "CLI modules: $cli_modules"
 
 # Count LLM modules
-llm_modules=$(find vtagent-core/src/llm_modular -name "*.rs" 2>/dev/null | wc -l)
+llm_modules=$(find vtcode-core/src/llm_modular -name "*.rs" 2>/dev/null | wc -l)
 echo "LLM modules: $llm_modules"
 
 # Count prompt modules
-prompt_modules=$(find vtagent-core/src/prompts_modular -name "*.rs" 2>/dev/null | wc -l)
+prompt_modules=$(find vtcode-core/src/prompts_modular -name "*.rs" 2>/dev/null | wc -l)
 echo "Prompt modules: $prompt_modules"
 
 total_modules=$((gemini_modules + config_modules + completion_modules + quality_modules + cli_modules + llm_modules + prompt_modules))
@@ -57,22 +57,22 @@ echo "---------------------------"
 
 # Check that legacy files exist
 legacy_files=0
-if [ -f "vtagent-core/src/gemini_legacy.rs" ]; then
+if [ -f "vtcode-core/src/gemini_legacy.rs" ]; then
     echo "gemini_legacy.rs preserved"
     legacy_files=$((legacy_files + 1))
 fi
 
-if [ -f "vtagent-core/src/config_legacy.rs" ]; then
+if [ -f "vtcode-core/src/config_legacy.rs" ]; then
     echo "config_legacy.rs preserved"
     legacy_files=$((legacy_files + 1))
 fi
 
-if [ -f "vtagent-core/src/code_completion_legacy.rs" ]; then
+if [ -f "vtcode-core/src/code_completion_legacy.rs" ]; then
     echo "code_completion_legacy.rs preserved"
     legacy_files=$((legacy_files + 1))
 fi
 
-if [ -f "vtagent-core/src/code_quality_tools_legacy.rs" ]; then
+if [ -f "vtcode-core/src/code_quality_tools_legacy.rs" ]; then
     echo "code_quality_tools_legacy.rs preserved"
     legacy_files=$((legacy_files + 1))
 fi
@@ -90,4 +90,4 @@ echo "Backward compatibility maintained"
 
 echo ""
 echo "🚀 Refactoring Complete!"
-echo "The VTAgent codebase has been successfully transformed into a modular architecture."
+echo "The VTCode codebase has been successfully transformed into a modular architecture."

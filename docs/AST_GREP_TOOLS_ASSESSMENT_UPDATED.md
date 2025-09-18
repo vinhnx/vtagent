@@ -31,7 +31,7 @@ Our test confirmed:
 
 ### 3. Code Analysis
 
-Looking at the source code in `vtagent-core/src/tools.rs`:
+Looking at the source code in `vtcode-core/src/tools.rs`:
 ```rust
 /// Search using AST-grep patterns
 async fn ast_grep_search(&self, args: Value) -> Result<Value> {

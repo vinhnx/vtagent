@@ -2,26 +2,26 @@
 
 ## Summary
 
-I have successfully implemented a comprehensive tool policy system for VTAgent that provides user control over which tools the agent can execute. The system stores user choices persistently in `~/.vtagent/tool-policy.json` and minimizes repeated prompts while maintaining security.
+I have successfully implemented a comprehensive tool policy system for VTCode that provides user control over which tools the agent can execute. The system stores user choices persistently in `~/.vtcode/tool-policy.json` and minimizes repeated prompts while maintaining security.
 
 ## Key Features Implemented
 
-### 1. Core Policy System (`vtagent-core/src/tool_policy.rs`)
+### 1. Core Policy System (`vtcode-core/src/tool_policy.rs`)
 
 -   **ToolPolicy enum**: Allow, Prompt, Deny policies
 -   **ToolPolicyConfig struct**: JSON-serializable configuration
 -   **ToolPolicyManager**: Main management interface
--   **Persistent storage**: Automatic save/load from `~/.vtagent/tool-policy.json`
+-   **Persistent storage**: Automatic save/load from `~/.vtcode/tool-policy.json`
 
-### 2. CLI Commands (`vtagent-core/src/cli/tool_policy_commands.rs`)
+### 2. CLI Commands (`vtcode-core/src/cli/tool_policy_commands.rs`)
 
--   `vtagent tool-policy status` - Show current policies
--   `vtagent tool-policy allow <tool>` - Allow specific tool
--   `vtagent tool-policy deny <tool>` - Deny specific tool
--   `vtagent tool-policy prompt <tool>` - Set tool to prompt
--   `vtagent tool-policy allow-all` - Allow all tools
--   `vtagent tool-policy deny-all` - Deny all tools
--   `vtagent tool-policy reset-all` - Reset all to prompt
+-   `vtcode tool-policy status` - Show current policies
+-   `vtcode tool-policy allow <tool>` - Allow specific tool
+-   `vtcode tool-policy deny <tool>` - Deny specific tool
+-   `vtcode tool-policy prompt <tool>` - Set tool to prompt
+-   `vtcode tool-policy allow-all` - Allow all tools
+-   `vtcode tool-policy deny-all` - Deny all tools
+-   `vtcode tool-policy reset-all` - Reset all to prompt
 
 ### 3. Integration with Tool Registry
 
@@ -41,23 +41,23 @@ I have successfully implemented a comprehensive tool policy system for VTAgent t
 
 ### New Files
 
-1. `vtagent-core/src/tool_policy.rs` - Core policy management system
-2. `vtagent-core/src/cli/tool_policy_commands.rs` - CLI command handlers
+1. `vtcode-core/src/tool_policy.rs` - Core policy management system
+2. `vtcode-core/src/cli/tool_policy_commands.rs` - CLI command handlers
 3. `docs/tool-policy-system.md` - Comprehensive documentation
 4. `tool_policy_test/` - Standalone test demonstrating functionality
 
 ### Modified Files
 
-1. `vtagent-core/src/lib.rs` - Added tool_policy module exports
-2. `vtagent-core/src/cli/mod.rs` - Added tool_policy_commands module
-3. `vtagent-core/src/cli/args.rs` - Added ToolPolicy command to CLI
-4. `vtagent-core/src/tools/registry.rs` - Integrated policy checking
-5. `vtagent-core/Cargo.toml` - Added dirs dependency
+1. `vtcode-core/src/lib.rs` - Added tool_policy module exports
+2. `vtcode-core/src/cli/mod.rs` - Added tool_policy_commands module
+3. `vtcode-core/src/cli/args.rs` - Added ToolPolicy command to CLI
+4. `vtcode-core/src/tools/registry.rs` - Integrated policy checking
+5. `vtcode-core/Cargo.toml` - Added dirs dependency
 6. `src/main.rs` - Added ToolPolicy command handler
 
 ## Configuration Format
 
-The system stores configuration in `~/.vtagent/tool-policy.json`:
+The system stores configuration in `~/.vtcode/tool-policy.json`:
 
 ```json
 {
@@ -93,16 +93,16 @@ The system stores configuration in `~/.vtagent/tool-policy.json`:
 
 ```bash
 # View current status
-vtagent tool-policy status
+vtcode tool-policy status
 
 # Allow a specific tool
-vtagent tool-policy allow read_file
+vtcode tool-policy allow read_file
 
 # Deny a dangerous tool
-vtagent tool-policy deny run_terminal_cmd
+vtcode tool-policy deny run_terminal_cmd
 
 # Reset everything to prompt again
-vtagent tool-policy reset-all
+vtcode tool-policy reset-all
 ```
 
 ## Security Benefits
@@ -218,7 +218,7 @@ The system implements optimized pagination for handling large datasets:
 
 ### Overview
 
-VTAgent implements automatic chunking strategies to handle large files and verbose outputs efficiently, preventing token limits and memory issues while preserving important content.
+VTCode implements automatic chunking strategies to handle large files and verbose outputs efficiently, preventing token limits and memory issues while preserving important content.
 
 ### Chunking Thresholds
 
@@ -276,6 +276,6 @@ The tool policy system successfully addresses the requirement to:
 3. Minimize repeated prompts in future runs
 4. Handle dynamic tool list changes
 5. Provide CLI management interface
-6. Store configuration in `~/.vtagent/tool-policy.json`
+6. Store configuration in `~/.vtcode/tool-policy.json`
 
 The implementation provides a robust, user-friendly, and secure foundation for controlling agent tool execution while maintaining a smooth user experience.

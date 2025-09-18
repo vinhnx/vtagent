@@ -1,6 +1,6 @@
 //! Integration tests for universal LLM provider system
 
-use vtagent_core::llm::{
+use vtcode_core::llm::{
     factory::{LLMFactory, create_provider_for_model},
     provider::{LLMProvider, Message},
     providers::{AnthropicProvider, GeminiProvider, OpenAIProvider},
@@ -97,8 +97,8 @@ fn test_provider_supported_models() {
 
 #[test]
 fn test_backward_compatibility() {
-    use vtagent_core::llm::make_client;
-    use vtagent_core::models::ModelId;
+    use vtcode_core::llm::make_client;
+    use vtcode_core::models::ModelId;
 
     // Test that the old make_client function still works
     let model = ModelId::from_str("gemini-2.5-flash").unwrap();

@@ -1,4 +1,4 @@
-use vtagent_core::utils::colors::*;
+use vtcode_core::utils::colors::*;
 
 #[test]
 fn test_basic_colors() {

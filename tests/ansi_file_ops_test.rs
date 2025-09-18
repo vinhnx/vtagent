@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serde_json::json;
 use tempfile::TempDir;
-use vtagent_core::{
+use vtcode_core::{
     tools::ToolRegistry,
     utils::ansi::{AnsiRenderer, MessageStyle},
 };

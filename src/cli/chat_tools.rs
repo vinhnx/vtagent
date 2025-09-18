@@ -1,5 +1,5 @@
 use anyhow::Result;
-use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
+use vtcode_core::config::types::AgentConfig as CoreAgentConfig;
 
 pub async fn handle_chat_command(
     config: &CoreAgentConfig,

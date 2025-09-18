@@ -3,7 +3,7 @@ use serde_json::Value;
 /// This test enforces the "Always check ./docs/models.json" rule from the project guidelines.
 use std::collections::HashSet;
 use std::fs;
-use vtagent_core::config::constants::{model_helpers, models};
+use vtcode_core::config::constants::{model_helpers, models};
 
 #[test]
 #[ignore]
@@ -67,7 +67,7 @@ fn constants_cover_models_json() {
             assert!(
                 missing_in_constants.is_empty(),
                 "Missing models in constants.rs for provider '{}': {:?}\n\
-                 Add these models to models::{}::SUPPORTED_MODELS in vtagent-core/src/config/constants.rs",
+                 Add these models to models::{}::SUPPORTED_MODELS in vtcode-core/src/config/constants.rs",
                 provider_name,
                 missing_in_constants,
                 provider_name

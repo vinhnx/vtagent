@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use vtagent_core::cli::ManPageGenerator;
+use vtcode_core::cli::ManPageGenerator;
 
 pub async fn handle_man_command(
     command: Option<String>,

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
-use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
+use vtcode_core::config::types::AgentConfig as CoreAgentConfig;
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind")]

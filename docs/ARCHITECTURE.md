@@ -1,8 +1,8 @@
-# VTAgent Architecture Guide
+# VTCode Architecture Guide
 
 ## Overview
 
-VTAgent follows a modular, trait-based architecture designed for maintainability, extensibility, and performance.
+VTCode follows a modular, trait-based architecture designed for maintainability, extensibility, and performance.
 
 ## Core Architecture
 

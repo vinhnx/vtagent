@@ -1,11 +1,11 @@
-# VTAgent - Coding Agent
+# VTCode - Coding Agent
 
-[![tool-eval](https://github.com/vinhnx/vtagent/actions/workflows/tool-eval.yml/badge.svg)](https://github.com/vinhnx/vtagent/actions/workflows/tool-eval.yml)
+[![tool-eval](https://github.com/vinhnx/vtcode/actions/workflows/tool-eval.yml/badge.svg)](https://github.com/vinhnx/vtcode/actions/workflows/tool-eval.yml)
 
-VTAgent is a Rust-based terminal coding agent with modular architecture supporting multiple LLM providers (Gemini, OpenAI, Anthropic, DeepSeek) and tree-sitter parsers for 6+ languages. It provides a reliable, context-aware coding experience through intelligent tool integration and sophisticated prompt engineering.
+VTCode is a Rust-based terminal coding agent with modular architecture supporting multiple LLM providers (Gemini, OpenAI, Anthropic, DeepSeek) and tree-sitter parsers for 6+ languages. It provides a reliable, context-aware coding experience through intelligent tool integration and sophisticated prompt engineering.
 
 <div align="center">
-  <img src="screenshots/vtagent.png" alt="VTAgent screenshot" width="800">
+  <img src="screenshots/vtcode.png" alt="VTCode screenshot" width="800">
 </div>
 
 ## Features
@@ -39,19 +39,49 @@ VTAgent is a Rust-based terminal coding agent with modular architecture supporti
 
 ### Prerequisites
 
+**For pre-built installations (Cargo, Homebrew, npm):** None - binaries are ready to use.
+
+**For building from source:**
+
 -   Rust 1.75+ (stable)
--   API key for your preferred LLM provider:
-    -   `GEMINI_API_KEY` or `GOOGLE_API_KEY` for Gemini
-    -   `OPENAI_API_KEY` for OpenAI
-    -   `ANTHROPIC_API_KEY` for Anthropic
-    -   `DEEPSEEK_API_KEY` for DeepSeek
+
+**API Keys (required for all installation methods):**
+
+-   `GEMINI_API_KEY` or `GOOGLE_API_KEY` for Gemini
+-   `OPENAI_API_KEY` for OpenAI
+-   `ANTHROPIC_API_KEY` for Anthropic
+-   `DEEPSEEK_API_KEY` for DeepSeek
 
 ### Installation
 
+#### Option 1: Cargo (crates.io) - Recommended for Rust developers
+
+```bash
+cargo install vtcode
+```
+
+#### Option 2: Homebrew (macOS)
+
+```bash
+brew install vinhnx/tap/vtcode
+```
+
+#### Option 3: npm (Cross-platform)
+
+```bash
+npm install -g vtcode
+```
+
+#### Option 4: Pre-built binaries
+
+Download the latest release from [GitHub Releases](https://github.com/vinhnx/vtcode/releases) for your platform.
+
+#### Option 5: Build from source
+
 ```bash
 # Clone the repository
-git clone https://github.com/vinhnx/vtagent.git
-cd vtagent
+git clone https://github.com/vinhnx/vtcode.git
+cd vtcode
 
 # Build the project
 cargo build --release
@@ -70,8 +100,8 @@ export GEMINI_API_KEY=your_api_key_here
 # Confirm the workspace root the agent should treat as primary context
 export WORKSPACE_DIR="$(pwd)"
 
-# Initialize VTAgent in your project
-./run.sh init  # Creates vtagent.toml and .vtagentgitignore
+# Initialize VTCode in your project
+./run.sh init  # Creates vtcode.toml and .vtcodegitignore
 
 # Start interactive chat
 ./run.sh chat
@@ -91,20 +121,20 @@ cargo run -- chat --full-auto
 
 ### Workspace-Aware Operations
 
-VTAgent automatically treats the directory referenced by `WORKSPACE_DIR` as its primary context:
+VTCode automatically treats the directory referenced by `WORKSPACE_DIR` as its primary context:
 
 -   Read, write, and refactor files relative to the workspace without extra configuration.
 -   Run shell commands and scripts inside the workspace, benefiting from PTY integration for interactive sessions.
 -   Perform project indexing (directory scans, metadata extraction, dependency inspection) before large tasks to align with the live codebase.
 -   Request confirmation before touching paths outside `WORKSPACE_DIR` or when downloading untrusted content.
--   Launch against a different project directory with `vtagent /path/to/project`; alternatively pass `--workspace-dir` (alias: `--workspace`) to other commands.
+-   Launch against a different project directory with `vtcode /path/to/project`; alternatively pass `--workspace-dir` (alias: `--workspace`) to other commands.
 
 ### UI Themes
 
-VTAgent ships with extensible ANSI themes to improve readability in different terminal setups. The default theme is **ciapre-dark**.
+VTCode ships with extensible ANSI themes to improve readability in different terminal setups. The default theme is **ciapre-dark**.
 
 -   **CLI override:** `cargo run -- chat --theme ciapre-blue`
--   **Config file:** set `theme = "ciapre-dark"` under `[agent]` in `vtagent.toml`
+-   **Config file:** set `theme = "ciapre-dark"` under `[agent]` in `vtcode.toml`
 -   **In-chat command:** type `/theme ciapre-blue` to switch without restarting
 -   **Discover themes:** `/list-themes` lists available palettes; `/help` shows all slash commands
 
@@ -123,7 +153,7 @@ Commands run without leaving the chat loop, and tool executions honor the same s
 
 ## Router & Budgets
 
-Configure dynamic routing and per-class budgets in `vtagent.toml`:
+Configure dynamic routing and per-class budgets in `vtcode.toml`:
 
 ```
 [router]
@@ -161,7 +191,7 @@ trajectory_enabled = true
 **Usage Notes:**
 
 -   Logs for trajectory: check `logs/trajectory.jsonl`
--   Inspect with: `vtagent trajectory --top 10` (pretty summary)
+-   Inspect with: `vtcode trajectory --top 10` (pretty summary)
 -   Gate trajectory logging behind config flag: set `trajectory_enabled = false` to disable
 
 ## Usage Notes
@@ -180,13 +210,13 @@ Logs for trajectory: check `logs/trajectory.jsonl`.
 
 ### Full-Auto Mode
 
--   Requires enabling `[automation.full_auto]` in `vtagent.toml` and creating the acknowledgement profile.
+-   Requires enabling `[automation.full_auto]` in `vtcode.toml` and creating the acknowledgement profile.
 -   Launch with `--full-auto` to skip confirmation prompts and rely on the configured tool allow-list.
 -   See [docs/guides/full_auto_mode.md](docs/guides/full_auto_mode.md) for safeguards and recommended setup.
 
 ## Available Models & Providers
 
-VTAgent supports the latest models from multiple providers:
+VTCode supports the latest models from multiple providers:
 
 ### Gemini (Google)
 
@@ -214,7 +244,7 @@ VTAgent supports the latest models from multiple providers:
 • Tree-sitter powered analysis
 • Research-preview context management
 
-**Usage:** `vtagent chat`
+**Usage:** `vtcode chat`
 
 #### `ask <prompt>` - Single prompt mode
 
@@ -223,7 +253,7 @@ VTAgent supports the latest models from multiple providers:
 • Code explanations
 • Simple queries
 
-**Example:** `vtagent ask "Explain Rust ownership"`
+**Example:** `vtcode ask "Explain Rust ownership"`
 
 #### `chat-verbose` - Verbose interactive chat
 
@@ -233,7 +263,7 @@ VTAgent supports the latest models from multiple providers:
 • Decision Ledger tracking (in single-agent mode)
 • Performance metrics
 
-**Usage:** `vtagent chat-verbose`
+**Usage:** `vtcode chat-verbose`
 
 #### `analyze` - Analyze workspace
 
@@ -244,7 +274,7 @@ VTAgent supports the latest models from multiple providers:
 • Dependency insights
 • Symbol extraction
 
-**Usage:** `vtagent analyze`
+**Usage:** `vtcode analyze`
 
 #### `performance` - Display performance metrics
 
@@ -255,7 +285,7 @@ VTAgent supports the latest models from multiple providers:
 • Memory usage patterns
 • Decision Ledger statistics (in single-agent mode)
 
-**Usage:** `vtagent performance`
+**Usage:** `vtcode performance`
 
 ### Project Management
 
@@ -268,12 +298,12 @@ VTAgent supports the latest models from multiple providers:
 • Tree-sitter parser setup
 • Context compression and Decision Ledger setup
 
-**Usage:** `vtagent init`
+**Usage:** `vtcode init`
 
 #### `init-project` - Initialize project with dot-folder structure
 
 **Features:**
-• Creates project directory structure in ~/.vtagent/projects/
+• Creates project directory structure in ~/.vtcode/projects/
 • Sets up config, cache, embeddings, and retrieval directories
 • Creates .project metadata file
 • Migrates existing config/cache files with user confirmation
@@ -281,9 +311,9 @@ VTAgent supports the latest models from multiple providers:
 **Examples:**
 
 ```
-vtagent init-project
-vtagent init-project --name my-project
-vtagent init-project --force
+vtcode init-project
+vtcode init-project --name my-project
+vtcode init-project --force
 ```
 
 #### `create-project <name> <features>` - Create complete Rust project
@@ -295,7 +325,7 @@ vtagent init-project --force
 • Testing setup
 • Tree-sitter integration
 
-**Example:** `vtagent create-project my-api serde,axum,tokio`
+**Example:** `vtcode create-project my-api serde,axum,tokio`
 
 ### Advanced Features
 
@@ -307,7 +337,7 @@ vtagent init-project --force
 • Memory optimization
 • Context preservation
 
-**Usage:** `vtagent compress-context`
+**Usage:** `vtcode compress-context`
 
 #### `benchmark` - Benchmark against SWE-bench
 
@@ -317,7 +347,7 @@ vtagent init-project --force
 • Benchmark scoring and metrics
 • Optimization insights
 
-**Usage:** `vtagent benchmark`
+**Usage:** `vtcode benchmark`
 
 ### Snapshot Management
 
@@ -329,7 +359,7 @@ vtagent init-project --force
 • Description
 • File size and compression status
 
-**Usage:** `vtagent snapshots`
+**Usage:** `vtcode snapshots`
 
 #### `revert --turn <n>` - Revert to previous snapshot
 
@@ -341,8 +371,8 @@ vtagent init-project --force
 **Examples:**
 
 ```
-vtagent revert --turn 5
-vtagent revert --turn 3 --partial memory
+vtcode revert --turn 5
+vtcode revert --turn 3 --partial memory
 ```
 
 #### `cleanup-snapshots` - Clean up old snapshots
@@ -355,8 +385,8 @@ vtagent revert --turn 3 --partial memory
 **Examples:**
 
 ```
-vtagent cleanup-snapshots
-vtagent cleanup-snapshots --max 20
+vtcode cleanup-snapshots
+vtcode cleanup-snapshots --max 20
 ```
 
 ### Configuration Management
@@ -373,9 +403,9 @@ vtagent cleanup-snapshots --max 20
 **Examples:**
 
 ```
-vtagent config
-vtagent config --output ./custom-config.toml
-vtagent config --global
+vtcode config
+vtcode config --output ./custom-config.toml
+vtcode config --global
 ```
 
 #### `tool-policy` - Manage tool execution policies
@@ -389,9 +419,9 @@ vtagent config --global
 **Examples:**
 
 ```
-vtagent tool-policy status
-vtagent tool-policy allow file-write
-vtagent tool-policy deny shell-exec
+vtcode tool-policy status
+vtcode tool-policy allow file-write
+vtcode tool-policy deny shell-exec
 ```
 
 #### `models` - Manage models and providers
@@ -405,10 +435,10 @@ vtagent tool-policy deny shell-exec
 **Examples:**
 
 ```
-vtagent models list
-vtagent models set-provider deepseek
-vtagent models set-model deepseek-reasoner
-vtagent models test gemini
+vtcode models list
+vtcode models set-provider deepseek
+vtcode models set-model deepseek-reasoner
+vtcode models test gemini
 ```
 
 ### Security & Analysis
@@ -421,7 +451,7 @@ vtagent models test gemini
 • Access control management
 • Privacy protection settings
 
-**Usage:** `vtagent security`
+**Usage:** `vtcode security`
 
 #### `tree-sitter` - Tree-sitter code analysis tools
 
@@ -431,7 +461,7 @@ vtagent models test gemini
 • Code complexity analysis
 • Multi-language refactoring
 
-**Usage:** `vtagent tree-sitter`
+**Usage:** `vtcode tree-sitter`
 
 #### `man` - Generate man pages
 
@@ -439,14 +469,14 @@ vtagent models test gemini
 • Generate Unix man pages for all commands
 • Display detailed command documentation
 • Save man pages to files
-• Comprehensive help for all VTAgent features
+• Comprehensive help for all VTCode features
 
 **Examples:**
 
 ```
-vtagent man
-vtagent man chat
-vtagent man chat --output chat.1
+vtcode man
+vtcode man chat
+vtcode man chat --output chat.1
 ```
 
 #### `srgn` - Code surgery tool
@@ -483,7 +513,7 @@ vtagent man chat --output chat.1
 
 ### Core Components
 
--   **`vtagent-core/`**: Library crate with core functionality
+-   **`vtcode-core/`**: Library crate with core functionality
 -   **`src/`**: Binary crate with CLI interface
 -   **`prompts/`**: System prompts for different agent types
 -   **`docs/`**: Comprehensive documentation
@@ -515,7 +545,7 @@ vtagent man chat --output chat.1
 
 ## Configuration
 
-VTAgent uses a comprehensive TOML configuration system loaded from `vtagent.toml`:
+VTCode uses a comprehensive TOML configuration system loaded from `vtcode.toml`:
 
 ### Basic Configuration
 
@@ -567,7 +597,7 @@ command_timeout_seconds = 300
 ./run.sh config --output my-config.toml
 
 # Copy example configuration
-cp vtagent.toml.example vtagent.toml
+cp vtcode.toml.example vtcode.toml
 
 # Validate configuration
 ./run.sh config --validate
@@ -575,7 +605,7 @@ cp vtagent.toml.example vtagent.toml
 
 **Configuration Generation**: The `config` command implements two-way synchronization:
 
--   **Reads existing `vtagent.toml`** if present, preserving your customizations
+-   **Reads existing `vtcode.toml`** if present, preserving your customizations
 -   **Generates complete TOML** with all sections, even missing ones
 -   **Falls back to defaults** if no configuration exists
 -   **Ensures consistency** between your config file and generated templates
@@ -608,14 +638,14 @@ cp vtagent.toml.example vtagent.toml
 
 ### Color Utilities
 
-VTAgent now includes advanced color manipulation capabilities through the `coolor` crate integration:
+VTCode now includes advanced color manipulation capabilities through the `coolor` crate integration:
 
 -   RGB to ANSI color conversion for terminal compatibility
 -   HSL color space support for intuitive color manipulation
 -   Color blending and harmonious color scheme generation
 -   Lighten/darken operations for dynamic color adjustments
 
-These utilities are available through the `vtagent_core::utils::colors` module for developers extending VTAgent's functionality.
+These utilities are available through the `vtcode_core::utils::colors` module for developers extending VTCode's functionality.
 
 ## Usage Examples
 
@@ -694,7 +724,7 @@ These utilities are available through the `vtagent_core::utils::colors` module f
 
 ## Global Options
 
-VTAgent supports several global options that can be used with any command:
+VTCode supports several global options that can be used with any command:
 
 ### Model & Provider Options
 
@@ -730,7 +760,7 @@ VTAgent supports several global options that can be used with any command:
 
 ## Contributing
 
-VTAgent is an open-source project. Contributions are welcome! Please see our [contributing guidelines](CONTRIBUTING.md) for details.
+VTCode is an open-source project. Contributions are welcome! Please see our [contributing guidelines](CONTRIBUTING.md) for details.
 
 ## License
 
@@ -749,3 +779,51 @@ Example:
 default_policy = "prompt"
 max_tool_loops = 100
 ```
+
+### Distribution & Releases
+
+VTCode supports multiple distribution channels for easy installation:
+
+#### Release Process
+
+The project uses an automated release script that handles publishing to multiple package managers:
+
+```bash
+# Create a patch release (increments 0.1.0 → 0.1.1)
+./scripts/release.sh --patch
+
+# Create a minor release (increments 0.1.0 → 0.2.0)
+./scripts/release.sh --minor
+
+# Create a major release (increments 0.1.0 → 1.0.0)
+./scripts/release.sh --major
+
+# Release a specific version
+./scripts/release.sh 1.0.0
+
+# Dry run to see what would happen
+./scripts/release.sh --patch --dry-run
+
+# Skip certain distribution channels
+./scripts/release.sh --patch --skip-npm --skip-homebrew
+```
+
+#### Distribution Channels
+
+1. **Cargo (crates.io)**: `cargo install vtcode`
+2. **npm**: `npm install -g vtcode`
+3. **Homebrew**: `brew install vinhnx/tap/vtcode`
+4. **GitHub Releases**: Pre-built binaries for all platforms
+
+#### Setup for Distribution
+
+To set up publishing to these channels:
+
+```bash
+# Run the setup script for guidance
+./scripts/setup-distribution.sh
+
+# Follow the prompts to set up authentication for each channel
+```
+
+For detailed setup instructions, see: [Distribution Setup Guide](docs/project/DISTRIBUTION_SETUP_GUIDE.md)

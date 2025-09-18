@@ -1,10 +1,10 @@
 #!/bin/bash
-# VTAgent Tools End-to-End Test Script
+# VTCode Tools End-to-End Test Script
 # Tests the simple_search and bash tools
 
 set -e  # Exit on any error
 
-echo "🧪 VTAgent Tools End-to-End Test Suite"
+echo "🧪 VTCode Tools End-to-End Test Suite"
 echo "===================================="
 
 # Colors for output
@@ -45,8 +45,8 @@ test_tool_directly() {
     echo -e "\n${YELLOW}Testing $tool_name tool directly${NC}"
 
     # Build and execute the tool through the binary
-    if cargo build --bin vtagent >/dev/null 2>&1; then
-        output=$(cargo run --quiet --bin vtagent -- "$tool_name" "$test_input" 2>/dev/null)
+    if cargo build --bin vtcode >/dev/null 2>&1; then
+        output=$(cargo run --quiet --bin vtcode -- "$tool_name" "$test_input" 2>/dev/null)
         if echo "$output" | grep -q "$expected_contains"; then
             echo -e "${GREEN}Tool output verified${NC}"
             TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -63,7 +63,7 @@ echo -e "\nTesting Tool Compilation"
 echo "============================"
 
 # Test 1: Check if tools compile
-run_test "VTAgent Core Compilation" "cargo check --package vtagent-core --quiet && echo 'success'" "success"
+run_test "VTCode Core Compilation" "cargo check --package vtcode-core --quiet && echo 'success'" "success"
 
 echo -e "\nTesting External Dependencies"
 echo "=============================="

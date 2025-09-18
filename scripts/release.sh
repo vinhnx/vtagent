@@ -414,11 +414,15 @@ main() {
                 exit 1
                 ;;
             *)
-                if [ -n "$version" ]; then
+                # Check if this looks like a version increment type
+                if [[ "$1" == "patch" || "$1" == "minor" || "$1" == "major" ]]; then
+                    increment_type="$1"
+                elif [ -n "$version" ]; then
                     print_error "Multiple versions specified"
                     exit 1
+                else
+                    version=$1
                 fi
-                version=$1
                 shift
                 ;;
         esac

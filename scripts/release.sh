@@ -248,6 +248,10 @@ main() {
     git commit -m "chore: bump version to $version"
     print_success "Committed version bump"
 
+    # Push commit to GitHub
+    git push origin main
+    print_success "Pushed commit to GitHub"
+
     # Create and push tag
     create_tag "$version"
     push_tag "$version"

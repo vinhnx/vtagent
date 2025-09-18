@@ -1,30 +1,4 @@
-https://deepwiki.com/crate-ci/cargo-release
-
 --
-
-9:26:28 ❯ codex
-
-╭────────────────────────────────────────────────────────╮
-│ >\_ OpenAI Codex (v0.36.0) │
-│ │
-│ model: gpt-5-codex /model to change │
-│ directory: ~/Developer/learn-by-doing/vtcode │
-╰────────────────────────────────────────────────────────╯
-
-To get started, describe a task or try one of these commands:
-
-/init - create an AGENTS.md file with instructions for Codex
-/status - show current session configuration
-/approvals - choose what Codex can do without approval
-/model - choose what model and reasoning effort to use
-
-> Model changed to gpt-5-codex
-
-▌ Find and fix a bug in @filename
-
-⏎ send ⇧⏎ newline ⌃T transcript ⌃C quit
-
----
 
 check docs/guides/codex-cloud-setup.md
 and setup codex cloud environment for vtcode

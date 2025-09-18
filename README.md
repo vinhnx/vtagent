@@ -1,9 +1,28 @@
-# VTCode - Terminal Coding Agent
+<div align="center">
+
+<h1>VT</h1>
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
+[![Deployed on Fly.io](https://img.shields.io/badge/Deployed%20on-Fly.io-blueviolet)](https://fly.io)
+[![CI](https://github.com/vinhnx/vtchat/actions/workflows/ci.yml/badge.svg)](https://github.com/vinhnx/vtchat/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/vinhnx/vtchat/branch/main/graph/badge.svg)](https://codecov.io/gh/vinhnx/vtchat)
+
+**A modern, privacy-first AI chat application with security**
+
+[Live App](https://vtchat.io.vn) | [Documentation](docs/) | [Repository Guidelines](AGENTS.md) | [Project Status](docs/PROJECT-STATUS.md) | [Features](docs/FEATURES.md) | [Architecture](docs/ARCHITECTURE.md) | [Security](docs/SECURITY.md)
+
+</div>
 
 [![Crates.io](https://img.shields.io/crates/v/vtcode.svg)](https://crates.io/crates/vtcode)
 [![Homebrew](https://img.shields.io/badge/homebrew-v0.8.2-orange)](https://github.com/vinhnx/homebrew-tap)
 [![GitHub release](https://img.shields.io/github/release/vinhnx/vtcode.svg)](https://github.com/vinhnx/vtcode/releases)
 [![docs.rs](https://img.shields.io/docsrs/vtcode)](https://docs.rs/vtcode)
+
+---
+
+## Overview
 
 A Rust-based terminal coding agent with modular architecture supporting multiple LLM providers (Gemini, OpenAI, Anthropic, DeepSeek) and tree-sitter parsers for 6+ languages.
 

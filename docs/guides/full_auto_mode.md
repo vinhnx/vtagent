@@ -1,11 +1,11 @@
 # Full-Auto Mode
 
-Full-auto mode lets VTAgent run without pausing for human approval. Use this capability only when
+Full-auto mode lets VTCode run without pausing for human approval. Use this capability only when
 you fully trust the workspace configuration and have reviewed the safeguards below.
 
 ## Activation Checklist
 
-1. **Update `vtagent.toml`**
+1. **Update `vtcode.toml`**
    - Enable the feature: `automation.full_auto.enabled = true`.
    - Configure the tool allow-list to match your risk tolerance.
    - (Recommended) Keep `require_profile_ack = true` so a profile file is required.
@@ -16,12 +16,12 @@ you fully trust the workspace configuration and have reviewed the safeguards bel
    - Full-auto still honours existing tool policies; denied tools remain blocked.
    - Tools not included in the allow-list will be rejected automatically.
 4. **Launch the agent**
-   - Run `vtagent --full-auto` (combine with other CLI flags as needed).
+   - Run `vtcode --full-auto` (combine with other CLI flags as needed).
    - The agent will also set `--skip-confirmations` internally.
 
 ## Runtime Behaviour
 
-- VTAgent displays the active allow-list at session start.
+- VTCode displays the active allow-list at session start.
 - Tool permission prompts are bypassed for allow-listed tools.
 - Non allow-listed tools are rejected before execution, and their attempts are logged.
 - Git diff confirmations and other safety prompts are skipped automatically.
@@ -45,7 +45,7 @@ allowed_tools = [
 
 Tips:
 
-- Use the constants listed in `vtagent_core::config::constants::tools` to avoid typos.
+- Use the constants listed in `vtcode_core::config::constants::tools` to avoid typos.
 - Include `"*"` to allow every registered tool (not recommended unless the workspace is fully
   isolated).
 - Combine with tool policies if you need per-tool constraints or prompts even in full-auto mode.

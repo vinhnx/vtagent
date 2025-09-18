@@ -2,7 +2,7 @@
 
 ## Overview
 
-The enhanced `/init` command now fully complies with the OpenAI Codex specifications for generating standardized `AGENTS.md` contributor guides. This implementation is designed for use in **any repository** (not just vtagent itself) and provides intelligent, adaptive documentation generation.
+The enhanced `/init` command now fully complies with the OpenAI Codex specifications for generating standardized `AGENTS.md` contributor guides. This implementation is designed for use in **any repository** (not just vtcode itself) and provides intelligent, adaptive documentation generation.
 
 ## Key Improvements Applied
 
@@ -122,7 +122,7 @@ let git_check = registry
 ### For a Rust Library Project
 ```bash
 cd /path/to/rust-library
-vtagent
+vtcode
 # In chat: /init
 ```
 
@@ -161,7 +161,7 @@ This document serves as a contributor guide for the rust-library repository.
 ### For a Next.js Application
 ```bash
 cd /path/to/nextjs-app
-vtagent
+vtcode
 # In chat: /init
 ```
 
@@ -239,13 +239,13 @@ Priority Level 4 (Optional): Security tips, Architecture notes
 - **Best Practices**: Technology-specific recommendations and standards
 - **Version Control**: Detects and recommends appropriate commit patterns
 
-## Integration with vtagent Ecosystem
+## Integration with vtcode Ecosystem
 
-The enhanced init command integrates seamlessly with vtagent's existing tools:
+The enhanced init command integrates seamlessly with vtcode's existing tools:
 
 - **Context Engine**: Provides project structure context for other operations
 - **Tool Registry**: Uses standard tool interface for file operations
 - **TUI Integration**: Non-blocking execution with progress feedback
-- **Configuration**: Respects vtagent.toml settings and workspace detection
+- **Configuration**: Respects vtcode.toml settings and workspace detection
 
 This implementation transforms the `/init` command from a simple template generator into an intelligent project analysis and documentation tool that truly understands and adapts to any repository structure.

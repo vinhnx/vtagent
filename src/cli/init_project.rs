@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use console::style;
 use std::fs;
 use std::path::Path;
-use vtagent_core::{ProjectData, SimpleProjectManager};
+use vtcode_core::{ProjectData, SimpleProjectManager};
 use walkdir::WalkDir;
 
 /// Handle the init-project command
@@ -52,7 +52,7 @@ pub async fn handle_init_project_command(
     }
 
     // Create project structure
-    project_manager.create_project(&project_name, Some("VTAgent project"))?;
+    project_manager.create_project(&project_name, Some("VTCode project"))?;
     println!(
         "{} Created project structure in: {}",
         style("Success").green(),
@@ -62,7 +62,7 @@ pub async fn handle_init_project_command(
     // Create or update project metadata
     let current_dir = std::env::current_dir()?;
     let mut metadata = ProjectData::new(&project_name);
-    metadata.description = Some("VTAgent project".to_string());
+    metadata.description = Some("VTCode project".to_string());
     project_manager.update_project(&metadata)?;
     println!("{} Created project metadata", style("Success").green());
 
@@ -101,24 +101,24 @@ async fn migrate_existing_files(
 
     let mut files_to_migrate = Vec::new();
 
-    // Check for vtagent.toml in current directory
-    let local_config = current_dir.join("vtagent.toml");
+    // Check for vtcode.toml in current directory
+    let local_config = current_dir.join("vtcode.toml");
     if local_config.exists() {
-        files_to_migrate.push(("vtagent.toml", local_config.clone()));
+        files_to_migrate.push(("vtcode.toml", local_config.clone()));
     }
 
-    // Check for .vtagent directory
-    let local_vtagent = current_dir.join(".vtagent");
-    if local_vtagent.exists() && local_vtagent.is_dir() {
-        // Look for config files in .vtagent directory
-        let vtagent_config = local_vtagent.join("vtagent.toml");
-        if vtagent_config.exists() {
-            files_to_migrate.push(("vtagent.toml (from .vtagent)", vtagent_config));
+    // Check for .vtcode directory
+    let local_vtcode = current_dir.join(".vtcode");
+    if local_vtcode.exists() && local_vtcode.is_dir() {
+        // Look for config files in .vtcode directory
+        let vtcode_config = local_vtcode.join("vtcode.toml");
+        if vtcode_config.exists() {
+            files_to_migrate.push(("vtcode.toml (from .vtcode)", vtcode_config));
         }
 
-        let vtagent_gitignore = local_vtagent.join(".vtagentgitignore");
-        if vtagent_gitignore.exists() {
-            files_to_migrate.push((".vtagentgitignore (from .vtagent)", vtagent_gitignore));
+        let vtcode_gitignore = local_vtcode.join(".vtcodegitignore");
+        if vtcode_gitignore.exists() {
+            files_to_migrate.push((".vtcodegitignore (from .vtcode)", vtcode_gitignore));
         }
     }
 
@@ -153,10 +153,10 @@ async fn migrate_existing_files(
     for (name, path) in files_to_migrate {
         let destination = if name.contains("cache") {
             _project_manager.cache_dir(_project_name).join(name)
-        } else if name.contains("vtagent.toml") {
+        } else if name.contains("vtcode.toml") {
             _project_manager
                 .config_dir(_project_name)
-                .join("vtagent.toml")
+                .join("vtcode.toml")
         } else {
             _project_manager.project_data_dir(_project_name).join(name)
         };

@@ -1,13 +1,13 @@
 # **Development Guide**
 
-This section contains information for developers who want to contribute to, modify, or understand the vtagent codebase.
+This section contains information for developers who want to contribute to, modify, or understand the vtcode codebase.
 
 ## **Getting Started**
 
 ### Development Setup
 
 - **[Environment Setup](./setup.md)** - Setting up your development environment
-- **[Building from Source](./building.md)** - How to build vtagent from source
+- **[Building from Source](./building.md)** - How to build vtcode from source
 - **[Running Tests](./testing.md)** - Testing strategies and procedures
 - **[Code Style](./code-style.md)** - Code formatting and style guidelines
 
@@ -56,8 +56,8 @@ This section contains information for developers who want to contribute to, modi
 ### Integration Guides
 
 - **[CLI Integration](./cli-integration.md)** - Command-line interface details
-- **[Library Integration](./library-integration.md)** - Using vtagent as a library
-- **[Plugin System](./plugin-system.md)** - Extending vtagent with plugins
+- **[Library Integration](./library-integration.md)** - Using vtcode as a library
+- **[Plugin System](./plugin-system.md)** - Extending vtcode with plugins
 
 ## **Debugging & Troubleshooting**
 
@@ -98,7 +98,7 @@ For detailed API documentation, see the **[API Reference](../api/)** section.
 
 ## **Getting Help**
 
-- **[Development Mailing List](mailto:dev@vtagent-project.org)** - Development discussions
-- **[Discord Server](https://discord.gg/vtagent)** - Real-time development chat
-- **[GitHub Issues](https://github.com/username/vtagent/issues)** - Bug reports and feature requests
-- **[Wiki](https://github.com/username/vtagent/wiki)** - Community-contributed documentation
+- **[Development Mailing List](mailto:dev@vtcode-project.org)** - Development discussions
+- **[Discord Server](https://discord.gg/vtcode)** - Real-time development chat
+- **[GitHub Issues](https://github.com/username/vtcode/issues)** - Bug reports and feature requests
+- **[Wiki](https://github.com/username/vtcode/wiki)** - Community-contributed documentation

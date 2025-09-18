@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `/init` command in vtagent generates a standardized `AGENTS.md` file that serves as a contributor guide for any repository. This command follows the specifications from the OpenAI Codex guide to create consistent, professional documentation optimized for 200-400 words.
+The `/init` command in vtcode generates a standardized `AGENTS.md` file that serves as a contributor guide for any repository. This command follows the specifications from the OpenAI Codex guide to create consistent, professional documentation optimized for 200-400 words.
 
 ## Key Features
 
@@ -24,16 +24,16 @@ The `/init` command in vtagent generates a standardized `AGENTS.md` file that se
 
 ## Usage
 
-1. **Navigate to any repository** (not just vtagent projects):
+1. **Navigate to any repository** (not just vtcode projects):
    ```bash
    cd /path/to/any/repository
    ```
 
-2. **Launch vtagent**:
+2. **Launch vtcode**:
    ```bash
-   /path/to/vtagent/run.sh
-   # or if vtagent is in PATH
-   vtagent
+   /path/to/vtcode/run.sh
+   # or if vtcode is in PATH
+   vtcode
    ```
 
 3. **Use the `/init` command**:
@@ -118,7 +118,7 @@ This document serves as a contributor guide for the my-rust-app repository.
 
 ## Integration with Other Projects
 
-The enhanced init command is designed to work with **any repository**, not just vtagent itself:
+The enhanced init command is designed to work with **any repository**, not just vtcode itself:
 
 ### For Open Source Projects
 - Run in contributor repositories to establish consistent guidelines

@@ -2,19 +2,19 @@ use anyhow::{Result, anyhow};
 use std::io;
 use std::path::Path;
 
-use vtagent_core::config::constants::defaults;
-use vtagent_core::config::loader::VTAgentConfig;
-use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
-use vtagent_core::core::decision_tracker::{Action as DTAction, DecisionOutcome, DecisionTracker};
-use vtagent_core::core::router::{Router, TaskClass};
-use vtagent_core::gemini::function_calling::{FunctionCall, FunctionResponse};
-use vtagent_core::gemini::models::{SystemInstruction, ToolConfig};
-use vtagent_core::gemini::{Client as GeminiClient, Content, GenerateContentRequest, Part, Tool};
-use vtagent_core::tools::registry::{ToolErrorType, ToolExecutionError};
-use vtagent_core::tools::{ToolRegistry, build_function_declarations};
-use vtagent_core::ui::{Spinner, theme};
-use vtagent_core::utils::ansi::{AnsiRenderer, MessageStyle};
-use vtagent_core::utils::dot_config::update_theme_preference;
+use vtcode_core::config::constants::defaults;
+use vtcode_core::config::loader::VTCodeConfig;
+use vtcode_core::config::types::AgentConfig as CoreAgentConfig;
+use vtcode_core::core::decision_tracker::{Action as DTAction, DecisionOutcome, DecisionTracker};
+use vtcode_core::core::router::{Router, TaskClass};
+use vtcode_core::gemini::function_calling::{FunctionCall, FunctionResponse};
+use vtcode_core::gemini::models::{SystemInstruction, ToolConfig};
+use vtcode_core::gemini::{Client as GeminiClient, Content, GenerateContentRequest, Part, Tool};
+use vtcode_core::tools::registry::{ToolErrorType, ToolExecutionError};
+use vtcode_core::tools::{ToolRegistry, build_function_declarations};
+use vtcode_core::ui::{Spinner, theme};
+use vtcode_core::utils::ansi::{AnsiRenderer, MessageStyle};
+use vtcode_core::utils::dot_config::update_theme_preference;
 
 use super::context::{
     apply_aggressive_trim_gemini, enforce_gemini_context_window, load_context_trim_config,
@@ -49,7 +49,7 @@ fn ensure_turn_bottom_gap(renderer: &mut AnsiRenderer, applied: &mut bool) -> Re
 
 pub(crate) async fn run_single_agent_loop_gemini(
     config: &CoreAgentConfig,
-    vt_cfg: Option<&VTAgentConfig>,
+    vt_cfg: Option<&VTCodeConfig>,
     skip_confirmations: bool,
     full_auto: bool,
 ) -> Result<()> {
@@ -242,7 +242,7 @@ pub(crate) async fn run_single_agent_loop_gemini(
         let decision = if let Some(vt) = vt_cfg {
             Router::route_async(vt, config, &config.api_key, input).await
         } else {
-            Router::route(&VTAgentConfig::default(), config, input)
+            Router::route(&VTCodeConfig::default(), config, input)
         };
         traj.log_route(
             conversation_history.len(),
@@ -280,7 +280,7 @@ pub(crate) async fn run_single_agent_loop_gemini(
                     renderer.line(MessageStyle::Output, "")?;
                 }
                 let notice = format!(
-                    "I reached the configured tool-call limit of {} for this turn and paused further tool execution. Increase `tools.max_tool_loops` in vtagent.toml if you need more, then ask me to continue.",
+                    "I reached the configured tool-call limit of {} for this turn and paused further tool execution. Increase `tools.max_tool_loops` in vtcode.toml if you need more, then ask me to continue.",
                     max_tool_loops
                 );
                 renderer.line(MessageStyle::Response, &notice)?;
@@ -386,7 +386,7 @@ pub(crate) async fn run_single_agent_loop_gemini(
                     }
                     Err(error) => {
                         if is_context_overflow_error(&error.to_string())
-                            && retry_attempts <= vtagent_core::config::constants::context::CONTEXT_ERROR_RETRY_LIMIT
+                            && retry_attempts <= vtcode_core::config::constants::context::CONTEXT_ERROR_RETRY_LIMIT
                         {
                             let removed_tool_messages = prune_gemini_tool_responses(
                                 &mut attempt_history,
@@ -404,7 +404,7 @@ pub(crate) async fn run_single_agent_loop_gemini(
                                         "Context overflow detected; removed {} older messages (retry {}/{}).",
                                         total_removed,
                                         retry_attempts,
-                                        vtagent_core::config::constants::context::CONTEXT_ERROR_RETRY_LIMIT,
+                                        vtcode_core::config::constants::context::CONTEXT_ERROR_RETRY_LIMIT,
                                     ),
                                 )?;
                                 conversation_history.clone_from(&attempt_history);
@@ -719,15 +719,15 @@ pub(crate) async fn run_single_agent_loop_gemini(
 }
 
 fn read_system_prompt(workspace: &Path, session_addendum: Option<&str>) -> String {
-    let mut prompt = vtagent_core::prompts::read_system_prompt_from_md()
+    let mut prompt = vtcode_core::prompts::read_system_prompt_from_md()
         .unwrap_or_else(|_| "You are a helpful coding assistant for a Rust workspace.".to_string());
 
-    if let Some(overview) = vtagent_core::utils::utils::build_project_overview(workspace) {
+    if let Some(overview) = vtcode_core::utils::utils::build_project_overview(workspace) {
         prompt.push_str("\n\n## PROJECT OVERVIEW\n");
         prompt.push_str(&overview.as_prompt_block());
     }
 
-    if let Some(guidelines) = vtagent_core::prompts::system::read_agent_guidelines(workspace) {
+    if let Some(guidelines) = vtcode_core::prompts::system::read_agent_guidelines(workspace) {
         prompt.push_str("\n\n## AGENTS.MD GUIDELINES\n");
         prompt.push_str(&guidelines);
     }

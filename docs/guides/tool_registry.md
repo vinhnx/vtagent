@@ -30,9 +30,9 @@ state from a single source of truth.
 2.  Create a `ToolRegistration`:
 
     ```rust
-    use vtagent_core::tools::{ToolRegistration, ToolRegistry};
-    use vtagent_core::config::constants::tools;
-    use vtagent_core::config::types::CapabilityLevel;
+    use vtcode_core::tools::{ToolRegistration, ToolRegistry};
+    use vtcode_core::config::constants::tools;
+    use vtcode_core::config::types::CapabilityLevel;
 
     let registration = ToolRegistration::from_tool_instance(
         tools::CREATE_FILE,

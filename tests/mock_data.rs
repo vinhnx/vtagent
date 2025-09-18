@@ -276,9 +276,9 @@ This project is licensed under the MIT License - see the LICENSE file for detail
     pub fn json_config_file() -> &'static str {
         r#"{
   "project": {
-    "name": "vtagent-test",
+    "name": "vtcode-test",
     "version": "0.1.0",
-    "description": "Test configuration for vtagent"
+    "description": "Test configuration for vtcode"
   },
   "settings": {
     "debug": true,
@@ -300,7 +300,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
     "format": "json",
     "outputs": ["console", "file"],
     "file": {
-      "path": "/var/log/vtagent.log",
+      "path": "/var/log/vtcode.log",
       "max_size": "10MB",
       "retention": "30d"
     }
@@ -314,23 +314,23 @@ pub struct MockCliArgs;
 
 impl MockCliArgs {
     pub fn ask_command(query: &str) -> Vec<String> {
-        vec!["vtagent".to_string(), "ask".to_string(), query.to_string()]
+        vec!["vtcode".to_string(), "ask".to_string(), query.to_string()]
     }
 
     pub fn analyze_command(path: &str) -> Vec<String> {
         vec![
-            "vtagent".to_string(),
+            "vtcode".to_string(),
             "analyze".to_string(),
             path.to_string(),
         ]
     }
 
     pub fn validate_command() -> Vec<String> {
-        vec!["vtagent".to_string(), "validate".to_string()]
+        vec!["vtcode".to_string(), "validate".to_string()]
     }
 
     pub fn chat_command() -> Vec<String> {
-        vec!["vtagent".to_string(), "chat".to_string()]
+        vec!["vtcode".to_string(), "chat".to_string()]
     }
 }
 

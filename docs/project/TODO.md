@@ -12,7 +12,7 @@ https://deepwiki.com/crate-ci/cargo-release
 │ >\_ OpenAI Codex (v0.36.0) │
 │ │
 │ model: gpt-5-codex /model to change │
-│ directory: ~/Developer/learn-by-doing/vtagent │
+│ directory: ~/Developer/learn-by-doing/vtcode │
 ╰────────────────────────────────────────────────────────╯
 
 To get started, describe a task or try one of these commands:
@@ -31,7 +31,7 @@ To get started, describe a task or try one of these commands:
 ---
 
 check docs/guides/codex-cloud-setup.md
-and setup codex cloud environment for vtagent
+and setup codex cloud environment for vtcode
 https://developers.openai.com/codex/cloud/environments
 
 ---
@@ -78,11 +78,11 @@ integrates the Hotpath profiler (available at https://deepwiki.com/pawurb/hotpat
 
 --
 
-rename vtagent to vtcode
+rename vtcode to vtcode
 
 --
 
-bump core? vtagent-core
+bump core? vtcode-core
 
 --
 
@@ -151,11 +151,11 @@ Status: Implemented via the new `--full-auto` flag (see docs/guides/full_auto_mo
 
 ---
 
-check dead code: vtagent-core/src/core/agent/runner.rs
+check dead code: vtcode-core/src/core/agent/runner.rs
 
-I reached the configured tool-call limit of 30 for this turn and paused further tool execution. Increase `tools.max_tool_loops` in vtagent.toml if you need more, then ask me to continue.
+I reached the configured tool-call limit of 30 for this turn and paused further tool execution. Increase `tools.max_tool_loops` in vtcode.toml if you need more, then ask me to continue.
 
--> remove VTAGENT_MAX_TOOL_LOOPS env, and read from vtagent.toml only.
+-> remove VTCODE_MAX_TOOL_LOOPS env, and read from vtcode.toml only.
 
 ---
 

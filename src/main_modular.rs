@@ -1,15 +1,15 @@
-//! VT Code - Research-preview Rust coding agent
+//! VTCode - Research-preview Rust coding agent
 //!
-//! This is the main binary entry point for VT Code with modular CLI architecture.
+//! This is the main binary entry point for VTCode with modular CLI architecture.
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use console::style;
 use std::path::PathBuf;
-use vtagent_core::api_keys::{get_api_key, load_dotenv, ApiKeySources};
-use vtagent_core::config::loader::ConfigManager;
-use vtagent_core::constants::defaults;
-use vtagent_core::{
+use vtcode_core::api_keys::{get_api_key, load_dotenv, ApiKeySources};
+use vtcode_core::config::loader::ConfigManager;
+use vtcode_core::constants::defaults;
+use vtcode_core::{
     config::ConfigManager,
     models::{ModelId, Provider},
     safety::SafetyValidator,
@@ -20,7 +20,7 @@ mod cli;
 
 use cli::*;
 
-/// Main CLI structure for VT Code
+/// Main CLI structure for VTCode
 #[derive(Parser, Debug)]
 #[command(name = "vtcode", version, about = "minimal coding agent")]
 pub struct Cli {
@@ -60,11 +60,11 @@ pub enum Commands {
     Analyze,
     /// Create a new project
     CreateProject { name: String, features: Vec<String> },
-    /// Initialize VTAgent configuration
+    /// Initialize VTCode configuration
     Init {
         #[arg(long)]
         force: bool,
-        /// Run vtagent after initialization
+        /// Run vtcode after initialization
         #[arg(long, default_value_t = false)]
         run: bool,
     },
@@ -153,7 +153,7 @@ async fn main() -> Result<()> {
 
             // Ask implementation
             // Create a simple LLM client and get a response
-            let client = vtagent_core::llm::make_client(
+            let client = vtcode_core::llm::make_client(
                 config.api_key.clone(),
                 config.model.parse().unwrap_or_default(),
             );

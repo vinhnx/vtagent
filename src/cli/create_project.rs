@@ -3,7 +3,7 @@ use console::style;
 use itertools::Itertools;
 use std::fs;
 use std::path::Path;
-use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
+use vtcode_core::config::types::AgentConfig as CoreAgentConfig;
 
 /// Handle the create-project command
 pub async fn handle_create_project_command(
@@ -26,8 +26,8 @@ pub async fn handle_create_project_command(
     // Create basic project structure based on features
     create_project_structure(&project_path, features)?;
 
-    // Create vtagent configuration
-    create_vtagent_config(&project_path)?;
+    // Create vtcode configuration
+    create_vtcode_config(&project_path)?;
 
     println!("Project '{}' created successfully!", name);
 
@@ -52,7 +52,7 @@ fn create_project_structure(project_path: &Path, features: &[String]) -> Result<
     let readme_content = format!(
         r#"# Project
 
-This is a new project created with VTAgent.
+This is a new project created with VTCode.
 
 ## Features
 
@@ -76,9 +76,9 @@ edition = "2021"
     Ok(())
 }
 
-/// Create vtagent configuration file
-fn create_vtagent_config(project_path: &Path) -> Result<()> {
-    let config_content = r#"# VTAgent Configuration
+/// Create vtcode configuration file
+fn create_vtcode_config(project_path: &Path) -> Result<()> {
+    let config_content = r#"# VTCode Configuration
 [model]
 name = "gemini-2.5-flash-lite-preview-06-17"
 
@@ -89,6 +89,6 @@ path = "."
 verbose = false
 "#;
 
-    fs::write(project_path.join("vtagent.toml"), config_content)?;
+    fs::write(project_path.join("vtcode.toml"), config_content)?;
     Ok(())
 }

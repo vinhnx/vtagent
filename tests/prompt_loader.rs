@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::Path;
 use tempfile::tempdir;
-use vtagent_core::config::constants::prompts;
+use vtcode_core::config::constants::prompts;
 
 /// Test that the default system prompt path constant is correct
 #[test]
@@ -101,7 +101,7 @@ fn actual_prompt_file_validation() {
             "System prompt should be substantial (>50 chars)"
         );
 
-        // Check for expected content patterns in the VTAgent system prompt
+        // Check for expected content patterns in the VTCode system prompt
         let content_lower = content.to_lowercase();
 
         // Should mention being a coding assistant
@@ -189,9 +189,9 @@ fn integration_prompt_loading_workflow() {
     fs::create_dir_all(&prompts_dir).expect("Failed to create prompts directory");
 
     // Create a comprehensive system prompt
-    let system_prompt = r#"# VTAgent System Prompt
+    let system_prompt = r#"# VTCode System Prompt
 
-You are a helpful coding assistant for the VTAgent Rust project with access to file operations.
+You are a helpful coding assistant for the VTCode Rust project with access to file operations.
 
 ## Available Tools
 - list_files: List files and directories
@@ -215,7 +215,7 @@ Always respond with helpful, accurate information about the codebase.
         .expect("Failed to load system prompt using constant path");
 
     assert_eq!(loaded_content, system_prompt);
-    assert!(loaded_content.contains("VTAgent"));
+    assert!(loaded_content.contains("VTCode"));
     assert!(loaded_content.contains("Available Tools"));
 
     // Restore original directory

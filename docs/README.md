@@ -1,10 +1,10 @@
-# VTAgent Documentation Hub
+# VTCode Documentation Hub
 
-Welcome to the comprehensive documentation for **VTAgent**, a Rust-based terminal coding agent with modular architecture supporting multiple LLM providers and advanced code analysis capabilities.
+Welcome to the comprehensive documentation for **VTCode**, a Rust-based terminal coding agent with modular architecture supporting multiple LLM providers and advanced code analysis capabilities.
 
-## What Makes VTAgent Special
+## What Makes VTCode Special
 
-VTAgent represents a modern approach to AI-powered software development, featuring:
+VTCode represents a modern approach to AI-powered software development, featuring:
 
 -   **Single-Agent Reliability (default)** – Streamlined, linear agent with robust context engineering
 -   **Decision Ledger** – Structured, compact record of key decisions injected each turn for consistency
@@ -20,7 +20,7 @@ This documentation is organized to support different user personas and use cases
 
 ### For Users
 
-New to VTAgent? Start with installation and basic usage:
+New to VTCode? Start with installation and basic usage:
 
 -   **[Getting Started](./user-guide/getting-started.md)** - Installation, configuration, and first steps
 -   [Decision Ledger](./context/DECISION_LEDGER.md) - How decisions are tracked and injected
@@ -28,17 +28,17 @@ New to VTAgent? Start with installation and basic usage:
 
 ### For Developers
 
-Contributing to VTAgent? Understand the architecture and development processes:
+Contributing to VTCode? Understand the architecture and development processes:
 
 -   **[Architecture Overview](./ARCHITECTURE.md)** - System design and core components
 -   **[Development Guide](./development/README.md)** - Development environment setup
 -   **[API Documentation](./api/README.md)** - Technical API references
 -   **[Code Standards](./development/code-style.md)** - Coding guidelines and best practices
--   **[Codex Cloud Setup](./guides/codex-cloud-setup.md)** - Configure Codex Cloud environments for VTAgent
+-   **[Codex Cloud Setup](./guides/codex-cloud-setup.md)** - Configure Codex Cloud environments for VTCode
 
 ### For Organizations
 
-Deploying VTAgent in production? Focus on enterprise features:
+Deploying VTCode in production? Focus on enterprise features:
 
 -   **[Security Implementation](./SAFETY_IMPLEMENTATION.md)** - Security controls and compliance
 -   **[Performance Analysis](./PERFORMANCE_ANALYSIS.md)** - Optimization and benchmarking
@@ -80,7 +80,7 @@ Deploying VTAgent in production? Focus on enterprise features:
 
 ### For New Users
 
-1. **[Installation](../README.md#installation)** - Get VTAgent running in minutes
+1. **[Installation](../README.md#installation)** - Get VTCode running in minutes
 2. **[Basic Configuration](./CONFIGURATION.md)** - Set up your environment
 3. **[First Chat Session](../README.md#basic-usage)** - Try interactive coding assistance
 
@@ -115,7 +115,7 @@ Logs for trajectory: check `logs/trajectory.jsonl`.
 -   Use targeted indexing (directory walks, dependency introspection, metadata extraction) before large changes to stay aligned with the current codebase.
 -   Keep shell commands and scripts within the workspace unless the workflow explicitly requires external paths.
 -   Ask for confirmation before operating outside `WORKSPACE_DIR` or when interacting with untrusted downloads.
--   Launch sessions against another repository with `vtagent /abs/path`; you can also pass `--workspace-dir` (alias: `--workspace`) to other commands when needed.
+-   Launch sessions against another repository with `vtcode /abs/path`; you can also pass `--workspace-dir` (alias: `--workspace`) to other commands when needed.
 
 ### Single-Agent Workflows
 
@@ -146,11 +146,11 @@ Logs for trajectory: check `logs/trajectory.jsonl`.
 ./run.sh config --validate
 ```
 
-**Smart Configuration Generation**: The `config` command implements two-way synchronization that reads your existing `vtagent.toml` and generates a complete template while preserving all your customizations.
+**Smart Configuration Generation**: The `config` command implements two-way synchronization that reads your existing `vtcode.toml` and generates a complete template while preserving all your customizations.
 
 ## Testing & Quality Assurance
 
-VTAgent includes comprehensive testing infrastructure:
+VTCode includes comprehensive testing infrastructure:
 
 ### Test Categories
 
@@ -200,8 +200,8 @@ cargo clippy && cargo fmt
 ### Community Resources
 
 -   **[Main README](../README.md)** - Project overview and quick reference
--   **[GitHub Repository](https://github.com/vinhnx/vtagent)** - Source code and collaboration
--   **[Discussions](https://github.com/vinhnx/vtagent/discussions)** - Community support
+-   **[GitHub Repository](https://github.com/vinhnx/vtcode)** - Source code and collaboration
+-   **[Discussions](https://github.com/vinhnx/vtcode/discussions)** - Community support
 
 ### Enterprise Support
 
@@ -212,11 +212,11 @@ cargo clippy && cargo fmt
 
 ## License & Attribution
 
-This documentation is part of the VTAgent project. See the main [README](../README.md) for license information.
+This documentation is part of the VTCode project. See the main [README](../README.md) for license information.
 
 ### Attribution
 
-VTAgent builds upon key developments in AI agent technology:
+VTCode builds upon key developments in AI agent technology:
 
 -   **Anthropic's Agent Patterns** - Tool design and safety principles
 -   **Cognition's Context Engineering** - Long-running agent reliability and Decision Ledger
@@ -228,6 +228,6 @@ VTAgent builds upon key developments in AI agent technology:
 
 **Documentation Version:** 2.0.0
 **Last Updated:** September 2025
-**VTAgent Version:** 0.2.0
+**VTCode Version:** 0.2.0
 
 **Ready to get started?** **[Installation Guide](../README.md#quick-start)**

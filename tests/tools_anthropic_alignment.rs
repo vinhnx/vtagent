@@ -1,8 +1,8 @@
 use serde_json::json;
 use std::fs;
 use tempfile::tempdir;
-use vtagent_core::ToolRegistry;
-use vtagent_core::config::constants::tools;
+use vtcode_core::ToolRegistry;
+use vtcode_core::config::constants::tools;
 
 #[tokio::test]
 async fn list_files_pagination_and_default_response_format() {
@@ -15,10 +15,10 @@ async fn list_files_pagination_and_default_response_format() {
     fs::write(ws.join("src/b.rs"), "fn b() {}\n").unwrap();
 
     // Workspace policy with constraints
-    let vtagent_dir = ws.join(".vtagent");
-    fs::create_dir_all(&vtagent_dir).unwrap();
+    let vtcode_dir = ws.join(".vtcode");
+    fs::create_dir_all(&vtcode_dir).unwrap();
     fs::write(
-        vtagent_dir.join("tool-policy.json"),
+        vtcode_dir.join("tool-policy.json"),
         json!({
             "version": 1,
             "available_tools": [tools::LIST_FILES],
@@ -65,10 +65,10 @@ async fn grep_search_default_concise_and_cap() {
     fs::write(ws.join("file.txt"), "TODO: one\nTODO: two\n").unwrap();
 
     // Minimal policy that allows grep and caps results
-    let vtagent_dir = ws.join(".vtagent");
-    fs::create_dir_all(&vtagent_dir).unwrap();
+    let vtcode_dir = ws.join(".vtcode");
+    fs::create_dir_all(&vtcode_dir).unwrap();
     fs::write(
-        vtagent_dir.join("tool-policy.json"),
+        vtcode_dir.join("tool-policy.json"),
         json!({
             "version": 1,
             "available_tools": [tools::GREP_SEARCH],

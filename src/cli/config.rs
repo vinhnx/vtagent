@@ -3,7 +3,7 @@ use console::style;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
-use vtagent_core::config::{ConfigManager, VTAgentConfig};
+use vtcode_core::config::{ConfigManager, VTCodeConfig};
 
 /// Handle the config command
 pub async fn handle_config_command(output: Option<&Path>, use_home_dir: bool) -> Result<()> {
@@ -11,7 +11,7 @@ pub async fn handle_config_command(output: Option<&Path>, use_home_dir: bool) ->
 
     if use_home_dir {
         // Create config in user's home directory
-        let created_files = VTAgentConfig::bootstrap_project_with_options(
+        let created_files = VTCodeConfig::bootstrap_project_with_options(
             std::env::current_dir()?,
             true, // force overwrite
             true, // use home directory
@@ -43,27 +43,27 @@ pub async fn handle_config_command(output: Option<&Path>, use_home_dir: bool) ->
 
 /// Generate default configuration content
 /// This function creates a complete configuration by:
-/// 1. Loading existing vtagent.toml if it exists (preserving user customizations)
+/// 1. Loading existing vtcode.toml if it exists (preserving user customizations)
 /// 2. Using default values if no config exists
 /// 3. Generating a complete TOML structure with all sections
 fn generate_default_config() -> String {
     // Try to load existing configuration to preserve user settings
-    let config = if Path::new("vtagent.toml").exists() {
+    let config = if Path::new("vtcode.toml").exists() {
         // Load existing config to preserve user customizations
-        match ConfigManager::load_from_file("vtagent.toml") {
+        match ConfigManager::load_from_file("vtcode.toml") {
             Ok(config_manager) => config_manager.config().clone(),
-            Err(_) => VTAgentConfig::default(), // Fall back to defaults if loading fails
+            Err(_) => VTCodeConfig::default(), // Fall back to defaults if loading fails
         }
     } else {
         // Use system defaults if no config file exists
-        VTAgentConfig::default()
+        VTCodeConfig::default()
     };
 
     // Generate TOML content from the loaded/created config
     toml::to_string_pretty(&config).unwrap_or_else(|_| {
         // Fallback to hardcoded template if serialization fails
-        r#"# VTAgent Configuration File
-# This file contains the configuration for VTAgent
+        r#"# VTCode Configuration File
+# This file contains the configuration for VTCode
 
 [agent]
 # Default model to use

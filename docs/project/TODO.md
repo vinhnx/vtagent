@@ -211,3 +211,15 @@ https://cookbook.openai.com/examples/gpt-5/gpt-5_prompting_guide
 
 check this package and find a way to better use ansi escape codes in the terminal output. https://github.com/rust-cli/anstyle
 if not found, search for other similar packages.
+
+---
+
+add
+
+-   crates.io
+-   npm
+-   Homebrew
+-   GitHub Releases (binaries)
+
+download links to the README and docs.
+also add github readme badges for these package managers.

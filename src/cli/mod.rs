@@ -32,3 +32,13 @@ pub use performance::handle_performance_command;
 pub use revert::handle_revert_command;
 pub use snapshots::{handle_cleanup_snapshots_command, handle_snapshots_command};
 pub use trajectory::handle_trajectory_command as handle_trajectory_logs_command;
+
+use std::path::Path;
+
+/// Export the current workspace directory through the expected environment variable
+pub fn set_workspace_env(path: &Path) {
+    // SAFETY: Setting a process-local environment variable is safe; the OS copies the value.
+    unsafe {
+        std::env::set_var("WORKSPACE_DIR", path);
+    }
+}

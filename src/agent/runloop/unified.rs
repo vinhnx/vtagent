@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use std::io::{self, Write};
 use std::path::Path;
 
+use vtagent_core::config::constants::tools;
 use vtagent_core::config::loader::VTAgentConfig;
 use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
 use vtagent_core::core::decision_tracker::{Action as DTAction, DecisionOutcome, DecisionTracker};
@@ -133,6 +134,7 @@ pub(crate) async fn run_single_agent_loop_unified(
 
         let mut loop_guard = 0usize;
         let mut any_write_effect = false;
+        let mut last_tool_stdout: Option<String> = None;
 
         'outer: loop {
             loop_guard += 1;
@@ -270,6 +272,19 @@ pub(crate) async fn run_single_agent_loop_unified(
                             MessageStyle::Error,
                             &format!("Provider error: {error_text}"),
                         )?;
+
+                        if working_history
+                            .iter()
+                            .any(|msg| msg.role == uni::MessageRole::Tool)
+                        {
+                            let reply = derive_recent_tool_output(&working_history)
+                                .unwrap_or_else(|| "Command completed successfully.".to_string());
+                            renderer.line(MessageStyle::Response, &reply)?;
+                            working_history.push(uni::Message::assistant(reply));
+                            let _ = last_tool_stdout.take();
+                            break 'outer;
+                        }
+
                         continue 'outer;
                     }
                 }
@@ -334,6 +349,11 @@ pub(crate) async fn run_single_agent_loop_unified(
                         Ok(tool_output) => {
                             traj.log_tool_call(working_history.len(), name, &args_val, true);
                             render_tool_output(&tool_output);
+                            last_tool_stdout = tool_output
+                                .get("stdout")
+                                .and_then(|value| value.as_str())
+                                .map(|s| s.trim().to_string())
+                                .filter(|s| !s.is_empty());
                             let modified_files: Vec<String> = if let Some(files) = tool_output
                                 .get("modified_files")
                                 .and_then(|value| value.as_array())
@@ -377,6 +397,16 @@ pub(crate) async fn run_single_agent_loop_unified(
                                     metrics: Default::default(),
                                 },
                             );
+
+                            if should_short_circuit_shell(input, name, &args_val) {
+                                let reply = last_tool_stdout.clone().unwrap_or_else(|| {
+                                    "Command completed successfully.".to_string()
+                                });
+                                renderer.line(MessageStyle::Response, &reply)?;
+                                working_history.push(uni::Message::assistant(reply));
+                                let _ = last_tool_stdout.take();
+                                break 'outer;
+                            }
                         }
                         Err(error) => {
                             traj.log_tool_call(working_history.len(), name, &args_val, false);
@@ -385,6 +415,7 @@ pub(crate) async fn run_single_agent_loop_unified(
                             let content = err.to_string();
                             working_history
                                 .push(uni::Message::tool_response(call.id.clone(), content));
+                            let _ = last_tool_stdout.take();
                             ledger.record_outcome(
                                 &dec_id,
                                 DecisionOutcome::Failure {
@@ -434,8 +465,18 @@ pub(crate) async fn run_single_agent_loop_unified(
                         }
                     }
                 }
-                renderer.line(MessageStyle::Response, &text)?;
+                let trimmed = text.trim();
+                let suppress_response = trimmed.is_empty()
+                    || last_tool_stdout
+                        .as_ref()
+                        .map(|stdout| stdout == trimmed)
+                        .unwrap_or(false);
+
+                if !suppress_response {
+                    renderer.line(MessageStyle::Response, &text)?;
+                }
                 working_history.push(uni::Message::assistant(text));
+                let _ = last_tool_stdout.take();
             }
             break 'outer;
         }
@@ -501,4 +542,80 @@ fn read_system_prompt(workspace: &Path, session_addendum: Option<&str>) -> Strin
     }
 
     prompt
+}
+
+fn should_short_circuit_shell(input: &str, tool_name: &str, args: &serde_json::Value) -> bool {
+    if tool_name != tools::RUN_TERMINAL_CMD && tool_name != tools::BASH {
+        return false;
+    }
+
+    let command = args
+        .get("command")
+        .and_then(|value| value.as_array())
+        .and_then(|items| {
+            let mut tokens = Vec::new();
+            for item in items {
+                if let Some(text) = item.as_str() {
+                    tokens.push(text.trim_matches(|c| c == '\"' || c == '\'').to_string());
+                } else {
+                    return None;
+                }
+            }
+            Some(tokens)
+        });
+
+    let Some(command_tokens) = command else {
+        return false;
+    };
+
+    if command_tokens.is_empty() {
+        return false;
+    }
+
+    let user_tokens: Vec<String> = input
+        .split_whitespace()
+        .map(|part| part.trim_matches(|c| c == '\"' || c == '\'').to_string())
+        .collect();
+
+    if user_tokens.is_empty() {
+        return false;
+    }
+
+    if user_tokens.len() != command_tokens.len() {
+        return false;
+    }
+
+    user_tokens
+        .iter()
+        .zip(command_tokens.iter())
+        .all(|(user, cmd)| user == cmd)
+}
+
+fn derive_recent_tool_output(history: &[uni::Message]) -> Option<String> {
+    let message = history
+        .iter()
+        .rev()
+        .find(|msg| msg.role == uni::MessageRole::Tool)?;
+
+    let value = serde_json::from_str::<serde_json::Value>(&message.content).ok()?;
+
+    if let Some(stdout) = value
+        .get("stdout")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+    {
+        return Some(stdout);
+    }
+
+    if let Some(result) = value
+        .get("result")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+    {
+        return Some(result);
+    }
+
+    Some("Command completed successfully.".to_string())
 }

@@ -11,6 +11,7 @@ VTAgent represents a modern approach to AI-powered software development, featuri
 -   **Enterprise-Grade Safety** - Comprehensive security controls and path validation
 -   **Flexible Configuration** - TOML-based configuration with granular policies
 -   **Research-Preview Features** - Cutting-edge agent coordination and context engineering
+-   **Workspace-First Operations** - Full read/write/command access within `WORKSPACE_DIR` and built-in project indexing
 
 ## Prerequisites
 
@@ -88,7 +89,23 @@ export OPENAI_API_KEY=your_api_key_here
 export ANTHROPIC_API_KEY=your_api_key_here
 ```
 
-### 2. Initialize VTAgent in Your Project
+### 2. Confirm Workspace Context
+
+`WORKSPACE_DIR` tells VTAgent which project folder to treat as its primary context. The CLI sets this automatically when you launch inside a directory, but you can override or verify it explicitly:
+
+```bash
+# Confirm the workspace root
+echo "Workspace: $WORKSPACE_DIR"
+
+# Override if you need to target a different project
+export WORKSPACE_DIR="/path/to/your/project"
+
+# One-off override when launching commands
+vtagent chat --workspace-dir /path/to/your/project
+vtagent /path/to/your/project
+```
+
+### 3. Initialize VTAgent in Your Project
 
 ```bash
 # Navigate to your project
@@ -101,7 +118,7 @@ cd /path/to/your/project
 /path/to/vtagent/run.sh init
 ```
 
-### 3. Start Your First Session
+### 4. Start Your First Session
 
 ```bash
 # Start interactive chat

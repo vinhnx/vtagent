@@ -163,6 +163,114 @@ https://docs.rs/eyre/latest/eyre/
 
 Enable the agent to operate within and interact with a provided input workspace. The agent must have full capabilities to read, write, and modify files in the workspace; execute shell commands and scripts within it; and gather contextual information by performing project indexing, such as scanning directories, analyzing file structures, and extracting metadata to build an index of the project's contents. By default, the agent should treat the workspace as its primary context for all operations, ensuring that any actions taken are relevant to the files and structure present in the workspace. For example, if the agent is tasked with adding a new feature, it should first analyze the existing codebase within the workspace to understand its architecture and dependencies before making any changes. This approach ensures that the agent's actions are informed by the current state of the project, leading to more coherent and contextually appropriate modifications. Default, the environment variable WORKSPACE_DIR is set to the path of the workspace directory, and the agent should use this variable to reference the workspace in its operations. Update system prompt to reflect these capabilities and provide guidance on how to effectively utilize the workspace context in various scenarios. Update document, readme and guides to reflect this new capability.
 
+Status 2025-09-18: System prompt, README, docs/README.md, and user-guide updates now document the workspace-first capabilities and `WORKSPACE_DIR` usage.
+
+--
+
+rename vtagent to vtcode
+
+--
+
+bump core? vtagent-core
+
 --
 
 distribute cargo, brew, and npm package managers to release.
+
+--
+
+~/Developer/learn-by-doing/vtagent main\* ⇡
+9:55:18 ❯ cargo run /Users/vinh.nguyenxuan/Developer/learn-by-doing/vtchat
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.42s
+Running `target/debug/vtagent /Users/vinh.nguyenxuan/Developer/learn-by-doing/vtchat`
+Interactive chat (tools)
+Model: gemini-2.5-flash-lite-preview-06-17
+Workspace: /Users/vinh.nguyenxuan/Developer/learn-by-doing/vtchat
+Detected languages: JavaScript:3980, Python:1, TypeScript:1020
+
+Let's get oriented. I preloaded workspace context so we can move fast.
+
+Project context:
+
+-   Root: /Users/vinh.nguyenxuan/Developer/learn-by-doing/vtchat
+
+Guideline highlights:
+
+-   **Monorepo**: Turborepo-managed, with `apps/` (main: Next.js web app) and `packages/` (shared code: `common`, `shared`, `ai`, `ui`, etc.).
+-   **Core Technologies**: Next.js 15 (App Router), React 19.0.0, TypeScript, Tailwind CSS, shadcn/ui, Zustand, Drizzle ORM (Neon PostgreSQL), Better-Auth, Framer Motion, Lucide icons.
+-   **AI/Agents**: Agentic Graph System in `packages/ai/` (supports OpenAI, Anthropic, Google, Groq, etc.).
+
+How to work together:
+
+-   Describe your current coding goal or ask for a quick status overview.
+-   Reference AGENTS.md guidelines when proposing changes.
+-   Prefer asking for targeted file reads or diffs before editing.
+
+Recommended next actions:
+
+-   Review the highlighted guidelines and share the task you want to tackle.
+-   Ask for a workspace tour if you need more context.
+
+-> fix: Warning: Failed to initialize tool policy manager: Failed to parse tool policy config
+
+-   2025-09-18: Tool policy loader now resets invalid JSON to defaults (with backup) instead of warning on every launch.
+
+---
+
+vtagent /Users/vinh.nguyenxuan/Developer/learn-by-doing/vtchat
+error: unrecognized subcommand '/Users/vinh.nguyenxuan/Developer/learn-by-doing/vtchat'
+
+Usage: vtagent [OPTIONS] [COMMAND]
+
+For more information, try '--help'.
+
+--\_
+
+✓ Approved: 'run_terminal_cmd' tool will be allowed in future runs
+[stdout]
+9e04460e Update
+The latest git commit is "9e04460e Update". It appears to be a general update to the project.
+
+> show the commit
+> I can show you the commit, but I need to know which commit you are referring to. Could you please provide the commit hash or a more specific description?
+> ----> the agent should know the latest commit is 9e04460e. ie. the agent should remember the context of the whole conversation. as the example above, the agent don't know the latest commit that we talk?
+
+--
+
+## revamp this welcome message info. make a bounding box
+
+Interactive chat (tools)
+Model: gemini-2.5-flash-lite-preview-06-17
+Workspace: /Users/vinh.nguyenxuan/Developer/learn-by-doing/vtchat
+Detected languages: JavaScript:3980, Python:1, TypeScript:1020
+
+---
+
+## also for project context welcome message. style the heading bold with ansi color. instead of using markdown, use ansi styling
+
+Let's get oriented. I preloaded workspace context so we can move fast.
+
+Project context:
+
+-   Root: /Users/vinh.nguyenxuan/Developer/learn-by-doing/vtchat
+
+Guideline highlights:
+
+-   **Monorepo**: Turborepo-managed, with `apps/` (main: Next.js web app) and `packages/` (shared code: `common`, `shared`, `ai`, `ui`, etc.).
+-   **Core Technologies**: Next.js 15 (App Router), React 19.0.0, TypeScript, Tailwind CSS, shadcn/ui, Zustand, Drizzle ORM (Neon PostgreSQL), Better-Auth, Framer Motion, Lucide icons.
+-   **AI/Agents**: Agentic Graph System in `packages/ai/` (supports OpenAI, Anthropic, Google, Groq, etc.).
+
+How to work together:
+
+-   Describe your current coding goal or ask for a quick status overview.
+-   Reference AGENTS.md guidelines when proposing changes.
+-   Prefer asking for targeted file reads or diffs before editing.
+
+Recommended next actions:
+
+-   Review the highlighted guidelines and share the task you want to tackle.
+-   Ask for a workspace tour if you need more context.
+
+--
+
+also for agent message, make a slight indentation to differeniate between use message and agent message and tool call. revamp the chat ui ux visual, also add a spinning indicatif showing "Thinking" and update on tools call action. show and update tools call result and message return

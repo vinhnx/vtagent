@@ -12,6 +12,7 @@ VTAgent represents a modern approach to AI-powered software development, featuri
 -   **Advanced Code Intelligence** – Tree-sitter parsers for 6+ programming languages
 -   **Enterprise-Grade Safety** – Comprehensive security controls and path validation
 -   **Flexible Configuration** – TOML-based configuration with granular policies
+-   **Workspace-First Execution** – Full read/write/command capabilities anchored to `WORKSPACE_DIR` with built-in indexing workflows
 
 ## Documentation Overview
 
@@ -107,6 +108,14 @@ To tune budgets: add `[router.budgets.<class>]` with max_tokens and max_parallel
 
 **Trajectory Logs:**
 Logs for trajectory: check `logs/trajectory.jsonl`.
+
+### Workspace-First Operations
+
+-   `WORKSPACE_DIR` always points to the active project root; treat it as the default scope for every command and edit.
+-   Use targeted indexing (directory walks, dependency introspection, metadata extraction) before large changes to stay aligned with the current codebase.
+-   Keep shell commands and scripts within the workspace unless the workflow explicitly requires external paths.
+-   Ask for confirmation before operating outside `WORKSPACE_DIR` or when interacting with untrusted downloads.
+-   Launch sessions against another repository with `vtagent /abs/path`; you can also pass `--workspace-dir` (alias: `--workspace`) to other commands when needed.
 
 ### Single-Agent Workflows
 

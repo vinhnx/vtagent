@@ -1,6 +1,7 @@
 use crate::cli::handle_chat_command;
 use anyhow::{Context, Result};
 use console::style;
+use std::fs;
 use std::path::Path;
 use vtagent_core::config::loader::VTAgentConfig;
 use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
@@ -14,6 +15,15 @@ pub async fn handle_init_command(workspace: &Path, force: bool, run: bool) -> Re
     println!("Workspace: {}", workspace.display());
     println!("Force overwrite: {}", force);
     println!("Run after init: {}", run);
+
+    super::set_workspace_env(workspace);
+
+    fs::create_dir_all(workspace).with_context(|| {
+        format!(
+            "failed to create workspace directory {}",
+            workspace.display()
+        )
+    })?;
 
     // Bootstrap configuration files in the workspace
     VTAgentConfig::bootstrap_project(workspace, force)

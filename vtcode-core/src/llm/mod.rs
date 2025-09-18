@@ -19,7 +19,7 @@
 //! |----------|--------|---------|
 //! | Gemini | ✅ | gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite |
 //! | OpenAI | ✅ | gpt-5, gpt-5-mini |
-//! | Anthropic | ✅ | claude-4.1-opus, claude-4.5-sonnet |
+//! | Anthropic | ✅ | claude-4.1-opus, claude-4-sonnet |
 //! | DeepSeek | ✅ | deepseek-chat |
 //!
 //! ## Basic Usage

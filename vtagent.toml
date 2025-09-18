@@ -47,6 +47,21 @@ require_write_tool_for_claims = true
 # Auto-apply patches detected in responses (use with caution)
 auto_apply_detected_patches = false
 
+[automation.full_auto]
+# Disable by default; must be enabled intentionally per workspace
+enabled = false
+# Require presence of an acknowledgement/profile file before autonomous runs
+require_profile_ack = true
+# Path is resolved relative to the workspace when not absolute
+profile_path = "automation/full_auto_profile.toml"
+# Restrictive default allow-list focused on read-only tools
+allowed_tools = [
+    "read_file",
+    "list_files",
+    "grep_search",
+    "simple_search",
+]
+
 [tools]
 # Default tool policy for tools not explicitly listed below
 # Values: "allow" | "deny" | "prompt" (require confirmation)

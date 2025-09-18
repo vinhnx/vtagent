@@ -181,6 +181,12 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub skip_confirmations: bool,
 
+    /// **Enable full-auto mode (no interaction)**
+    ///
+    /// Runs the agent without pausing for approvals. Requires enabling in configuration.
+    #[arg(long, global = true)]
+    pub full_auto: bool,
+
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
@@ -602,6 +608,7 @@ impl Default for Cli {
             no_color: false,
             theme: None,
             skip_confirmations: false,
+            full_auto: false,
             debug: false,
             command: Some(Commands::Chat),
         }

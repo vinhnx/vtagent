@@ -18,6 +18,7 @@ mod welcome;
 pub async fn run_single_agent_loop(
     config: &CoreAgentConfig,
     skip_confirmations: bool,
+    full_auto: bool,
 ) -> Result<()> {
     let provider = config
         .model
@@ -31,9 +32,13 @@ pub async fn run_single_agent_loop(
 
     match provider {
         Provider::Gemini => {
-            gemini::run_single_agent_loop_gemini(config, vt_cfg, skip_confirmations).await
+            gemini::run_single_agent_loop_gemini(config, vt_cfg, skip_confirmations, full_auto)
+                .await
         }
-        _ => unified::run_single_agent_loop_unified(config, vt_cfg, skip_confirmations).await,
+        _ => {
+            unified::run_single_agent_loop_unified(config, vt_cfg, skip_confirmations, full_auto)
+                .await
+        }
     }
 }
 

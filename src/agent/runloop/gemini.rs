@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use std::io;
 use std::path::Path;
 
@@ -51,6 +51,7 @@ pub(crate) async fn run_single_agent_loop_gemini(
     config: &CoreAgentConfig,
     vt_cfg: Option<&VTAgentConfig>,
     skip_confirmations: bool,
+    full_auto: bool,
 ) -> Result<()> {
     let trim_config = load_context_trim_config(vt_cfg);
     let session_bootstrap = prepare_session_bootstrap(config, vt_cfg);
@@ -77,6 +78,31 @@ pub(crate) async fn run_single_agent_loop_gemini(
                 "Warning: Failed to apply tool policies from config: {}",
                 err
             );
+        }
+    }
+
+    if full_auto {
+        let automation_cfg = vt_cfg
+            .map(|cfg| cfg.automation.full_auto.clone())
+            .ok_or_else(|| anyhow!("Full-auto configuration unavailable"))?;
+
+        tool_registry.enable_full_auto_mode(&automation_cfg.allowed_tools);
+        let allowlist = tool_registry
+            .current_full_auto_allowlist()
+            .unwrap_or_default();
+        if allowlist.is_empty() {
+            renderer.line(
+                MessageStyle::Info,
+                "Full-auto mode enabled with no tool permissions; tool calls will be skipped.",
+            )?;
+        } else {
+            renderer.line(
+                MessageStyle::Info,
+                &format!(
+                    "Full-auto mode enabled. Permitted tools: {}",
+                    allowlist.join(", ")
+                ),
+            )?;
         }
     }
     let function_declarations = build_function_declarations();

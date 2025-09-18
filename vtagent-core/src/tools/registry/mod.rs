@@ -21,7 +21,8 @@ use utils::normalize_tool_output;
 
 use crate::config::PtyConfig;
 use crate::config::ToolsConfig;
-use crate::tool_policy::ToolPolicyManager;
+use crate::config::constants::tools;
+use crate::tool_policy::{ToolPolicy, ToolPolicyManager};
 use crate::tools::ast_grep::AstGrepEngine;
 use crate::tools::grep_search::GrepSearchManager;
 use anyhow::{Result, anyhow};
@@ -62,6 +63,7 @@ pub struct ToolRegistry {
     tool_registrations: Vec<ToolRegistration>,
     tool_lookup: HashMap<&'static str, usize>,
     preapproved_tools: HashSet<String>,
+    full_auto_allowlist: Option<HashSet<String>>,
 }
 
 impl ToolRegistry {
@@ -111,6 +113,7 @@ impl ToolRegistry {
             tool_registrations: Vec::new(),
             tool_lookup: HashMap::new(),
             preapproved_tools: HashSet::new(),
+            full_auto_allowlist: None,
         };
 
         register_builtin_tools(&mut registry);
@@ -136,6 +139,35 @@ impl ToolRegistry {
             .iter()
             .map(|registration| registration.name().to_string())
             .collect()
+    }
+
+    pub fn enable_full_auto_mode(&mut self, allowed_tools: &[String]) {
+        let mut normalized: HashSet<String> = HashSet::new();
+        if allowed_tools
+            .iter()
+            .any(|tool| tool.trim() == tools::WILDCARD_ALL)
+        {
+            for tool in self.available_tools() {
+                normalized.insert(tool);
+            }
+        } else {
+            for tool in allowed_tools {
+                let trimmed = tool.trim();
+                if !trimmed.is_empty() {
+                    normalized.insert(trimmed.to_string());
+                }
+            }
+        }
+
+        self.full_auto_allowlist = Some(normalized);
+    }
+
+    pub fn current_full_auto_allowlist(&self) -> Option<Vec<String>> {
+        self.full_auto_allowlist.as_ref().map(|set| {
+            let mut items: Vec<String> = set.iter().cloned().collect();
+            items.sort();
+            items
+        })
     }
 
     pub fn has_tool(&self, name: &str) -> bool {
@@ -164,6 +196,20 @@ impl ToolRegistry {
     }
 
     pub async fn execute_tool(&mut self, name: &str, args: Value) -> Result<Value> {
+        if let Some(allowlist) = &self.full_auto_allowlist {
+            if !allowlist.contains(name) {
+                let error = ToolExecutionError::new(
+                    name.to_string(),
+                    ToolErrorType::PolicyViolation,
+                    format!(
+                        "Tool '{}' is not permitted while full-auto mode is active",
+                        name
+                    ),
+                );
+                return Ok(error.to_json_value());
+            }
+        }
+
         let skip_policy_prompt = self.preapproved_tools.remove(name);
 
         if !skip_policy_prompt {
@@ -250,6 +296,25 @@ impl ToolRegistry {
 impl ToolRegistry {
     /// Prompt for permission before starting long-running tool executions to avoid spinner conflicts
     pub fn preflight_tool_permission(&mut self, name: &str) -> Result<bool> {
+        if let Some(allowlist) = self.full_auto_allowlist.as_ref() {
+            if !allowlist.contains(name) {
+                return Ok(false);
+            }
+
+            if let Some(policy_manager) = self.tool_policy.as_mut() {
+                match policy_manager.get_policy(name) {
+                    ToolPolicy::Deny => return Ok(false),
+                    ToolPolicy::Allow | ToolPolicy::Prompt => {
+                        self.preapproved_tools.insert(name.to_string());
+                        return Ok(true);
+                    }
+                }
+            }
+
+            self.preapproved_tools.insert(name.to_string());
+            return Ok(true);
+        }
+
         if let Ok(policy_manager) = self.policy_manager_mut() {
             let allowed = policy_manager.should_execute_tool(name)?;
             if allowed {
@@ -324,6 +389,19 @@ mod tests {
             .execute_tool(CUSTOM_TOOL_NAME, json!({"input": "value"}))
             .await?;
         assert!(response["success"].as_bool().unwrap_or(false));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn full_auto_allowlist_enforced() -> Result<()> {
+        let temp_dir = TempDir::new()?;
+        let mut registry = ToolRegistry::new(temp_dir.path().to_path_buf());
+
+        registry.enable_full_auto_mode(&vec![tools::READ_FILE.to_string()]);
+
+        assert!(registry.preflight_tool_permission(tools::READ_FILE)?);
+        assert!(!registry.preflight_tool_permission(tools::RUN_TERMINAL_CMD)?);
+
         Ok(())
     }
 }

@@ -98,12 +98,13 @@ check_homebrew_setup() {
 
 # Function to trigger docs.rs rebuild
 trigger_docs_rs_rebuild() {
-    local dry_run=$1
+    local version=$1
+    local dry_run=$2
 
-    print_distribution "Triggering docs.rs rebuild..."
+    print_distribution "Triggering docs.rs rebuild for version $version..."
 
     if [[ "$dry_run" == "true" ]]; then
-        print_info "Dry run - would trigger docs.rs rebuild for vtcode and vtcode-core"
+        print_info "Dry run - would trigger docs.rs rebuild for vtcode and vtcode-core v$version"
         return 0
     fi
 
@@ -115,28 +116,35 @@ trigger_docs_rs_rebuild() {
     fi
 
     # Trigger docs.rs rebuild for vtcode-core
-    print_info "Triggering docs.rs rebuild for vtcode-core..."
-    if curl -X POST "https://docs.rs/crate/vtcode-core/latest/builds" \
+    print_info "Triggering docs.rs rebuild for vtcode-core v$version..."
+    local core_response=$(curl -X POST "https://docs.rs/crate/vtcode-core/$version/builds" \
              -H "Authorization: Bearer $CRATES_IO_TOKEN" \
              -H "Content-Type: application/json" \
-             --silent --output /dev/null; then
-        print_success "Triggered docs.rs rebuild for vtcode-core"
+             -w "%{http_code}" \
+             --silent --output /dev/null)
+    if [[ "$core_response" == "200" || "$core_response" == "202" ]]; then
+        print_success "Triggered docs.rs rebuild for vtcode-core v$version (HTTP $core_response)"
     else
-        print_warning "Failed to trigger docs.rs rebuild for vtcode-core (this is usually automatic)"
+        print_warning "Failed to trigger docs.rs rebuild for vtcode-core v$version (HTTP $core_response)"
+        print_info "This may be normal - docs.rs usually rebuilds automatically after publishing"
     fi
 
     # Trigger docs.rs rebuild for vtcode
-    print_info "Triggering docs.rs rebuild for vtcode..."
-    if curl -X POST "https://docs.rs/crate/vtcode/latest/builds" \
+    print_info "Triggering docs.rs rebuild for vtcode v$version..."
+    local main_response=$(curl -X POST "https://docs.rs/crate/vtcode/$version/builds" \
              -H "Authorization: Bearer $CRATES_IO_TOKEN" \
              -H "Content-Type: application/json" \
-             --silent --output /dev/null; then
-        print_success "Triggered docs.rs rebuild for vtcode"
+             -w "%{http_code}" \
+             --silent --output /dev/null)
+    if [[ "$main_response" == "200" || "$main_response" == "202" ]]; then
+        print_success "Triggered docs.rs rebuild for vtcode v$version (HTTP $main_response)"
     else
-        print_warning "Failed to trigger docs.rs rebuild for vtcode (this is usually automatic)"
+        print_warning "Failed to trigger docs.rs rebuild for vtcode v$version (HTTP $main_response)"
+        print_info "This may be normal - docs.rs usually rebuilds automatically after publishing"
     fi
 
     print_info "Note: docs.rs rebuild is usually automatic after crates.io publishing"
+    print_info "Check https://docs.rs/vtcode/$version and https://docs.rs/vtcode-core/$version for status"
 }
 
 # Function to get current version from Cargo.toml
@@ -589,7 +597,9 @@ main() {
             exit 1
         fi
         # Trigger docs.rs rebuild after successful crates.io publishing
-        trigger_docs_rs_rebuild false
+        print_info "Waiting a moment for crates.io to propagate..."
+        sleep 10
+        trigger_docs_rs_rebuild "$version" false
     fi
 
     if [[ "$skip_homebrew" != "true" ]]; then

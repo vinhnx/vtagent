@@ -1,6 +1,6 @@
-# VTCode Homebrew Distribution Setup Guide
+# VT Code Homebrew Distribution Setup Guide
 
-This guide will help you set up Homebrew distribution for VTCode on macOS.
+This guide will help you set up Homebrew distribution for VT Code on macOS.
 
 ## Prerequisites
 
@@ -148,13 +148,13 @@ update_homebrew_formula() {
 
 ## Usage
 
-Once your tap is set up, users can install VTCode with:
+Once your tap is set up, users can install VT Code with:
 
 ```bash
 # Add your tap
 brew tap YOUR_USERNAME/homebrew-tap
 
-# Install VTCode
+# Install VT Code
 brew install YOUR_USERNAME/homebrew-tap/vtcode
 ```
 
@@ -226,4 +226,4 @@ update_homebrew_formula() {
 }
 ```
 
-This setup provides a complete Homebrew distribution system for VTCode that integrates with your existing release process.
+This setup provides a complete Homebrew distribution system for VT Code that integrates with your existing release process.

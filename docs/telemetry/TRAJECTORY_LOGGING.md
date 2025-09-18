@@ -1,6 +1,6 @@
 # Trajectory Logging
 
-VTCode records routing decisions and tool calls as structured JSON lines to support trajectory evaluation and continuous improvement.
+VT Code records routing decisions and tool calls as structured JSON lines to support trajectory evaluation and continuous improvement.
 
 -   Output file: `logs/trajectory.jsonl`
 -   Writer: `vtcode-core/src/core/trajectory.rs` (`TrajectoryLogger`)

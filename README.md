@@ -1,177 +1,113 @@
-# VTCode - Terminal Coding Agent
+<div align="center">
 
-[![Crates.io](https://img.shields.io/crates/v/vtcode.svg)](https://crates.io/crates/vtcode)
-[![Homebrew](https://img.shields.io/badge/homebrew-v0.8.2-orange)](https://github.com/vinhnx/homebrew-tap)
-[![GitHub release](https://img.shields.io/github/release/vinhnx/vtcode.svg)](https://github.com/vinhnx/vtcode/releases)
-[![docs.rs](https://img.shields.io/docsrs/vtcode)](https://docs.rs/vtcode)
+<h1>VT Code</h1>
 
-A Rust-based terminal coding agent with modular architecture supporting multiple LLM providers (Gemini, OpenAI, Anthropic, DeepSeek) and tree-sitter parsers for 6+ languages.
+<p align="center"><code>cargo install vtcode</code><br />or <code>brew install vinhnx/tap/vtcode</code></p>
 
-## Quick Start
+<p align="center"><strong>VT Code</strong> is a Rust-based terminal coding agent with modular architecture supporting multiple LLM providers.
+</br>
+</br>Built for developers who demand precision, security, and efficiency in their coding workflows.</p>
 
-### 1. Install
+<p align="center">
+  <img src="screenshots/vtcode.png" alt="VT Code Terminal Interface" width="80%" />
+</p>
 
-**Cargo (Recommended):**
+</div>
 
-```bash
+---
+
+## Quickstart
+
+### Installing and running VT Code
+
+Install globally with Cargo:
+
+```shell
 cargo install vtcode
 ```
 
-**Homebrew (macOS):**
+Alternatively, with Homebrew:
 
-```bash
-# Add the tap
-brew tap vinhnx/homebrew-tap
-
-# Install VTCode
-brew install vtcode
-
-# Verify installation
-vtcode --version
+```shell
+brew install vinhnx/tap/vtcode
 ```
 
-**Pre-built Binaries:**
-Download from [GitHub Releases](https://github.com/vinhnx/vtcode/releases)
+Then simply run `vtcode` to get started:
 
-#### Homebrew Installation Details
-
-The Homebrew formula supports both Intel and Apple Silicon Macs:
-
--   **Apple Silicon (M1/M2/M3)**: Native `aarch64-apple-darwin` binary
--   **Intel Macs**: `x86_64-apple-darwin` binary (when available)
-
-**Supported macOS Versions:**
-
--   macOS 12.0+ (Monterey and later)
--   Both Intel and Apple Silicon architectures
-
-**Uninstall:**
-
-```bash
-brew uninstall vtcode
-brew untap vinhnx/homebrew-tap  # Optional: remove the tap
+```shell
+vtcode
 ```
 
-#### Troubleshooting Homebrew Installation
+<details>
+<summary>You can also download pre-built binaries from <a href="https://github.com/vinhnx/vtcode/releases/latest">GitHub Releases</a>.</summary>
 
-**If you encounter issues:**
+Available for:
 
-1. **Update Homebrew:**
+-   **macOS**: Apple Silicon (`aarch64-apple-darwin`) and Intel (`x86_64-apple-darwin`)
+-   **Linux**: x86_64 and ARM64 architectures
+-   **Windows**: x86_64 architecture
 
-```bash
-brew update
+Each archive contains the executable - extract and rename to `vtcode` if needed.
+
+</details>
+
+### Configuration
+
+Set your API key for your preferred provider:
+
+```shell
+export GEMINI_API_KEY="your_key_here"
+# or
+export OPENAI_API_KEY="your_key_here"
+# or
+export ANTHROPIC_API_KEY="your_key_here"
 ```
 
-2. **Clear Homebrew cache:**
+VT Code supports advanced configuration via `vtcode.toml`. See [Configuration](docs/project/) for details.
 
-```bash
-brew cleanup
-```
+---
 
-3. **Re-tap the repository:**
+## Core Features
 
-```bash
-brew untap vinhnx/homebrew-tap
-brew tap vinhnx/homebrew-tap
-```
+**Multi-Provider AI Support**
 
-4. **Check formula:**
+-   Gemini, OpenAI, Anthropic, and DeepSeek integration
+-   Automatic provider selection and failover
+-   Cost optimization with safety controls
 
-```bash
-brew info vtcode
-```
+**Advanced Code Intelligence**
 
-5. **Manual installation (if needed):**
+-   Tree-sitter parsing for 6+ languages (Rust, Python, JavaScript, TypeScript, Go, Java)
+-   Semantic code analysis and pattern recognition
+-   Intelligent refactoring and optimization suggestions
 
-```bash
-# Download the binary directly
-curl -L -o vtcode.tar.gz https://github.com/vinhnx/vtcode/releases/download/v0.8.2/vtcode-v0.8.2-aarch64-apple-darwin.tar.gz
+**Enterprise Security**
 
-# Extract and install
-tar -xzf vtcode.tar.gz
-sudo mv vtcode /usr/local/bin/
-```
+-   Workspace boundary enforcement
+-   Configurable command allowlists
+-   Human-in-the-loop controls for safety
+-   Comprehensive audit logging
 
-### 2. Configure API Key
+**Modular Architecture**
 
-```bash
-# Set your API key (choose one)
-export GEMINI_API_KEY="your_gemini_key"
-export OPENAI_API_KEY="your_openai_key"
-export ANTHROPIC_API_KEY="your_anthropic_key"
-export DEEPSEEK_API_KEY="your_deepseek_key"
-```
+-   Trait-based tool system for extensibility
+-   Multi-mode execution (terminal, PTY, streaming)
+-   Intelligent caching and performance optimization
+-   Plugin architecture for custom tools
 
-### 3. Run
-
-```bash
-# Initialize in your project
-vtcode init
-
-# Start interactive chat
-vtcode chat
-
-# Or run with custom workspace
-vtcode --workspace-dir /path/to/project chat
-```
-
-## Requirements
-
--   **Rust 1.75+** (for building from source)
--   **API Key** from one of: Gemini, OpenAI, Anthropic, or DeepSeek
-
-## Configuration
-
-VTCode uses `vtcode.toml` for configuration. Key settings:
-
-```toml
-[agent]
-provider = "gemini"  # or "openai", "anthropic", "deepseek"
-default_model = "gemini-2.5-flash-lite-preview-06-17"
-max_conversation_turns = 150
-
-[security]
-human_in_the_loop = true  # Require confirmation for destructive actions
-```
-
-## Key Features
-
--   **Multi-Provider LLM Support** - Gemini, OpenAI, Anthropic, DeepSeek
--   **Advanced Code Analysis** - Tree-sitter parsers for Rust, Python, JavaScript, TypeScript, Go, Java
--   **Intelligent Tool Suite** - File operations, search, terminal commands, PTY integration
--   **Workspace Safety** - Path validation and configurable security policies
--   **Context Engineering** - Full conversation history with intelligent management
--   **Decision Ledger** - Structured record of agent decisions for consistency
+---
 
 ## Documentation
 
--   **API Docs**: [docs.rs/vtcode](https://docs.rs/vtcode)
--   **User Guide**: [docs/](docs/)
--   **Configuration**: [docs/project/](docs/project/)
+-   [**Getting Started**](docs/user-guide/getting-started.md) - Installation and basic usage
+-   [**Configuration**](docs/project/) - Advanced configuration options
+-   [**Architecture**](docs/ARCHITECTURE.md) - Technical architecture details
+-   [**Advanced Features**](docs/ADVANCED_FEATURES_IMPLEMENTATION.md) - Safety controls and debug mode
+-   [**API Reference**](https://docs.rs/vtcode) - Complete API documentation
+-   [**Contributing**](CONTRIBUTING.md) - Development guidelines
 
-## 🛠️ Development
-
-```bash
-# Clone repository
-git clone https://github.com/vinhnx/vtcode.git
-cd vtcode
-
-# Build and run
-./run.sh              # Production build
-./run-debug.sh        # Development build
-
-# Run tests
-cargo test
-
-# Check code quality
-cargo clippy
-cargo fmt
-```
-
-## Contributing
-
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+---
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+This project is licensed under the MIT License - see [LICENSE](LICENSE) for details.

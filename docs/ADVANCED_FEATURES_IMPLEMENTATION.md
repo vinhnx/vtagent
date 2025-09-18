@@ -1,8 +1,8 @@
-# VTCode Advanced Features Implementation
+# VT Code Advanced Features Implementation
 
 ## Overview
 
-This document summarizes the implementation of advanced features in VTCode, safety controls, and error recovery mechanisms.
+This document summarizes the implementation of advanced features in VT Code, safety controls, and error recovery mechanisms.
 
 ## Debug Mode Implementation
 
@@ -60,7 +60,7 @@ if finish_reason == "MALFORMED_FUNCTION_CALL" {
 
 ### Overview
 
-Safety implementation adds critical safety and efficiency controls to VTCode, ensuring user explicit confirmation for expensive operations and defaulting to single-agent mode for optimal resource usage.
+Safety implementation adds critical safety and efficiency controls to VT Code, ensuring user explicit confirmation for expensive operations and defaulting to single-agent mode for optimal resource usage.
 
 ### Key Safety Features Implemented
 
@@ -207,5 +207,5 @@ dangerous_commands_require_confirmation = true
 
 ---
 
-_This document covers the implementation of debug mode and safety features in VTCode. For user-facing documentation, see the respective guide documents._</content>
+_This document covers the implementation of debug mode and safety features in VT Code. For user-facing documentation, see the respective guide documents._</content>
 <parameter name="filePath">/Users/vinh.nguyenxuan/Developer/learn-by-doing/vtcode/docs/ADVANCED_FEATURES_IMPLEMENTATION.md

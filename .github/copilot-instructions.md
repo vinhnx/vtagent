@@ -5,10 +5,10 @@
 
 # AGENTS.md
 
-# VTCode
+# VT Code
 
 ## Project Overview
-VTCode is a Rust-based terminal coding agent with modular architecture supporting multiple LLM providers (Gemini, OpenAI, Anthropic) and tree-sitter parsers for 6+ languages.
+VT Code is a Rust-based terminal coding agent with modular architecture supporting multiple LLM providers (Gemini, OpenAI, Anthropic) and tree-sitter parsers for 6+ languages.
 
 ## Architecture & Key Components
 - **Workspace Structure**: `vtcode-core/` (library) + `src/` (binary) with modular tools system

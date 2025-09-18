@@ -2,13 +2,13 @@
 
 ## Overview
 
-This document details the comprehensive implementation of model updates for VTCode as of September 2025, adding 47 new models across 2 new providers and updating all existing providers with their latest releases.
+This document details the comprehensive implementation of model updates for VT Code as of September 2025, adding 47 new models across 2 new providers and updating all existing providers with their latest releases.
 
 ## Implementation Approach
 
 ### Objective
 
-Update the VTCode codebase to focus on the latest and most capable AI models as of September 2025, removing outdated or less relevant providers and models while maintaining backward compatibility.
+Update the VT Code codebase to focus on the latest and most capable AI models as of September 2025, removing outdated or less relevant providers and models while maintaining backward compatibility.
 
 ### Models to Keep
 

@@ -2,7 +2,7 @@
 
 ## Summary
 
-I have successfully implemented a comprehensive tool policy system for VTCode that provides user control over which tools the agent can execute. The system stores user choices persistently in `~/.vtcode/tool-policy.json` and minimizes repeated prompts while maintaining security.
+I have successfully implemented a comprehensive tool policy system for VT Code that provides user control over which tools the agent can execute. The system stores user choices persistently in `~/.vtcode/tool-policy.json` and minimizes repeated prompts while maintaining security.
 
 ## Key Features Implemented
 
@@ -218,7 +218,7 @@ The system implements optimized pagination for handling large datasets:
 
 ### Overview
 
-VTCode implements automatic chunking strategies to handle large files and verbose outputs efficiently, preventing token limits and memory issues while preserving important content.
+VT Code implements automatic chunking strategies to handle large files and verbose outputs efficiently, preventing token limits and memory issues while preserving important content.
 
 ### Chunking Thresholds
 

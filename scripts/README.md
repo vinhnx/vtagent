@@ -21,12 +21,12 @@ Sets up the complete development environment with all necessary tools.
 
 **What it does:**
 
-- Checks Rust installation
-- Updates Rust toolchain
-- Installs rustfmt and clippy components
-- Installs development tools (cargo-audit, cargo-outdated, etc.)
-- Optionally sets up git hooks
-- Verifies everything works
+-   Checks Rust installation
+-   Updates Rust toolchain
+-   Installs rustfmt and clippy components
+-   Installs development tools (cargo-audit, cargo-outdated, etc.)
+-   Optionally sets up git hooks
+-   Verifies everything works
 
 ### `check.sh` - Code Quality Checks
 
@@ -49,15 +49,15 @@ Runs comprehensive code quality checks (same as CI pipeline).
 
 **Checks performed:**
 
-- Code formatting (rustfmt)
-- Linting (clippy)
-- Build verification
-- Test execution
-- Documentation generation
+-   Code formatting (rustfmt)
+-   Linting (clippy)
+-   Build verification
+-   Test execution
+-   Documentation generation
 
 ### `release.sh` - Release Management
 
-Creates releases for VTCode using changelogithub integration.
+Creates releases for VT Code using changelogithub integration.
 
 ```bash
 # Create a specific version release
@@ -81,16 +81,16 @@ Creates releases for VTCode using changelogithub integration.
 
 **What it does:**
 
-- Updates version in `Cargo.toml`
-- Creates git tag with proper versioning
-- Pushes tag to GitHub (triggers release workflow)
-- GitHub Actions automatically generates changelog and creates release
+-   Updates version in `Cargo.toml`
+-   Creates git tag with proper versioning
+-   Pushes tag to GitHub (triggers release workflow)
+-   GitHub Actions automatically generates changelog and creates release
 
 **Prerequisites:**
 
-- Must be on `main` branch
-- Working tree must be clean
-- Requires GitHub repository access
+-   Must be on `main` branch
+-   Working tree must be clean
+-   Requires GitHub repository access
 
 **Release Process:**
 
@@ -101,9 +101,9 @@ Creates releases for VTCode using changelogithub integration.
 
 **Recent Updates:**
 
-- Fixed changelogithub CLI compatibility issues by switching to the official GitHub Action
-- Added proper workflow permissions for release creation
-- Improved error handling and debugging information
+-   Fixed changelogithub CLI compatibility issues by switching to the official GitHub Action
+-   Added proper workflow permissions for release creation
+-   Improved error handling and debugging information
 
 ## Quick Start
 
@@ -111,39 +111,40 @@ For new developers:
 
 1. **Clone the repository**
 
-   ```bash
-   git clone <repository-url>
-   cd vtcode
-   ```
+    ```bash
+    git clone <repository-url>
+    cd vtcode
+    ```
 
 2. **Set up development environment**
 
-   ```bash
-   ./scripts/setup.sh --with-hooks
-   ```
+    ```bash
+    ./scripts/setup.sh --with-hooks
+    ```
 
 3. **Configure API keys (optional)**
 
-   Create a `.env` file in the project root to store your API keys:
-   ```bash
-   # .env file
-   GEMINI_API_KEY=your_gemini_api_key_here
-   ANTHROPIC_API_KEY=your_anthropic_api_key_here
-   OPENAI_API_KEY=your_openai_api_key_here
-   ```
+    Create a `.env` file in the project root to store your API keys:
+
+    ```bash
+    # .env file
+    GEMINI_API_KEY=your_gemini_api_key_here
+    ANTHROPIC_API_KEY=your_anthropic_api_key_here
+    OPENAI_API_KEY=your_openai_api_key_here
+    ```
 
 4. **Run code quality checks**
 
-   ```bash
-   ./scripts/check.sh
-   ```
+    ```bash
+    ./scripts/check.sh
+    ```
 
 5. **Start developing!**
 
-   ```bash
-   cargo build
-   cargo nextest run
-   ```
+    ```bash
+    cargo build
+    cargo nextest run
+    ```
 
 ## API Key Configuration
 
@@ -154,6 +155,7 @@ vtcode supports multiple ways to configure API keys, with the following priority
 3. **Configuration file** (vtcode.toml) - Least secure, but convenient
 
 Example `.env` file:
+
 ```bash
 GEMINI_API_KEY=your_gemini_api_key_here
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
@@ -161,6 +163,7 @@ OPENAI_API_KEY=your_openai_api_key_here
 ```
 
 Example `vtcode.toml` configuration:
+
 ```toml
 [agent]
 gemini_api_key = "your_gemini_api_key_here"
@@ -172,10 +175,10 @@ openai_api_key = "your_openai_api_key_here"
 
 These scripts run the same checks as our GitHub Actions workflows:
 
-- `ci.yml` - Main CI pipeline
-- `code-quality.yml` - Code quality checks
-- `development.yml` - Development workflow
-- `nightly.yml` - Nightly builds
+-   `ci.yml` - Main CI pipeline
+-   `code-quality.yml` - Code quality checks
+-   `development.yml` - Development workflow
+-   `nightly.yml` - Nightly builds
 
 ## Pre-commit Hooks
 
@@ -191,9 +194,9 @@ The hook can be bypassed with `git commit --no-verify` if needed.
 
 You can modify these scripts to fit your development workflow:
 
-- Add additional tools to `setup.sh`
-- Modify check criteria in `check.sh`
-- Customize git hooks for your team
+-   Add additional tools to `setup.sh`
+-   Modify check criteria in `check.sh`
+-   Customize git hooks for your team
 
 ## Troubleshooting
 
@@ -226,6 +229,6 @@ rustup install nightly
 
 ## Related Documentation
 
-- [CI/CD Guide](../docs/development/ci-cd.md)
-- [Contributing Guide](../docs/development/README.md)
-- [Code Quality Standards](../docs/project/README.md)
+-   [CI/CD Guide](../docs/development/ci-cd.md)
+-   [Contributing Guide](../docs/development/README.md)
+-   [Code Quality Standards](../docs/project/README.md)

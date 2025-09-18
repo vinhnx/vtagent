@@ -1,6 +1,6 @@
-# VTCode Distribution Setup
+# VT Code Distribution Setup
 
-This document outlines the complete distribution setup for VTCode across multiple package managers and platforms.
+This document outlines the complete distribution setup for VT Code across multiple package managers and platforms.
 
 ## Distribution Channels
 

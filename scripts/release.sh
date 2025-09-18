@@ -291,11 +291,29 @@ create_tag() {
 
     if git tag -l | grep -q "^$tag$"; then
         print_error "Tag $tag already exists"
-        exit 1
+        return 1
     fi
 
-    git tag -a "$tag" -m "Release $tag"
+    if ! git tag -a "$tag" -m "Release $tag"; then
+        print_error "Failed to create tag $tag"
+        return 1
+    fi
+
     print_success "Created tag $tag"
+}
+
+# Function to push commit to GitHub
+push_commit() {
+    local version=$1
+
+    print_info "Pushing commit to GitHub..."
+    if ! git push origin main; then
+        print_error "Failed to push commit to GitHub"
+        print_info "You may need to push manually: git push origin main"
+        return 1
+    fi
+
+    print_success "Pushed commit to GitHub"
 }
 
 # Function to push tag to GitHub
@@ -303,7 +321,13 @@ push_tag() {
     local version=$1
     local tag="v$version"
 
-    git push origin "$tag"
+    print_info "Pushing tag $tag to GitHub..."
+    if ! git push origin "$tag"; then
+        print_error "Failed to push tag $tag to GitHub"
+        print_info "You may need to push tag manually: git push origin $tag"
+        return 1
+    fi
+
     print_success "Pushed tag $tag to GitHub"
 }
 
@@ -375,6 +399,44 @@ increment_version() {
     esac
 
     echo "${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.${VERSION_PARTS[2]}"
+}
+
+# Function to handle all git operations
+handle_git_operations() {
+    local version=$1
+    local files_to_commit=$2
+
+    print_info "Handling git operations..."
+
+    # Add files to git
+    git add $files_to_commit
+    print_info "Staged files: $files_to_commit"
+
+    # Commit version change
+    if ! git commit -m "chore: bump version to $version"; then
+        print_error "Failed to commit version changes"
+        return 1
+    fi
+    print_success "Committed version bump"
+
+    # Push commit to GitHub
+    if ! push_commit "$version"; then
+        print_error "Failed to push commit - release may be incomplete"
+        return 1
+    fi
+
+    # Create and push tag
+    if ! create_tag "$version"; then
+        print_error "Failed to create tag"
+        return 1
+    fi
+
+    if ! push_tag "$version"; then
+        print_error "Failed to push tag - release may be incomplete"
+        return 1
+    fi
+
+    print_success "All git operations completed successfully"
 }
 
 # Main function
@@ -478,16 +540,13 @@ main() {
         echo
         echo "Would perform the following actions:"
         echo "1. Update version to $version in all package files"
-        echo "2. Create git tag v$version"
-        echo "3. Push tag v$version to GitHub"
-        if [[ "$skip_crates" != "true" ]]; then
-            echo "4. Publish to crates.io (dry run)"
-            echo "5. Trigger docs.rs rebuild"
-        fi
-        if [[ "$skip_homebrew" != "true" ]]; then
-            echo "6. Update Homebrew formula"
-        fi
-        echo "7. GitHub Actions will create release with binaries"
+        echo "2. Publish to crates.io (if enabled)"
+        echo "3. Update Homebrew formula (if enabled)"
+        echo "4. Commit version changes to git"
+        echo "5. Push commit to GitHub"
+        echo "6. Create and push git tag v$version"
+        echo "7. Trigger docs.rs rebuild"
+        echo "8. GitHub Actions will create release with binaries"
         exit 0
     fi
 
@@ -549,21 +608,11 @@ main() {
         update_homebrew_formula "$version"
     fi
 
-    # Commit version change
-    git add Cargo.toml vtcode-core/Cargo.toml
-    git commit -m "chore: bump version to $version"
-    print_success "Committed version bump"
-
-    # Push commit to GitHub
-    git push origin main
-    print_success "Pushed commit to GitHub"
-
-    # Create and push tag
-    create_tag "$version"
-    push_tag "$version"
-
-    # Trigger docs.rs rebuild
-    trigger_docs_rs_rebuild false
+    # Handle all git operations
+    if ! handle_git_operations "$version" "$files_to_commit"; then
+        print_error "Git operations failed - release may be incomplete"
+        exit 1
+    fi
 
     print_success "Release $version created successfully!"
     print_info "Distribution Summary:"

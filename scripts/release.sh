@@ -340,24 +340,24 @@ OPTIONS:
     -M, --major         Create a major release (increment major version)
     --dry-run           Show what would be done without making changes
     --skip-crates       Skip publishing to crates.io
-    --skip-homebrew     Skip Homebrew formula update
+    --enable-homebrew   Enable Homebrew formula update (currently disabled by default)
 
 EXAMPLES:
     $0 1.0.0                           # Release specific version
     $0 --patch                         # Create patch release
-    $0 --minor --skip-homebrew         # Create minor release, skip Homebrew
+    $0 --minor --enable-homebrew       # Create minor release with Homebrew
     $0 --patch --dry-run               # Show what patch release would do
 
 DISTRIBUTION CHANNELS:
     - crates.io: Rust package registry
     - docs.rs: Automatic API documentation
-    - Homebrew: macOS package manager
+    - Homebrew: macOS package manager (disabled by default, use --enable-homebrew)
     - GitHub Releases: Pre-built binaries
 
 SETUP REQUIREMENTS:
     1. Cargo: Run 'cargo login' with your crates.io API token
     2. Git: Ensure you're on main branch with clean working tree
-    3. Homebrew: Set up tap repository for macOS distribution (optional)
+    3. Homebrew: Set up tap repository for macOS distribution (optional, use --enable-homebrew)
 
 EOF
 }
@@ -398,7 +398,7 @@ main() {
     local increment_type=""
     local dry_run=false
     local skip_crates=false
-    local skip_homebrew=false
+    local skip_homebrew=true  # Skip Homebrew by default for now
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
@@ -427,8 +427,8 @@ main() {
                 skip_crates=true
                 shift
                 ;;
-            --skip-homebrew)
-                skip_homebrew=true
+            --enable-homebrew)
+                skip_homebrew=false
                 shift
                 ;;
             -*)

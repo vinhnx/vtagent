@@ -90,11 +90,15 @@ pub(crate) async fn run_single_agent_loop_unified(
             }
             placeholder_shown = true;
         }
-        let prompt_style = theme::active_styles().primary;
-        renderer.inline_with_style(prompt_style, "❯ ")?;
+        let styles = theme::active_styles();
+        renderer.inline_with_style(styles.primary, "❯ ")?;
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
         let input = input.trim();
+
+        if input.is_empty() {
+            continue;
+        }
 
         match input {
             "" => continue,
@@ -172,6 +176,8 @@ pub(crate) async fn run_single_agent_loop_unified(
                 }
             }
         }
+
+        renderer.line(MessageStyle::User, input)?;
 
         let refined_user = refine_user_prompt_if_enabled(input, config, vt_cfg).await;
         conversation_history.push(uni::Message::user(refined_user));

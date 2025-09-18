@@ -96,8 +96,8 @@ pub(crate) async fn run_single_agent_loop_gemini(
             }
             placeholder_shown = true;
         }
-        let prompt_style = theme::active_styles().primary;
-        renderer.inline_with_style(prompt_style, "❯ ")?;
+        let styles = theme::active_styles();
+        renderer.inline_with_style(styles.primary, "❯ ")?;
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
         let input = input.trim();
@@ -178,6 +178,8 @@ pub(crate) async fn run_single_agent_loop_gemini(
                 }
             }
         }
+
+        renderer.line(MessageStyle::User, input)?;
 
         conversation_history.push(Content::user_text(input));
         let _pruned_tools = prune_gemini_tool_responses(

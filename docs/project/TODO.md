@@ -280,19 +280,3 @@ The project aims for clean, maintainable, and testable code through these archit
 ---
 
 explore and use parking_lot for better performance in multithreaded scenarios. Replace standard library synchronization primitives (like Mutex and RwLock) with their parking_lot counterparts where appropriate. Ensure that the transition maintains thread safety and correctness while improving performance. Update documentation to reflect the use of parking_lot and any changes in synchronization behavior.
-
----
-
--   `/command <program> [args...]` — run a shell command via `run_terminal_cmd`
-    --> also add "!" to toggle command and normal mode.
-
-press ! -> command mode
-press ! again -> normal mode.
-
-note:
-
--   on command mode only execute `run_terminal_cmd` only no tool call
--   on normal mode, full chat agent loop with tools call
--   on command mode, update the info and visual of the repl
-
----

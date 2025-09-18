@@ -202,6 +202,12 @@ explore https://github.com/rust-cli/anstyle/tree/main/crates/anstyle-syntect to 
 
 ---
 
-can we let the agent output text as ansi codes directly, and not markdown, so we can render it directly in terminal with colors and styles? check if the model can do that.
-
 --
+
+Optimize prompts for GPT-5 models by following these best practices.
+https://cookbook.openai.com/examples/gpt-5/gpt-5_prompting_guide
+
+---
+
+check this package and find a way to better use ansi escape codes in the terminal output. https://github.com/rust-cli/anstyle
+if not found, search for other similar packages.

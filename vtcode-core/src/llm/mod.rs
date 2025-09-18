@@ -18,7 +18,7 @@
 //! | Provider | Status | Models |
 //! |----------|--------|---------|
 //! | Gemini | ✅ | gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite |
-//! | OpenAI | ✅ | gpt-5, gpt-5-mini |
+//! | OpenAI | ✅ | gpt-5, gpt-4.1, gpt-5-mini |
 //! | Anthropic | ✅ | claude-4.1-opus, claude-4-sonnet |
 //! | DeepSeek | ✅ | deepseek-chat |
 //!
@@ -66,14 +66,14 @@
 //! let config = ProviderConfigs {
 //!     gemini: Some(ProviderConfig {
 //!         api_key: "your-api-key".to_string(),
-//!         model: "gemini-2.0-flash-exp".to_string(),
+//!         model: "gemini-2.5-flash".to_string(),
 //!         temperature: Some(0.7),
 //!         max_tokens: Some(4096),
 //!         ..Default::default()
 //!     }),
 //!     openai: Some(ProviderConfig {
 //!         api_key: "your-openai-key".to_string(),
-//!         model: "gpt-4".to_string(),
+//!         model: "gpt-5".to_string(),
 //!         temperature: Some(0.3),
 //!         max_tokens: Some(8192),
 //!         ..Default::default()

@@ -34,7 +34,7 @@
 //!     let providers = ProviderConfigs {
 //!         gemini: Some(vtcode_core::utils::dot_config::ProviderConfig {
 //!             api_key: std::env::var("GEMINI_API_KEY")?,
-//!             model: "gemini-2.0-flash-exp".to_string(),
+//!             model: "gemini-2.5-flash".to_string(),
 //!             ..Default::default()
 //!         }),
 //!         ..Default::default()

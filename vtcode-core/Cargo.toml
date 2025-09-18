@@ -2,6 +2,14 @@
 name = "vtcode-core"
 version = "0.1.0"
 edition = "2024"
+authors = ["vinhnx <vinhnx@users.noreply.github.com>"]
+description = "Core library for VTCode - a Rust-based terminal coding agent"
+license = "MIT"
+readme = "../README.md"
+homepage = "https://github.com/vinhnx/vtcode"
+repository = "https://github.com/vinhnx/vtcode"
+keywords = ["ai", "coding", "agent", "llm", "library", "rust"]
+categories = ["development-tools", "api-bindings"]
 
 [dependencies]
 anyhow = "1.0"

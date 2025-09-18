@@ -78,14 +78,6 @@ integrates the Hotpath profiler (available at https://deepwiki.com/pawurb/hotpat
 
 --
 
-rename vtcode to vtcode
-
---
-
-bump core? vtcode-core
-
---
-
 distribute cargo, brew, and npm package managers to release.
 
 ---

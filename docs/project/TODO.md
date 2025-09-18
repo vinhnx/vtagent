@@ -74,12 +74,6 @@ integrates the Hotpath profiler (available at https://deepwiki.com/pawurb/hotpat
 
 --
 
-distribute cargo, brew, and npm package managers to release.
-
----
-
-explore and use parking_lot for better performance in multithreaded scenarios. Replace standard library synchronization primitives (like Mutex and RwLock) with their parking_lot counterparts where appropriate. Ensure that the transition maintains thread safety and correctness while improving performance. Update documentation to reflect the use of parking_lot and any changes in synchronization behavior.
-
 ---
 
 ✓ Allow the agent to use 'read_file'? · yes
@@ -151,20 +145,6 @@ Planning & Agent Development
 -   Sub-agents are a fantastic way of preserving context for longer complex tasks but nothing actively being worked on right now
 
 -   Conversation compacting for longer work coming soon and users able to ask Codex to create plans in markdown files for review and editing, with ability to prompt for multi-page documents where model will work for extended periods
-
-Integration & Workflow Improvements
-
--   Team would love to build ChatGPT mobile app integration to trigger Codex agents from chat and enable conversation transfer between ChatGPT and Codex with UX still being worked out, plus MCP server integration for Codex web hopefully soon
-
--   GPT-5-Codex Pro might be coming (responded to the question with eyes emoji)
-
-Long-term Vision
-
--   Team excited about world where non-coders build and deploy apps without touching IDE or terminal but Codex currently focused on professional software engineers rather than complete deployment handling
-
--   Team hopes Codex becomes as ubiquitous as compilers fading into background, with abstraction level rising so engineers work at system level rather than code level where simple CRUD endpoints are nearly all written by Codex
-
--   Engineers becoming more generalist with design and product skills enabling single engineers to own large product spaces, with potential for new programming languages designed to be less footgun-y for LLMs to use and Tony Stark/Jarvis collaboration model where humans talk to agent coworkers building individual parts while maintaining control over direction even if agents become smarter at programming
 
 https://www.reddit.com/r/OpenAI/comments/1nhust6/ama_with_the_codex_team/
 

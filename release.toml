@@ -16,6 +16,9 @@ shared-version = true
 consolidate-commits = true
 allow-branch = ["main"]
 
+# Exclude tools directory from release
+exclude = ["tools"]
+
 # Tag configuration
 tag = true
 tag-name = "v{{version}}"

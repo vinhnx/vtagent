@@ -1,5 +1,3 @@
-
-
 https://deepwiki.com/crate-ci/cargo-release
 
 --
@@ -209,30 +207,3 @@ https://cookbook.openai.com/examples/gpt-5/gpt-5_prompting_guide
 
 check this package and find a way to better use ansi escape codes in the terminal output. https://github.com/rust-cli/anstyle
 if not found, search for other similar packages.
-
----
-
-add
-
--   crates.io
--   npm
--   Homebrew
--   GitHub Releases (binaries)
-
-download links to the README and docs.
-also add github readme badges for these package managers.
-
----
-
-Set up Homebrew tap (optional):
-
-Create vinhnx/homebrew-tap repository
-Add formula from vtcode.rb
-
----
-
-update README guide, read the codebase and docs for context and update content with latest information.
-
---
-
-https://github.com/assert-rs/assert_cmd

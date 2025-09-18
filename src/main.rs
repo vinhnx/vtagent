@@ -2,7 +2,7 @@
 //!
 //! Thin binary entry point that delegates to modular CLI handlers.
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use clap::Parser;
 use std::path::PathBuf;
 use vtagent_core::cli::args::{Cli, Commands};
@@ -50,6 +50,37 @@ async fn main() -> Result<()> {
         )
     })?;
     let cfg = config_manager.config();
+
+    if args.full_auto {
+        let automation_cfg = &cfg.automation.full_auto;
+        if !automation_cfg.enabled {
+            bail!(
+                "Full-auto mode is disabled in configuration. Enable it under [automation.full_auto]."
+            );
+        }
+
+        if automation_cfg.require_profile_ack {
+            let profile_path = automation_cfg.profile_path.clone().ok_or_else(|| {
+                anyhow!(
+                    "Full-auto mode requires 'profile_path' in [automation.full_auto] when require_profile_ack = true."
+                )
+            })?;
+            let resolved_profile = if profile_path.is_absolute() {
+                profile_path
+            } else {
+                workspace.join(profile_path)
+            };
+
+            if !resolved_profile.exists() {
+                bail!(
+                    "Full-auto profile '{}' not found. Create the acknowledgement file before using --full-auto.",
+                    resolved_profile.display()
+                );
+            }
+        }
+    }
+
+    let skip_confirmations = args.skip_confirmations || args.full_auto;
 
     // Resolve provider/model/theme with CLI override
     let provider = args
@@ -115,14 +146,14 @@ async fn main() -> Result<()> {
             vtagent_core::cli::models_commands::handle_models_command(&args, command).await?;
         }
         Some(Commands::Chat) => {
-            cli::handle_chat_command(&core_cfg, args.skip_confirmations).await?;
+            cli::handle_chat_command(&core_cfg, skip_confirmations, args.full_auto).await?;
         }
         Some(Commands::Ask { prompt }) => {
             cli::handle_ask_single_command(&core_cfg, prompt).await?;
         }
         Some(Commands::ChatVerbose) => {
             // Reuse chat path; verbose behavior is handled in the module if applicable
-            cli::handle_chat_command(&core_cfg, args.skip_confirmations).await?;
+            cli::handle_chat_command(&core_cfg, skip_confirmations, args.full_auto).await?;
         }
         Some(Commands::Analyze) => {
             cli::handle_analyze_command(&core_cfg).await?;
@@ -169,7 +200,7 @@ async fn main() -> Result<()> {
         }
         _ => {
             // Default to chat
-            cli::handle_chat_command(&core_cfg, args.skip_confirmations).await?;
+            cli::handle_chat_command(&core_cfg, skip_confirmations, args.full_auto).await?;
         }
     }
 

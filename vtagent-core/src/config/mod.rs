@@ -17,7 +17,10 @@ pub mod types;
 
 // Re-export main types for backward compatibility
 pub use context::{ContextFeaturesConfig, LedgerConfig};
-pub use core::{AgentConfig, CommandsConfig, SecurityConfig, ToolPolicy, ToolsConfig};
+pub use core::{
+    AgentConfig, AutomationConfig, CommandsConfig, FullAutoConfig, SecurityConfig, ToolPolicy,
+    ToolsConfig,
+};
 pub use defaults::{ContextStoreDefaults, PerformanceDefaults, ScenarioDefaults};
 pub use loader::{ConfigManager, VTAgentConfig};
 pub use router::{ComplexityModelMap, ResourceBudget, RouterConfig};

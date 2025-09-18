@@ -1,6 +1,8 @@
 use crate::config::PtyConfig;
 use crate::config::context::ContextFeaturesConfig;
-use crate::config::core::{AgentConfig, CommandsConfig, SecurityConfig, ToolsConfig};
+use crate::config::core::{
+    AgentConfig, AutomationConfig, CommandsConfig, SecurityConfig, ToolsConfig,
+};
 use crate::config::router::RouterConfig;
 use crate::config::telemetry::TelemetryConfig;
 use crate::project::SimpleProjectManager;
@@ -119,6 +121,10 @@ pub struct VTAgentConfig {
     /// Syntax highlighting configuration
     #[serde(default)]
     pub syntax_highlighting: SyntaxHighlightingConfig,
+
+    /// Automation configuration
+    #[serde(default)]
+    pub automation: AutomationConfig,
 }
 
 impl Default for VTAgentConfig {
@@ -133,6 +139,7 @@ impl Default for VTAgentConfig {
             router: RouterConfig::default(),
             telemetry: TelemetryConfig::default(),
             syntax_highlighting: SyntaxHighlightingConfig::default(),
+            automation: AutomationConfig::default(),
         }
     }
 }

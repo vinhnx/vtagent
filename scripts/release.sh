@@ -56,16 +56,33 @@ check_clean_tree() {
 
 # Function to check Cargo authentication
 check_cargo_auth() {
-    if ! cargo login --help &> /dev/null; then
+    if ! command -v cargo &> /dev/null; then
         print_error "Cargo is not available"
         return 1
     fi
 
-    # Check if user is logged in to crates.io
-    if ! cargo publish --dry-run &> /dev/null; then
+    # Check if credentials file exists
+    local credentials_file="$HOME/.cargo/credentials.toml"
+    if [[ ! -f "$credentials_file" ]]; then
         print_warning "Not logged in to crates.io"
         print_info "Run: cargo login"
         print_info "Get your API token from: https://crates.io/me"
+        return 1
+    fi
+
+    # Check if credentials file has content (not empty)
+    if [[ ! -s "$credentials_file" ]]; then
+        print_warning "Cargo credentials file is empty"
+        print_info "Run: cargo login"
+        print_info "Get your API token from: https://crates.io/me"
+        return 1
+    fi
+
+    # Try a simple cargo command that requires authentication
+    if ! cargo search --limit 1 dummy-package-name &> /dev/null; then
+        print_warning "Cargo authentication may have issues"
+        print_info "Try re-running: cargo login"
+        print_info "Or check your token at: https://crates.io/me"
         return 1
     fi
 

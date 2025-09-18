@@ -158,3 +158,11 @@ Recommended next actions:
 --
 
 https://docs.rs/eyre/latest/eyre/
+
+--
+
+Enable the agent to operate within and interact with a provided input workspace. The agent must have full capabilities to read, write, and modify files in the workspace; execute shell commands and scripts within it; and gather contextual information by performing project indexing, such as scanning directories, analyzing file structures, and extracting metadata to build an index of the project's contents. By default, the agent should treat the workspace as its primary context for all operations, ensuring that any actions taken are relevant to the files and structure present in the workspace. For example, if the agent is tasked with adding a new feature, it should first analyze the existing codebase within the workspace to understand its architecture and dependencies before making any changes. This approach ensures that the agent's actions are informed by the current state of the project, leading to more coherent and contextually appropriate modifications. Default, the environment variable WORKSPACE_DIR is set to the path of the workspace directory, and the agent should use this variable to reference the workspace in its operations. Update system prompt to reflect these capabilities and provide guidance on how to effectively utilize the workspace context in various scenarios. Update document, readme and guides to reflect this new capability.
+
+--
+
+distribute cargo, brew, and npm package managers to release.

@@ -216,6 +216,3 @@ can we let the agent output text as ansi codes directly, and not markdown, so we
 ▌ mode is Full Auto in welcome message
 
 ---
-
-▌ check dead code: vtagent-core/src/core/agent/runner.rs
-▌ if can be used, if not remove it

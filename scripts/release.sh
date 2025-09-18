@@ -316,6 +316,9 @@ main() {
         cargo_release_cmd="$cargo_release_cmd --no-publish"
     fi
 
+    # Add package selection to avoid tools directory issues
+    cargo_release_cmd="$cargo_release_cmd --package vtcode --package vtcode-core"
+
     # Add version/level
     if [ -n "$version" ]; then
         cargo_release_cmd="$cargo_release_cmd $version"

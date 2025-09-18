@@ -1,8 +1,8 @@
-# VTCode Architecture Guide
+# VT Code Architecture Guide
 
 ## Overview
 
-VTCode follows a modular, trait-based architecture designed for maintainability, extensibility, and performance.
+VT Code follows a modular, trait-based architecture designed for maintainability, extensibility, and performance.
 
 ## Core Architecture
 
@@ -46,21 +46,24 @@ pub trait CacheableTool: Tool {
 ## Tool Implementations
 
 ### SearchTool (4 modes)
-- `exact`: Exact string matching
-- `fuzzy`: Fuzzy string matching
-- `multi-pattern`: Multiple pattern search
-- `similarity`: Semantic similarity search
+
+-   `exact`: Exact string matching
+-   `fuzzy`: Fuzzy string matching
+-   `multi-pattern`: Multiple pattern search
+-   `similarity`: Semantic similarity search
 
 ### FileOpsTool (4 modes)
-- `list`: Basic directory listing
-- `recursive`: Recursive directory traversal
-- `find_name`: Find files by name pattern
-- `find_content`: Find files by content
+
+-   `list`: Basic directory listing
+-   `recursive`: Recursive directory traversal
+-   `find_name`: Find files by name pattern
+-   `find_content`: Find files by content
 
 ### CommandTool (3 modes)
-- `terminal`: Standard command execution
-- `pty`: Pseudo-terminal execution
-- `streaming`: Real-time output streaming
+
+-   `terminal`: Standard command execution
+-   `pty`: Pseudo-terminal execution
+-   `streaming`: Real-time output streaming
 
 ## Design Principles
 
@@ -83,7 +86,7 @@ impl Tool for MyTool {
     async fn execute(&self, args: Value) -> Result<Value> {
         // Implementation
     }
-    
+
     fn name(&self) -> &'static str { "my_tool" }
     fn description(&self) -> &'static str { "My custom tool" }
 }
@@ -93,7 +96,7 @@ impl ModeTool for MyTool {
     fn supported_modes(&self) -> Vec<&'static str> {
         vec!["mode1", "mode2"]
     }
-    
+
     async fn execute_mode(&self, mode: &str, args: Value) -> Result<Value> {
         match mode {
             "mode1" => self.execute_mode1(args).await,
@@ -106,8 +109,8 @@ impl ModeTool for MyTool {
 
 ## Benefits
 
-- **77% complexity reduction** from monolithic structure
-- **Enhanced functionality** through mode-based execution
-- **100% backward compatibility** maintained
-- **Plugin-ready architecture** for external development
-- **Performance optimized** with intelligent caching
+-   **77% complexity reduction** from monolithic structure
+-   **Enhanced functionality** through mode-based execution
+-   **100% backward compatibility** maintained
+-   **Plugin-ready architecture** for external development
+-   **Performance optimized** with intelligent caching

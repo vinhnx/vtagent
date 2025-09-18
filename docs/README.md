@@ -1,6 +1,6 @@
-# VTCode Documentation Hub
+# VT Code Documentation Hub
 
-Welcome to the comprehensive documentation for **VTCode**, a Rust-based terminal coding agent with modular architecture supporting multiple LLM providers and advanced code analysis capabilities.
+Welcome to the comprehensive documentation for **VT Code**, a Rust-based terminal coding agent with modular architecture supporting multiple LLM providers and advanced code analysis capabilities.
 
 ## 🚀 Quick Installation
 
@@ -30,9 +30,9 @@ brew install vinhnx/tap/vtcode
 
 Download from [GitHub Releases](https://github.com/vinhnx/vtcode/releases) for Linux, macOS, or Windows.
 
-## What Makes VTCode Special
+## What Makes VT Code Special
 
-VTCode represents a modern approach to AI-powered software development, featuring:
+VT Code represents a modern approach to AI-powered software development, featuring:
 
 -   **Single-Agent Reliability (default)** – Streamlined, linear agent with robust context engineering
 -   **Decision Ledger** – Structured, compact record of key decisions injected each turn for consistency
@@ -48,7 +48,7 @@ This documentation is organized to support different user personas and use cases
 
 ### For Users
 
-New to VTCode? Start with installation and basic usage:
+New to VT Code? Start with installation and basic usage:
 
 -   **[Getting Started](./user-guide/getting-started.md)** - Installation, configuration, and first steps
 -   [Decision Ledger](./context/DECISION_LEDGER.md) - How decisions are tracked and injected
@@ -56,17 +56,17 @@ New to VTCode? Start with installation and basic usage:
 
 ### For Developers
 
-Contributing to VTCode? Understand the architecture and development processes:
+Contributing to VT Code? Understand the architecture and development processes:
 
 -   **[Architecture Overview](./ARCHITECTURE.md)** - System design and core components
 -   **[Development Guide](./development/README.md)** - Development environment setup
 -   **[API Documentation](./api/README.md)** - Technical API references
 -   **[Code Standards](./development/code-style.md)** - Coding guidelines and best practices
--   **[Codex Cloud Setup](./guides/codex-cloud-setup.md)** - Configure Codex Cloud environments for VTCode
+-   **[Codex Cloud Setup](./guides/codex-cloud-setup.md)** - Configure Codex Cloud environments for VT Code
 
 ### For Organizations
 
-Deploying VTCode in production? Focus on enterprise features:
+Deploying VT Code in production? Focus on enterprise features:
 
 -   **[Security Implementation](./SAFETY_IMPLEMENTATION.md)** - Security controls and compliance
 -   **[Performance Analysis](./PERFORMANCE_ANALYSIS.md)** - Optimization and benchmarking
@@ -108,7 +108,7 @@ Deploying VTCode in production? Focus on enterprise features:
 
 ### For New Users
 
-1. **[Installation](../README.md#installation)** - Get VTCode running in minutes
+1. **[Installation](../README.md#installation)** - Get VT Code running in minutes
 2. **[Basic Configuration](./CONFIGURATION.md)** - Set up your environment
 3. **[First Chat Session](../README.md#basic-usage)** - Try interactive coding assistance
 
@@ -178,7 +178,7 @@ Logs for trajectory: check `logs/trajectory.jsonl`.
 
 ## Testing & Quality Assurance
 
-VTCode includes comprehensive testing infrastructure:
+VT Code includes comprehensive testing infrastructure:
 
 ### Test Categories
 
@@ -240,11 +240,11 @@ cargo clippy && cargo fmt
 
 ## License & Attribution
 
-This documentation is part of the VTCode project. See the main [README](../README.md) for license information.
+This documentation is part of the VT Code project. See the main [README](../README.md) for license information.
 
 ### Attribution
 
-VTCode builds upon key developments in AI agent technology:
+VT Code builds upon key developments in AI agent technology:
 
 -   **Anthropic's Agent Patterns** - Tool design and safety principles
 -   **Cognition's Context Engineering** - Long-running agent reliability and Decision Ledger
@@ -256,6 +256,6 @@ VTCode builds upon key developments in AI agent technology:
 
 **Documentation Version:** 2.0.0
 **Last Updated:** September 2025
-**VTCode Version:** 0.2.0
+**VT Code Version:** 0.2.0
 
 **Ready to get started?** **[Installation Guide](../README.md#quick-start)**

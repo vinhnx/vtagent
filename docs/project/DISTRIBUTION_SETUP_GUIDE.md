@@ -1,6 +1,6 @@
-# VTCode Distribution Setup Guide
+# VT Code Distribution Setup Guide
 
-This guide will help you set up distribution for VTCode across multiple package managers and platforms.
+This guide will help you set up distribution for VT Code across multiple package managers and platforms.
 
 ## Prerequisites
 
@@ -44,7 +44,7 @@ cargo login
 -   **Search Functionality**: Full-text search across documentation
 -   **Cross-references**: Links between related types and functions
 
-#### URLs for VTCode
+#### URLs for VT Code
 
 -   **Main Package**: https://docs.rs/vtcode
 -   **Core Library**: https://docs.rs/vtcode-core

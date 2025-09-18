@@ -1,6 +1,6 @@
 # Command Reference
 
-This guide summarizes common actions and how to invoke them with vtagent. The agent exposes a suite of tools to the LLM; you interact with them via chat. When you ask to search, read, or edit files, the agent chooses an appropriate tool.
+This guide summarizes common actions and how to invoke them with vtcode. The agent exposes a suite of tools to the LLM; you interact with them via chat. When you ask to search, read, or edit files, the agent chooses an appropriate tool.
 
 ## rp_search (ripgrep-like)
 
@@ -69,7 +69,7 @@ tool.
 
 ## Tips
 
-- The agent respects `.vtagentgitignore` to exclude files from search and I/O.
+- The agent respects `.vtcodegitignore` to exclude files from search and I/O.
 - Prefer `rp_search` for fast, focused searches with glob filters and context.
 - Ask for “N lines of context” when searching to understand usage in-place.
-- Shell commands are filtered by allow/deny lists and can be extended via `VTAGENT_<AGENT>_COMMANDS_*` environment variables.
+- Shell commands are filtered by allow/deny lists and can be extended via `VTCODE_<AGENT>_COMMANDS_*` environment variables.

@@ -1,7 +1,7 @@
-use vtagent_core::config::constants::context as context_defaults;
-use vtagent_core::config::loader::VTAgentConfig;
-use vtagent_core::gemini::{Content, Part};
-use vtagent_core::llm::provider as uni;
+use vtcode_core::config::constants::context as context_defaults;
+use vtcode_core::config::loader::VTCodeConfig;
+use vtcode_core::gemini::{Content, Part};
+use vtcode_core::llm::provider as uni;
 
 #[derive(Clone, Copy)]
 pub(crate) struct ContextTrimConfig {
@@ -234,9 +234,9 @@ pub(crate) fn enforce_unified_context_window(
     }
 }
 
-pub(crate) fn load_context_trim_config(vt_cfg: Option<&VTAgentConfig>) -> ContextTrimConfig {
+pub(crate) fn load_context_trim_config(vt_cfg: Option<&VTCodeConfig>) -> ContextTrimConfig {
     let context_cfg = vt_cfg.map(|cfg| &cfg.context);
-    let max_tokens = std::env::var("VTAGENT_CONTEXT_TOKEN_LIMIT")
+    let max_tokens = std::env::var("VTCODE_CONTEXT_TOKEN_LIMIT")
         .ok()
         .and_then(|value| value.parse::<usize>().ok())
         .filter(|value| *value > 0)
@@ -375,7 +375,7 @@ mod tests {
         let mut history = vec![
             Content::user_text("keep0"),
             Content::user_parts(vec![Part::FunctionResponse {
-                function_response: vtagent_core::gemini::function_calling::FunctionResponse {
+                function_response: vtcode_core::gemini::function_calling::FunctionResponse {
                     name: "tool_a".to_string(),
                     response: serde_json::json!({"output": "value"}),
                 },
@@ -388,7 +388,7 @@ mod tests {
             },
             Content::user_text("keep1"),
             Content::user_parts(vec![Part::FunctionResponse {
-                function_response: vtagent_core::gemini::function_calling::FunctionResponse {
+                function_response: vtcode_core::gemini::function_calling::FunctionResponse {
                     name: "tool_b".to_string(),
                     response: serde_json::json!({"output": "new"}),
                 },

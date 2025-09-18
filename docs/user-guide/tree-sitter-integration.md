@@ -2,7 +2,7 @@
 
 ## Overview
 
-The tree-sitter integration provides Research-preview code parsing and analysis capabilities to enhance vtagent's understanding of codebases. This implementation follows Anthropic's breakthrough engineering approach for SWE-bench optimization.
+The tree-sitter integration provides Research-preview code parsing and analysis capabilities to enhance vtcode's understanding of codebases. This implementation follows Anthropic's breakthrough engineering approach for SWE-bench optimization.
 
 ## Features
 
@@ -63,7 +63,7 @@ src/tree_sitter/
 ### Basic Code Analysis
 
 ```rust
-use vtagent::tree_sitter::{TreeSitterAnalyzer, CodeAnalyzer, LanguageSupport};
+use vtcode::tree_sitter::{TreeSitterAnalyzer, CodeAnalyzer, LanguageSupport};
 
 // Initialize analyzers
 let mut analyzer = TreeSitterAnalyzer::new()?;
@@ -91,7 +91,7 @@ println!("Complexity: {}", analysis.complexity.cyclomatic_complexity);
 ### Symbol Extraction
 
 ```rust
-use vtagent::tree_sitter::languages::{LanguageAnalyzer, SymbolInfo};
+use vtcode::tree_sitter::languages::{LanguageAnalyzer, SymbolInfo};
 
 // Extract symbols from parsed code
 let language_analyzer = LanguageAnalyzer::new(&LanguageSupport::Rust);
@@ -111,7 +111,7 @@ for symbol in symbols {
 ### Code Navigation
 
 ```rust
-use vtagent::tree_sitter::navigation::CodeNavigator;
+use vtcode::tree_sitter::navigation::CodeNavigator;
 
 // Build navigation index
 let mut navigator = CodeNavigator::new();
@@ -130,7 +130,7 @@ println!("Found {} symbols matching 'print'", search_results.len());
 ### Refactoring Analysis
 
 ```rust
-use vtagent::tree_sitter::refactoring::RefactoringEngine;
+use vtcode::tree_sitter::refactoring::RefactoringEngine;
 
 // Analyze refactoring opportunities
 let mut engine = RefactoringEngine::new();
@@ -395,4 +395,4 @@ This tree-sitter integration directly addresses key requirements for SWE-bench o
 - **Intelligent Analysis**: Complexity and quality metrics guide decision making
 - **Multi-language Support**: Essential for diverse software ecosystems
 
-By providing deep code understanding capabilities, tree-sitter integration positions vtagent to achieve competitive performance on SWE-bench Verified, following Anthropic's breakthrough engineering approach!
+By providing deep code understanding capabilities, tree-sitter integration positions vtcode to achieve competitive performance on SWE-bench Verified, following Anthropic's breakthrough engineering approach!

@@ -21,12 +21,12 @@ jobs:
         run: cargo install cargo-nextest --locked
 
       - name: Build tests
-        run: cargo nextest list -p vtagent-core --lib || true
+        run: cargo nextest list -p vtcode-core --lib || true
 
       - name: Run tool-only tests (quarantined)
         run: |
-          # Run the transform_matches_to_concise test from vtagent-core library
-          cargo nextest run -p vtagent-core --lib -E "test(tools::search::tests::test_transform_matches_to_concise)"
-          # Run the anthropic API key test from vtagent-core library
-          cargo nextest run -p vtagent-core --lib -E "test(config::api_keys::tests::test_get_anthropic_api_key_from_env)"
+          # Run the transform_matches_to_concise test from vtcode-core library
+          cargo nextest run -p vtcode-core --lib -E "test(tools::search::tests::test_transform_matches_to_concise)"
+          # Run the anthropic API key test from vtcode-core library
+          cargo nextest run -p vtcode-core --lib -E "test(config::api_keys::tests::test_get_anthropic_api_key_from_env)"
 

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serde_json::{Map, Value};
-use vtagent_core::ui::theme;
-use vtagent_core::utils::ansi::{AnsiRenderer, MessageStyle};
+use vtcode_core::ui::theme;
+use vtcode_core::utils::ansi::{AnsiRenderer, MessageStyle};
 
 pub enum SlashCommandOutcome {
     Handled,

@@ -3,10 +3,10 @@
 //! These tests validate that all refactored modules work together correctly
 //! and maintain backward compatibility.
 
-use vtagent_core::{
+use vtcode_core::{
     code::code_completion::{CompletionContext, CompletionEngine},
     code::code_quality::{FormattingOrchestrator, LintingOrchestrator, QualityMetrics},
-    config::{ConfigManager, ToolPolicy, VTAgentConfig},
+    config::{ConfigManager, ToolPolicy, VTCodeConfig},
     gemini::{Client, ClientConfig},
 };
 
@@ -14,7 +14,7 @@ use vtagent_core::{
 fn test_gemini_module_integration() {
     // Test that we can create a Gemini client with different configurations
     let client = Client::new("test_key".to_string(), "gemini-2.5-flash".to_string());
-    assert_eq!(client.config().user_agent, "vtagent/1.0.0");
+    assert_eq!(client.config().user_agent, "vtcode/1.0.0");
 
     // Test different client configurations
     let high_throughput_config = ClientConfig::high_throughput();
@@ -27,7 +27,7 @@ fn test_gemini_module_integration() {
 #[test]
 fn test_config_module_integration() {
     // Test that we can create and use configurations
-    let config = VTAgentConfig::default();
+    let config = VTCodeConfig::default();
     assert_eq!(config.agent.provider, "gemini");
     assert_eq!(config.tools.default_policy, ToolPolicy::Prompt);
 
@@ -67,14 +67,14 @@ fn test_code_quality_integration() {
 #[test]
 fn test_backward_compatibility() {
     // Test that all the old import patterns still work
-    use vtagent_core::code::code_completion::CompletionEngine;
-    use vtagent_core::code::code_quality::FormattingOrchestrator;
-    use vtagent_core::config::VTAgentConfig;
-    use vtagent_core::gemini::Client;
+    use vtcode_core::code::code_completion::CompletionEngine;
+    use vtcode_core::code::code_quality::FormattingOrchestrator;
+    use vtcode_core::config::VTCodeConfig;
+    use vtcode_core::gemini::Client;
 
     // These should all compile and work as before
     let _client = Client::new("key".to_string(), "model".to_string());
-    let _config = VTAgentConfig::default();
+    let _config = VTCodeConfig::default();
     let _engine = CompletionEngine::new();
     let _formatter = FormattingOrchestrator::new();
 }

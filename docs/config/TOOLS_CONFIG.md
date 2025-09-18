@@ -1,10 +1,10 @@
 # Tools Configuration
 
-This document describes the tools-related configuration in `vtagent.toml`.
+This document describes the tools-related configuration in `vtcode.toml`.
 
 - max_tool_loops: Maximum number of inner tool-call loops per user turn. Prevents infinite tool-calling cycles in interactive chat.
-  - Configuration: `[tools].max_tool_loops` in `vtagent.toml`
-  - Code default: defined in `vtagent-core/src/config/core/tools.rs`
+  - Configuration: `[tools].max_tool_loops` in `vtcode.toml`
+  - Code default: defined in `vtcode-core/src/config/core/tools.rs`
   - Default: `100`
 
 Example:

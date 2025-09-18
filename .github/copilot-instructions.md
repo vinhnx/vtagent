@@ -5,13 +5,13 @@
 
 # AGENTS.md
 
-# VTAgent
+# VTCode
 
 ## Project Overview
-VTAgent is a Rust-based terminal coding agent with modular architecture supporting multiple LLM providers (Gemini, OpenAI, Anthropic) and tree-sitter parsers for 6+ languages.
+VTCode is a Rust-based terminal coding agent with modular architecture supporting multiple LLM providers (Gemini, OpenAI, Anthropic) and tree-sitter parsers for 6+ languages.
 
 ## Architecture & Key Components
-- **Workspace Structure**: `vtagent-core/` (library) + `src/` (binary) with modular tools system
+- **Workspace Structure**: `vtcode-core/` (library) + `src/` (binary) with modular tools system
 - **Core Modules**: `llm/` (provider abstraction), `tools/` (modular tool system), `config/` (TOML-based settings)
 - **Integration Points**: Gemini API, tree-sitter parsers, PTY command execution, MCP tools
 
@@ -26,8 +26,8 @@ cargo clippy          # Linting with project-specific rules
 ```
 
 ### Configuration Management
-- **Primary Config**: `vtagent.toml` (never hardcode settings)
-- **Model Constants**: Always reference `vtagent-core/src/config/constants.rs`
+- **Primary Config**: `vtcode.toml` (never hardcode settings)
+- **Model Constants**: Always reference `vtcode-core/src/config/constants.rs`
 - **Latest Models**: Check `docs/models.json` for current model IDs
 
 ## Project-Specific Patterns
@@ -38,7 +38,7 @@ cargo clippy          # Linting with project-specific rules
 let model = "gemini-2.5-flash-lite";
 
 // Use constants module
-use vtagent_core::config::constants::models::google::GEMINI_2_5_FLASH_LITE;
+use vtcode_core::config::constants::models::google::GEMINI_2_5_FLASH_LITE;
 let model = GEMINI_2_5_FLASH_LITE;
 ```
 
@@ -101,7 +101,7 @@ if is_valid && is_allowed && is_secure {
 ### LLM Providers
 - **Gemini**: Primary provider via `gemini.rs`
 - **Multi-Provider**: Abstracted through `llm/` module
-- **Configuration**: Model selection via `vtagent.toml`
+- **Configuration**: Model selection via `vtcode.toml`
 
 ### Tree-Sitter Integration
 - **Supported Languages**: Rust, Python, JavaScript, TypeScript, Go, Java
@@ -126,7 +126,7 @@ if is_valid && is_allowed && is_secure {
 - **Mocking**: External dependencies for reliable tests
 
 ### File Organization
-- **Library Code**: `vtagent-core/src/`
+- **Library Code**: `vtcode-core/src/`
 - **Binary Entry**: `src/main.rs`
 - **Documentation**: `./docs/` folder only
 - **Benchmarks**: `benches/` directory
@@ -141,7 +141,7 @@ if is_valid && is_allowed && is_secure {
 ### File System Safety
 - **Path Validation**: All file operations check workspace boundaries
 - **Size Limits**: Configurable maximum file sizes
-- **Exclusion Patterns**: `.vtagentgitignore` support
+- **Exclusion Patterns**: `.vtcodegitignore` support
 
 ## Performance Considerations
 
@@ -256,14 +256,14 @@ if is_valid && is_allowed && is_secure {
 - Test with various input files and edge cases
 - Prefered ripgrep over grep for search
 - DO NOT USE EMOJI THIS IS IMPORTANT
-- Put all agent's configuration option to vtagent.toml. This is important, every logic should be read from this toml config instead of hardcode.
+- Put all agent's configuration option to vtcode.toml. This is important, every logic should be read from this toml config instead of hardcode.
 - Use MCP tools for enhanced context awareness if needed.
 - Use `cargo check` instead of `cargo build` whenever possible
 - Use `cargo nextest` Instead of `cargo test
 - Put all markdown documentation files to ./docs folder. don't put any unrelated files in root folder. THIS IS IMPORTANT!
 - Put all report documentation (md) files to ./docs folder. don't put any unrelated files in root folder. THIS IS IMPORTANT!
 - Always check ./docs/models.json use to use latest LLM model. Don't guess the model id/name. THIS IS IMPORTANT!
-- Always use vtagent-core/src/config/constants.rs for constant values. Don't hardcode any constant values, especially model id. THIS IS IMPORTANT!
+- Always use vtcode-core/src/config/constants.rs for constant values. Don't hardcode any constant values, especially model id. THIS IS IMPORTANT!
 - You should always use Context7 for fetching documentation from MCP. THIS IS IMPORTANT!
 - For testing echo, make sure not to use "!" this will cause shell escaping issue. for example Use "echo test" instead of "echo test!" THIS IS IMPORTANT!
 - Reference ANSI color code when you want to print colored text in terminal. THIS IS IMPORTANT! https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit

@@ -1,4 +1,4 @@
-//! A tool to help migrate from console::style to anstyle in VTAgent
+//! A tool to help migrate from console::style to anstyle in VTCode
 //!
 //! USAGE:
 //!   cargo run -- <file>
@@ -50,7 +50,7 @@ fn main() -> io::Result<()> {
 fn update_imports(contents: String) -> String {
     let import_re = Regex::new(r#"use console::style;"#).unwrap();
     import_re
-        .replace(&contents, "use vtagent_core::ui::styled::*;")
+        .replace(&contents, "use vtcode_core::ui::styled::*;")
         .to_string()
 }
 

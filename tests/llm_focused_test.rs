@@ -1,6 +1,6 @@
 //! Focused test for LLM provider functionality
 
-use vtagent_core::llm::{
+use vtcode_core::llm::{
     factory::{LLMFactory, create_provider_for_model},
     provider::{LLMProvider, LLMRequest, Message, MessageRole},
     providers::{AnthropicProvider, GeminiProvider, OpenAIProvider},

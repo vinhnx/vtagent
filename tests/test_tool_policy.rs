@@ -31,7 +31,7 @@ pub enum ToolPolicy {
     Deny,
 }
 
-/// Tool policy configuration stored in ~/.vtagent/tool-policy.json
+/// Tool policy configuration stored in ~/.vtcode/tool-policy.json
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolPolicyConfig {
     /// Configuration version for future compatibility

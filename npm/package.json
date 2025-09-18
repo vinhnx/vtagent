@@ -1,0 +1,51 @@
+{
+  "name": "vtcode",
+  "version": "0.8.0",
+  "description": "A Rust-based terminal coding agent with modular architecture supporting multiple LLM providers",
+  "main": "index.js",
+  "bin": {
+    "vtcode": "./bin/vtcode"
+  },
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js",
+    "preuninstall": "node scripts/preuninstall.js"
+  },
+  "keywords": [
+    "ai",
+    "coding",
+    "agent",
+    "llm",
+    "cli",
+    "terminal",
+    "rust",
+    "automation"
+  ],
+  "author": "vinhnx <vinhnx@users.noreply.github.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/vinhnx/vtcode",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vinhnx/vtcode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vinhnx/vtcode/issues"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "files": [
+    "bin/",
+    "scripts/",
+    "index.js",
+    "README.md"
+  ]
+}

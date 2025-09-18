@@ -1,6 +1,6 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
-use vtagent_core::TreeSitterAnalyzer;
-use vtagent_core::tools::tree_sitter::LanguageSupport;
+use vtcode_core::TreeSitterAnalyzer;
+use vtcode_core::tools::tree_sitter::LanguageSupport;
 
 /// Benchmark tree-sitter parsing performance
 fn benchmark_tree_sitter_parsing(c: &mut Criterion) {

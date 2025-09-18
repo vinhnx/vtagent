@@ -235,7 +235,7 @@ mod tests {
         r#"
 # Test Project
 
-This is a test project for demonstrating vtagent capabilities.
+This is a test project for demonstrating vtcode capabilities.
 
 ## Features
 

@@ -1,6 +1,6 @@
-# vtagent Development Roadmap
+# vtcode Development Roadmap
 
-This document outlines planned enhancements and features for the vtagent coding agent, inspired by Anthropic's breakthrough engineering approach that achieved 49% on SWE-bench Verified.
+This document outlines planned enhancements and features for the vtcode coding agent, inspired by Anthropic's breakthrough engineering approach that achieved 49% on SWE-bench Verified.
 
 ## **Recently Completed - Major Breakthroughs**
 

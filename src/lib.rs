@@ -1,3 +1,3 @@
-//! Vtagent binary package
+//! VTCode binary package
 //!
-//! This package contains the binary executable for a minimal VTAgent implementation.
+//! This package contains the binary executable for a minimal VTCode implementation.

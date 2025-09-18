@@ -1,8 +1,8 @@
-# VTAgent Advanced Features Implementation
+# VTCode Advanced Features Implementation
 
 ## Overview
 
-This document summarizes the implementation of advanced features in VTAgent, safety controls, and error recovery mechanisms.
+This document summarizes the implementation of advanced features in VTCode, safety controls, and error recovery mechanisms.
 
 ## Debug Mode Implementation
 
@@ -13,7 +13,7 @@ This document summarizes the implementation of advanced features in VTAgent, saf
 -   Added `debug_mode: bool` field to `MultiAgentConfig` struct
 -   Added `DEBUG_MODE` constant to `MultiAgentDefaults` (default: false)
 -   Updated `MultiAgentSystemConfig` to include `debug_mode` field
--   Added debug mode configuration to `vtagent.toml.example`
+-   Added debug mode configuration to `vtcode.toml.example`
 
 #### 3. Debug Features Added
 
@@ -60,7 +60,7 @@ if finish_reason == "MALFORMED_FUNCTION_CALL" {
 
 ### Overview
 
-Safety implementation adds critical safety and efficiency controls to VTAgent, ensuring user explicit confirmation for expensive operations and defaulting to single-agent mode for optimal resource usage.
+Safety implementation adds critical safety and efficiency controls to VTCode, ensuring user explicit confirmation for expensive operations and defaulting to single-agent mode for optimal resource usage.
 
 ### Key Safety Features Implemented
 
@@ -131,7 +131,7 @@ Safety implementation adds critical safety and efficiency controls to VTAgent, e
 
 -   Path validation and normalization
 -   Permission checking before file operations
--   .vtagentgitignore integration for file exclusions
+-   .vtcodegitignore integration for file exclusions
 -   Safe file writing with backup mechanisms
 -   Directory traversal protection
 
@@ -207,5 +207,5 @@ dangerous_commands_require_confirmation = true
 
 ---
 
-_This document covers the implementation of debug mode and safety features in VTAgent. For user-facing documentation, see the respective guide documents._</content>
-<parameter name="filePath">/Users/vinh.nguyenxuan/Developer/learn-by-doing/vtagent/docs/ADVANCED_FEATURES_IMPLEMENTATION.md
+_This document covers the implementation of debug mode and safety features in VTCode. For user-facing documentation, see the respective guide documents._</content>
+<parameter name="filePath">/Users/vinh.nguyenxuan/Developer/learn-by-doing/vtcode/docs/ADVANCED_FEATURES_IMPLEMENTATION.md

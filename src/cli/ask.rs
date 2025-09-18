@@ -1,13 +1,13 @@
 use anyhow::Result;
 use console::style;
-use vtagent_core::{
+use vtcode_core::{
     config::types::AgentConfig as CoreAgentConfig, llm::make_client, models::ModelId,
 };
 
 /// Handle the ask command - single prompt, no tools
 pub async fn handle_ask_command(config: &CoreAgentConfig, prompt: &str) -> Result<()> {
     if prompt.trim().is_empty() {
-        anyhow::bail!("No prompt provided. Use: vtagent ask \"Your question here\"");
+        anyhow::bail!("No prompt provided. Use: vtcode ask \"Your question here\"");
     }
 
     println!("{}", style("Single Prompt Mode").blue().bold());

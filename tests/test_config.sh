@@ -1,28 +1,28 @@
 #!/usr/bin/env bash
 
-# Test script for VTAgent config loading from home directory
+# Test script for VTCode config loading from home directory
 
-echo "Testing VTAgent configuration loading..."
+echo "Testing VTCode configuration loading..."
 
-# Check if ~/.vtagent directory exists
-if [ -d "$HOME/.vtagent" ]; then
-    echo "✓ Found ~/.vtagent directory"
+# Check if ~/.vtcode directory exists
+if [ -d "$HOME/.vtcode" ]; then
+    echo "✓ Found ~/.vtcode directory"
     
-    # Check if vtagent.toml exists in ~/.vtagent
-    if [ -f "$HOME/.vtagent/vtagent.toml" ]; then
-        echo "✓ Found ~/.vtagent/vtagent.toml"
+    # Check if vtcode.toml exists in ~/.vtcode
+    if [ -f "$HOME/.vtcode/vtcode.toml" ]; then
+        echo "✓ Found ~/.vtcode/vtcode.toml"
         
         # Check if the file has content
-        if [ -s "$HOME/.vtagent/vtagent.toml" ]; then
+        if [ -s "$HOME/.vtcode/vtcode.toml" ]; then
             echo "✓ Configuration file has content"
         else
             echo "⚠ Configuration file is empty"
         fi
     else
-        echo "✗ ~/.vtagent/vtagent.toml not found"
+        echo "✗ ~/.vtcode/vtcode.toml not found"
     fi
 else
-    echo "✗ ~/.vtagent directory not found"
+    echo "✗ ~/.vtcode directory not found"
 fi
 
 echo "Test completed."

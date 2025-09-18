@@ -1,6 +1,6 @@
-use vtagent_core::core::agent::types::MessageType;
-use vtagent_core::core::agent::{CompactionConfig, CompactionEngine};
-use vtagent_core::gemini::Content;
+use vtcode_core::core::agent::types::MessageType;
+use vtcode_core::core::agent::{CompactionConfig, CompactionEngine};
+use vtcode_core::gemini::Content;
 
 #[tokio::test]
 async fn compaction_engine_compacts_messages() {

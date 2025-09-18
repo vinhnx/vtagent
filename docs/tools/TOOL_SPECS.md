@@ -1,4 +1,4 @@
-# VTAgent Tool Specifications (Anthropic-Aligned)
+# VTCode Tool Specifications (Anthropic-Aligned)
 
 This document summarizes the updated tool schemas and guidance following Anthropic’s best practices for agent tools. Use these specs when writing prompts and building evaluations.
 
@@ -52,7 +52,7 @@ This document summarizes the updated tool schemas and guidance following Anthrop
 
 ## Policy Constraints (scoped)
 
-The workspace `.vtagent/tool-policy.json` may include constraints like:
+The workspace `.vtcode/tool-policy.json` may include constraints like:
 
 ```json
 {

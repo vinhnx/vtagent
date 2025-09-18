@@ -1,10 +1,10 @@
 #  **Testing Guide**
 
-This guide covers vtagent's comprehensive test suite, including unit tests, integration tests, benchmarks, and testing best practices.
+This guide covers vtcode's comprehensive test suite, including unit tests, integration tests, benchmarks, and testing best practices.
 
 ##  **Test Overview**
 
-vtagent includes a multi-layered test suite designed to ensure reliability and performance:
+vtcode includes a multi-layered test suite designed to ensure reliability and performance:
 
 - **Unit Tests**: Test individual components and functions
 - **Integration Tests**: Test end-to-end functionality
@@ -100,7 +100,7 @@ Located in `tests/integration_tests.rs`:
 ```rust
 #[cfg(test)]
 mod integration_tests {
-    use vtagent::tools::ToolRegistry;
+    use vtcode::tools::ToolRegistry;
     use serde_json::json;
 
     #[tokio::test]

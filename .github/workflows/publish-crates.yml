@@ -1,0 +1,42 @@
+name: Publish to Crates.io
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Verify Cargo authentication
+        run: |
+          if [ -z "$CRATES_IO_TOKEN" ]; then
+            echo "CRATES_IO_TOKEN secret is not set"
+            echo "Please set up the CRATES_IO_TOKEN secret in your repository settings"
+            echo "Get your token from: https://crates.io/me"
+            exit 1
+          fi
+        env:
+          CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+
+      - name: Publish vtcode-core
+        run: cargo publish --manifest-path vtcode-core/Cargo.toml --token "$CRATES_IO_TOKEN"
+        env:
+          CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+
+      - name: Wait for vtcode-core to be available
+        run: sleep 30
+
+      - name: Publish vtcode
+        run: cargo publish --token "$CRATES_IO_TOKEN"
+        env:
+          CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}

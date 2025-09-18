@@ -1,11 +1,11 @@
 use std::path::Path;
 
-use vtagent_core::config::loader::VTAgentConfig;
-use vtagent_core::core::trajectory::TrajectoryLogger;
+use vtcode_core::config::loader::VTCodeConfig;
+use vtcode_core::core::trajectory::TrajectoryLogger;
 
 pub(crate) fn build_trajectory_logger(
     workspace: &Path,
-    vt_cfg: Option<&VTAgentConfig>,
+    vt_cfg: Option<&VTCodeConfig>,
 ) -> TrajectoryLogger {
     vt_cfg
         .map(|cfg| cfg.telemetry.trajectory_enabled)

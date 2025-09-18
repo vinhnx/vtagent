@@ -13,15 +13,15 @@ echo "Hello, PTY!" > test.txt
 
 # Test basic PTY command
 echo "Running basic PTY command..."
-vtagent chat <<< "Run 'ls -la' in a PTY"
+vtcode chat <<< "Run 'ls -la' in a PTY"
 
 # Test PTY command with arguments
 echo "Running PTY command with arguments..."
-vtagent chat <<< "Run 'cat test.txt' in a PTY"
+vtcode chat <<< "Run 'cat test.txt' in a PTY"
 
 # Test PTY command with custom terminal size
 echo "Running PTY command with custom terminal size..."
-vtagent chat <<< "Run 'echo \"Testing custom terminal size\"' in a PTY with 40 columns and 10 rows"
+vtcode chat <<< "Run 'echo \"Testing custom terminal size\"' in a PTY with 40 columns and 10 rows"
 
 # Clean up
 cd ..

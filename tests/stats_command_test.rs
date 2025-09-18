@@ -1,7 +1,7 @@
 use anyhow::Result;
 use tempfile::TempDir;
 use tokio::time::{Duration, sleep};
-use vtagent_core::{
+use vtcode_core::{
     Agent, config::constants::models::google::GEMINI_2_5_FLASH_LITE, config::types::AgentConfig,
     handle_stats_command, ui::theme::DEFAULT_THEME_ID,
 };

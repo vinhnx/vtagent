@@ -86,7 +86,7 @@ impl Default for UserPreferences {
             max_tokens: Some(4096),
             temperature: Some(0.7),
             auto_save: true,
-            theme: "dark".to_string(),
+            theme: defaults::DEFAULT_THEME.to_string(),
             keybindings: HashMap::new(),
         }
     }
@@ -457,6 +457,12 @@ pub fn load_user_config() -> Result<DotConfig, DotError> {
 pub fn save_user_config(config: &DotConfig) -> Result<(), DotError> {
     let manager = get_dot_manager().lock().unwrap();
     manager.save_config(config)
+}
+
+/// Persist the preferred UI theme in the user's dot configuration.
+pub fn update_theme_preference(theme: &str) -> Result<(), DotError> {
+    let manager = get_dot_manager().lock().unwrap();
+    manager.update_config(|cfg| cfg.preferences.theme = theme.to_string())
 }
 
 #[cfg(test)]

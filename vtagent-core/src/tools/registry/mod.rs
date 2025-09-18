@@ -25,7 +25,7 @@ use crate::tools::ast_grep::AstGrepEngine;
 use crate::tools::grep_search::GrepSearchManager;
 use anyhow::{Result, anyhow};
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
@@ -60,6 +60,7 @@ pub struct ToolRegistry {
     srgn_tool: SrgnTool,
     tool_registrations: Vec<ToolRegistration>,
     tool_lookup: HashMap<&'static str, usize>,
+    preapproved_tools: HashSet<String>,
 }
 
 impl ToolRegistry {
@@ -108,6 +109,7 @@ impl ToolRegistry {
             srgn_tool,
             tool_registrations: Vec::new(),
             tool_lookup: HashMap::new(),
+            preapproved_tools: HashSet::new(),
         };
 
         register_builtin_tools(&mut registry);
@@ -153,14 +155,18 @@ impl ToolRegistry {
     }
 
     pub async fn execute_tool(&mut self, name: &str, args: Value) -> Result<Value> {
-        if let Ok(policy_manager) = self.policy_manager_mut() {
-            if !policy_manager.should_execute_tool(name)? {
-                let error = ToolExecutionError::new(
-                    name.to_string(),
-                    ToolErrorType::PolicyViolation,
-                    format!("Tool '{}' execution denied by policy", name),
-                );
-                return Ok(error.to_json_value());
+        let skip_policy_prompt = self.preapproved_tools.remove(name);
+
+        if !skip_policy_prompt {
+            if let Ok(policy_manager) = self.policy_manager_mut() {
+                if !policy_manager.should_execute_tool(name)? {
+                    let error = ToolExecutionError::new(
+                        name.to_string(),
+                        ToolErrorType::PolicyViolation,
+                        format!("Tool '{}' execution denied by policy", name),
+                    );
+                    return Ok(error.to_json_value());
+                }
             }
         }
 
@@ -229,6 +235,21 @@ impl ToolRegistry {
                 Ok(error.to_json_value())
             }
         }
+    }
+}
+
+impl ToolRegistry {
+    /// Prompt for permission before starting long-running tool executions to avoid spinner conflicts
+    pub fn preflight_tool_permission(&mut self, name: &str) -> Result<bool> {
+        if let Ok(policy_manager) = self.policy_manager_mut() {
+            let allowed = policy_manager.should_execute_tool(name)?;
+            if allowed {
+                self.preapproved_tools.insert(name.to_string());
+            }
+            return Ok(allowed);
+        }
+
+        Ok(true)
     }
 }
 

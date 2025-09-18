@@ -81,9 +81,9 @@ impl LLMProvider for GeminiProvider {
 
     fn supported_models(&self) -> Vec<String> {
         vec![
-            models::GEMINI_2_5_FLASH.to_string(),
-            models::GEMINI_2_5_FLASH_LITE.to_string(),
-            models::GEMINI_2_5_PRO.to_string(),
+            models::google::GEMINI_2_5_FLASH.to_string(),
+            models::google::GEMINI_2_5_FLASH_LITE.to_string(),
+            models::google::GEMINI_2_5_PRO.to_string(),
         ]
     }
 
@@ -126,7 +126,7 @@ impl GeminiProvider {
             let mut parts = Vec::new();
 
             // Add text content if present
-            if !message.content.is_empty() {
+            if message.role != MessageRole::Tool && !message.content.is_empty() {
                 parts.push(json!({"text": message.content}));
             }
 
@@ -158,10 +158,23 @@ impl GeminiProvider {
                         .get(tool_call_id)
                         .cloned()
                         .unwrap_or_else(|| tool_call_id.clone());
+
+                    let response_text = serde_json::from_str::<Value>(&message.content)
+                        .map(|value| {
+                            serde_json::to_string_pretty(&value)
+                                .unwrap_or_else(|_| message.content.clone())
+                        })
+                        .unwrap_or_else(|_| message.content.clone());
+
                     parts.push(json!({
                         "functionResponse": {
-                            "name": func_name,
-                            "response": {"content": message.content}
+                            "name": func_name.clone(),
+                            "response": {
+                                "name": func_name,
+                                "content": [
+                                    {"text": response_text}
+                                ]
+                            }
                         }
                     }));
                 } else {
@@ -196,7 +209,7 @@ impl GeminiProvider {
                 .iter()
                 .map(|tool| {
                     json!({
-                        "functionDeclarations": [
+                        "function_declarations": [
                             {
                                 "name": tool.function.name,
                                 "description": tool.function.description,
@@ -244,11 +257,23 @@ impl GeminiProvider {
                 for part in parts {
                     if let Some(text) = part["text"].as_str() {
                         text_content.push_str(text);
-                    } else if let Some(function_call) = part["functionCall"].as_object() {
+                    } else if let Some(function_call) = part["functionCall"]
+                        .as_object()
+                        .or_else(|| part["function_call"].as_object())
+                    {
                         let name = function_call["name"].as_str().unwrap_or("").to_string();
                         let args = function_call["args"].clone();
+                        // Use timestamp-based unique IDs to avoid conflicts
+                        let call_id = format!(
+                            "call_{}_{}",
+                            std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_nanos(),
+                            tool_calls.len()
+                        );
                         tool_calls.push(ToolCall {
-                            id: format!("call_{}", tool_calls.len()), // Gemini doesn't provide IDs
+                            id: call_id,
                             call_type: "function".to_string(),
                             function: FunctionCall {
                                 name,

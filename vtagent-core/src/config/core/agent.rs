@@ -12,6 +12,10 @@ pub struct AgentConfig {
     #[serde(default = "default_model")]
     pub default_model: String,
 
+    /// UI theme identifier controlling ANSI styling
+    #[serde(default = "default_theme")]
+    pub theme: String,
+
     /// Maximum number of conversation turns before auto-termination
     #[serde(default = "default_max_conversation_turns")]
     pub max_conversation_turns: usize,
@@ -51,6 +55,7 @@ impl Default for AgentConfig {
         Self {
             provider: default_provider(),
             default_model: default_model(),
+            theme: default_theme(),
             max_conversation_turns: default_max_conversation_turns(),
             reasoning_effort: default_reasoning_effort(),
             enable_self_review: default_enable_self_review(),
@@ -68,6 +73,9 @@ fn default_provider() -> String {
 }
 fn default_model() -> String {
     defaults::DEFAULT_MODEL.to_string()
+}
+fn default_theme() -> String {
+    defaults::DEFAULT_THEME.to_string()
 }
 fn default_max_conversation_turns() -> usize {
     150

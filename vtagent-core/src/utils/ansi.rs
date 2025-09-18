@@ -1,5 +1,6 @@
+use crate::ui::theme;
 use anstream::{AutoStream, ColorChoice};
-use anstyle::{AnsiColor, Color, Reset, Style};
+use anstyle::{Reset, Style};
 use anstyle_query::{clicolor, clicolor_force, no_color, term_supports_color};
 use anyhow::Result;
 use std::io::{self, Write};
@@ -11,19 +12,25 @@ pub enum MessageStyle {
     Error,
     Output,
     Response,
+    Tool,
 }
 
 impl MessageStyle {
     fn style(self) -> Style {
+        let styles = theme::active_styles();
         match self {
-            Self::Info => Style::new()
-                .fg_color(Some(Color::Ansi(AnsiColor::Blue)))
-                .bold(),
-            Self::Error => Style::new()
-                .fg_color(Some(Color::Ansi(AnsiColor::Red)))
-                .bold(),
-            Self::Output => Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green))),
-            Self::Response => Style::new().fg_color(Some(Color::Ansi(AnsiColor::BrightBlack))),
+            Self::Info => styles.info,
+            Self::Error => styles.error,
+            Self::Output => styles.output,
+            Self::Response => styles.response,
+            Self::Tool => styles.tool,
+        }
+    }
+
+    fn indent(self) -> &'static str {
+        match self {
+            Self::Response | Self::Tool => "  ",
+            _ => "",
         }
     }
 }
@@ -72,9 +79,45 @@ impl AnsiRenderer {
 
     /// Convenience for writing a single line
     pub fn line(&mut self, style: MessageStyle, text: &str) -> Result<()> {
-        self.buffer.clear();
-        self.push(text);
-        self.flush(style)
+        let indent = style.indent();
+
+        if text.contains('\n') {
+            let trailing_newline = text.ends_with('\n');
+            for line in text.lines() {
+                self.buffer.clear();
+                if !indent.is_empty() && !line.is_empty() {
+                    self.buffer.push_str(indent);
+                }
+                self.buffer.push_str(line);
+                self.flush(style)?;
+            }
+            if trailing_newline {
+                self.buffer.clear();
+                if !indent.is_empty() {
+                    self.buffer.push_str(indent);
+                }
+                self.flush(style)?;
+            }
+            Ok(())
+        } else {
+            self.buffer.clear();
+            if !indent.is_empty() && !text.is_empty() {
+                self.buffer.push_str(indent);
+            }
+            self.buffer.push_str(text);
+            self.flush(style)
+        }
+    }
+
+    /// Write styled text without a trailing newline
+    pub fn inline_with_style(&mut self, style: Style, text: &str) -> Result<()> {
+        if self.color {
+            write!(self.writer, "{style}{}{Reset}", text)?;
+        } else {
+            write!(self.writer, "{}", text)?;
+        }
+        self.writer.flush()?;
+        Ok(())
     }
 
     /// Write a line with an explicit style
@@ -106,6 +149,8 @@ mod tests {
         assert_eq!(info, MessageStyle::Info.style());
         let resp = MessageStyle::Response.style();
         assert_eq!(resp, MessageStyle::Response.style());
+        let tool = MessageStyle::Tool.style();
+        assert_eq!(tool, MessageStyle::Tool.style());
     }
 
     #[test]

@@ -4,6 +4,7 @@ use std::path::Path;
 use vtagent_core::config::core::AgentOnboardingConfig;
 use vtagent_core::config::loader::VTAgentConfig;
 use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
+use vtagent_core::ui::styled::Styles;
 use vtagent_core::utils::utils::{
     ProjectOverview, build_project_overview, summarize_workspace_languages,
 };
@@ -88,14 +89,17 @@ fn render_welcome_text(
 
     if onboarding_cfg.include_project_overview {
         if let Some(project) = overview {
-            push_section_header(&mut lines, "Project context:");
-            lines.extend(format_overview_lines(project));
+            let summary = project.short_for_display();
+            if let Some(first_line) = summary.lines().next() {
+                push_section_header(&mut lines, "Project context summary:");
+                lines.push(format!("  - {}", first_line.trim()));
+            }
         }
     }
 
     if onboarding_cfg.include_language_summary {
         if let Some(summary) = language_summary {
-            push_section_header(&mut lines, "Languages detected:");
+            push_section_header(&mut lines, "Detected stack:");
             lines.push(format!("  - {}", summary));
         }
     }
@@ -103,30 +107,10 @@ fn render_welcome_text(
     if onboarding_cfg.include_guideline_highlights {
         if let Some(highlights) = guideline_highlights {
             if !highlights.is_empty() {
-                push_section_header(&mut lines, "Guideline highlights:");
-                for item in highlights {
+                push_section_header(&mut lines, "Key guidelines:");
+                for item in highlights.iter().take(2) {
                     lines.push(format!("  - {}", item));
                 }
-            }
-        }
-    }
-
-    if !onboarding_cfg.usage_tips.is_empty() {
-        push_section_header(&mut lines, "How to work together:");
-        for tip in &onboarding_cfg.usage_tips {
-            let trimmed = tip.trim();
-            if !trimmed.is_empty() {
-                lines.push(format!("  - {}", trimmed));
-            }
-        }
-    }
-
-    if !onboarding_cfg.recommended_actions.is_empty() {
-        push_section_header(&mut lines, "Recommended next actions:");
-        for action in &onboarding_cfg.recommended_actions {
-            let trimmed = action.trim();
-            if !trimmed.is_empty() {
-                lines.push(format!("  - {}", trimmed));
             }
         }
     }
@@ -138,15 +122,9 @@ fn push_section_header(lines: &mut Vec<String>, header: &str) {
     if !lines.is_empty() && !lines.last().map(|line| line.is_empty()).unwrap_or(false) {
         lines.push(String::new());
     }
-    lines.push(header.to_string());
-}
-
-fn format_overview_lines(overview: &ProjectOverview) -> Vec<String> {
-    overview
-        .short_for_display()
-        .lines()
-        .map(|line| format!("  - {}", line))
-        .collect()
+    let style = Styles::header();
+    let styled = format!("{}{}{}", style.render(), header, style.render_reset());
+    lines.push(styled);
 }
 
 fn extract_guideline_highlights(workspace: &Path, limit: usize) -> Option<Vec<String>> {
@@ -205,20 +183,10 @@ fn build_prompt_addendum(
     if onboarding_cfg.include_guideline_highlights {
         if let Some(highlights) = guideline_highlights {
             if !highlights.is_empty() {
-                lines.push("### Guideline Highlights".to_string());
-                for item in highlights {
+                lines.push("### Key Guidelines".to_string());
+                for item in highlights.iter().take(2) {
                     lines.push(format!("- {}", item));
                 }
-            }
-        }
-    }
-
-    if !onboarding_cfg.recommended_actions.is_empty() {
-        lines.push("### Suggested Next Actions".to_string());
-        for action in &onboarding_cfg.recommended_actions {
-            let trimmed = action.trim();
-            if !trimmed.is_empty() {
-                lines.push(format!("- {}", trimmed));
             }
         }
     }
@@ -266,6 +234,7 @@ mod tests {
             api_key: "test".to_string(),
             workspace: tmp.path().to_path_buf(),
             verbose: false,
+            theme: vtagent_core::ui::theme::DEFAULT_THEME_ID.to_string(),
         };
 
         let bootstrap = prepare_session_bootstrap(&runtime_cfg, Some(&vt_cfg));

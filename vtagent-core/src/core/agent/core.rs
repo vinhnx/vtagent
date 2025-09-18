@@ -474,6 +474,7 @@ impl AgentBuilder {
                 workspace: std::env::current_dir()
                     .unwrap_or_else(|_| std::path::PathBuf::from(".")),
                 verbose: false,
+                theme: crate::config::constants::defaults::DEFAULT_THEME.to_string(),
             },
         }
     }

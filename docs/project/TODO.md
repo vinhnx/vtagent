@@ -246,31 +246,53 @@ Detected languages: JavaScript:3980, Python:1, TypeScript:1020
 
 ---
 
-## also for project context welcome message. style the heading bold with ansi color. instead of using markdown, use ansi styling
+IMPORTANT double check why the agent message seem to duplicate
+check message:
 
-Let's get oriented. I preloaded workspace context so we can move fast.
+> what is this project about
+> This project is the Chotot iOS application, a large-scale iOS app developed in Swift. It follows the MVVM + Clean Architecture pattern and utilizes a monorepo structure with CocoaPods for dependency management.
 
-Project context:
+Key technologies and practices include:
 
--   Root: /Users/vinh.nguyenxuan/Developer/learn-by-doing/vtchat
+-   **Language**: Swift
+-   **Architecture**: MVVM + Clean Architecture
+-   **UI Framework**: Custom CTDesignSystem
+-   **Layout**: SnapKit
+-   **Reactive Programming**: RxSwift
+-   **Dependency Injection**: Swinject
+-   **Testing**: Quick/Nimble
 
-Guideline highlights:
+The project has a standardized directory organization for feature modules, promoting a clean separation of concerns across Presentation, Domain, and Data layers. It also emphasizes consistent code style, design system component usage, and robust testing practices.
+The project is about the Chotot iOS application. It's a large-scale iOS app built with Swift, following the MVVM + Clean Architecture pattern. The project uses a monorepo structure with CocoaPods for dependency management.
 
--   **Monorepo**: Turborepo-managed, with `apps/` (main: Next.js web app) and `packages/` (shared code: `common`, `shared`, `ai`, `ui`, etc.).
--   **Core Technologies**: Next.js 15 (App Router), React 19.0.0, TypeScript, Tailwind CSS, shadcn/ui, Zustand, Drizzle ORM (Neon PostgreSQL), Better-Auth, Framer Motion, Lucide icons.
--   **AI/Agents**: Agentic Graph System in `packages/ai/` (supports OpenAI, Anthropic, Google, Groq, etc.).
+Key aspects of the project include:
 
-How to work together:
+-   **Architecture**: MVVM + Clean Architecture
+-   **UI Components**: Primarily uses a custom design system (`CTDesignSystem`) and SnapKit for layout.
+-   **Reactive Programming**: RxSwift is used for managing asynchronous operations and data flow.
+-   **Dependency Injection**: Swinject is used for dependency injection.
+-   **Testing**: Quick and Nimble are used for unit testing.
+-   **Code Standards**: Adheres to specific naming conventions, file organization, and error handling practices.
+-   **Module Structure**: Features are organized into distinct modules with a consistent directory structure (Presentation, Domain, Data).
 
--   Describe your current coding goal or ask for a quick status overview.
--   Reference AGENTS.md guidelines when proposing changes.
--   Prefer asking for targeted file reads or diffs before editing.
+The project aims for clean, maintainable, and testable code through these architectural and tooling choices.
 
-Recommended next actions:
+---
 
--   Review the highlighted guidelines and share the task you want to tackle.
--   Ask for a workspace tour if you need more context.
+explore and use parking_lot for better performance in multithreaded scenarios. Replace standard library synchronization primitives (like Mutex and RwLock) with their parking_lot counterparts where appropriate. Ensure that the transition maintains thread safety and correctness while improving performance. Update documentation to reflect the use of parking_lot and any changes in synchronization behavior.
 
---
+---
 
-also for agent message, make a slight indentation to differeniate between use message and agent message and tool call. revamp the chat ui ux visual, also add a spinning indicatif showing "Thinking" and update on tools call action. show and update tools call result and message return
+-   `/command <program> [args...]` — run a shell command via `run_terminal_cmd`
+    --> also add "!" to toggle command and normal mode.
+
+press ! -> command mode
+press ! again -> normal mode.
+
+note:
+
+-   on command mode only execute `run_terminal_cmd` only no tool call
+-   on normal mode, full chat agent loop with tools call
+-   on command mode, update the info and visual of the repl
+
+---

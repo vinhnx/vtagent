@@ -9,6 +9,8 @@ use vtagent_core::cli::args::{Cli, Commands};
 use vtagent_core::config::api_keys::{ApiKeySources, get_api_key, load_dotenv};
 use vtagent_core::config::loader::ConfigManager;
 use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
+use vtagent_core::ui::theme::{self as ui_theme, DEFAULT_THEME_ID};
+use vtagent_core::{initialize_dot_folder, load_user_config, update_theme_preference};
 
 mod agent;
 mod cli; // local CLI handlers in src/cli // agent runloops (single-agent only)
@@ -49,7 +51,7 @@ async fn main() -> Result<()> {
     })?;
     let cfg = config_manager.config();
 
-    // Resolve provider/model with CLI override
+    // Resolve provider/model/theme with CLI override
     let provider = args
         .provider
         .clone()
@@ -58,6 +60,38 @@ async fn main() -> Result<()> {
         .model
         .clone()
         .unwrap_or_else(|| cfg.agent.default_model.clone());
+
+    initialize_dot_folder().ok();
+    let user_theme_pref = load_user_config().ok().and_then(|dot| {
+        let trimmed = dot.preferences.theme.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    });
+
+    let mut theme_selection = args
+        .theme
+        .clone()
+        .or(user_theme_pref)
+        .or_else(|| Some(cfg.agent.theme.clone()))
+        .unwrap_or_else(|| DEFAULT_THEME_ID.to_string());
+
+    if let Err(err) = ui_theme::set_active_theme(&theme_selection) {
+        if args.theme.is_some() {
+            return Err(err.context(format!("Failed to activate theme '{}'", theme_selection)));
+        }
+        eprintln!(
+            "Warning: {}. Falling back to default theme '{}'.",
+            err, DEFAULT_THEME_ID
+        );
+        theme_selection = DEFAULT_THEME_ID.to_string();
+        ui_theme::set_active_theme(&theme_selection)
+            .with_context(|| format!("Failed to activate theme '{}'", theme_selection))?;
+    }
+
+    update_theme_preference(&theme_selection).ok();
 
     // Resolve API key for chosen provider
     let api_key = get_api_key(&provider, &ApiKeySources::default())
@@ -69,6 +103,7 @@ async fn main() -> Result<()> {
         api_key,
         workspace: workspace.clone(),
         verbose: args.verbose,
+        theme: theme_selection.clone(),
     };
 
     match &args.command {

@@ -125,6 +125,7 @@ async fn main() -> Result<()> {
         api_key: api_key.clone(),
         workspace: workspace.clone(),
         verbose: args.verbose,
+        theme: defaults::DEFAULT_THEME.to_string(),
     };
 
     // Apply safety validations for model usage

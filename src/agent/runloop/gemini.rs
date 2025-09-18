@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::io::{self, Write};
+use std::io;
 use std::path::Path;
 
 use vtagent_core::config::loader::VTAgentConfig;
@@ -9,8 +9,11 @@ use vtagent_core::core::router::{Router, TaskClass};
 use vtagent_core::gemini::function_calling::{FunctionCall, FunctionResponse};
 use vtagent_core::gemini::models::{SystemInstruction, ToolConfig};
 use vtagent_core::gemini::{Client as GeminiClient, Content, GenerateContentRequest, Part, Tool};
+use vtagent_core::tools::registry::{ToolErrorType, ToolExecutionError};
 use vtagent_core::tools::{ToolRegistry, build_function_declarations};
+use vtagent_core::ui::{Spinner, theme};
 use vtagent_core::utils::ansi::{AnsiRenderer, MessageStyle};
+use vtagent_core::utils::dot_config::update_theme_preference;
 
 use super::context::{
     apply_aggressive_trim_gemini, enforce_gemini_context_window, load_context_trim_config,
@@ -18,10 +21,22 @@ use super::context::{
 };
 use super::git::confirm_changes_with_git_diff;
 use super::is_context_overflow_error;
+use super::slash_commands::{SlashCommandOutcome, handle_slash_command};
 use super::telemetry::build_trajectory_logger;
 use super::text_tools::detect_textual_tool_call;
 use super::tool_output::render_tool_output;
+use super::ui::render_session_banner;
 use super::welcome::prepare_session_bootstrap;
+
+fn persist_theme_preference(renderer: &mut AnsiRenderer, theme_id: &str) -> Result<()> {
+    if let Err(err) = update_theme_preference(theme_id) {
+        renderer.line(
+            MessageStyle::Error,
+            &format!("Failed to persist theme preference: {}", err),
+        )?;
+    }
+    Ok(())
+}
 
 pub(crate) async fn run_single_agent_loop_gemini(
     config: &CoreAgentConfig,
@@ -31,19 +46,7 @@ pub(crate) async fn run_single_agent_loop_gemini(
     let trim_config = load_context_trim_config(vt_cfg);
     let session_bootstrap = prepare_session_bootstrap(config, vt_cfg);
     let mut renderer = AnsiRenderer::stdout();
-    renderer.line(MessageStyle::Info, "Interactive chat (tools)")?;
-    renderer.line(MessageStyle::Output, &format!("Model: {}", config.model))?;
-    renderer.line(
-        MessageStyle::Output,
-        &format!("Workspace: {}", config.workspace.display()),
-    )?;
-    if let Some(summary) = session_bootstrap.language_summary.as_deref() {
-        renderer.line(
-            MessageStyle::Output,
-            &format!("Detected languages: {}", summary),
-        )?;
-    }
-    renderer.line(MessageStyle::Output, "")?;
+    render_session_banner(&mut renderer, config, &session_bootstrap)?;
 
     if let Some(text) = session_bootstrap.welcome_text.as_ref() {
         renderer.line(MessageStyle::Response, text)?;
@@ -82,6 +85,10 @@ pub(crate) async fn run_single_agent_loop_gemini(
         MessageStyle::Info,
         "Type 'exit' to quit, 'help' for commands",
     )?;
+    renderer.line(
+        MessageStyle::Info,
+        "Slash commands: /help, /list-themes, /theme <id>, /command <program>",
+    )?;
     loop {
         if !placeholder_shown {
             if let Some(ref hint) = placeholder_hint {
@@ -89,8 +96,8 @@ pub(crate) async fn run_single_agent_loop_gemini(
             }
             placeholder_shown = true;
         }
-        print!("> ");
-        io::stdout().flush()?;
+        let prompt_style = theme::active_styles().primary;
+        renderer.inline_with_style(prompt_style, "❯ ")?;
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
         let input = input.trim();
@@ -106,6 +113,70 @@ pub(crate) async fn run_single_agent_loop_gemini(
                 continue;
             }
             _ => {}
+        }
+
+        if let Some(command_input) = input.strip_prefix('/') {
+            match handle_slash_command(command_input, &mut renderer)? {
+                SlashCommandOutcome::Handled => continue,
+                SlashCommandOutcome::ThemeChanged(theme_id) => {
+                    persist_theme_preference(&mut renderer, &theme_id)?;
+                    continue;
+                }
+                SlashCommandOutcome::ExecuteTool { name, args } => {
+                    match tool_registry.preflight_tool_permission(&name) {
+                        Ok(true) => {
+                            let tool_spinner = Spinner::new(&format!("Running tool: {}", name));
+                            match tool_registry.execute_tool(&name, args.clone()).await {
+                                Ok(tool_output) => {
+                                    tool_spinner.finish_and_clear();
+                                    traj.log_tool_call(
+                                        conversation_history.len(),
+                                        &name,
+                                        &args,
+                                        true,
+                                    );
+                                    render_tool_output(&tool_output);
+                                }
+                                Err(err) => {
+                                    tool_spinner.finish_and_clear();
+                                    traj.log_tool_call(
+                                        conversation_history.len(),
+                                        &name,
+                                        &args,
+                                        false,
+                                    );
+                                    renderer.line(
+                                        MessageStyle::Error,
+                                        &format!("Tool '{}' failed: {}", name, err),
+                                    )?;
+                                }
+                            }
+                        }
+                        Ok(false) => {
+                            let denial = ToolExecutionError::new(
+                                name.clone(),
+                                ToolErrorType::PolicyViolation,
+                                format!("Tool '{}' execution denied by policy", name),
+                            )
+                            .to_json_value();
+                            traj.log_tool_call(conversation_history.len(), &name, &args, false);
+                            render_tool_output(&denial);
+                        }
+                        Err(err) => {
+                            traj.log_tool_call(conversation_history.len(), &name, &args, false);
+                            renderer.line(
+                                MessageStyle::Error,
+                                &format!("Failed to evaluate policy for tool '{}': {}", name, err),
+                            )?;
+                        }
+                    }
+                    continue;
+                }
+                SlashCommandOutcome::Exit => {
+                    renderer.line(MessageStyle::Info, "Goodbye!")?;
+                    break;
+                }
+            }
         }
 
         conversation_history.push(Content::user_text(input));
@@ -250,8 +321,10 @@ pub(crate) async fn run_single_agent_loop_gemini(
                     generation_config: gen_cfg.clone(),
                 };
 
+                let spinner = Spinner::new("Thinking");
                 match client.generate(&req).await {
                     Ok(result) => {
+                        spinner.finish_and_clear();
                         working_history = attempt_history.clone();
                         break result;
                     }
@@ -267,6 +340,8 @@ pub(crate) async fn run_single_agent_loop_gemini(
                                 apply_aggressive_trim_gemini(&mut attempt_history, trim_config);
                             let total_removed = removed_tool_messages + removed_turns;
                             if total_removed > 0 {
+                                spinner.finish_and_clear();
+                                renderer.line(MessageStyle::Info, "↻ Adjusting context")?;
                                 renderer.line(
                                     MessageStyle::Info,
                                     &format!(
@@ -280,8 +355,36 @@ pub(crate) async fn run_single_agent_loop_gemini(
                                 continue;
                             }
                         }
-                        renderer.line(MessageStyle::Error, &format!("Provider error: {error}"))?;
-                        break 'outer;
+                        spinner.finish_and_clear();
+                        let has_tool = working_history
+                            .iter()
+                            .any(|content| matches!(content.role.as_str(), "tool"));
+                        if has_tool {
+                            eprintln!("Provider error (suppressed): {error}");
+                            let reply = working_history
+                                .iter()
+                                .rev()
+                                .find(|content| content.role == "tool")
+                                .and_then(|tool_content| {
+                                    tool_content.parts.iter().find_map(|part| match part {
+                                        Part::Text { text } if !text.trim().is_empty() => {
+                                            Some(text.clone())
+                                        }
+                                        _ => None,
+                                    })
+                                })
+                                .unwrap_or_else(|| "Command completed successfully.".to_string());
+                            renderer.line(MessageStyle::Response, &reply)?;
+                            conversation_history.push(Content {
+                                role: "model".to_string(),
+                                parts: vec![Part::Text { text: reply }],
+                            });
+                            break 'outer;
+                        } else {
+                            renderer
+                                .line(MessageStyle::Error, &format!("Provider error: {error}"))?;
+                            break 'outer;
+                        }
                     }
                 }
             };
@@ -348,7 +451,7 @@ pub(crate) async fn run_single_agent_loop_gemini(
                 if let Some(text) = final_text.clone()
                     && !text.trim().is_empty()
                 {
-                    renderer.line(MessageStyle::Output, &text)?;
+                    renderer.line(MessageStyle::Response, &text)?;
                 }
                 break 'outer;
             }
@@ -356,7 +459,7 @@ pub(crate) async fn run_single_agent_loop_gemini(
             for call in function_calls {
                 let name = call.name.as_str();
                 let args = call.args.clone();
-                renderer.line(MessageStyle::Info, &format!("[TOOL] {} {}", name, args))?;
+                renderer.line(MessageStyle::Tool, &format!("[TOOL] {} {}", name, args))?;
                 let decision_id = ledger.record_decision(
                     format!("Execute tool '{}' to progress task", name),
                     DTAction::ToolCall {
@@ -366,58 +469,109 @@ pub(crate) async fn run_single_agent_loop_gemini(
                     },
                     None,
                 );
-                match tool_registry.execute_tool(name, args).await {
-                    Ok(tool_output) => {
-                        render_tool_output(&tool_output);
-                        let modified_files: Vec<String> = if let Some(files) = tool_output
-                            .get("modified_files")
-                            .and_then(|value| value.as_array())
-                        {
-                            files
-                                .iter()
-                                .filter_map(|file| file.as_str().map(|value| value.to_string()))
-                                .collect()
-                        } else {
-                            vec![]
-                        };
+                match tool_registry.preflight_tool_permission(name) {
+                    Ok(true) => {
+                        let tool_spinner = Spinner::new(&format!("Running tool: {}", name));
+                        match tool_registry.execute_tool(name, args.clone()).await {
+                            Ok(tool_output) => {
+                                tool_spinner.finish_and_clear();
+                                render_tool_output(&tool_output);
+                                let modified_files: Vec<String> = if let Some(files) = tool_output
+                                    .get("modified_files")
+                                    .and_then(|value| value.as_array())
+                                {
+                                    files
+                                        .iter()
+                                        .filter_map(|file| {
+                                            file.as_str().map(|value| value.to_string())
+                                        })
+                                        .collect()
+                                } else {
+                                    vec![]
+                                };
 
-                        if matches!(
-                            name,
-                            "write_file" | "edit_file" | "create_file" | "delete_file" | "srgn"
-                        ) {
-                            any_write_effect = true;
+                                if matches!(
+                                    name,
+                                    "write_file"
+                                        | "edit_file"
+                                        | "create_file"
+                                        | "delete_file"
+                                        | "srgn"
+                                ) {
+                                    any_write_effect = true;
+                                }
+
+                                if !modified_files.is_empty()
+                                    && confirm_changes_with_git_diff(
+                                        &modified_files,
+                                        skip_confirmations,
+                                    )
+                                    .await?
+                                {
+                                    renderer.line(
+                                        MessageStyle::Info,
+                                        "Changes applied successfully.",
+                                    )?;
+                                } else if !modified_files.is_empty() {
+                                    renderer.line(MessageStyle::Info, "Changes discarded.")?;
+                                }
+
+                                let fr = FunctionResponse {
+                                    name: call.name.clone(),
+                                    response: tool_output,
+                                };
+                                working_history.push(Content::user_parts(vec![
+                                    Part::FunctionResponse {
+                                        function_response: fr,
+                                    },
+                                ]));
+                                ledger.record_outcome(
+                                    &decision_id,
+                                    DecisionOutcome::Success {
+                                        result: "tool_ok".to_string(),
+                                        metrics: Default::default(),
+                                    },
+                                );
+                            }
+                            Err(error) => {
+                                tool_spinner.finish_and_clear();
+                                renderer
+                                    .line(MessageStyle::Tool, &format!("Tool {} failed.", name))?;
+                                renderer
+                                    .line(MessageStyle::Error, &format!("Tool error: {error}"))?;
+                                let err = serde_json::json!({ "error": error.to_string() });
+                                let fr = FunctionResponse {
+                                    name: call.name.clone(),
+                                    response: err,
+                                };
+                                working_history.push(Content::user_parts(vec![
+                                    Part::FunctionResponse {
+                                        function_response: fr,
+                                    },
+                                ]));
+                                ledger.record_outcome(
+                                    &decision_id,
+                                    DecisionOutcome::Failure {
+                                        error: error.to_string(),
+                                        recovery_attempts: 0,
+                                        context_preserved: true,
+                                    },
+                                );
+                            }
                         }
-
-                        if !modified_files.is_empty()
-                            && confirm_changes_with_git_diff(&modified_files, skip_confirmations)
-                                .await?
-                        {
-                            renderer.line(MessageStyle::Info, "Changes applied successfully.")?;
-                        } else if !modified_files.is_empty() {
-                            renderer.line(MessageStyle::Info, "Changes discarded.")?;
-                        }
-
-                        let fr = FunctionResponse {
-                            name: call.name.clone(),
-                            response: tool_output,
-                        };
-                        working_history.push(Content::user_parts(vec![Part::FunctionResponse {
-                            function_response: fr,
-                        }]));
-                        ledger.record_outcome(
-                            &decision_id,
-                            DecisionOutcome::Success {
-                                result: "tool_ok".to_string(),
-                                metrics: Default::default(),
-                            },
-                        );
                     }
-                    Err(error) => {
-                        renderer.line(MessageStyle::Error, &format!("Tool error: {error}"))?;
-                        let err = serde_json::json!({ "error": error.to_string() });
+                    Ok(false) => {
+                        let denial = ToolExecutionError::new(
+                            name.to_string(),
+                            ToolErrorType::PolicyViolation,
+                            format!("Tool '{}' execution denied by policy", name),
+                        )
+                        .to_json_value();
+                        traj.log_tool_call(working_history.len(), name, &args, false);
+                        render_tool_output(&denial);
                         let fr = FunctionResponse {
                             name: call.name.clone(),
-                            response: err,
+                            response: denial,
                         };
                         working_history.push(Content::user_parts(vec![Part::FunctionResponse {
                             function_response: fr,
@@ -425,11 +579,44 @@ pub(crate) async fn run_single_agent_loop_gemini(
                         ledger.record_outcome(
                             &decision_id,
                             DecisionOutcome::Failure {
-                                error: error.to_string(),
+                                error: format!("Tool '{}' execution denied by policy", name),
                                 recovery_attempts: 0,
                                 context_preserved: true,
                             },
                         );
+                        continue;
+                    }
+                    Err(err) => {
+                        traj.log_tool_call(working_history.len(), name, &args, false);
+                        renderer.line(
+                            MessageStyle::Error,
+                            &format!("Failed to evaluate policy for tool '{}': {}", name, err),
+                        )?;
+                        let err_json = serde_json::json!({
+                            "error": format!(
+                                "Policy evaluation error for '{}' : {}",
+                                name, err
+                            )
+                        });
+                        let fr = FunctionResponse {
+                            name: call.name.clone(),
+                            response: err_json,
+                        };
+                        working_history.push(Content::user_parts(vec![Part::FunctionResponse {
+                            function_response: fr,
+                        }]));
+                        ledger.record_outcome(
+                            &decision_id,
+                            DecisionOutcome::Failure {
+                                error: format!(
+                                    "Failed to evaluate policy for tool '{}': {}",
+                                    name, err
+                                ),
+                                recovery_attempts: 0,
+                                context_preserved: true,
+                            },
+                        );
+                        continue;
                     }
                 }
             }

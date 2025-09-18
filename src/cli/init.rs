@@ -5,6 +5,7 @@ use std::fs;
 use std::path::Path;
 use vtagent_core::config::loader::VTAgentConfig;
 use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
+use vtagent_core::ui::theme::DEFAULT_THEME_ID;
 
 /// Handle the init command
 pub async fn handle_init_command(workspace: &Path, force: bool, run: bool) -> Result<()> {
@@ -36,6 +37,7 @@ pub async fn handle_init_command(workspace: &Path, force: bool, run: bool) -> Re
             api_key: String::new(),
             workspace: workspace.to_path_buf(),
             verbose: false,
+            theme: DEFAULT_THEME_ID.to_string(),
         };
         handle_chat_command(&config, false)
             .await

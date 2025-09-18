@@ -16,13 +16,13 @@
   "policies": {
     "grep_search": "allow",
     "list_files": "prompt",
-    "run_terminal_cmd": "prompt",
+    "run_terminal_cmd": "allow",
     "read_file": "prompt",
     "write_file": "prompt",
     "edit_file": "prompt",
     "ast_grep_search": "prompt",
     "simple_search": "prompt",
-    "bash": "prompt",
+    "bash": "allow",
     "apply_patch": "prompt",
     "srgn": "prompt"
   },

@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use std::io::{self, Write};
+use std::io;
 use std::path::Path;
 
 use vtagent_core::config::constants::tools;
@@ -8,8 +8,11 @@ use vtagent_core::config::types::AgentConfig as CoreAgentConfig;
 use vtagent_core::core::decision_tracker::{Action as DTAction, DecisionOutcome, DecisionTracker};
 use vtagent_core::core::router::{Router, TaskClass};
 use vtagent_core::llm::{factory::create_provider_for_model, provider as uni};
+use vtagent_core::tools::registry::{ToolErrorType, ToolExecutionError};
 use vtagent_core::tools::{ToolRegistry, build_function_declarations};
+use vtagent_core::ui::{Spinner, theme};
 use vtagent_core::utils::ansi::{AnsiRenderer, MessageStyle};
+use vtagent_core::utils::dot_config::update_theme_preference;
 
 use super::context::{
     apply_aggressive_trim_unified, enforce_unified_context_window, load_context_trim_config,
@@ -18,10 +21,22 @@ use super::context::{
 use super::git::confirm_changes_with_git_diff;
 use super::is_context_overflow_error;
 use super::prompt::refine_user_prompt_if_enabled;
+use super::slash_commands::{SlashCommandOutcome, handle_slash_command};
 use super::telemetry::build_trajectory_logger;
 use super::text_tools::detect_textual_tool_call;
 use super::tool_output::render_tool_output;
+use super::ui::render_session_banner;
 use super::welcome::prepare_session_bootstrap;
+
+fn persist_theme_preference(renderer: &mut AnsiRenderer, theme_id: &str) -> Result<()> {
+    if let Err(err) = update_theme_preference(theme_id) {
+        renderer.line(
+            MessageStyle::Error,
+            &format!("Failed to persist theme preference: {}", err),
+        )?;
+    }
+    Ok(())
+}
 
 pub(crate) async fn run_single_agent_loop_unified(
     config: &CoreAgentConfig,
@@ -30,19 +45,7 @@ pub(crate) async fn run_single_agent_loop_unified(
 ) -> Result<()> {
     let session_bootstrap = prepare_session_bootstrap(config, vt_cfg);
     let mut renderer = AnsiRenderer::stdout();
-    renderer.line(MessageStyle::Info, "Interactive chat (tools)")?;
-    renderer.line(MessageStyle::Output, &format!("Model: {}", config.model))?;
-    renderer.line(
-        MessageStyle::Output,
-        &format!("Workspace: {}", config.workspace.display()),
-    )?;
-    if let Some(summary) = session_bootstrap.language_summary.as_deref() {
-        renderer.line(
-            MessageStyle::Output,
-            &format!("Detected languages: {}", summary),
-        )?;
-    }
-    renderer.line(MessageStyle::Output, "")?;
+    render_session_banner(&mut renderer, config, &session_bootstrap)?;
 
     if let Some(text) = session_bootstrap.welcome_text.as_ref() {
         renderer.line(MessageStyle::Response, text)?;
@@ -76,6 +79,10 @@ pub(crate) async fn run_single_agent_loop_unified(
         MessageStyle::Info,
         "Type 'exit' to quit, 'help' for commands",
     )?;
+    renderer.line(
+        MessageStyle::Info,
+        "Slash commands: /help, /list-themes, /theme <id>, /command <program>",
+    )?;
     loop {
         if !placeholder_shown {
             if let Some(ref hint) = placeholder_hint {
@@ -83,8 +90,8 @@ pub(crate) async fn run_single_agent_loop_unified(
             }
             placeholder_shown = true;
         }
-        print!("> ");
-        io::stdout().flush()?;
+        let prompt_style = theme::active_styles().primary;
+        renderer.inline_with_style(prompt_style, "❯ ")?;
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
         let input = input.trim();
@@ -100,6 +107,70 @@ pub(crate) async fn run_single_agent_loop_unified(
                 continue;
             }
             _ => {}
+        }
+
+        if let Some(command_input) = input.strip_prefix('/') {
+            match handle_slash_command(command_input, &mut renderer)? {
+                SlashCommandOutcome::Handled => continue,
+                SlashCommandOutcome::ThemeChanged(theme_id) => {
+                    persist_theme_preference(&mut renderer, &theme_id)?;
+                    continue;
+                }
+                SlashCommandOutcome::ExecuteTool { name, args } => {
+                    match tool_registry.preflight_tool_permission(&name) {
+                        Ok(true) => {
+                            let tool_spinner = Spinner::new(&format!("Running tool: {}", name));
+                            match tool_registry.execute_tool(&name, args.clone()).await {
+                                Ok(tool_output) => {
+                                    tool_spinner.finish_and_clear();
+                                    traj.log_tool_call(
+                                        conversation_history.len(),
+                                        &name,
+                                        &args,
+                                        true,
+                                    );
+                                    render_tool_output(&tool_output);
+                                }
+                                Err(err) => {
+                                    tool_spinner.finish_and_clear();
+                                    traj.log_tool_call(
+                                        conversation_history.len(),
+                                        &name,
+                                        &args,
+                                        false,
+                                    );
+                                    renderer.line(
+                                        MessageStyle::Error,
+                                        &format!("Tool '{}' failed: {}", name, err),
+                                    )?;
+                                }
+                            }
+                        }
+                        Ok(false) => {
+                            let denial = ToolExecutionError::new(
+                                name.clone(),
+                                ToolErrorType::PolicyViolation,
+                                format!("Tool '{}' execution denied by policy", name),
+                            )
+                            .to_json_value();
+                            traj.log_tool_call(conversation_history.len(), &name, &args, false);
+                            render_tool_output(&denial);
+                        }
+                        Err(err) => {
+                            traj.log_tool_call(conversation_history.len(), &name, &args, false);
+                            renderer.line(
+                                MessageStyle::Error,
+                                &format!("Failed to evaluate policy for tool '{}': {}", name, err),
+                            )?;
+                        }
+                    }
+                    continue;
+                }
+                SlashCommandOutcome::Exit => {
+                    renderer.line(MessageStyle::Info, "Goodbye!")?;
+                    break;
+                }
+            }
         }
 
         let refined_user = refine_user_prompt_if_enabled(input, config, vt_cfg).await;
@@ -237,8 +308,10 @@ pub(crate) async fn run_single_agent_loop_unified(
                     reasoning_effort: vt_cfg.map(|cfg| cfg.agent.reasoning_effort.clone()),
                 };
 
+                let spinner = Spinner::new("Thinking");
                 match provider_client.generate(request).await {
                     Ok(result) => {
+                        spinner.finish_and_clear();
                         working_history = attempt_history.clone();
                         break result;
                     }
@@ -255,6 +328,8 @@ pub(crate) async fn run_single_agent_loop_unified(
                                 apply_aggressive_trim_unified(&mut attempt_history, trim_config);
                             let total_removed = removed_tool_messages + removed_turns;
                             if total_removed > 0 {
+                                spinner.finish_and_clear();
+                                renderer.line(MessageStyle::Info, "↻ Adjusting context")?;
                                 renderer.line(
                                     MessageStyle::Info,
                                     &format!(
@@ -268,21 +343,25 @@ pub(crate) async fn run_single_agent_loop_unified(
                                 continue;
                             }
                         }
-                        renderer.line(
-                            MessageStyle::Error,
-                            &format!("Provider error: {error_text}"),
-                        )?;
+                        spinner.finish_and_clear();
 
-                        if working_history
+                        let has_tool = working_history
                             .iter()
-                            .any(|msg| msg.role == uni::MessageRole::Tool)
-                        {
+                            .any(|msg| msg.role == uni::MessageRole::Tool);
+
+                        if has_tool {
+                            eprintln!("Provider error (suppressed): {error_text}");
                             let reply = derive_recent_tool_output(&working_history)
                                 .unwrap_or_else(|| "Command completed successfully.".to_string());
                             renderer.line(MessageStyle::Response, &reply)?;
                             working_history.push(uni::Message::assistant(reply));
                             let _ = last_tool_stdout.take();
                             break 'outer;
+                        } else {
+                            renderer.line(
+                                MessageStyle::Error,
+                                &format!("Provider error: {error_text}"),
+                            )?;
                         }
 
                         continue 'outer;
@@ -336,6 +415,12 @@ pub(crate) async fn run_single_agent_loop_unified(
                     let args_val = call
                         .parsed_arguments()
                         .unwrap_or_else(|_| serde_json::json!({}));
+                    let args_display =
+                        serde_json::to_string(&args_val).unwrap_or_else(|_| "{}".to_string());
+                    renderer.line(
+                        MessageStyle::Tool,
+                        &format!("[TOOL] {} {}", name, args_display),
+                    )?;
                     let dec_id = ledger.record_decision(
                         format!("Execute tool '{}' to progress task", name),
                         DTAction::ToolCall {
@@ -345,85 +430,176 @@ pub(crate) async fn run_single_agent_loop_unified(
                         },
                         None,
                     );
-                    match tool_registry.execute_tool(name, args_val.clone()).await {
-                        Ok(tool_output) => {
-                            traj.log_tool_call(working_history.len(), name, &args_val, true);
-                            render_tool_output(&tool_output);
-                            last_tool_stdout = tool_output
-                                .get("stdout")
-                                .and_then(|value| value.as_str())
-                                .map(|s| s.trim().to_string())
-                                .filter(|s| !s.is_empty());
-                            let modified_files: Vec<String> = if let Some(files) = tool_output
-                                .get("modified_files")
-                                .and_then(|value| value.as_array())
-                            {
-                                files
-                                    .iter()
-                                    .filter_map(|file| file.as_str().map(|value| value.to_string()))
-                                    .collect()
-                            } else {
-                                vec![]
-                            };
 
-                            if matches!(
-                                name,
-                                "write_file" | "edit_file" | "create_file" | "delete_file" | "srgn"
-                            ) {
-                                any_write_effect = true;
-                            }
+                    match tool_registry.preflight_tool_permission(name) {
+                        Ok(true) => {
+                            let tool_spinner = Spinner::new(&format!("Running tool: {}", name));
+                            match tool_registry.execute_tool(name, args_val.clone()).await {
+                                Ok(tool_output) => {
+                                    tool_spinner.finish_and_clear();
+                                    traj.log_tool_call(
+                                        working_history.len(),
+                                        name,
+                                        &args_val,
+                                        true,
+                                    );
+                                    render_tool_output(&tool_output);
+                                    last_tool_stdout = tool_output
+                                        .get("stdout")
+                                        .and_then(|value| value.as_str())
+                                        .map(|s| s.trim().to_string())
+                                        .filter(|s| !s.is_empty());
+                                    let modified_files: Vec<String> = if let Some(files) =
+                                        tool_output
+                                            .get("modified_files")
+                                            .and_then(|value| value.as_array())
+                                    {
+                                        files
+                                            .iter()
+                                            .filter_map(|file| {
+                                                file.as_str().map(|value| value.to_string())
+                                            })
+                                            .collect()
+                                    } else {
+                                        vec![]
+                                    };
 
-                            if !modified_files.is_empty()
-                                && confirm_changes_with_git_diff(
-                                    &modified_files,
-                                    skip_confirmations,
-                                )
-                                .await?
-                            {
-                                renderer
-                                    .line(MessageStyle::Info, "Changes applied successfully.")?;
-                            } else if !modified_files.is_empty() {
-                                renderer.line(MessageStyle::Info, "Changes discarded.")?;
-                            }
+                                    if matches!(
+                                        name,
+                                        "write_file"
+                                            | "edit_file"
+                                            | "create_file"
+                                            | "delete_file"
+                                            | "srgn"
+                                    ) {
+                                        any_write_effect = true;
+                                    }
 
-                            let content =
-                                serde_json::to_string(&tool_output).unwrap_or("{}".to_string());
-                            working_history
-                                .push(uni::Message::tool_response(call.id.clone(), content));
-                            ledger.record_outcome(
-                                &dec_id,
-                                DecisionOutcome::Success {
-                                    result: "tool_ok".to_string(),
-                                    metrics: Default::default(),
-                                },
-                            );
+                                    if !modified_files.is_empty()
+                                        && confirm_changes_with_git_diff(
+                                            &modified_files,
+                                            skip_confirmations,
+                                        )
+                                        .await?
+                                    {
+                                        renderer.line(
+                                            MessageStyle::Info,
+                                            "Changes applied successfully.",
+                                        )?;
+                                    } else if !modified_files.is_empty() {
+                                        renderer.line(MessageStyle::Info, "Changes discarded.")?;
+                                    }
 
-                            if should_short_circuit_shell(input, name, &args_val) {
-                                let reply = last_tool_stdout.clone().unwrap_or_else(|| {
-                                    "Command completed successfully.".to_string()
-                                });
-                                renderer.line(MessageStyle::Response, &reply)?;
-                                working_history.push(uni::Message::assistant(reply));
-                                let _ = last_tool_stdout.take();
-                                break 'outer;
+                                    let content = serde_json::to_string(&tool_output)
+                                        .unwrap_or("{}".to_string());
+                                    working_history.push(uni::Message::tool_response(
+                                        call.id.clone(),
+                                        content,
+                                    ));
+                                    ledger.record_outcome(
+                                        &dec_id,
+                                        DecisionOutcome::Success {
+                                            result: "tool_ok".to_string(),
+                                            metrics: Default::default(),
+                                        },
+                                    );
+
+                                    if should_short_circuit_shell(input, name, &args_val) {
+                                        let reply = last_tool_stdout.clone().unwrap_or_else(|| {
+                                            "Command completed successfully.".to_string()
+                                        });
+                                        renderer.line(MessageStyle::Response, &reply)?;
+                                        working_history.push(uni::Message::assistant(reply));
+                                        let _ = last_tool_stdout.take();
+                                        break 'outer;
+                                    }
+                                }
+                                Err(error) => {
+                                    tool_spinner.finish_and_clear();
+                                    renderer.line(
+                                        MessageStyle::Tool,
+                                        &format!("Tool {} failed.", name),
+                                    )?;
+                                    traj.log_tool_call(
+                                        working_history.len(),
+                                        name,
+                                        &args_val,
+                                        false,
+                                    );
+                                    renderer.line(
+                                        MessageStyle::Error,
+                                        &format!("Tool error: {error}"),
+                                    )?;
+                                    let err = serde_json::json!({ "error": error.to_string() });
+                                    let content = err.to_string();
+                                    working_history.push(uni::Message::tool_response(
+                                        call.id.clone(),
+                                        content,
+                                    ));
+                                    let _ = last_tool_stdout.take();
+                                    ledger.record_outcome(
+                                        &dec_id,
+                                        DecisionOutcome::Failure {
+                                            error: error.to_string(),
+                                            recovery_attempts: 0,
+                                            context_preserved: true,
+                                        },
+                                    );
+                                }
                             }
                         }
-                        Err(error) => {
+                        Ok(false) => {
+                            let denial = ToolExecutionError::new(
+                                name.to_string(),
+                                ToolErrorType::PolicyViolation,
+                                format!("Tool '{}' execution denied by policy", name),
+                            )
+                            .to_json_value();
                             traj.log_tool_call(working_history.len(), name, &args_val, false);
-                            renderer.line(MessageStyle::Error, &format!("Tool error: {error}"))?;
-                            let err = serde_json::json!({ "error": error.to_string() });
-                            let content = err.to_string();
+                            render_tool_output(&denial);
+                            let content =
+                                serde_json::to_string(&denial).unwrap_or("{}".to_string());
                             working_history
                                 .push(uni::Message::tool_response(call.id.clone(), content));
-                            let _ = last_tool_stdout.take();
                             ledger.record_outcome(
                                 &dec_id,
                                 DecisionOutcome::Failure {
-                                    error: error.to_string(),
+                                    error: format!("Tool '{}' execution denied by policy", name),
                                     recovery_attempts: 0,
                                     context_preserved: true,
                                 },
                             );
+                            continue;
+                        }
+                        Err(err) => {
+                            traj.log_tool_call(working_history.len(), name, &args_val, false);
+                            renderer.line(
+                                MessageStyle::Error,
+                                &format!("Failed to evaluate policy for tool '{}': {}", name, err),
+                            )?;
+                            let err_json = serde_json::json!({
+                                "error": format!(
+                                    "Policy evaluation error for '{}' : {}",
+                                    name, err
+                                )
+                            });
+                            working_history.push(uni::Message::tool_response(
+                                call.id.clone(),
+                                err_json.to_string(),
+                            ));
+                            let _ = last_tool_stdout.take();
+                            ledger.record_outcome(
+                                &dec_id,
+                                DecisionOutcome::Failure {
+                                    error: format!(
+                                        "Failed to evaluate policy for tool '{}': {}",
+                                        name, err
+                                    ),
+                                    recovery_attempts: 0,
+                                    context_preserved: true,
+                                },
+                            );
+                            continue;
                         }
                     }
                 }
@@ -572,6 +748,18 @@ fn should_short_circuit_shell(input: &str, tool_name: &str, args: &serde_json::V
         return false;
     }
 
+    // Don't short-circuit for commands that contain shell metacharacters
+    // as these need more sophisticated reasoning
+    let full_command = command_tokens.join(" ");
+    if full_command.contains('|')
+        || full_command.contains('>')
+        || full_command.contains('<')
+        || full_command.contains('&')
+        || full_command.contains(';')
+    {
+        return false;
+    }
+
     let user_tokens: Vec<String> = input
         .split_whitespace()
         .map(|part| part.trim_matches(|c| c == '\"' || c == '\'').to_string())
@@ -599,23 +787,55 @@ fn derive_recent_tool_output(history: &[uni::Message]) -> Option<String> {
 
     let value = serde_json::from_str::<serde_json::Value>(&message.content).ok()?;
 
+    let mut output_parts = Vec::new();
+
+    // Add stdout if present
     if let Some(stdout) = value
         .get("stdout")
         .and_then(|v| v.as_str())
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
     {
-        return Some(stdout);
+        output_parts.push(format!("Output:\n{}", stdout));
     }
 
-    if let Some(result) = value
-        .get("result")
+    // Add stderr if present
+    if let Some(stderr) = value
+        .get("stderr")
         .and_then(|v| v.as_str())
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
     {
-        return Some(result);
+        output_parts.push(format!("Errors:\n{}", stderr));
     }
 
-    Some("Command completed successfully.".to_string())
+    // Add exit code if non-zero
+    if let Some(exit_code) = value.get("exit_code").and_then(|v| v.as_i64()) {
+        if exit_code != 0 {
+            output_parts.push(format!("Exit code: {}", exit_code));
+        }
+    }
+
+    // Add command info if it was a piped command
+    if let Some(used_shell) = value.get("used_shell").and_then(|v| v.as_bool()) {
+        if used_shell {
+            if let Some(command) = value.get("command").and_then(|v| v.as_str()) {
+                output_parts.push(format!("Command executed: {}", command));
+            }
+        }
+    }
+
+    if output_parts.is_empty() {
+        if let Some(result) = value
+            .get("result")
+            .and_then(|v| v.as_str())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+        {
+            return Some(result);
+        }
+        return Some("Command completed successfully.".to_string());
+    }
+
+    Some(output_parts.join("\n\n"))
 }

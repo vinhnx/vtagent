@@ -10,14 +10,14 @@ pub mod models {
     pub mod google {
         pub const DEFAULT_MODEL: &str = "gemini-2.5-flash-lite-preview-06-17";
         pub const SUPPORTED_MODELS: &[&str] = &[
-            "gemini-2.5-flash-lite-preview-06-17",
-            "gemini-2.5-flash",
+            "gemini-2.0-flash-exp",
+            "gemini-2.0-flash-001",
             "gemini-2.5-pro",
         ];
 
         // Convenience constants for commonly used models
-        pub const GEMINI_2_5_FLASH_LITE: &str = "gemini-2.5-flash-lite-preview-06-17";
-        pub const GEMINI_2_5_FLASH: &str = "gemini-2.5-flash";
+        pub const GEMINI_2_5_FLASH_LITE: &str = "gemini-2.0-flash-exp";
+        pub const GEMINI_2_5_FLASH: &str = "gemini-2.0-flash-001";
         pub const GEMINI_2_5_PRO: &str = "gemini-2.5-pro";
     }
 
@@ -111,6 +111,7 @@ pub mod defaults {
     pub const DEFAULT_CLI_MODEL: &str = models::google::GEMINI_2_5_FLASH;
     pub const DEFAULT_PROVIDER: &str = "gemini";
     pub const DEFAULT_API_KEY_ENV: &str = "GEMINI_API_KEY";
+    pub const DEFAULT_THEME: &str = "ciapre-dark";
 }
 
 /// Message role constants to avoid hardcoding strings

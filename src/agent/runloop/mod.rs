@@ -7,9 +7,11 @@ mod context;
 mod gemini;
 mod git;
 mod prompt;
+mod slash_commands;
 mod telemetry;
 mod text_tools;
 mod tool_output;
+mod ui;
 mod unified;
 mod welcome;
 

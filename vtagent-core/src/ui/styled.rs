@@ -1,10 +1,6 @@
-//! Styled text output using anstyle for cross-platform terminal styling
-//!
-//! This module provides a consistent API for styled terminal output that works
-//! across different platforms and respects environment variables like NO_COLOR.
-
+use super::theme;
 use anstream::println as styled_println;
-use anstyle::{AnsiColor, Color, Effects, Style};
+use anstyle::{Effects, Reset, Style};
 
 /// Style presets for consistent UI theming
 pub struct Styles;
@@ -12,27 +8,27 @@ pub struct Styles;
 impl Styles {
     /// Error message style (red)
     pub fn error() -> Style {
-        Style::new().fg_color(Some(Color::Ansi(AnsiColor::Red)))
+        theme::active_styles().error
     }
 
     /// Warning message style (yellow)
     pub fn warning() -> Style {
-        Style::new().fg_color(Some(Color::Ansi(AnsiColor::Yellow)))
+        theme::active_styles().secondary
     }
 
     /// Success message style (green)
     pub fn success() -> Style {
-        Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green)))
+        theme::active_styles().primary
     }
 
     /// Info message style (blue)
     pub fn info() -> Style {
-        Style::new().fg_color(Some(Color::Ansi(AnsiColor::Blue)))
+        theme::active_styles().output
     }
 
     /// Debug message style (cyan)
     pub fn debug() -> Style {
-        Style::new().fg_color(Some(Color::Ansi(AnsiColor::Cyan)))
+        theme::active_styles().response
     }
 
     /// Bold text style
@@ -42,35 +38,37 @@ impl Styles {
 
     /// Bold error style
     pub fn bold_error() -> Style {
-        Style::new()
-            .fg_color(Some(Color::Ansi(AnsiColor::Red)))
-            .effects(Effects::BOLD)
+        theme::active_styles().error.bold()
     }
 
     /// Bold success style
     pub fn bold_success() -> Style {
-        Style::new()
-            .fg_color(Some(Color::Ansi(AnsiColor::Green)))
-            .effects(Effects::BOLD)
+        theme::active_styles().primary.bold()
     }
 
     /// Bold warning style
     pub fn bold_warning() -> Style {
-        Style::new()
-            .fg_color(Some(Color::Ansi(AnsiColor::Yellow)))
-            .effects(Effects::BOLD)
+        theme::active_styles().secondary.bold()
     }
 
     /// Header style (bold blue)
     pub fn header() -> Style {
-        Style::new()
-            .fg_color(Some(Color::Ansi(AnsiColor::Blue)))
-            .effects(Effects::BOLD)
+        theme::active_styles().response
     }
 
     /// Code style (magenta)
     pub fn code() -> Style {
-        Style::new().fg_color(Some(Color::Ansi(AnsiColor::Magenta)))
+        theme::active_styles().secondary
+    }
+
+    /// Render style to ANSI string
+    pub fn render(style: &Style) -> String {
+        format!("{}", style)
+    }
+
+    /// Render reset ANSI string
+    pub fn render_reset() -> String {
+        format!("{}", Reset)
     }
 }
 
@@ -78,9 +76,9 @@ impl Styles {
 pub fn error(message: &str) {
     styled_println!(
         "{}{}{}",
-        Styles::error().render(),
+        Styles::render(&Styles::error()),
         message,
-        Styles::error().render_reset()
+        Styles::render_reset()
     );
 }
 
@@ -88,9 +86,9 @@ pub fn error(message: &str) {
 pub fn warning(message: &str) {
     styled_println!(
         "{}{}{}",
-        Styles::warning().render(),
+        Styles::render(&Styles::warning()),
         message,
-        Styles::warning().render_reset()
+        Styles::render_reset()
     );
 }
 
@@ -98,9 +96,9 @@ pub fn warning(message: &str) {
 pub fn success(message: &str) {
     styled_println!(
         "{}{}{}",
-        Styles::success().render(),
+        Styles::render(&Styles::success()),
         message,
-        Styles::success().render_reset()
+        Styles::render_reset()
     );
 }
 
@@ -108,9 +106,9 @@ pub fn success(message: &str) {
 pub fn info(message: &str) {
     styled_println!(
         "{}{}{}",
-        Styles::info().render(),
+        Styles::render(&Styles::info()),
         message,
-        Styles::info().render_reset()
+        Styles::render_reset()
     );
 }
 
@@ -118,25 +116,30 @@ pub fn info(message: &str) {
 pub fn debug(message: &str) {
     styled_println!(
         "{}{}{}",
-        Styles::debug().render(),
+        Styles::render(&Styles::debug()),
         message,
-        Styles::debug().render_reset()
+        Styles::render_reset()
     );
 }
 
-/// Print a bold message
+/// Print a styled bold message
 pub fn bold(message: &str) {
     styled_println!(
         "{}{}{}",
-        Styles::bold().render(),
+        Styles::render(&Styles::bold()),
         message,
-        Styles::bold().render_reset()
+        Styles::render_reset()
     );
 }
 
-/// Print a message with a custom style
-pub fn custom(message: &str, style: Style) {
-    styled_println!("{}{}{}", style.render(), message, style.render_reset());
+/// Print a styled message with custom style
+pub fn styled(style: &Style, message: &str) {
+    styled_println!(
+        "{}{}{}",
+        Styles::render(style),
+        message,
+        Styles::render_reset()
+    );
 }
 
 #[cfg(test)]
@@ -152,6 +155,6 @@ mod tests {
         info("Test info");
         debug("Test debug");
         bold("Test bold");
-        custom("Test custom", Styles::header());
+        styled(&Styles::header(), "Test custom");
     }
 }

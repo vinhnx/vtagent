@@ -171,6 +171,10 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub no_color: bool,
 
+    /// Select UI theme for ANSI styling (e.g., ciapre-dark, ciapre-blue)
+    #[arg(long, global = true, value_name = "THEME")]
+    pub theme: Option<String>,
+
     /// **Skip safety confirmations**
     ///
     /// Warning: Reduces security, use with caution
@@ -596,6 +600,7 @@ impl Default for Cli {
             config: None,
             log_level: "info".to_string(),
             no_color: false,
+            theme: None,
             skip_confirmations: false,
             debug: false,
             command: Some(Commands::Chat),

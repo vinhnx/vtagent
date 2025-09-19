@@ -396,10 +396,26 @@ impl OpenAIProvider {
         }
 
         if let Some(reasoning) = &request.reasoning_effort {
-            openai_request["reasoning"] = json!({"effort": reasoning});
+            if Self::model_supports_reasoning(&request.model) {
+                openai_request["reasoning"] = json!({"effort": reasoning});
+            }
         }
 
         Ok(openai_request)
+    }
+
+    fn model_supports_reasoning(model: &str) -> bool {
+        let trimmed_model = model.trim();
+        if models::openai::REASONING_MODELS
+            .iter()
+            .any(|candidate| candidate.eq_ignore_ascii_case(trimmed_model))
+        {
+            return true;
+        }
+
+        trimmed_model
+            .to_ascii_lowercase()
+            .starts_with("gpt-5")
     }
 
     fn parse_openai_response(&self, response_json: Value) -> Result<LLMResponse, LLMError> {

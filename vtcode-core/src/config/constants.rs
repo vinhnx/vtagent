@@ -24,6 +24,9 @@ pub mod models {
         pub const DEFAULT_MODEL: &str = "gpt-5";
         pub const SUPPORTED_MODELS: &[&str] = &["gpt-5", "gpt-5-mini", "gpt-5-nano", "codex-mini-latest"];
 
+        /// Models that support the OpenAI reasoning API extensions
+        pub const REASONING_MODELS: &[&str] = &[GPT_5, GPT_5_MINI, GPT_5_NANO];
+
         // Convenience constants for commonly used models
         pub const GPT_5: &str = "gpt-5";
         pub const GPT_5_MINI: &str = "gpt-5-mini";

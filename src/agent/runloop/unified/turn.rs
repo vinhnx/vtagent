@@ -1,50 +1,32 @@
-use anyhow::{Context, Result, anyhow};
+use anyhow::Result;
 use std::io;
-use std::path::Path;
 
-use vtcode_core::config::constants::{defaults, tools};
+use vtcode_core::config::constants::defaults;
 use vtcode_core::config::loader::VTCodeConfig;
 use vtcode_core::config::types::AgentConfig as CoreAgentConfig;
-use vtcode_core::core::decision_tracker::{Action as DTAction, DecisionOutcome, DecisionTracker};
+use vtcode_core::core::decision_tracker::{Action as DTAction, DecisionOutcome};
 use vtcode_core::core::router::{Router, TaskClass};
-use vtcode_core::llm::{factory::create_provider_for_model, provider as uni};
+use vtcode_core::llm::provider as uni;
 use vtcode_core::tools::registry::{ToolErrorType, ToolExecutionError};
-use vtcode_core::tools::{ToolRegistry, build_function_declarations};
-use vtcode_core::ui::{Spinner, theme};
-use vtcode_core::utils::ansi::{AnsiRenderer, MessageStyle};
-use vtcode_core::utils::dot_config::update_theme_preference;
+use vtcode_core::ui::Spinner;
+use vtcode_core::utils::ansi::MessageStyle;
 
-use super::context::{
-    apply_aggressive_trim_unified, enforce_unified_context_window, load_context_trim_config,
-    prune_unified_tool_responses,
+use crate::agent::runloop::context::{
+    apply_aggressive_trim_unified, enforce_unified_context_window, prune_unified_tool_responses,
 };
-use super::git::confirm_changes_with_git_diff;
-use super::is_context_overflow_error;
-use super::prompt::refine_user_prompt_if_enabled;
-use super::slash_commands::{SlashCommandOutcome, handle_slash_command};
-use super::telemetry::build_trajectory_logger;
-use super::text_tools::detect_textual_tool_call;
-use super::tool_output::render_tool_output;
-use super::ui::render_session_banner;
-use super::welcome::prepare_session_bootstrap;
+use crate::agent::runloop::git::confirm_changes_with_git_diff;
+use crate::agent::runloop::is_context_overflow_error;
+use crate::agent::runloop::prompt::refine_user_prompt_if_enabled;
+use crate::agent::runloop::slash_commands::{SlashCommandOutcome, handle_slash_command};
+use crate::agent::runloop::text_tools::detect_textual_tool_call;
+use crate::agent::runloop::tool_output::render_tool_output;
 
-fn persist_theme_preference(renderer: &mut AnsiRenderer, theme_id: &str) -> Result<()> {
-    if let Err(err) = update_theme_preference(theme_id) {
-        renderer.line(
-            MessageStyle::Error,
-            &format!("Failed to persist theme preference: {}", err),
-        )?;
-    }
-    Ok(())
-}
-
-fn ensure_turn_bottom_gap(renderer: &mut AnsiRenderer, applied: &mut bool) -> Result<()> {
-    if !*applied {
-        renderer.line(MessageStyle::Output, "")?;
-        *applied = true;
-    }
-    Ok(())
-}
+use super::display::{
+    ensure_turn_bottom_gap, maybe_show_placeholder_hint, persist_theme_preference,
+    render_prompt_indicator,
+};
+use super::session_setup::{SessionState, initialize_session};
+use super::shell::{derive_recent_tool_output, should_short_circuit_shell};
 
 pub(crate) async fn run_single_agent_loop_unified(
     config: &CoreAgentConfig,
@@ -52,70 +34,19 @@ pub(crate) async fn run_single_agent_loop_unified(
     skip_confirmations: bool,
     full_auto: bool,
 ) -> Result<()> {
-    let session_bootstrap = prepare_session_bootstrap(config, vt_cfg);
-    let mut renderer = AnsiRenderer::stdout();
-    render_session_banner(&mut renderer, config, &session_bootstrap)?;
-
-    if let Some(text) = session_bootstrap.welcome_text.as_ref() {
-        renderer.line(MessageStyle::Response, text)?;
-        renderer.line(MessageStyle::Output, "")?;
-    }
-
-    let placeholder_hint = session_bootstrap.placeholder.clone();
-    let mut placeholder_shown = false;
-
-    let provider_client = create_provider_for_model(&config.model, config.api_key.clone())
-        .context("Failed to initialize provider client")?;
-
-    let mut tool_registry = ToolRegistry::new(config.workspace.clone());
-    tool_registry.initialize_async().await?;
-    if let Some(cfg) = vt_cfg {
-        if let Err(err) = tool_registry.apply_config_policies(&cfg.tools) {
-            eprintln!(
-                "Warning: Failed to apply tool policies from config: {}",
-                err
-            );
-        }
-    }
-
-    if full_auto {
-        let automation_cfg = vt_cfg
-            .map(|cfg| cfg.automation.full_auto.clone())
-            .ok_or_else(|| anyhow!("Full-auto configuration unavailable"))?;
-
-        tool_registry.enable_full_auto_mode(&automation_cfg.allowed_tools);
-        let allowlist = tool_registry
-            .current_full_auto_allowlist()
-            .unwrap_or_default();
-        if allowlist.is_empty() {
-            renderer.line(
-                MessageStyle::Info,
-                "Full-auto mode enabled with no tool permissions; tool calls will be skipped.",
-            )?;
-        } else {
-            renderer.line(
-                MessageStyle::Info,
-                &format!(
-                    "Full-auto mode enabled. Permitted tools: {}",
-                    allowlist.join(", ")
-                ),
-            )?;
-        }
-    }
-    let declarations = build_function_declarations();
-    let tools: Vec<uni::ToolDefinition> = declarations
-        .into_iter()
-        .map(|decl| uni::ToolDefinition::function(decl.name, decl.description, decl.parameters))
-        .collect();
-
-    let trim_config = load_context_trim_config(vt_cfg);
-    let mut conversation_history: Vec<uni::Message> = vec![];
-    let mut ledger = DecisionTracker::new();
-    let traj = build_trajectory_logger(&config.workspace, vt_cfg);
-    let base_system_prompt = read_system_prompt(
-        &config.workspace,
-        session_bootstrap.prompt_addendum.as_deref(),
-    );
+    let SessionState {
+        mut renderer,
+        placeholder_hint,
+        mut placeholder_shown,
+        provider_client,
+        mut tool_registry,
+        tools,
+        trim_config,
+        mut conversation_history,
+        mut ledger,
+        trajectory: traj,
+        base_system_prompt,
+    } = initialize_session(config, vt_cfg, full_auto).await?;
 
     renderer.line(
         MessageStyle::Info,
@@ -126,14 +57,8 @@ pub(crate) async fn run_single_agent_loop_unified(
         "Slash commands: /help, /list-themes, /theme <id>, /command <program>",
     )?;
     loop {
-        if !placeholder_shown {
-            if let Some(ref hint) = placeholder_hint {
-                renderer.line(MessageStyle::Info, &format!("Suggested input: {}", hint))?;
-            }
-            placeholder_shown = true;
-        }
-        let styles = theme::active_styles();
-        renderer.inline_with_style(styles.primary, "❯ ")?;
+        maybe_show_placeholder_hint(&mut renderer, &placeholder_hint, &mut placeholder_shown)?;
+        render_prompt_indicator(&mut renderer)?;
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
         let input = input.trim();
@@ -755,149 +680,4 @@ pub(crate) async fn run_single_agent_loop_unified(
     }
 
     Ok(())
-}
-
-fn read_system_prompt(workspace: &Path, session_addendum: Option<&str>) -> String {
-    let mut prompt = vtcode_core::prompts::read_system_prompt_from_md()
-        .unwrap_or_else(|_| "You are a helpful coding assistant for a Rust workspace.".to_string());
-
-    if let Some(overview) = vtcode_core::utils::utils::build_project_overview(workspace) {
-        prompt.push_str("\n\n## PROJECT OVERVIEW\n");
-        prompt.push_str(&overview.as_prompt_block());
-    }
-
-    if let Some(guidelines) = vtcode_core::prompts::system::read_agent_guidelines(workspace) {
-        prompt.push_str("\n\n## AGENTS.MD GUIDELINES\n");
-        prompt.push_str(&guidelines);
-    }
-
-    if let Some(addendum) = session_addendum {
-        let trimmed = addendum.trim();
-        if !trimmed.is_empty() {
-            prompt.push_str("\n\n");
-            prompt.push_str(trimmed);
-        }
-    }
-
-    prompt
-}
-
-fn should_short_circuit_shell(input: &str, tool_name: &str, args: &serde_json::Value) -> bool {
-    if tool_name != tools::RUN_TERMINAL_CMD && tool_name != tools::BASH {
-        return false;
-    }
-
-    let command = args
-        .get("command")
-        .and_then(|value| value.as_array())
-        .and_then(|items| {
-            let mut tokens = Vec::new();
-            for item in items {
-                if let Some(text) = item.as_str() {
-                    tokens.push(text.trim_matches(|c| c == '\"' || c == '\'').to_string());
-                } else {
-                    return None;
-                }
-            }
-            Some(tokens)
-        });
-
-    let Some(command_tokens) = command else {
-        return false;
-    };
-
-    if command_tokens.is_empty() {
-        return false;
-    }
-
-    // Don't short-circuit for commands that contain shell metacharacters
-    // as these need more sophisticated reasoning
-    let full_command = command_tokens.join(" ");
-    if full_command.contains('|')
-        || full_command.contains('>')
-        || full_command.contains('<')
-        || full_command.contains('&')
-        || full_command.contains(';')
-    {
-        return false;
-    }
-
-    let user_tokens: Vec<String> = input
-        .split_whitespace()
-        .map(|part| part.trim_matches(|c| c == '\"' || c == '\'').to_string())
-        .collect();
-
-    if user_tokens.is_empty() {
-        return false;
-    }
-
-    if user_tokens.len() != command_tokens.len() {
-        return false;
-    }
-
-    user_tokens
-        .iter()
-        .zip(command_tokens.iter())
-        .all(|(user, cmd)| user == cmd)
-}
-
-fn derive_recent_tool_output(history: &[uni::Message]) -> Option<String> {
-    let message = history
-        .iter()
-        .rev()
-        .find(|msg| msg.role == uni::MessageRole::Tool)?;
-
-    let value = serde_json::from_str::<serde_json::Value>(&message.content).ok()?;
-
-    let mut output_parts = Vec::new();
-
-    // Add stdout if present
-    if let Some(stdout) = value
-        .get("stdout")
-        .and_then(|v| v.as_str())
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-    {
-        output_parts.push(format!("Output:\n{}", stdout));
-    }
-
-    // Add stderr if present
-    if let Some(stderr) = value
-        .get("stderr")
-        .and_then(|v| v.as_str())
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-    {
-        output_parts.push(format!("Errors:\n{}", stderr));
-    }
-
-    // Add exit code if non-zero
-    if let Some(exit_code) = value.get("exit_code").and_then(|v| v.as_i64()) {
-        if exit_code != 0 {
-            output_parts.push(format!("Exit code: {}", exit_code));
-        }
-    }
-
-    // Add command info if it was a piped command
-    if let Some(used_shell) = value.get("used_shell").and_then(|v| v.as_bool()) {
-        if used_shell {
-            if let Some(command) = value.get("command").and_then(|v| v.as_str()) {
-                output_parts.push(format!("Command executed: {}", command));
-            }
-        }
-    }
-
-    if output_parts.is_empty() {
-        if let Some(result) = value
-            .get("result")
-            .and_then(|v| v.as_str())
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-        {
-            return Some(result);
-        }
-        return Some("Command completed successfully.".to_string());
-    }
-
-    Some(output_parts.join("\n\n"))
 }

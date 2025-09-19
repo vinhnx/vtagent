@@ -113,6 +113,7 @@ pub mod defaults {
     pub const DEFAULT_API_KEY_ENV: &str = "GEMINI_API_KEY";
     pub const DEFAULT_THEME: &str = "ciapre-dark";
     pub const DEFAULT_MAX_TOOL_LOOPS: usize = 100;
+    pub const ANTHROPIC_DEFAULT_MAX_TOKENS: u32 = 4_096;
 }
 
 /// Message role constants to avoid hardcoding strings
@@ -124,7 +125,12 @@ pub mod message_roles {
 }
 
 /// URL constants for API endpoints
-pub mod urls {}
+pub mod urls {
+    pub const GEMINI_API_BASE: &str = "https://generativelanguage.googleapis.com/v1beta";
+    pub const OPENAI_API_BASE: &str = "https://api.openai.com/v1";
+    pub const ANTHROPIC_API_BASE: &str = "https://api.anthropic.com/v1";
+    pub const ANTHROPIC_API_VERSION: &str = "2023-06-01";
+}
 
 /// Tool name constants to avoid hardcoding strings throughout the codebase
 pub mod tools {

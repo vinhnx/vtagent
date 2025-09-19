@@ -63,6 +63,15 @@ export OPENAI_API_KEY="your_key_here"
 export ANTHROPIC_API_KEY="your_key_here"
 ```
 
+Alternatively, create a `.env` file in your project directory:
+
+```shell
+# .env file
+GEMINI_API_KEY=your_gemini_key_here
+OPENAI_API_KEY=your_openai_key_here
+ANTHROPIC_API_KEY=your_anthropic_key_here
+```
+
 VT Code supports advanced configuration via `vtcode.toml`. See [Configuration](docs/project/) for details.
 
 ---

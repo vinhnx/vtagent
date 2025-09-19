@@ -22,7 +22,7 @@ output_path = "AGENTS.md"
 # Enable/disable MCP propagation globally (default: true)
 enabled = true
 # Global merge strategy: 'merge' or 'overwrite' (default: 'merge')
-merge_strategy = "merge"
+merge_strategy = "overwrite"
 
 [gitignore]
 # Enable/disable automatic .gitignore updates (default: true)

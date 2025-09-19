@@ -17,26 +17,29 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
-      - name: Verify Cargo authentication
+      - name: Set token availability
+        id: check_token
         run: |
-          if [ -z "$CRATES_IO_TOKEN" ]; then
-            echo "CRATES_IO_TOKEN secret is not set"
-            echo "Please set up the CRATES_IO_TOKEN secret in your repository settings"
-            echo "Get your token from: https://crates.io/me"
-            exit 1
+          if [ -n "$CRATES_IO_TOKEN" ]; then
+            echo "available=true" >> $GITHUB_OUTPUT
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
           fi
         env:
           CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
 
       - name: Publish vtcode-core
+        if: steps.check_token.outputs.available == 'true'
         run: cargo publish --manifest-path vtcode-core/Cargo.toml --token "$CRATES_IO_TOKEN"
         env:
           CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
 
       - name: Wait for vtcode-core to be available
+        if: steps.check_token.outputs.available == 'true'
         run: sleep 30
 
       - name: Publish vtcode
+        if: steps.check_token.outputs.available == 'true'
         run: cargo publish --token "$CRATES_IO_TOKEN"
         env:
           CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}

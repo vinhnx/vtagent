@@ -13,14 +13,20 @@ pub struct OpenAIProvider {
     api_key: String,
     http_client: HttpClient,
     base_url: String,
+    model: String,
 }
 
 impl OpenAIProvider {
     pub fn new(api_key: String) -> Self {
+        Self::with_model(api_key, models::openai::DEFAULT_MODEL.to_string())
+    }
+
+    pub fn with_model(api_key: String, model: String) -> Self {
         Self {
             api_key,
             http_client: HttpClient::new(),
             base_url: "https://api.openai.com/v1".to_string(),
+            model,
         }
     }
 }
@@ -299,8 +305,8 @@ impl OpenAIProvider {
 
 #[async_trait]
 impl LLMClient for OpenAIProvider {
-    async fn generate(&mut self, _prompt: &str) -> Result<llm_types::LLMResponse, LLMError> {
-        let model = models::openai::DEFAULT_MODEL.to_string();
+    async fn generate(&mut self, prompt: &str) -> Result<llm_types::LLMResponse, LLMError> {
+        let model = self.model.clone();
 
         // Validate the model
         if !model_helpers::is_valid("openai", &model) {
@@ -311,10 +317,10 @@ impl LLMClient for OpenAIProvider {
         }
 
         let request = LLMRequest {
-            messages: vec![Message::user("test".to_string())],
+            messages: vec![Message::user(prompt.to_string())],
             system_prompt: None,
             tools: None,
-            model: "test".to_string(),
+            model: model.clone(),
             max_tokens: Some(100),
             temperature: None,
             stream: false,
@@ -342,6 +348,6 @@ impl LLMClient for OpenAIProvider {
     }
 
     fn model_id(&self) -> &str {
-        models::openai::DEFAULT_MODEL
+        &self.model
     }
 }

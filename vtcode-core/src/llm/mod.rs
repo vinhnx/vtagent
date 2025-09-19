@@ -17,7 +17,7 @@
 //!
 //! | Provider | Status | Models |
 //! |----------|--------|---------|
-//! | Gemini | ✅ | gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite |
+//! | Gemini | ✅ | gemini-2.5-pro, gemini-2.5-flash-preview-05-20 |
 //! | OpenAI | ✅ | gpt-5, gpt-4.1, gpt-5-mini |
 //! | Anthropic | ✅ | claude-4.1-opus, claude-4-sonnet |
 //! | DeepSeek | ✅ | deepseek-chat |

@@ -128,6 +128,15 @@ impl RetryManager {
                         err
                     );
 
+                    // Check if this error should be retried
+                    if !is_retryable_error(&err) {
+                        eprintln!(
+                            "Error is not retryable, failing immediately: {}",
+                            err
+                        );
+                        return Err(err);
+                    }
+
                     // If this is not the last attempt, wait before retrying
                     if attempt < self.config.max_retries {
                         let backoff_duration = Duration::from_secs(delay_secs);
@@ -225,8 +234,8 @@ pub fn is_empty_response(response: &serde_json::Value) -> bool {
 pub fn is_retryable_error(error: &anyhow::Error) -> bool {
     let error_msg = error.to_string().to_lowercase();
 
-    // Common temporary error patterns
-    error_msg.contains("timeout")
+    // Common temporary error patterns (exclude quota/429 errors)
+    (error_msg.contains("timeout")
         || error_msg.contains("rate limit")
         || error_msg.contains("503")
         || error_msg.contains("502")
@@ -234,8 +243,10 @@ pub fn is_retryable_error(error: &anyhow::Error) -> bool {
         || error_msg.contains("connection")
         || error_msg.contains("network")
         || error_msg.contains("temporary")
-        || error_msg.contains("overloaded")
-        || error_msg.contains("quota")
+        || error_msg.contains("overloaded"))
+        && !error_msg.contains("quota")
+        && !error_msg.contains("insufficient")
+        && !error_msg.contains("429")
 }
 
 #[cfg(test)]
@@ -272,6 +283,9 @@ mod tests {
         assert!(!is_retryable_error(&anyhow!("Invalid API key")));
         assert!(!is_retryable_error(&anyhow!("Permission denied")));
         assert!(!is_retryable_error(&anyhow!("Invalid model")));
+        assert!(!is_retryable_error(&anyhow!("You exceeded your current quota")));
+        assert!(!is_retryable_error(&anyhow!("insufficient_quota")));
+        assert!(!is_retryable_error(&anyhow!("HTTP 429")));
     }
 
     #[test]

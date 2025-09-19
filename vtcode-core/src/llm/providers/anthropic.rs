@@ -605,6 +605,12 @@ impl LLMProvider for AnthropicProvider {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
+
+            // Handle specific HTTP status codes
+            if status.as_u16() == 429 || error_text.contains("insufficient_quota") || error_text.contains("quota") || error_text.contains("rate limit") {
+                return Err(LLMError::RateLimit);
+            }
+
             let formatted_error = error_display::format_llm_error(
                 "Anthropic",
                 &format!("HTTP {}: {}", status, error_text),

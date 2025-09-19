@@ -292,7 +292,7 @@ Any dates before this are in the past, and any dates after this are in the futur
 -   You should always use Context7 for fetching documentation from MCP. THIS IS IMPORTANT!
 -   For testing echo, make sure not to use "!" this will cause shell escaping issue. for example Use "echo test" instead of "echo test!" THIS IS IMPORTANT!
 -   Reference ANSI color code when you want to print colored text in terminal. THIS IS IMPORTANT! https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit
--   Don't create examples, make tests instead. THIS IS IMPORTANT!
+-   Don't create examples, make tests/mocks and put to /tests folder instead. THIS IS IMPORTANT!
 -   Prefer to use nextest over cargo test. THIS IS IMPORTANT!
 -   Always use anyhow::Context to add context to errors. THIS IS IMPORTANT!
 -   Testing: for headless testing without user input, use `cargo run -- ask "{QUERY}"` Single Prompt Mode. replace "{QUERY}" with actual prompt

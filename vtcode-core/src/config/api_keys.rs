@@ -41,11 +41,23 @@ impl Default for ApiKeySources {
 /// Load environment variables from .env file
 ///
 /// This function attempts to load environment variables from a .env file
-/// in the current directory, ignoring errors if the file doesn't exist.
+/// in the current directory. It logs a warning if the file exists but cannot
+/// be loaded, but doesn't fail if the file doesn't exist.
 pub fn load_dotenv() -> Result<()> {
-    // Try to load .env file, but don't fail if it doesn't exist
-    let _ = dotenvy::dotenv();
-    Ok(())
+    match dotenvy::dotenv() {
+        Ok(path) => {
+            eprintln!("Loaded environment variables from: {}", path.display());
+            Ok(())
+        }
+        Err(dotenvy::Error::Io(e)) if e.kind() == std::io::ErrorKind::NotFound => {
+            // .env file doesn't exist, which is fine
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!("Warning: Failed to load .env file: {}", e);
+            Ok(())
+        }
+    }
 }
 
 /// Get API key for a specific provider with secure fallback mechanism
@@ -96,7 +108,7 @@ fn get_api_key_with_fallback(
 
     // If neither worked, return an error
     Err(anyhow::anyhow!(
-        "No API key found for {} provider. Set {} environment variable or configure in vtcode.toml",
+        "No API key found for {} provider. Set {} environment variable (or add to .env file) or configure in vtcode.toml",
         provider_name,
         env_var
     ))
@@ -127,7 +139,7 @@ fn get_gemini_api_key(sources: &ApiKeySources) -> Result<String> {
 
     // If nothing worked, return an error
     Err(anyhow::anyhow!(
-        "No API key found for Gemini provider. Set {} or GOOGLE_API_KEY environment variable or configure in vtcode.toml",
+        "No API key found for Gemini provider. Set {} or GOOGLE_API_KEY environment variable (or add to .env file) or configure in vtcode.toml",
         sources.gemini_env
     ))
 }

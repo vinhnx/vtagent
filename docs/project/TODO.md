@@ -165,3 +165,113 @@ setup codex cloud environment for vtcode
 ---
 
 check git stash@{1}: On main: streaming. apply only streaming implementation
+
+---
+
+implement planning mode and TODO list (research)
+
+---
+
+https://news.ycombinator.com/item?id=45289168
+
+---
+
+Prompt structure
+
+    Task context
+    Tone context
+    Background data, documents, and images
+    Detailed task description & rules
+    Examples
+    Conversation history
+    Immediate task description or request
+    Thinking step by step / take a deep breath
+    Output formatting
+    Prefilled response (if any)
+
+content:
+
+User: You will be acting as an AI career coach named Joe created by the company AdAstra Careers. Your goal is to give career advice to users. You will be replying to users who are on the AdAstra site and who will be confused if you don't respond in the character of Joe.
+
+You should maintain a friendly customer service tone.
+
+Here is the career guidance document you should reference when giving the user guidance: [DOCUMENT] </guidance>
+
+Here are some important rules for the interaction:
+
+    Always stay in character as Joe, an AI from AdAstra careers.
+    If you are unsure how to respond, say "Sorry, I didn't understand that. Could you repeat the question?"
+    If someone asks something irrelevant, say "Sorry, I am Joe and I give career advice. Do you have a career question today I can help you with?"
+
+Here is an example of how to respond in a standard interaction:
+<example> User: Hi, how were you created and what do you do? Joe: Hello! My name is Joe, and I was created by AdAstra Careers to provide career advice. What can I help you with today? </example>
+
+Here is the conversation history [between the user and you] prior to the current question. It could be empty if there is no history: <history> [[HISTORY]] </history>
+
+Here is the user's question: <question> [[QUESTION]] </question>
+
+How do you respond to the user's question?
+
+Think about your answer first before you respond.
+
+Put your response in <response></response> tags.
+
+Assistant (prefix): <response>
+
+This image shows a well-structured prompt engineering framework with 10 key components for creating effective AI prompts. The example on the right demonstrates how to implement this structure for an AI career coach character named "Joe" from AdAstra Careers.
+
+The framework progresses logically from establishing context and tone, through providing background materials and detailed instructions, to formatting the output and potentially prefilling responses. This systematic approach helps ensure AI responses are consistent, on-brand, and follow specific guidelines while maintaining the desired character and tone throughout interactions.
+
+The career coach example effectively demonstrates several best practices:
+
+    Clear role definition and company context
+    Specific tone guidance (friendly customer service)
+    Fallback responses for unclear or off-topic questions
+    Concrete examples of proper responses
+    Structured input formatting with conversation history
+    Clear output formatting requirements
+
+This type of structured prompting is particularly valuable for customer-facing AI applications where consistency and brand alignment are crucial.
+
+---
+
+build-release.yml fix
+
+0s
+Run actions/upload-release-asset@v1
+Error: ENOENT: no such file or directory, stat './vtcode-vv0.8.2-linux-x64.tar.gz'
+Run actions/upload-release-asset@v1
+0s
+Run actions/upload-release-asset@v1
+Error: ENOENT: no such file or directory, stat './vtcode-vv0.8.2-linux-x64.tar.gz'
+0s
+
+---
+
+publish-crates.yml fix
+
+0s
+Run if [ -z "$CRATES_IO_TOKEN" ]; then
+CRATES_IO_TOKEN secret is not set
+Please set up the CRATES_IO_TOKEN secret in your repository settings
+Get your token from: https://crates.io/me
+Error: Process completed with exit code 1.
+Run if [ -z "$CRATES_IO_TOKEN" ]; then
+CRATES_IO_TOKEN secret is not set
+Please set up the CRATES_IO_TOKEN secret in your repository settings
+Get your token from: https://crates.io/me
+0s
+Run if [ -z "$CRATES_IO_TOKEN" ]; then
+CRATES_IO_TOKEN secret is not set
+Please set up the CRATES_IO_TOKEN secret in your repository settings
+Get your token from: https://crates.io/me
+Error: Process completed with exit code 1.
+0s
+
+---
+
+refactor and extract and modular unified.rs into composable small modules.
+
+---
+
+update and sync logic from gemini.rs to anthropic.rs and openai.rs

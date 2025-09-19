@@ -233,3 +233,40 @@ The career coach example effectively demonstrates several best practices:
 
 This type of structured prompting is particularly valuable for customer-facing AI applications where consistency and brand alignment are crucial.
 
+---
+
+build-release.yml fix
+
+
+0s
+Run actions/upload-release-asset@v1
+Error: ENOENT: no such file or directory, stat './vtcode-vv0.8.2-linux-x64.tar.gz'
+Run actions/upload-release-asset@v1
+0s
+Run actions/upload-release-asset@v1
+Error: ENOENT: no such file or directory, stat './vtcode-vv0.8.2-linux-x64.tar.gz'
+0s
+
+
+---
+
+publish-crates.yml fix
+
+0s
+Run if [ -z "$CRATES_IO_TOKEN" ]; then
+CRATES_IO_TOKEN secret is not set
+Please set up the CRATES_IO_TOKEN secret in your repository settings
+Get your token from: https://crates.io/me
+Error: Process completed with exit code 1.
+Run if [ -z "$CRATES_IO_TOKEN" ]; then
+CRATES_IO_TOKEN secret is not set
+Please set up the CRATES_IO_TOKEN secret in your repository settings
+Get your token from: https://crates.io/me
+0s
+Run if [ -z "$CRATES_IO_TOKEN" ]; then
+CRATES_IO_TOKEN secret is not set
+Please set up the CRATES_IO_TOKEN secret in your repository settings
+Get your token from: https://crates.io/me
+Error: Process completed with exit code 1.
+0s
+

@@ -34,7 +34,7 @@ cargo clippy          # Linting with project-specific rules
 ### Configuration Pattern
 
 ```rust
-// ❌ Don't hardcode
+// Don't hardcode
 let model = "gemini-2.5-flash-lite";
 
 // Use constants module
@@ -58,7 +58,7 @@ fn process_file(path: &Path) -> Result<String> {
 
 ```rust
 // All .md files belong in ./docs/ folder
-// ❌ Don't put documentation in root or other folders
+// Don't put documentation in root or other folders
 ```
 
 ### Tool Integration Pattern
@@ -86,7 +86,7 @@ impl Tool for MyTool {
 ### Memory-Efficient Conditionals
 
 ```rust
-// ❌ Hard to track mentally
+// Hard to track mentally
 if val > threshold && (cond1 || cond2) && (cond3 && !cond4) {
     // ...
 }

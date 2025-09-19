@@ -165,3 +165,11 @@ setup codex cloud environment for vtcode
 ---
 
 check git stash@{1}: On main: streaming. apply only streaming implementation
+
+---
+
+implement planning mode and TODO list (research)
+
+---
+
+https://news.ycombinator.com/item?id=45289168

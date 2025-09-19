@@ -24,7 +24,7 @@ use cli::*;
 #[derive(Parser, Debug)]
 #[command(name = "vtcode", version, about = "minimal coding agent")]
 pub struct Cli {
-    /// Gemini model ID (e.g., gemini-2.5-flash-lite-preview-06-17)
+    /// Gemini model ID (e.g., gemini-2.5-flash-preview-05-20)
     #[arg(long, global = true, default_value = defaults::DEFAULT_CLI_MODEL)]
     pub model: String,
 

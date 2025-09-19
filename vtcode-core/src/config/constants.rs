@@ -8,28 +8,28 @@ pub mod prompts {
 pub mod models {
     // Google/Gemini models
     pub mod google {
-        pub const DEFAULT_MODEL: &str = "gemini-2.5-flash-lite-preview-06-17";
+        pub const DEFAULT_MODEL: &str = "gemini-2.5-flash-preview-05-20";
         pub const SUPPORTED_MODELS: &[&str] = &[
-            "gemini-2.5-flash",
-            "gemini-2.5-flash-lite",
+            "gemini-2.5-flash-preview-05-20",
             "gemini-2.5-pro",
         ];
 
         // Convenience constants for commonly used models
-        pub const GEMINI_2_5_FLASH_LITE: &str = "gemini-2.5-flash-lite";
-        pub const GEMINI_2_5_FLASH: &str = "gemini-2.5-flash";
+        pub const GEMINI_2_5_FLASH_PREVIEW: &str = "gemini-2.5-flash-preview-05-20";
         pub const GEMINI_2_5_PRO: &str = "gemini-2.5-pro";
     }
 
     // OpenAI models (from docs/models.json)
     pub mod openai {
         pub const DEFAULT_MODEL: &str = "gpt-5";
-        pub const SUPPORTED_MODELS: &[&str] = &["gpt-4.1", "gpt-5", "gpt-5-mini"];
+        pub const SUPPORTED_MODELS: &[&str] = &["gpt-5", "gpt-5-mini", "gpt-5-nano", "codex-mini-latest"];
 
         // Convenience constants for commonly used models
         pub const GPT_5: &str = "gpt-5";
         pub const GPT_5_MINI: &str = "gpt-5-mini";
-        pub const GPT_4_1: &str = "gpt-4.1";
+        pub const GPT_5_NANO: &str = "gpt-5-nano";
+        pub const CODEX_MINI_LATEST: &str = "codex-mini-latest";
+        pub const CODEX_MINI: &str = "codex-mini";
     }
 
     // Anthropic models (from docs/models.json) - Updated for tool use best practices
@@ -37,38 +37,25 @@ pub mod models {
         // Standard model for straightforward tools - Sonnet 4 preferred for most use cases
         pub const DEFAULT_MODEL: &str = "claude-sonnet-4-20250514";
         pub const SUPPORTED_MODELS: &[&str] = &[
-            "claude-sonnet-4-20250514", // Standard: Sonnet 4 for straightforward tools
-            "claude-opus-4-1-20250805", // Complex: Opus 4.1 for complex workflows (configurable)
-            "claude-opus-4-20250514",   // Complex: Alternative Opus model
-            "claude-sonnet-3.7-20250219", // Advanced: Sonnet 3.7 with extended thinking
-            "claude-haiku-3.5-20241022", // Minimal: Haiku 3.5 for basic tools
-            "claude-sonnet-3.5-20241022", // Legacy: Sonnet 3.5 (deprecated but still available)
-            "claude-haiku-3-20240307",  // Basic: Haiku 3 for simple tasks
+            "claude-opus-4-1-20250805", // Latest: Opus 4.1 (2025-08-05)
+            "claude-sonnet-4-20250514", // Latest: Sonnet 4 (2025-05-14)
         ];
 
         // Convenience constants for commonly used models
         pub const CLAUDE_OPUS_4_1_20250805: &str = "claude-opus-4-1-20250805";
-        pub const CLAUDE_OPUS_4_20250514: &str = "claude-opus-4-20250514";
         pub const CLAUDE_SONNET_4_20250514: &str = "claude-sonnet-4-20250514";
-        pub const CLAUDE_SONNET_3_7_20250219: &str = "claude-sonnet-3.7-20250219";
-        pub const CLAUDE_SONNET_3_5_20241022: &str = "claude-sonnet-3.5-20241022";
-        pub const CLAUDE_HAIKU_3_5_20241022: &str = "claude-haiku-3.5-20241022";
-        pub const CLAUDE_HAIKU_3_20240307: &str = "claude-haiku-3-20240307";
     }
 
     // Backwards compatibility - keep old constants working
-    pub const GEMINI_2_5_FLASH: &str = google::GEMINI_2_5_FLASH;
-    pub const GEMINI_2_5_FLASH_LITE: &str = google::GEMINI_2_5_FLASH_LITE;
+    pub const GEMINI_2_5_FLASH_PREVIEW: &str = google::GEMINI_2_5_FLASH_PREVIEW;
     pub const GEMINI_2_5_PRO: &str = google::GEMINI_2_5_PRO;
     pub const GPT_5: &str = openai::GPT_5;
     pub const GPT_5_MINI: &str = openai::GPT_5_MINI;
+    pub const GPT_5_NANO: &str = openai::GPT_5_NANO;
+    pub const CODEX_MINI: &str = openai::CODEX_MINI;
+    pub const CODEX_MINI_LATEST: &str = openai::CODEX_MINI_LATEST;
     pub const CLAUDE_OPUS_4_1_20250805: &str = anthropic::CLAUDE_OPUS_4_1_20250805;
-    pub const CLAUDE_OPUS_4_20250514: &str = anthropic::CLAUDE_OPUS_4_20250514;
     pub const CLAUDE_SONNET_4_20250514: &str = anthropic::CLAUDE_SONNET_4_20250514;
-    pub const CLAUDE_SONNET_3_7_20250219: &str = anthropic::CLAUDE_SONNET_3_7_20250219;
-    pub const CLAUDE_SONNET_3_5_20241022: &str = anthropic::CLAUDE_SONNET_3_5_20241022;
-    pub const CLAUDE_HAIKU_3_5_20241022: &str = anthropic::CLAUDE_HAIKU_3_5_20241022;
-    pub const CLAUDE_HAIKU_3_20240307: &str = anthropic::CLAUDE_HAIKU_3_20240307;
 }
 
 /// Model validation and helper functions
@@ -107,8 +94,8 @@ pub mod model_helpers {
 pub mod defaults {
     use super::models;
 
-    pub const DEFAULT_MODEL: &str = models::google::GEMINI_2_5_FLASH_LITE;
-    pub const DEFAULT_CLI_MODEL: &str = models::google::GEMINI_2_5_FLASH;
+    pub const DEFAULT_MODEL: &str = models::google::GEMINI_2_5_FLASH_PREVIEW;
+    pub const DEFAULT_CLI_MODEL: &str = models::google::GEMINI_2_5_FLASH_PREVIEW;
     pub const DEFAULT_PROVIDER: &str = "gemini";
     pub const DEFAULT_API_KEY_ENV: &str = "GEMINI_API_KEY";
     pub const DEFAULT_THEME: &str = "ciapre-dark";

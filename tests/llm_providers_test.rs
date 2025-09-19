@@ -65,7 +65,7 @@ fn test_provider_auto_detection() {
 fn test_provider_creation() {
     // Test creating providers directly
     let gemini = create_provider_for_model(
-        "gemini-2.5-flash-lite-preview-06-17",
+        "gemini-2.5-flash-preview-05-20",
         "test_key".to_string(),
     );
     assert!(gemini.is_ok());
@@ -85,7 +85,7 @@ fn test_provider_creation() {
 fn test_unified_client_creation() {
     // Test creating unified clients for different providers
     let gemini_client = create_provider_for_model(
-        "gemini-2.5-flash-lite-preview-06-17",
+        "gemini-2.5-flash-preview-05-20",
         "test_key".to_string(),
     );
     assert!(gemini_client.is_ok());
@@ -134,7 +134,8 @@ fn test_provider_supported_models() {
     assert!(gemini_models.contains(&"gemini-2.5-flash-lite".to_string()));
     assert!(gemini_models.contains(&"gemini-2.5-pro".to_string()));
     assert!(gemini_models.contains(&"gemini-2.5-flash-lite-preview-06-17".to_string()));
-    assert!(gemini_models.len() >= 4);
+    assert!(gemini_models.contains(&"gemini-2.5-flash-preview-05-20".to_string()));
+    assert!(gemini_models.len() >= 5);
 
     let openai = OpenAIProvider::new("test_key".to_string());
     let openai_models = openai.supported_models();
@@ -274,7 +275,7 @@ fn test_backward_compatibility() {
     use vtcode_core::models::ModelId;
 
     // Test that the old make_client function still works
-    let model = ModelId::from_str("gemini-2.5-flash-lite-preview-06-17").unwrap();
+    let model = ModelId::from_str("gemini-2.5-flash-preview-05-20").unwrap();
     let client = make_client("test_key".to_string(), model);
 
     // Should be able to get model ID

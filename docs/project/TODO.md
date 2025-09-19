@@ -1,8 +1,12 @@
 --
+Please review the documentation file at `docs/guides/codex-cloud-setup.md` for detailed setup instructions. Using this as a primary reference, configure and deploy a Codex cloud environment tailored for the vtcode project. Ensure compliance with OpenAI's official guidelines available at https://developers.openai.com/codex/cloud/environments. Include the following steps in your process:
 
-check docs/guides/codex-cloud-setup.md
-and setup codex cloud environment for vtcode
-https://developers.openai.com/codex/cloud/environments
+1. Verify prerequisites such as API keys, dependencies, and system requirements from the local docs.
+2. Initialize the environment with vtcode-specific configurations (e.g., custom models, integrations, or variables).
+3. Test the setup by running a sample Codex query or integration relevant to vtcode.
+4. Document any deviations, issues, or additional configurations made during setup.
+
+If any ambiguities arise, cross-reference the OpenAI URL for the latest best practices. Confirm successful setup with a status report.
 
 ---
 
@@ -235,43 +239,26 @@ This type of structured prompting is particularly valuable for customer-facing A
 
 ---
 
-build-release.yml fix
-
-0s
-Run actions/upload-release-asset@v1
-Error: ENOENT: no such file or directory, stat './vtcode-vv0.8.2-linux-x64.tar.gz'
-Run actions/upload-release-asset@v1
-0s
-Run actions/upload-release-asset@v1
-Error: ENOENT: no such file or directory, stat './vtcode-vv0.8.2-linux-x64.tar.gz'
-0s
-
----
-
-publish-crates.yml fix
-
-0s
-Run if [ -z "$CRATES_IO_TOKEN" ]; then
-CRATES_IO_TOKEN secret is not set
-Please set up the CRATES_IO_TOKEN secret in your repository settings
-Get your token from: https://crates.io/me
-Error: Process completed with exit code 1.
-Run if [ -z "$CRATES_IO_TOKEN" ]; then
-CRATES_IO_TOKEN secret is not set
-Please set up the CRATES_IO_TOKEN secret in your repository settings
-Get your token from: https://crates.io/me
-0s
-Run if [ -z "$CRATES_IO_TOKEN" ]; then
-CRATES_IO_TOKEN secret is not set
-Please set up the CRATES_IO_TOKEN secret in your repository settings
-Get your token from: https://crates.io/me
-Error: Process completed with exit code 1.
-0s
-
----
-
 refactor and extract and modular unified.rs into composable small modules.
 
 ---
 
-update and sync logic from gemini.rs to anthropic.rs and openai.rs
+Task: Update and synchronize the core logic from `gemini.rs` to both `anthropic.rs` and `openai.rs`, ensuring that key functions (e.g., request handling, response parsing, error management, and authentication flows) are accurately mirrored across all three files for consistent API behavior and compatibility.
+
+After updates, thoroughly review and validate the integration logic in `unified.rs` to confirm it correctly abstracts and syncs the changes from the provider-specific files, including testing for edge cases, input/output consistency, and any shared utilities.
+
+---
+
+support more models and providers.
+
+---
+
+support opensource models
+
+---
+
+support openrouter models
+
+---
+
+support huggingface models

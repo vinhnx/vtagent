@@ -24,24 +24,39 @@ impl LLMFactory {
         factory.register_provider(
             "gemini",
             Box::new(|config: ProviderConfig| {
-                let api_key = config.api_key.unwrap_or_default();
-                Box::new(GeminiProvider::new(api_key)) as Box<dyn LLMProvider>
+                let ProviderConfig {
+                    api_key,
+                    base_url,
+                    model,
+                } = config;
+                Box::new(GeminiProvider::from_config(api_key, model, base_url))
+                    as Box<dyn LLMProvider>
             }),
         );
 
         factory.register_provider(
             "openai",
             Box::new(|config: ProviderConfig| {
-                let api_key = config.api_key.unwrap_or_default();
-                Box::new(OpenAIProvider::new(api_key)) as Box<dyn LLMProvider>
+                let ProviderConfig {
+                    api_key,
+                    base_url,
+                    model,
+                } = config;
+                Box::new(OpenAIProvider::from_config(api_key, model, base_url))
+                    as Box<dyn LLMProvider>
             }),
         );
 
         factory.register_provider(
             "anthropic",
             Box::new(|config: ProviderConfig| {
-                let api_key = config.api_key.unwrap_or_default();
-                Box::new(AnthropicProvider::new(api_key)) as Box<dyn LLMProvider>
+                let ProviderConfig {
+                    api_key,
+                    base_url,
+                    model,
+                } = config;
+                Box::new(AnthropicProvider::from_config(api_key, model, base_url))
+                    as Box<dyn LLMProvider>
             }),
         );
 

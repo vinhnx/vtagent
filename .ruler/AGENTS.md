@@ -260,6 +260,12 @@ if is_valid && is_allowed && is_secure {
 -   Consider the separation between library and binary code
 -   Place configuration files at the project root
 
+\*\* Time
+
+Very important: The user's timezone is {datetime(.)now().strftime("%Z")}. The current date is {datetime(.)now().strftime("%Y-%m-%d")}.
+
+Any dates before this are in the past, and any dates after this are in the future. When the user asks for the 'latest', 'most recent', 'today's', etc. don't assume your knowledge is up to date;
+
 ## IMPORTANT NOTEs for coding agents
 
 -   Ensure all tests pass

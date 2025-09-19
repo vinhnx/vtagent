@@ -15,25 +15,10 @@
       ],
       "type": "stdio"
     },
-    "serena": {
+    "fetch": {
       "command": "uvx",
       "args": [
-        "--from",
-        "git+https://github.com/oraios/serena",
-        "serena",
-        "start-mcp-server",
-        "--context",
-        "ide-assistant",
-        "--project",
-        "./"
-      ],
-      "type": "stdio"
-    },
-    "sequential-thinking": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-sequential-thinking"
+        "mcp-server-fetch"
       ],
       "type": "stdio"
     }

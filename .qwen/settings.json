@@ -15,6 +15,13 @@
         "mcp-server-time"
       ],
       "type": "stdio"
+    },
+    "fetch": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-fetch"
+      ],
+      "type": "stdio"
     }
   }
 }

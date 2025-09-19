@@ -24,10 +24,6 @@ enabled = true
 # Global merge strategy: 'merge' or 'overwrite' (default: 'merge')
 merge_strategy = "merge"
 
-[agents.copilot]
-enabled = true
-output_path = "AGENTS.md"
-
 [gitignore]
 # Enable/disable automatic .gitignore updates (default: true)
 enabled = true
@@ -42,9 +38,9 @@ command = "npx"
 args = ["-y", "@upstash/context7-mcp@latest"]
 gallery = true
 
-[mcp_servers.time]
+[mcp_servers.fetch]
 command = "uvx"
-args = ["mcp-server-time"]
+args = ["mcp-server-fetch"]
 type = "stdio"
 disabled = false
 autoApprove = []

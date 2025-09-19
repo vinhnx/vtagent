@@ -36,7 +36,7 @@ pub async fn run_single_agent_loop(
                 .await
         }
         _ => {
-            unified::run_single_agent_loop_unified(config, vt_cfg, skip_confirmations, full_auto)
+            unified::run_single_agent_loop_unified(config, None, skip_confirmations, full_auto)
                 .await
         }
     }

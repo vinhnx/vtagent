@@ -42,8 +42,6 @@ use super::srgn::SrgnTool;
 #[cfg(test)]
 use super::traits::Tool;
 #[cfg(test)]
-use crate::config::constants::tools;
-#[cfg(test)]
 use crate::config::types::CapabilityLevel;
 
 #[derive(Clone)]

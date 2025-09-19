@@ -1,4 +1,5 @@
 use anyhow::{Context, Result, anyhow};
+use futures_util::StreamExt;
 use std::io;
 use std::path::Path;
 
@@ -249,6 +250,8 @@ pub(crate) async fn run_single_agent_loop_unified(
         let mut bottom_gap_applied = false;
 
         'outer: loop {
+            let mut was_streamed = false; // Track if response was already streamed
+
             if loop_guard == 0 {
                 renderer.line(MessageStyle::Output, "")?;
             }
@@ -355,7 +358,7 @@ pub(crate) async fn run_single_agent_loop_unified(
                     model: active_model.clone(),
                     max_tokens: max_tokens_opt.or(Some(2000)),
                     temperature: Some(0.7),
-                    stream: false,
+                    stream: vt_cfg.map(|cfg| cfg.ui_streaming.enabled).unwrap_or(false),
                     tool_choice: Some(uni::ToolChoice::auto()),
                     parallel_tool_calls: None,
                     parallel_tool_config: parallel_cfg_opt.clone(),
@@ -363,65 +366,91 @@ pub(crate) async fn run_single_agent_loop_unified(
                 };
 
                 let spinner = Spinner::new("Thinking");
-                match provider_client.generate(request).await {
-                    Ok(result) => {
-                        spinner.finish_and_clear();
-                        working_history = attempt_history.clone();
-                        break result;
-                    }
-                    Err(error) => {
-                        let error_text = error.to_string();
-                        if is_context_overflow_error(&error_text)
-                            && retry_attempts <= vtcode_core::config::constants::context::CONTEXT_ERROR_RETRY_LIMIT
-                        {
-                            let removed_tool_messages = prune_unified_tool_responses(
-                                &mut attempt_history,
-                                trim_config.preserve_recent_turns,
-                            );
-                            let removed_turns =
-                                apply_aggressive_trim_unified(&mut attempt_history, trim_config);
-                            let total_removed = removed_tool_messages + removed_turns;
-                            if total_removed > 0 {
-                                spinner.finish_and_clear();
-                                renderer.line(MessageStyle::Info, "↻ Adjusting context")?;
-                                renderer.line(
-                                    MessageStyle::Info,
-                                    &format!(
-                                        "Context overflow detected; removed {} older messages (retry {}/{}).",
-                                        total_removed,
-                                        retry_attempts,
-                                        vtcode_core::config::constants::context::CONTEXT_ERROR_RETRY_LIMIT,
-                                    ),
-                                )?;
-                                conversation_history.clone_from(&attempt_history);
-                                continue;
-                            }
+                let result = if vt_cfg.map(|cfg| cfg.ui_streaming.enabled).unwrap_or(false) {
+                    // Use streaming response
+                    spinner.finish_and_clear();
+                    let stream_request = uni::LLMRequest {
+                        messages: attempt_history.clone(),
+                        system_prompt: Some(system_prompt.clone()),
+                        tools: Some(tools.clone()),
+                        model: active_model.clone(),
+                        max_tokens: max_tokens_opt.or(Some(2000)),
+                        temperature: Some(0.7),
+                        stream: true,
+                        tool_choice: Some(uni::ToolChoice::auto()),
+                        parallel_tool_calls: None,
+                        parallel_tool_config: parallel_cfg_opt.clone(),
+                        reasoning_effort: vt_cfg.map(|cfg| cfg.agent.reasoning_effort.clone()),
+                    };
+                    match provider_client.stream_tokens(stream_request).await {
+                        Ok(stream) => {
+                            use vtcode_core::ui::streaming::TerminalStreamer;
+                            let mut streamer = if let Some(cfg) = vt_cfg {
+                                TerminalStreamer::with_config(cfg.ui_streaming.clone())
+                            } else {
+                                TerminalStreamer::new()
+                            };
+
+                            let stream = stream.map(|result| {
+                                result.map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+                            });
+
+                            let (collected_content, finish_reason) = streamer.stream_response(stream).await
+                                .map_err(|e| anyhow::anyhow!("Streaming error: {}", e))?;
+
+                            // Create LLMResponse from streamed content
+                            use vtcode_core::llm::provider::{LLMResponse, FinishReason};
+                            let finish_reason_enum = match finish_reason.as_deref() {
+                                Some("STOP") => FinishReason::Stop,
+                                Some("MAX_TOKENS") => FinishReason::Length,
+                                Some(reason) => FinishReason::Error(reason.to_string()),
+                                None => FinishReason::Stop,
+                            };
+
+                            let result = LLMResponse {
+                                content: Some(collected_content),
+                                tool_calls: None, // Streaming doesn't provide tool calls
+                                usage: None, // Streaming doesn't provide usage info
+                                finish_reason: finish_reason_enum,
+                            };
+                            was_streamed = true; // Mark that this response was streamed
+                            result
                         }
-                        spinner.finish_and_clear();
-
-                        let has_tool = working_history
-                            .iter()
-                            .any(|msg| msg.role == uni::MessageRole::Tool);
-
-                        if has_tool {
-                            eprintln!("Provider error (suppressed): {error_text}");
-                            let reply = derive_recent_tool_output(&working_history)
-                                .unwrap_or_else(|| "Command completed successfully.".to_string());
-                            renderer.line(MessageStyle::Response, &reply)?;
-                            ensure_turn_bottom_gap(&mut renderer, &mut bottom_gap_applied)?;
-                            working_history.push(uni::Message::assistant(reply));
-                            let _ = last_tool_stdout.take();
-                            break 'outer;
-                        } else {
-                            renderer.line(
-                                MessageStyle::Error,
-                                &format!("Provider error: {error_text}"),
-                            )?;
+                        Err(error) => {
+                            spinner.finish_and_clear();
+                            return Err(error.into());
                         }
-
-                        continue 'outer;
                     }
-                }
+                } else {
+                    // Use regular generation
+                    let request = uni::LLMRequest {
+                        messages: attempt_history.clone(),
+                        system_prompt: Some(system_prompt.clone()),
+                        tools: Some(tools.clone()),
+                        model: active_model.clone(),
+                        max_tokens: max_tokens_opt.or(Some(2000)),
+                        temperature: Some(0.7),
+                        stream: false,
+                        tool_choice: Some(uni::ToolChoice::auto()),
+                        parallel_tool_calls: None,
+                        parallel_tool_config: parallel_cfg_opt.clone(),
+                        reasoning_effort: vt_cfg.map(|cfg| cfg.agent.reasoning_effort.clone()),
+                    };
+                    match provider_client.generate(request).await {
+                        Ok(result) => {
+                            spinner.finish_and_clear();
+                            result
+                        }
+                        Err(error) => {
+                            spinner.finish_and_clear();
+                            return Err(error.into());
+                        }
+                    }
+                };
+
+                // Success - update working history and break
+                working_history = attempt_history.clone();
+                break result;
             };
 
             let mut final_text = response.content.clone();
@@ -429,8 +458,8 @@ pub(crate) async fn run_single_agent_loop_unified(
             let mut interpreted_textual_call = false;
 
             if tool_calls.is_empty()
-                && let Some(text) = final_text.clone()
-                && let Some((name, args)) = detect_textual_tool_call(&text)
+                && let Some(text) = &final_text
+                && let Some((name, args)) = detect_textual_tool_call(text)
             {
                 let args_display =
                     serde_json::to_string(&args).unwrap_or_else(|_| "{}".to_string());
@@ -707,7 +736,7 @@ pub(crate) async fn run_single_agent_loop_unified(
                         .map(|stdout| stdout == trimmed)
                         .unwrap_or(false);
 
-                if !suppress_response {
+                if !suppress_response && !was_streamed {
                     renderer.line(MessageStyle::Response, &text)?;
                     ensure_turn_bottom_gap(&mut renderer, &mut bottom_gap_applied)?;
                 }

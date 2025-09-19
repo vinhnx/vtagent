@@ -10,8 +10,10 @@ use tokio::time::{Duration, sleep};
 use tokio_stream::Stream;
 
 /// Configuration for terminal streaming
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct TerminalStreamingConfig {
+    /// Whether streaming is enabled
+    pub enabled: bool,
     /// Delay between characters for typing animation (in milliseconds)
     pub typing_delay_ms: u64,
     /// Whether to enable typing animation
@@ -23,6 +25,7 @@ pub struct TerminalStreamingConfig {
 impl Default for TerminalStreamingConfig {
     fn default() -> Self {
         Self {
+            enabled: true,
             typing_delay_ms: 50,
             enable_animation: false,
             prefix: "Assistant: ".to_string(),
@@ -57,23 +60,24 @@ impl TerminalStreamer {
     ///
     /// This method consumes a stream of tokens and displays them in real-time.
     /// If animation is enabled, it will simulate typing by adding delays between characters.
+    /// Returns the collected content and finish reason.
     pub async fn stream_response<S>(
         &mut self,
         mut stream: S,
-    ) -> Result<(), Box<dyn std::error::Error>>
+    ) -> Result<(String, Option<String>), Box<dyn std::error::Error>>
     where
-        S: Stream<Item = Result<StreamToken, Box<dyn std::error::Error + Send>>> + Unpin,
+        S: Stream<Item = Result<StreamToken, Box<dyn std::error::Error + Send + Sync>>> + Unpin,
     {
-        // Print prefix
-        print!("{}", self.config.prefix);
-        self.stdout.flush().await?;
-
         let mut total_tokens = 0;
+        let mut collected_content = String::new();
+        let mut finish_reason = None;
 
         while let Some(result) = stream.next().await {
             match result {
                 Ok(token) => {
                     if !token.text.is_empty() {
+                        collected_content.push_str(&token.text);
+
                         if self.config.enable_animation {
                             // Simulate typing animation
                             for char in token.text.chars() {
@@ -90,8 +94,9 @@ impl TerminalStreamer {
                     }
 
                     if token.is_final {
+                        finish_reason = token.finish_reason.clone();
                         println!(); // New line after completion
-                        if let Some(reason) = token.finish_reason {
+                        if let Some(reason) = &token.finish_reason {
                             if reason != "STOP" {
                                 println!("Finished: {} (tokens: {})", reason, total_tokens);
                             }
@@ -106,7 +111,7 @@ impl TerminalStreamer {
             }
         }
 
-        Ok(())
+        Ok((collected_content, finish_reason))
     }
 }
 
@@ -130,7 +135,7 @@ pub async fn run_interactive_streaming<F>(
     create_stream: F,
 ) -> Result<(), Box<dyn std::error::Error>>
 where
-    F: Fn(&str) -> Box<dyn Stream<Item = Result<StreamToken, Box<dyn std::error::Error + Send>>> + Unpin>,
+    F: Fn(&str) -> Box<dyn Stream<Item = Result<StreamToken, Box<dyn std::error::Error + Send + Sync>>> + Unpin>,
 {
     println!("Interactive Streaming Chat");
     println!("==========================");
@@ -205,7 +210,6 @@ mod tests {
             text: "Hello".to_string(),
             is_final: false,
             finish_reason: None,
-            usage_metadata: None,
         };
         assert_eq!(token.text, "Hello");
         assert!(!token.is_final);

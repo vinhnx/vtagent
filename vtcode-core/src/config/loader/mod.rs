@@ -5,6 +5,7 @@ use crate::config::core::{
 };
 use crate::config::router::RouterConfig;
 use crate::config::telemetry::TelemetryConfig;
+use crate::ui::streaming::TerminalStreamingConfig;
 use crate::project::SimpleProjectManager;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -125,6 +126,10 @@ pub struct VTCodeConfig {
     /// Automation configuration
     #[serde(default)]
     pub automation: AutomationConfig,
+
+    /// UI streaming configuration
+    #[serde(default)]
+    pub ui_streaming: TerminalStreamingConfig,
 }
 
 impl Default for VTCodeConfig {
@@ -140,6 +145,7 @@ impl Default for VTCodeConfig {
             telemetry: TelemetryConfig::default(),
             syntax_highlighting: SyntaxHighlightingConfig::default(),
             automation: AutomationConfig::default(),
+            ui_streaming: TerminalStreamingConfig::default(),
         }
     }
 }

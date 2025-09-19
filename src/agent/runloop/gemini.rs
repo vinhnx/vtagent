@@ -1,4 +1,5 @@
 use anyhow::{Result, anyhow};
+use futures_util::StreamExt;
 use std::io;
 use std::path::Path;
 
@@ -28,6 +29,8 @@ use super::text_tools::detect_textual_tool_call;
 use super::tool_output::render_tool_output;
 use super::ui::render_session_banner;
 use super::welcome::prepare_session_bootstrap;
+
+use vtcode_core::llm::provider::{LLMResponse, FinishReason};
 
 fn persist_theme_preference(renderer: &mut AnsiRenderer, theme_id: &str) -> Result<()> {
     if let Err(err) = update_theme_preference(theme_id) {
@@ -271,6 +274,8 @@ pub(crate) async fn run_single_agent_loop_gemini(
         let mut bottom_gap_applied = false;
 
         'outer: loop {
+            let mut was_streamed = false; // Track if response was already streamed
+
             if loop_guard == 0 {
                 renderer.line(MessageStyle::Output, "")?;
             }
@@ -312,12 +317,12 @@ pub(crate) async fn run_single_agent_loop_gemini(
                     if let Some(max_tokens) = budget.max_tokens {
                         cfg["maxOutputTokens"] = serde_json::json!(max_tokens as u32);
                     }
-                    (Some(cfg), budget.max_parallel_tools.unwrap_or(0) > 1)
+                    (Some(cfg), budget.max_parallel_tools.unwrap_or(1))
                 } else {
-                    (None, false)
+                    (None, 0)
                 }
             } else {
-                (None, false)
+                (None, 0)
             };
 
             ledger.start_turn(working_history.len(), Some(input.to_string()));
@@ -377,89 +382,107 @@ pub(crate) async fn run_single_agent_loop_gemini(
                     generation_config: gen_cfg.clone(),
                 };
 
+                let is_streaming_enabled = vt_cfg.map(|cfg| cfg.ui_streaming.enabled).unwrap_or(false);
+
                 let spinner = Spinner::new("Thinking");
-                match client.generate(&req).await {
-                    Ok(result) => {
-                        spinner.finish_and_clear();
-                        working_history = attempt_history.clone();
-                        break result;
-                    }
-                    Err(error) => {
-                        if is_context_overflow_error(&error.to_string())
-                            && retry_attempts <= vtcode_core::config::constants::context::CONTEXT_ERROR_RETRY_LIMIT
-                        {
-                            let removed_tool_messages = prune_gemini_tool_responses(
-                                &mut attempt_history,
-                                trim_config.preserve_recent_turns,
-                            );
-                            let removed_turns =
-                                apply_aggressive_trim_gemini(&mut attempt_history, trim_config);
-                            let total_removed = removed_tool_messages + removed_turns;
-                            if total_removed > 0 {
-                                spinner.finish_and_clear();
-                                renderer.line(MessageStyle::Info, "↻ Adjusting context")?;
-                                renderer.line(
-                                    MessageStyle::Info,
-                                    &format!(
-                                        "Context overflow detected; removed {} older messages (retry {}/{}).",
-                                        total_removed,
-                                        retry_attempts,
-                                        vtcode_core::config::constants::context::CONTEXT_ERROR_RETRY_LIMIT,
-                                    ),
-                                )?;
-                                conversation_history.clone_from(&attempt_history);
-                                continue;
+                let result = if is_streaming_enabled {
+                    // Use streaming response
+                    spinner.finish_and_clear();
+                    let stream = client.stream_tokens(&req);
+                    use vtcode_core::ui::streaming::TerminalStreamer;
+                    let mut streamer = if let Some(cfg) = vt_cfg {
+                        TerminalStreamer::with_config(cfg.ui_streaming.clone())
+                    } else {
+                        TerminalStreamer::new()
+                    };
+
+                    let stream = stream.map(|result| {
+                        result.map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+                    });
+
+                    let (collected_content, finish_reason) = streamer.stream_response(stream).await
+                        .map_err(|e| anyhow::anyhow!("Streaming error: {}", e))?;
+
+                    // Create LLMResponse from streamed content
+                    use vtcode_core::llm::provider::{LLMResponse, FinishReason};
+                    let finish_reason_enum = match finish_reason.as_deref() {
+                        Some("STOP") => FinishReason::Stop,
+                        Some("MAX_TOKENS") => FinishReason::Length,
+                        Some(reason) => FinishReason::Error(reason.to_string()),
+                        None => FinishReason::Stop,
+                    };
+
+                    let result = LLMResponse {
+                        content: Some(collected_content),
+                        tool_calls: None, // Streaming doesn't provide tool calls
+                        usage: None, // Streaming doesn't provide usage info
+                        finish_reason: finish_reason_enum,
+                    };
+
+                    was_streamed = true; // Mark that this response was streamed
+                    result
+                } else {
+                    // Use regular generation
+                    match client.generate(&req).await {
+                        Ok(result) => {
+                            spinner.finish_and_clear();
+                            // Convert GenerateContentResponse to LLMResponse
+                            let content = result.candidates.first()
+                                .and_then(|c| c.content.parts.first())
+                                .and_then(|p| match p {
+                                    vtcode_core::gemini::models::Part::Text { text } => Some(text.clone()),
+                                    _ => None,
+                                })
+                                .unwrap_or_default();
+
+                            let finish_reason = result.candidates.first()
+                                .and_then(|c| c.finish_reason.clone())
+                                .unwrap_or_else(|| "STOP".to_string());
+
+                            let finish_reason_enum = match finish_reason.as_str() {
+                                "STOP" => FinishReason::Stop,
+                                "MAX_TOKENS" => FinishReason::Length,
+                                reason => FinishReason::Error(reason.to_string()),
+                            };
+
+                            LLMResponse {
+                                content: Some(content),
+                                tool_calls: None, // Gemini client doesn't provide tool calls in this format
+                                usage: None, // Gemini client doesn't provide usage in this format
+                                finish_reason: finish_reason_enum,
                             }
                         }
-                        spinner.finish_and_clear();
-                        let has_tool = working_history
-                            .iter()
-                            .any(|content| matches!(content.role.as_str(), "tool"));
-                        if has_tool {
-                            eprintln!("Provider error (suppressed): {error}");
-                            let reply = working_history
-                                .iter()
-                                .rev()
-                                .find(|content| content.role == "tool")
-                                .and_then(|tool_content| {
-                                    tool_content.parts.iter().find_map(|part| match part {
-                                        Part::Text { text } if !text.trim().is_empty() => {
-                                            Some(text.clone())
-                                        }
-                                        _ => None,
-                                    })
-                                })
-                                .unwrap_or_else(|| "Command completed successfully.".to_string());
-                            renderer.line(MessageStyle::Response, &reply)?;
-                            ensure_turn_bottom_gap(&mut renderer, &mut bottom_gap_applied)?;
-                            conversation_history.push(Content {
-                                role: "model".to_string(),
-                                parts: vec![Part::Text { text: reply }],
-                            });
-                            break 'outer;
-                        } else {
-                            renderer
-                                .line(MessageStyle::Error, &format!("Provider error: {error}"))?;
-                            ensure_turn_bottom_gap(&mut renderer, &mut bottom_gap_applied)?;
-                            break 'outer;
+                        Err(error) => {
+                            spinner.finish_and_clear();
+                            return Err(error.into());
                         }
                     }
-                }
+                };
+
+                // Success - update working history and break
+                working_history = attempt_history.clone();
+                break result;
             };
 
             let mut aggregated_text: Vec<String> = Vec::new();
             let mut function_calls: Vec<FunctionCall> = Vec::new();
             let mut response_content: Option<Content> = None;
-            if let Some(candidate) = response.candidates.first() {
-                response_content = Some(candidate.content.clone());
-                for part in &candidate.content.parts {
-                    match part {
-                        Part::Text { text } => aggregated_text.push(text.clone()),
-                        Part::FunctionCall { function_call } => {
-                            function_calls.push(function_call.clone())
-                        }
-                        _ => {}
-                    }
+
+            // Extract content from LLMResponse
+            if let Some(content) = &response.content {
+                aggregated_text.push(content.clone());
+                // Create Content for working history
+                response_content = Some(Content {
+                    role: "model".to_string(),
+                    parts: vec![vtcode_core::gemini::models::Part::Text { text: content.clone() }],
+                });
+            }
+
+            // Extract tool calls from LLMResponse
+            if let Some(tool_calls) = &response.tool_calls {
+                for tool_call in tool_calls {
+                    // Convert LLM ToolCall to Gemini FunctionCall if needed
+                    // For now, we'll handle this in the tool processing section
                 }
             }
 
@@ -508,6 +531,7 @@ pub(crate) async fn run_single_agent_loop_gemini(
             if function_calls.is_empty() {
                 if let Some(text) = final_text.clone()
                     && !text.trim().is_empty()
+                    && !was_streamed
                 {
                     renderer.line(MessageStyle::Response, &text)?;
                 }

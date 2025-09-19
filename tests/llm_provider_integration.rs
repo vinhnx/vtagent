@@ -84,6 +84,7 @@ fn test_provider_supported_models() {
     assert!(gemini_models.contains(&"gemini-2.5-flash-lite".to_string()));
     assert!(gemini_models.contains(&"gemini-2.5-pro".to_string()));
     assert!(gemini_models.contains(&"gemini-2.5-flash-lite-preview-06-17".to_string()));
+    assert!(gemini_models.contains(&"gemini-2.5-flash-preview-05-20".to_string()));
 
     let openai = OpenAIProvider::new("test_key".to_string());
     let openai_models = openai.supported_models();

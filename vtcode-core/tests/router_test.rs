@@ -29,12 +29,12 @@ fn main() {}
 fn route_uses_model_mapping() {
     let mut cfg = VTCodeConfig::default();
     cfg.router.enabled = true;
-    cfg.router.models.standard = "gemini-2.5-flash-lite-preview-06-17".to_string();
+    cfg.router.models.standard = "gemini-2.5-flash-preview-05-20".to_string();
     cfg.router.models.codegen_heavy = "gemini-2.5-pro".to_string();
 
-    let core = core_cfg("gemini-2.5-flash-lite-preview-06-17");
+    let core = core_cfg("gemini-2.5-flash-preview-05-20");
     let r1 = Router::route(&cfg, &core, "summarize this text");
-    assert_eq!(r1.selected_model, "gemini-2.5-flash-lite-preview-06-17");
+    assert_eq!(r1.selected_model, "gemini-2.5-flash-preview-05-20");
 
     let r2 = Router::route(&cfg, &core, "Provide a patch:\n```diff\n- a\n+ b\n```\n");
     assert_eq!(r2.selected_model, "gemini-2.5-pro");

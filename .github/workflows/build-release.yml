@@ -43,13 +43,13 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: |
           cd target/${{ matrix.target }}/release
-          tar -czf ../../../vtcode-v${{ github.event.release.tag_name }}-x86_64-${{ matrix.name }}.tar.gz vtcode
+          tar -czf ../../../vtcode-v${{ github.event.release.tag_name }}-${{ matrix.name }}.tar.gz vtcode
 
       - name: Package binary (Windows)
         if: matrix.os == 'windows-latest'
         run: |
           cd target/${{ matrix.target }}/release
-          7z a ../../../vtcode-v${{ github.event.release.tag_name }}-x86_64-${{ matrix.name }}.zip vtcode.exe
+          7z a ../../../vtcode-v${{ github.event.release.tag_name }}-${{ matrix.name }}.zip vtcode.exe
 
       - name: Upload binary
         uses: actions/upload-release-asset@v1

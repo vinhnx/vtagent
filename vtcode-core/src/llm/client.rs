@@ -22,7 +22,10 @@ pub fn make_client(api_key: String, model: ModelId) -> AnyClient {
             api_key,
             model.as_str().to_string(),
         )),
-        Provider::OpenAI => Box::new(OpenAIProvider::new(api_key)),
+        Provider::OpenAI => Box::new(OpenAIProvider::with_model(
+            api_key,
+            model.as_str().to_string(),
+        )),
         Provider::Anthropic => Box::new(AnthropicProvider::new(api_key)),
     }
 }

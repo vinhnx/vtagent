@@ -96,16 +96,16 @@ impl ChatInput {
             KeyCode::Left => {
                 if key.modifiers.contains(KeyModifiers::CONTROL) {
                     self.move_word_left();
-                } else if self.cursor > 0 {
-                    self.cursor -= 1;
+                } else if let Some(prev) = self.prev_char_boundary(self.cursor) {
+                    self.cursor = prev;
                 }
                 self.refresh(*start_col, *start_row, stdout)?;
             }
             KeyCode::Right => {
                 if key.modifiers.contains(KeyModifiers::CONTROL) {
                     self.move_word_right();
-                } else if self.cursor < self.buffer.len() {
-                    self.cursor += 1;
+                } else if let Some(next) = self.next_char_boundary(self.cursor) {
+                    self.cursor = next;
                 }
                 self.refresh(*start_col, *start_row, stdout)?;
             }
@@ -118,15 +118,15 @@ impl ChatInput {
                 self.refresh(*start_col, *start_row, stdout)?;
             }
             KeyCode::Backspace => {
-                if self.cursor > 0 {
-                    self.buffer.remove(self.cursor - 1);
-                    self.cursor -= 1;
+                if let Some(prev) = self.prev_char_boundary(self.cursor) {
+                    self.buffer.drain(prev..self.cursor);
+                    self.cursor = prev;
                     self.refresh(*start_col, *start_row, stdout)?;
                 }
             }
             KeyCode::Delete => {
-                if self.cursor < self.buffer.len() {
-                    self.buffer.remove(self.cursor);
+                if let Some(next) = self.next_char_boundary(self.cursor) {
+                    self.buffer.drain(self.cursor..next);
                     self.refresh(*start_col, *start_row, stdout)?;
                 }
             }
@@ -197,7 +197,7 @@ impl ChatInput {
                     return Ok(None);
                 }
                 self.buffer.insert(self.cursor, ch);
-                self.cursor += 1;
+                self.cursor += ch.len_utf8();
                 self.refresh(*start_col, *start_row, stdout)?;
             }
             _ => {}
@@ -210,13 +210,22 @@ impl ChatInput {
         if self.cursor == 0 {
             return;
         }
-        let bytes = self.buffer.as_bytes();
         let mut idx = self.cursor;
-        while idx > 0 && bytes[idx - 1].is_ascii_whitespace() {
-            idx -= 1;
+        while let Some(prev) = self.prev_char_boundary(idx) {
+            let ch = self.char_at(prev);
+            if ch.is_whitespace() {
+                idx = prev;
+            } else {
+                break;
+            }
         }
-        while idx > 0 && !bytes[idx - 1].is_ascii_whitespace() {
-            idx -= 1;
+        while let Some(prev) = self.prev_char_boundary(idx) {
+            let ch = self.char_at(prev);
+            if !ch.is_whitespace() {
+                idx = prev;
+            } else {
+                break;
+            }
         }
         self.cursor = idx;
     }
@@ -225,19 +234,28 @@ impl ChatInput {
         if self.cursor >= self.buffer.len() {
             return;
         }
-        let bytes = self.buffer.as_bytes();
         let mut idx = self.cursor;
-        while idx < bytes.len() && !bytes[idx].is_ascii_whitespace() {
-            idx += 1;
+        let mut iter = self.buffer[self.cursor..].char_indices().peekable();
+        while let Some(&(offset, ch)) = iter.peek() {
+            if ch.is_whitespace() {
+                break;
+            }
+            idx = self.cursor + offset + ch.len_utf8();
+            iter.next();
         }
-        while idx < bytes.len() && bytes[idx].is_ascii_whitespace() {
-            idx += 1;
+        while let Some(&(offset, ch)) = iter.peek() {
+            if !ch.is_whitespace() {
+                break;
+            }
+            idx = self.cursor + offset + ch.len_utf8();
+            iter.next();
         }
         self.cursor = min(idx, self.buffer.len());
     }
 
     fn refresh(&self, start_col: u16, start_row: u16, stdout: &mut std::io::Stdout) -> Result<()> {
-        let cursor_col = u16::try_from(self.cursor).unwrap_or(u16::MAX);
+        let cursor_col =
+            u16::try_from(self.buffer[..self.cursor].chars().count()).unwrap_or(u16::MAX);
         crossterm::queue!(stdout, cursor::MoveTo(start_col, start_row))?;
         crossterm::queue!(stdout, Clear(ClearType::UntilNewLine))?;
         stdout.write_all(self.buffer.as_bytes()).ok();
@@ -245,6 +263,33 @@ impl ChatInput {
         crossterm::queue!(stdout, cursor::MoveTo(final_col, start_row))?;
         stdout.flush().ok();
         Ok(())
+    }
+
+    fn prev_char_boundary(&self, from: usize) -> Option<usize> {
+        if from == 0 || from > self.buffer.len() {
+            return None;
+        }
+        self.buffer[..from]
+            .char_indices()
+            .next_back()
+            .map(|(idx, _)| idx)
+    }
+
+    fn next_char_boundary(&self, from: usize) -> Option<usize> {
+        if from >= self.buffer.len() {
+            return None;
+        }
+        self.buffer[from..]
+            .char_indices()
+            .next()
+            .map(|(offset, ch)| from + offset + ch.len_utf8())
+    }
+
+    fn char_at(&self, start: usize) -> char {
+        self.buffer[start..]
+            .chars()
+            .next()
+            .expect("start should be a valid char boundary")
     }
 }
 
@@ -347,5 +392,59 @@ mod tests {
         input.cursor = 0;
         input.move_word_right();
         assert_eq!(input.cursor, 8);
+    }
+
+    #[test]
+    fn editing_multibyte_characters_does_not_panic() {
+        let mut input = ChatInput::default();
+        let mut stdout = stdout();
+        let mut col = 0;
+        let mut row = 0;
+
+        input
+            .handle_key(
+                build_key_event(KeyCode::Char('é'), KeyModifiers::empty()),
+                &mut col,
+                &mut row,
+                &mut stdout,
+                &mut noop_scroll(),
+            )
+            .unwrap();
+        assert_eq!(input.buffer, "é");
+        assert_eq!(input.cursor, "é".len());
+
+        input
+            .handle_key(
+                build_key_event(KeyCode::Left, KeyModifiers::empty()),
+                &mut col,
+                &mut row,
+                &mut stdout,
+                &mut noop_scroll(),
+            )
+            .unwrap();
+        assert_eq!(input.cursor, 0);
+
+        input
+            .handle_key(
+                build_key_event(KeyCode::Right, KeyModifiers::empty()),
+                &mut col,
+                &mut row,
+                &mut stdout,
+                &mut noop_scroll(),
+            )
+            .unwrap();
+        assert_eq!(input.cursor, "é".len());
+
+        input
+            .handle_key(
+                build_key_event(KeyCode::Backspace, KeyModifiers::empty()),
+                &mut col,
+                &mut row,
+                &mut stdout,
+                &mut noop_scroll(),
+            )
+            .unwrap();
+        assert!(input.buffer.is_empty());
+        assert_eq!(input.cursor, 0);
     }
 }

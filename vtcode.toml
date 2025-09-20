@@ -4,9 +4,9 @@
 [agent]
 # Provider to use: one of "gemini", "openai", "anthropic"
 # API key environment variable is automatically inferred from provider
-provider = "openai"
+provider = "gemini"
 # Default model for single-agent mode - using GPT-5 for Codex integration
-default_model = "gpt-5"
+default_model = "gemini-2.5-flash-lite"
 
 # Max conversation turns per session (prevents infinite loops)
 max_conversation_turns = 150
@@ -23,7 +23,7 @@ max_review_passes = 1
 
 [agent.onboarding]
 enabled = true
-intro_text = "VTCode"
+intro_text = "VT Code"
 include_project_overview = false
 include_language_summary = false
 include_guideline_highlights = false
@@ -203,11 +203,11 @@ heuristic_classification = true
 llm_router_model = ""
 
 [router.models]
-simple = "gpt-5-mini"
-standard = "gpt-5"
-complex = "gpt-5"
-codegen_heavy = "gpt-5"
-retrieval_heavy = "gpt-5"
+simple = "gemini-2.5-flash-lite"
+standard = "gemini-2.5-flash-lite"
+complex = "gemini-2.5-flash-lite"
+codegen_heavy = "gemini-2.5-flash-lite"
+retrieval_heavy = "gemini-2.5-flash-lite"
 
 [telemetry]
 # Enable trajectory logging to logs/trajectory.jsonl

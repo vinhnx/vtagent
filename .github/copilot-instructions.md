@@ -8,12 +8,14 @@
 # VT Code
 
 ## Project Overview
+
 VT Code is a Rust-based terminal coding agent with modular architecture supporting multiple LLM providers (Gemini, OpenAI, Anthropic) and tree-sitter parsers for 6+ languages.
 
 ## Architecture & Key Components
-- **Workspace Structure**: `vtcode-core/` (library) + `src/` (binary) with modular tools system
-- **Core Modules**: `llm/` (provider abstraction), `tools/` (modular tool system), `config/` (TOML-based settings)
-- **Integration Points**: Gemini API, tree-sitter parsers, PTY command execution, MCP tools
+
+-   **Workspace Structure**: `vtcode-core/` (library) + `src/` (binary) with modular tools system
+-   **Core Modules**: `llm/` (provider abstraction), `tools/` (modular tool system), `config/` (TOML-based settings)
+-   **Integration Points**: Gemini API, tree-sitter parsers, PTY command execution, MCP tools
 
 ## Critical Developer Workflows
 
@@ -27,9 +29,10 @@ cargo clippy          # Linting with project-specific rules
 ```
 
 ### Configuration Management
-- **Primary Config**: `vtcode.toml` (never hardcode settings)
-- **Model Constants**: Always reference `vtcode-core/src/config/constants.rs`
-- **Latest Models**: Check `docs/models.json` for current model IDs
+
+-   **Primary Config**: `vtcode.toml` (never hardcode settings)
+-   **Model Constants**: Always reference `vtcode-core/src/config/constants.rs`
+-   **Latest Models**: Check `docs/models.json` for current model IDs
 
 ## Project-Specific Patterns
 
@@ -106,9 +109,10 @@ if is_valid && is_allowed && is_secure {
 ## Integration Points
 
 ### LLM Providers
-- **Gemini**: Primary provider via `gemini.rs`
-- **Multi-Provider**: Abstracted through `llm/` module
-- **Configuration**: Model selection via `vtcode.toml`
+
+-   **Gemini**: Primary provider via `gemini.rs`
+-   **Multi-Provider**: Abstracted through `llm/` module
+-   **Configuration**: Model selection via `vtcode.toml`
 
 ### Tree-Sitter Integration
 
@@ -137,10 +141,11 @@ if is_valid && is_allowed && is_secure {
 -   **Mocking**: External dependencies for reliable tests
 
 ### File Organization
-- **Library Code**: `vtcode-core/src/`
-- **Binary Entry**: `src/main.rs`
-- **Documentation**: `./docs/` folder only
-- **Benchmarks**: `benches/` directory
+
+-   **Library Code**: `vtcode-core/src/`
+-   **Binary Entry**: `src/main.rs`
+-   **Documentation**: `./docs/` folder only
+-   **Benchmarks**: `benches/` directory
 
 ## Security & Safety
 
@@ -151,9 +156,10 @@ if is_valid && is_allowed && is_secure {
 -   **Validation**: Input sanitization for all external data
 
 ### File System Safety
-- **Path Validation**: All file operations check workspace boundaries
-- **Size Limits**: Configurable maximum file sizes
-- **Exclusion Patterns**: `.vtcodegitignore` support
+
+-   **Path Validation**: All file operations check workspace boundaries
+-   **Size Limits**: Configurable maximum file sizes
+-   **Exclusion Patterns**: `.vtcodegitignore` support
 
 ## Performance Considerations
 
@@ -259,27 +265,34 @@ if is_valid && is_allowed && is_secure {
 -   Consider the separation between library and binary code
 -   Place configuration files at the project root
 
+\*\* Time
+
+Very important: The user's timezone is {datetime(.)now().strftime("%Z")}. The current date is {datetime(.)now().strftime("%Y-%m-%d")}.
+
+Any dates before this are in the past, and any dates after this are in the future. When the user asks for the 'latest', 'most recent', 'today's', etc. don't assume your knowledge is up to date;
+
 ## IMPORTANT NOTEs for coding agents
 
-- Ensure all tests pass
-- Run `cargo clippy` and fix warnings
-- Format code with `cargo fmt`
-- Update documentation if needed
-- Consider performance implications
-- Test with various input files and edge cases
-- Prefered ripgrep over grep for search
-- DO NOT USE EMOJI THIS IS IMPORTANT
-- Put all agent's configuration option to vtcode.toml. This is important, every logic should be read from this toml config instead of hardcode.
-- Use MCP tools for enhanced context awareness if needed.
-- Use `cargo check` instead of `cargo build` whenever possible
-- Use `cargo nextest` Instead of `cargo test
-- Put all markdown documentation files to ./docs folder. don't put any unrelated files in root folder. THIS IS IMPORTANT!
-- Put all report documentation (md) files to ./docs folder. don't put any unrelated files in root folder. THIS IS IMPORTANT!
-- Always check ./docs/models.json use to use latest LLM model. Don't guess the model id/name. THIS IS IMPORTANT!
-- Always use vtcode-core/src/config/constants.rs for constant values. Don't hardcode any constant values, especially model id. THIS IS IMPORTANT!
-- You should always use Context7 for fetching documentation from MCP. THIS IS IMPORTANT!
-- For testing echo, make sure not to use "!" this will cause shell escaping issue. for example Use "echo test" instead of "echo test!" THIS IS IMPORTANT!
-- Reference ANSI color code when you want to print colored text in terminal. THIS IS IMPORTANT! https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit
-- Don't create examples, make tests instead. THIS IS IMPORTANT!
-- Prefer to use nextest over cargo test. THIS IS IMPORTANT!
-- Always use anyhow::Context to add context to errors. THIS IS IMPORTANT!
+-   Ensure all tests pass
+-   Run `cargo clippy` and fix warnings
+-   Format code with `cargo fmt`
+-   Update documentation if needed
+-   Consider performance implications
+-   Test with various input files and edge cases
+-   Prefered ripgrep over grep for search
+-   DO NOT USE EMOJI THIS IS IMPORTANT
+-   Put all agent's configuration option to vtcode.toml. This is important, every logic should be read from this toml config instead of hardcode.
+-   Use MCP tools for enhanced context awareness if needed.
+-   Use `cargo check` instead of `cargo build` whenever possible
+-   Use `cargo nextest` Instead of `cargo test
+-   Put all markdown documentation files to ./docs folder. don't put any unrelated files in root folder. THIS IS IMPORTANT!
+-   Put all report documentation (md) files to ./docs folder. don't put any unrelated files in root folder. THIS IS IMPORTANT!
+-   Always check ./docs/models.json use to use latest LLM model. Don't guess the model id/name. THIS IS IMPORTANT!
+-   Always use vtcode-core/src/config/constants.rs for constant values. Don't hardcode any constant values, especially model id. THIS IS IMPORTANT!
+-   You should always use Context7 for fetching documentation from MCP. THIS IS IMPORTANT!
+-   For testing echo, make sure not to use "!" this will cause shell escaping issue. for example Use "echo test" instead of "echo test!" THIS IS IMPORTANT!
+-   Reference ANSI color code when you want to print colored text in terminal. THIS IS IMPORTANT! https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit
+-   Don't create examples, make tests instead. THIS IS IMPORTANT!
+-   Prefer to use nextest over cargo test. THIS IS IMPORTANT!
+-   Always use anyhow::Context to add context to errors. THIS IS IMPORTANT!
+-   Testing: for headless testing without user input, use `cargo run -- ask "{QUERY}"` Single Prompt Mode. replace "{QUERY}" with actual prompt

@@ -1,4 +1,4 @@
-use crate::config::constants::models;
+use crate::config::constants::{models, urls};
 use crate::llm::client::LLMClient;
 use crate::llm::error_display;
 use crate::llm::provider::{
@@ -26,9 +26,26 @@ impl GeminiProvider {
         Self {
             api_key,
             http_client: HttpClient::new(),
-            base_url: "https://generativelanguage.googleapis.com/v1beta".to_string(),
+            base_url: urls::GEMINI_API_BASE.to_string(),
             model,
         }
+    }
+
+    pub fn from_config(
+        api_key: Option<String>,
+        model: Option<String>,
+        base_url: Option<String>,
+    ) -> Self {
+        let api_key_value = api_key.unwrap_or_default();
+        let mut provider = if let Some(model_value) = model {
+            Self::with_model(api_key_value, model_value)
+        } else {
+            Self::new(api_key_value)
+        };
+        if let Some(base) = base_url {
+            provider.base_url = base;
+        }
+        provider
     }
 }
 
@@ -61,6 +78,12 @@ impl LLMProvider for GeminiProvider {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
+
+            // Handle specific HTTP status codes
+            if status.as_u16() == 429 || error_text.contains("insufficient_quota") || error_text.contains("quota") || error_text.contains("rate limit") {
+                return Err(LLMError::RateLimit);
+            }
+
             let formatted_error = error_display::format_llm_error(
                 "Gemini",
                 &format!("HTTP {}: {}", status, error_text),
@@ -496,7 +519,7 @@ impl LLMClient for GeminiProvider {
 
         Ok(llm_types::LLMResponse {
             content: response.content.unwrap_or("".to_string()),
-            model: models::GEMINI_2_5_FLASH.to_string(),
+            model: self.model.clone(),
             usage: response.usage.map(|u| llm_types::Usage {
                 prompt_tokens: u.prompt_tokens as usize,
                 completion_tokens: u.completion_tokens as usize,

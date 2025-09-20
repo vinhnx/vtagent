@@ -311,7 +311,7 @@ async fn run_iocraft(
             placeholder: placeholder,
         )
     }
-    .fullscreen()
+    .render_loop()
     .await
     .context("iocraft render loop failed")
 }

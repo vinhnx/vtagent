@@ -1,7 +1,11 @@
 use anyhow::{Context, Result};
 use iocraft::prelude::*;
+use parking_lot::Mutex;
+use std::cmp;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use tokio::sync::oneshot;
 
 const ESCAPE_DOUBLE_MS: u64 = 750;
 
@@ -21,15 +25,33 @@ impl IocraftTextStyle {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IocraftMessageKind {
+    System,
+    User,
+    Agent,
+    Tool,
+    Error,
+    Reasoning,
+}
+
+impl Default for IocraftMessageKind {
+    fn default() -> Self {
+        Self::System
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct IocraftSegment {
     pub text: String,
     pub style: IocraftTextStyle,
+    pub kind: IocraftMessageKind,
 }
 
 #[derive(Clone, Default)]
 struct StyledLine {
     segments: Vec<IocraftSegment>,
+    kind: IocraftMessageKind,
 }
 
 impl StyledLine {
@@ -37,7 +59,33 @@ impl StyledLine {
         if segment.text.is_empty() {
             return;
         }
+        if matches!(self.kind, IocraftMessageKind::System) {
+            self.kind = segment.kind;
+        }
         self.segments.push(segment);
+    }
+}
+
+#[derive(Clone)]
+struct ToolPermissionPrompt {
+    tool: String,
+    description: Option<String>,
+    responder: Arc<Mutex<Option<oneshot::Sender<bool>>>>,
+}
+
+impl ToolPermissionPrompt {
+    fn new(tool: String, description: Option<String>, responder: oneshot::Sender<bool>) -> Self {
+        Self {
+            tool,
+            description,
+            responder: Arc::new(Mutex::new(Some(responder))),
+        }
+    }
+
+    fn respond(&self, approved: bool) {
+        if let Some(sender) = self.responder.lock().take() {
+            let _ = sender.send(approved);
+        }
     }
 }
 
@@ -47,6 +95,7 @@ pub struct IocraftTheme {
     pub foreground: Option<Color>,
     pub primary: Option<Color>,
     pub secondary: Option<Color>,
+    pub alert: Option<Color>,
 }
 
 impl Default for IocraftTheme {
@@ -56,6 +105,7 @@ impl Default for IocraftTheme {
             foreground: None,
             primary: None,
             secondary: None,
+            alert: None,
         }
     }
 }
@@ -76,6 +126,11 @@ pub enum IocraftCommand {
     },
     SetTheme {
         theme: IocraftTheme,
+    },
+    RequestToolPermission {
+        tool: String,
+        description: Option<String>,
+        responder: oneshot::Sender<bool>,
     },
     Shutdown,
 }
@@ -126,6 +181,23 @@ impl IocraftHandle {
         let _ = self.sender.send(IocraftCommand::SetTheme { theme });
     }
 
+    pub async fn request_tool_permission(
+        &self,
+        tool: impl Into<String>,
+        description: Option<String>,
+    ) -> bool {
+        let (tx, rx) = oneshot::channel();
+        let command = IocraftCommand::RequestToolPermission {
+            tool: tool.into(),
+            description,
+            responder: tx,
+        };
+        if self.sender.send(command).is_err() {
+            return false;
+        }
+        rx.await.unwrap_or(false)
+    }
+
     pub fn shutdown(&self) {
         let _ = self.sender.send(IocraftCommand::Shutdown);
     }
@@ -166,7 +238,7 @@ async fn run_iocraft(
             placeholder: placeholder,
         )
     }
-    .render_loop()
+    .fullscreen()
     .await
     .context("iocraft render loop failed")
 }
@@ -181,19 +253,33 @@ struct SessionRootProps {
 
 #[component]
 fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    let (width, height) = hooks.use_terminal_size();
     let mut system = hooks.use_context_mut::<SystemContext>();
+    let (stdout, _) = hooks.use_output();
+
+    hooks.use_future(async move {
+        let _ = stdout.println("VT Code terminal ready");
+    });
+
     let lines = hooks.use_state(Vec::<StyledLine>::default);
     let current_line = hooks.use_state(StyledLine::default);
     let current_active = hooks.use_state(|| false);
     let prompt_prefix = hooks.use_state(|| "❯ ".to_string());
     let prompt_style = hooks.use_state(IocraftTextStyle::default);
-    let input_value = hooks.use_state(|| String::new());
+    let mut input_value = hooks.use_state(String::new);
     let placeholder_hint = hooks.use_state(|| props.placeholder.clone().unwrap_or_default());
     let show_placeholder = hooks.use_state(|| props.placeholder.is_some());
-    let should_exit = hooks.use_state(|| false);
+    let mut should_exit = hooks.use_state(|| false);
     let theme_state = hooks.use_state(|| props.theme.clone());
     let command_state = hooks.use_state(|| props.commands.take());
+    let line_count_state = hooks.use_state(|| 0usize);
+    let scroll_offset_state = hooks.use_state(|| 0usize);
+    let manual_scroll_state = hooks.use_state(|| false);
+    let tool_prompt_state = hooks.use_state(|| None::<ToolPermissionPrompt>);
 
+    let estimated_view_capacity = cmp::max(height.saturating_sub(12) as usize, 8);
+
+    let tool_prompt_for_commands = tool_prompt_state.clone();
     hooks.use_future({
         let mut command_slot = command_state;
         let mut lines_state = lines;
@@ -204,6 +290,11 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
         let mut placeholder_state = placeholder_hint;
         let mut placeholder_visible_state = show_placeholder;
         let mut exit_state = should_exit;
+        let mut theme_handle_state = theme_state;
+        let mut line_count = line_count_state;
+        let mut scroll_offset = scroll_offset_state;
+        let manual_scroll = manual_scroll_state;
+        let mut tool_prompt_store = tool_prompt_for_commands;
         async move {
             let receiver = {
                 let mut guard = command_slot
@@ -226,8 +317,19 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                             &mut lines_state,
                             was_active,
                         );
-                        if let Some(mut lines) = lines_state.try_write() {
-                            lines.push(StyledLine { segments });
+                        if let Some(mut lines_guard) = lines_state.try_write() {
+                            let line_kind = segments
+                                .iter()
+                                .find(|segment| !segment.text.is_empty())
+                                .map(|segment| segment.kind)
+                                .unwrap_or_default();
+                            lines_guard.push(StyledLine {
+                                segments,
+                                kind: line_kind,
+                            });
+                        }
+                        if !manual_scroll.get() {
+                            scroll_offset.set(0);
                         }
                     }
                     IocraftCommand::Inline { segment } => {
@@ -237,6 +339,9 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                             &mut lines_state,
                             segment,
                         );
+                        if !manual_scroll.get() {
+                            scroll_offset.set(0);
+                        }
                     }
                     IocraftCommand::SetPrompt { prefix, style } => {
                         prompt_prefix_state.set(prefix);
@@ -247,14 +352,38 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                         placeholder_visible_state.set(hint.is_some());
                     }
                     IocraftCommand::SetTheme { theme } => {
-                        let mut theme_handle = theme_state;
-                        theme_handle.set(theme);
+                        theme_handle_state.set(theme);
+                    }
+                    IocraftCommand::RequestToolPermission {
+                        tool,
+                        description,
+                        responder,
+                    } => {
+                        let existing_prompt = tool_prompt_store.read().clone();
+                        if let Some(active) = existing_prompt {
+                            active.respond(false);
+                        }
+                        tool_prompt_store.set(Some(ToolPermissionPrompt::new(
+                            tool,
+                            description,
+                            responder,
+                        )));
                     }
                     IocraftCommand::Shutdown => {
                         exit_state.set(true);
                         break;
                     }
                 }
+
+                let mut total = lines_state.read().len();
+                if current_active_state.get() {
+                    if let Some(line) = current_line_state.try_read() {
+                        if !line.segments.is_empty() {
+                            total += 1;
+                        }
+                    }
+                }
+                line_count.set(total);
             }
         }
     });
@@ -266,6 +395,10 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
     let events_tx = props.events.clone().expect("iocraft events sender missing");
     let mut last_escape = hooks.use_state(|| None::<Instant>);
     let mut placeholder_toggle = show_placeholder;
+    let mut scroll_handle = scroll_offset_state;
+    let mut manual_scroll_toggle = manual_scroll_state;
+    let line_count_snapshot = line_count_state;
+    let mut prompt_state_for_events = tool_prompt_state.clone();
 
     hooks.use_terminal_events(move |event| {
         if let TerminalEvent::Key(KeyEvent {
@@ -279,13 +412,30 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                 return;
             }
 
+            let active_prompt_opt = prompt_state_for_events.read().clone();
+            if let Some(active_prompt) = active_prompt_opt {
+                match code {
+                    KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Enter => {
+                        active_prompt.respond(true);
+                        prompt_state_for_events.set(None);
+                    }
+                    KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                        active_prompt.respond(false);
+                        prompt_state_for_events.set(None);
+                    }
+                    _ => {}
+                }
+                return;
+            }
+
             match code {
                 KeyCode::Enter => {
                     let text = input_value.to_string();
-                    let mut input_handle = input_value;
-                    input_handle.set(String::new());
+                    input_value.set(String::new());
                     last_escape.set(None);
                     placeholder_toggle.set(false);
+                    manual_scroll_toggle.set(false);
+                    scroll_handle.set(0);
                     let _ = events_tx.send(IocraftEvent::Submit(text));
                 }
                 KeyCode::Esc => {
@@ -297,8 +447,7 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                         .unwrap_or(false)
                     {
                         let _ = events_tx.send(IocraftEvent::Exit);
-                        let mut exit_flag = should_exit;
-                        exit_flag.set(true);
+                        should_exit.set(true);
                     } else {
                         last_escape.set(Some(now));
                         let _ = events_tx.send(IocraftEvent::Cancel);
@@ -306,29 +455,78 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                 }
                 KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => {
                     let _ = events_tx.send(IocraftEvent::Interrupt);
-                    let mut exit_flag = should_exit;
-                    exit_flag.set(true);
+                    should_exit.set(true);
                 }
                 KeyCode::Up => {
+                    manual_scroll_toggle.set(true);
+                    let total = line_count_snapshot.get();
+                    let next_offset = cmp::min(
+                        scroll_handle.get().saturating_add(1),
+                        total.saturating_sub(1),
+                    );
+                    scroll_handle.set(next_offset);
                     let _ = events_tx.send(IocraftEvent::ScrollLineUp);
                 }
                 KeyCode::Down => {
+                    let current = scroll_handle.get();
+                    if current > 0 {
+                        let new_offset = current.saturating_sub(1);
+                        scroll_handle.set(new_offset);
+                        if new_offset == 0 {
+                            manual_scroll_toggle.set(false);
+                        }
+                    }
                     let _ = events_tx.send(IocraftEvent::ScrollLineDown);
                 }
                 KeyCode::PageUp => {
+                    manual_scroll_toggle.set(true);
+                    let total = line_count_snapshot.get();
+                    let next_offset = cmp::min(
+                        scroll_handle.get().saturating_add(estimated_view_capacity),
+                        total.saturating_sub(1),
+                    );
+                    scroll_handle.set(next_offset);
                     let _ = events_tx.send(IocraftEvent::ScrollPageUp);
                 }
                 KeyCode::PageDown => {
+                    let current = scroll_handle.get();
+                    let step = estimated_view_capacity;
+                    if current > 0 {
+                        let new_offset = current.saturating_sub(step);
+                        scroll_handle.set(new_offset);
+                        if new_offset == 0 {
+                            manual_scroll_toggle.set(false);
+                        }
+                    }
                     let _ = events_tx.send(IocraftEvent::ScrollPageDown);
+                }
+                KeyCode::End => {
+                    manual_scroll_toggle.set(false);
+                    scroll_handle.set(0);
                 }
                 KeyCode::Char('k')
                     if modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
                 {
+                    manual_scroll_toggle.set(true);
+                    let total = line_count_snapshot.get();
+                    let next_offset = cmp::min(
+                        scroll_handle.get().saturating_add(1),
+                        total.saturating_sub(1),
+                    );
+                    scroll_handle.set(next_offset);
                     let _ = events_tx.send(IocraftEvent::ScrollLineUp);
                 }
                 KeyCode::Char('j')
                     if modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
                 {
+                    let current = scroll_handle.get();
+                    if current > 0 {
+                        let new_offset = current.saturating_sub(1);
+                        scroll_handle.set(new_offset);
+                        if new_offset == 0 {
+                            manual_scroll_toggle.set(false);
+                        }
+                    }
                     let _ = events_tx.send(IocraftEvent::ScrollLineDown);
                 }
                 _ => {}
@@ -338,7 +536,7 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
 
     let mut transcript_lines = lines.read().clone();
     if let Some(current) = current_line.try_read() {
-        if current_active.get() && (!current.segments.is_empty()) {
+        if current_active.get() && !current.segments.is_empty() {
             transcript_lines.push(current.clone());
         }
     }
@@ -348,25 +546,20 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
     let input_value_string = input_value.to_string();
     let placeholder_text = placeholder_hint.to_string();
     let placeholder_visible = show_placeholder.get() && !placeholder_text.is_empty();
+    let prompt_snapshot = tool_prompt_state.read().clone();
+    let prompt_active = prompt_snapshot.is_some();
 
-    let transcript_rows = transcript_lines.into_iter().map(|line| {
-        element! {
-            View(flex_direction: FlexDirection::Row) {
-                #(line
-                    .segments
-                    .into_iter()
-                    .map(|segment| element! {
-                        Text(
-                            content: segment.text,
-                            color: segment.style.color,
-                            weight: segment.style.weight,
-                            italic: segment.style.italic,
-                            wrap: TextWrap::NoWrap,
-                        )
-                    }))
-            }
-        }
-    });
+    let total_lines = transcript_lines.len();
+    let manual_scroll_active = manual_scroll_state.get();
+    let applied_offset = cmp::min(scroll_offset_state.get(), total_lines.saturating_sub(1));
+    let end_index = total_lines.saturating_sub(applied_offset);
+    let start_index = end_index.saturating_sub(estimated_view_capacity).max(0);
+
+    let visible_lines: Vec<StyledLine> = transcript_lines
+        .into_iter()
+        .skip(start_index)
+        .take(estimated_view_capacity)
+        .collect();
 
     let theme_value = theme_state.read().clone();
 
@@ -374,6 +567,33 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
         .background
         .unwrap_or(Color::Rgb { r: 0, g: 0, b: 0 });
     let foreground = theme_value.foreground.unwrap_or(Color::White);
+    let primary = theme_value.primary.unwrap_or(foreground);
+    let secondary = theme_value.secondary.unwrap_or(primary);
+    let alert = theme_value.alert.unwrap_or(Color::Red);
+
+    let surface = lighten_color(background, 0.06);
+    let transcript_surface = lighten_color(background, 0.04);
+    let header_background = mix_colors(primary, background, 0.35);
+    let header_border = mix_colors(primary, background, 0.6);
+    let footer_background = mix_colors(secondary, background, 0.3);
+    let frame_color = mix_colors(primary, background, 0.45);
+    let input_surface = lighten_color(background, 0.1);
+    let input_border = mix_colors(secondary, background, 0.4);
+    let input_inner_surface = lighten_color(background, 0.14);
+    let logo_background = mix_colors(primary, background, 0.55);
+
+    let user_bubble_bg = mix_colors(primary, background, 0.3);
+    let agent_bubble_bg = mix_colors(secondary, background, 0.35);
+    let system_bubble_bg = lighten_color(background, 0.12);
+    let tool_bubble_bg = mix_colors(secondary, background, 0.45);
+    let error_bubble_bg = mix_colors(alert, background, 0.4);
+    let reasoning_bubble_bg = mix_colors(secondary, background, 0.5);
+    let overlay_scrim = mix_colors(background, Color::Black, 0.65);
+    let prompt_card_bg = lighten_color(background, 0.18);
+    let prompt_card_border = mix_colors(primary, background, 0.5);
+    let approve_button_color = mix_colors(primary, background, 0.25);
+    let deny_button_color = mix_colors(alert, background, 0.25);
+    let button_trim_color = mix_colors(foreground, background, 0.3);
 
     let placeholder_color = theme_value.secondary.or(Some(foreground));
     let placeholder_element = placeholder_visible.then(|| {
@@ -382,51 +602,398 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                 content: placeholder_text.clone(),
                 color: placeholder_color,
                 italic: true,
+                wrap: TextWrap::Wrap,
             )
         }
     });
+
+    let mut transcript_rows: Vec<AnyElement<'static>> = visible_lines
+        .into_iter()
+        .map(|line| {
+            if line.segments.is_empty() {
+                return element! {
+                    View(height: 1u16) {
+                        Text(content: "", wrap: TextWrap::NoWrap)
+                    }
+                }
+                .into();
+            }
+
+            let (bubble_bg, border_color, text_color) = match line.kind {
+                IocraftMessageKind::User => (user_bubble_bg, primary, foreground),
+                IocraftMessageKind::Agent => (agent_bubble_bg, secondary, foreground),
+                IocraftMessageKind::Tool => (tool_bubble_bg, secondary, foreground),
+                IocraftMessageKind::Error => (error_bubble_bg, alert, foreground),
+                IocraftMessageKind::Reasoning => (reasoning_bubble_bg, secondary, foreground),
+                IocraftMessageKind::System => (system_bubble_bg, frame_color, foreground),
+            };
+
+            let alignment = match line.kind {
+                IocraftMessageKind::User => AlignItems::FlexEnd,
+                _ => AlignItems::FlexStart,
+            };
+
+            let label_color = mix_colors(border_color, foreground, 0.2);
+
+            let message_segments = line.segments.into_iter().map(|segment| {
+                let color = segment.style.color.unwrap_or(text_color);
+                element! {
+                    Text(
+                        content: segment.text,
+                        color: Some(color),
+                        weight: segment.style.weight,
+                        italic: segment.style.italic,
+                        wrap: TextWrap::Wrap,
+                    )
+                }
+            });
+
+            element! {
+                View(
+                    flex_direction: FlexDirection::Column,
+                    align_items: alignment,
+                    width: 100pct,
+                    gap: 0u16,
+                ) {
+                    Text(
+                        content: message_label(line.kind).to_string(),
+                        color: Some(label_color),
+                        weight: Weight::Bold,
+                        italic: false,
+                        wrap: TextWrap::NoWrap,
+                    )
+                    View(
+                        background_color: Some(bubble_bg),
+                        border_style: BorderStyle::Round,
+                        border_color: Some(border_color),
+                        padding_left: 2u16,
+                        padding_right: 2u16,
+                        padding_top: 1u16,
+                        padding_bottom: 1u16,
+                        gap: 0u16,
+                        max_width: 90pct,
+                    ) {
+                        #(message_segments)
+                    }
+                }
+            }
+            .into()
+        })
+        .collect();
+
+    if transcript_rows.is_empty() {
+        transcript_rows.push(
+            element! {
+                View(
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::Center,
+                    padding: 2u16,
+                ) {
+                    Text(
+                        content: "Welcome! Start by typing a prompt or load a project.",
+                        color: Some(foreground),
+                        weight: Weight::Bold,
+                        wrap: TextWrap::Wrap,
+                    )
+                }
+            }
+            .into(),
+        );
+    }
+
+    if manual_scroll_active {
+        transcript_rows.insert(
+            0,
+            element! {
+                View(
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::Center,
+                    border_style: BorderStyle::Classic,
+                    border_color: Some(frame_color),
+                    background_color: Some(surface),
+                    padding_left: 2u16,
+                    padding_right: 2u16,
+                    padding_top: 1u16,
+                    padding_bottom: 1u16,
+                ) {
+                    Text(
+                        content: format!("Viewing history (offset {})", applied_offset),
+                        color: Some(foreground),
+                        weight: Weight::Bold,
+                        wrap: TextWrap::NoWrap,
+                    )
+                }
+            }
+            .into(),
+        );
+    }
+
     let input_value_state = input_value;
+    let prompt_state_for_buttons = tool_prompt_state.clone();
+
+    let prompt_overlay: Option<AnyElement<'static>> = prompt_snapshot.clone().map(|prompt| {
+        let tool_name = prompt.tool.clone();
+        let description = prompt
+            .description
+            .clone()
+            .unwrap_or_else(|| format!("Allow the agent to use '{tool_name}'?"));
+        let mut approve_state = prompt_state_for_buttons.clone();
+        let mut deny_state = prompt_state_for_buttons.clone();
+        let helper_color = mix_colors(foreground, background, 0.35);
+
+        element! {
+            View(
+                position: Position::Absolute,
+                left: 0i16,
+                top: 0i16,
+                width: 100pct,
+                height: 100pct,
+                background_color: Some(overlay_scrim),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                padding_left: 4u16,
+                padding_right: 4u16,
+            ) {
+                View(
+                    flex_direction: FlexDirection::Column,
+                    gap: 1u16,
+                    background_color: Some(prompt_card_bg),
+                    border_style: BorderStyle::Round,
+                    border_color: Some(prompt_card_border),
+                    padding_left: 3u16,
+                    padding_right: 3u16,
+                    padding_top: 2u16,
+                    padding_bottom: 2u16,
+                    max_width: 70pct,
+                ) {
+                    Text(
+                        content: "Tool permission required",
+                        color: Some(foreground),
+                        weight: Weight::Bold,
+                        wrap: TextWrap::Wrap,
+                    )
+                    Text(
+                        content: format!("Tool: {tool_name}"),
+                        color: Some(theme_value.secondary.unwrap_or(foreground)),
+                        weight: Weight::Bold,
+                        wrap: TextWrap::Wrap,
+                    )
+                    Text(
+                        content: description,
+                        color: Some(foreground),
+                        wrap: TextWrap::Wrap,
+                    )
+                    View(
+                        flex_direction: FlexDirection::Row,
+                        gap: 2u16,
+                        margin_top: 1u16,
+                    ) {
+                        Button(
+                            handler: move |_| {
+                                let active_opt = approve_state.read().clone();
+                                if let Some(active) = active_opt {
+                                    active.respond(true);
+                                    approve_state.set(None);
+                                }
+                            },
+                        ) {
+                            View(
+                                border_style: BorderStyle::Round,
+                                border_color: Some(button_trim_color),
+                                background_color: Some(approve_button_color),
+                                padding_left: 3u16,
+                                padding_right: 3u16,
+                                padding_top: 1u16,
+                                padding_bottom: 1u16,
+                            ) {
+                                Text(
+                                    content: "Approve",
+                                    color: Some(foreground),
+                                    weight: Weight::Bold,
+                                    wrap: TextWrap::NoWrap,
+                                )
+                            }
+                        }
+                        Button(
+                            handler: move |_| {
+                                let active_opt = deny_state.read().clone();
+                                if let Some(active) = active_opt {
+                                    active.respond(false);
+                                    deny_state.set(None);
+                                }
+                            },
+                        ) {
+                            View(
+                                border_style: BorderStyle::Round,
+                                border_color: Some(button_trim_color),
+                                background_color: Some(deny_button_color),
+                                padding_left: 3u16,
+                                padding_right: 3u16,
+                                padding_top: 1u16,
+                                padding_bottom: 1u16,
+                            ) {
+                                Text(
+                                    content: "Deny",
+                                    color: Some(foreground),
+                                    weight: Weight::Bold,
+                                    wrap: TextWrap::NoWrap,
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        content: "Tip: Y/Enter to approve, N/Esc to deny",
+                        color: Some(helper_color),
+                        italic: true,
+                        wrap: TextWrap::Wrap,
+                    )
+                }
+            }
+        }
+        .into()
+    });
 
     element! {
         View(
+            width,
+            height,
             flex_direction: FlexDirection::Column,
-            padding: 1u16,
+            background_color: Some(background),
+            padding_top: 1u16,
+            padding_bottom: 1u16,
+            padding_left: 2u16,
+            padding_right: 2u16,
             gap: 1u16,
-            background_color: background,
         ) {
+            View(
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                gap: 2u16,
+                border_style: BorderStyle::Round,
+                border_color: Some(header_border),
+                background_color: Some(header_background),
+                padding_left: 3u16,
+                padding_right: 3u16,
+                padding_top: 1u16,
+                padding_bottom: 1u16,
+            ) {
+                View(
+                    border_style: BorderStyle::Round,
+                    border_color: Some(frame_color),
+                    background_color: Some(logo_background),
+                    padding_left: 2u16,
+                    padding_right: 2u16,
+                    padding_top: 0u16,
+                    padding_bottom: 0u16,
+                ) {
+                    Text(
+                        content: "VT",
+                        color: Some(foreground),
+                        weight: Weight::Bold,
+                        wrap: TextWrap::NoWrap,
+                    )
+                }
+                View(
+                    flex_direction: FlexDirection::Column,
+                    gap: 0u16,
+                ) {
+                    Text(
+                        content: "VT Code",
+                        color: Some(foreground),
+                        weight: Weight::Bold,
+                        wrap: TextWrap::NoWrap,
+                    )
+                    Text(
+                        content: "Terminal workspace for building software",
+                        color: Some(lighten_color(foreground, 0.2)),
+                        wrap: TextWrap::Wrap,
+                    )
+                }
+            }
             View(
                 flex_direction: FlexDirection::Column,
                 flex_grow: 1.0,
-                gap: 0u16,
-                overflow: Overflow::Hidden,
+                gap: 1u16,
+                border_style: BorderStyle::Round,
+                border_color: Some(frame_color),
+                background_color: Some(transcript_surface),
+                padding_left: 2u16,
+                padding_right: 2u16,
+                padding_top: 1u16,
+                padding_bottom: 1u16,
             ) {
-                #(transcript_rows)
-            }
-            View(flex_direction: FlexDirection::Column, gap: 1u16) {
                 View(
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
+                    flex_direction: FlexDirection::Column,
+                    flex_grow: 1.0,
                     gap: 1u16,
                 ) {
-                    Text(
-                        content: prompt_prefix_value.clone(),
-                        color: prompt_style_value.color.or(theme_value.secondary),
-                        weight: prompt_style_value.weight,
-                        italic: prompt_style_value.italic,
-                        wrap: TextWrap::NoWrap,
-                    )
-                    TextInput(
-                        has_focus: true,
-                        value: input_value_string.clone(),
-                        on_change: move |value| {
-                            let mut handle = input_value_state;
-                            handle.set(value);
-                        },
-                        color: theme_value.foreground,
-                    )
+                    #(transcript_rows)
                 }
-                #(placeholder_element.into_iter())
+                View(
+                    flex_direction: FlexDirection::Column,
+                    gap: 1u16,
+                    border_style: BorderStyle::Round,
+                    border_color: Some(input_border),
+                    background_color: Some(input_surface),
+                    padding_left: 2u16,
+                    padding_right: 2u16,
+                    padding_top: 1u16,
+                    padding_bottom: 1u16,
+                ) {
+                    View(
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        gap: 1u16,
+                    ) {
+                        Text(
+                            content: prompt_prefix_value.clone(),
+                            color: prompt_style_value.color.or(theme_value.secondary),
+                            weight: prompt_style_value.weight,
+                            italic: prompt_style_value.italic,
+                            wrap: TextWrap::NoWrap,
+                        )
+                        View(
+                            flex_direction: FlexDirection::Column,
+                            flex_grow: 1.0,
+                            border_style: BorderStyle::Classic,
+                            border_color: Some(input_border),
+                            background_color: Some(input_inner_surface),
+                            padding_left: 1u16,
+                            padding_right: 1u16,
+                            padding_top: 0u16,
+                            padding_bottom: 0u16,
+                        ) {
+                            TextInput(
+                                has_focus: !prompt_active,
+                                value: input_value_string.clone(),
+                                on_change: move |value| {
+                                    let mut handle = input_value_state;
+                                    handle.set(value);
+                                },
+                                color: Some(foreground),
+                            )
+                        }
+                    }
+                    #(placeholder_element.into_iter())
+                }
             }
+            View(
+                flex_direction: FlexDirection::Row,
+                border_style: BorderStyle::Classic,
+                border_color: Some(frame_color),
+                background_color: Some(footer_background),
+                padding_left: 2u16,
+                padding_right: 2u16,
+                padding_top: 1u16,
+                padding_bottom: 1u16,
+            ) {
+                Text(
+                    content: "Enter: send • Esc Esc: exit • Ctrl+C: interrupt • PgUp/PgDn: scroll • /help for commands",
+                    color: Some(foreground),
+                    wrap: TextWrap::Wrap,
+                )
+            }
+            #(prompt_overlay.into_iter())
         }
     }
 }
@@ -477,6 +1044,7 @@ fn append_inline_segment(
                 cur.push_segment(IocraftSegment {
                     text: part.to_string(),
                     style: style.clone(),
+                    kind: segment.kind,
                 });
             }
             current_active.set(true);
@@ -489,6 +1057,116 @@ fn append_inline_segment(
 
     if ends_with_newline {
         flush_current_line(current_line, current_active, lines_state, true);
+    }
+}
+
+fn message_label(kind: IocraftMessageKind) -> &'static str {
+    match kind {
+        IocraftMessageKind::User => "You",
+        IocraftMessageKind::Agent => "VT Code",
+        IocraftMessageKind::Tool => "Tool Output",
+        IocraftMessageKind::Error => "Alert",
+        IocraftMessageKind::Reasoning => "Thinking",
+        IocraftMessageKind::System => "System",
+    }
+}
+
+fn mix_colors(base: Color, target: Color, ratio: f32) -> Color {
+    let (br, bg, bb) = color_to_rgb_components(base);
+    let (tr, tg, tb) = color_to_rgb_components(target);
+    let ratio = ratio.clamp(0.0, 1.0);
+    let blend = |start: u8, end: u8| -> u8 {
+        let start = start as f32;
+        let end = end as f32;
+        ((start + (end - start) * ratio).round()).clamp(0.0, 255.0) as u8
+    };
+    Color::Rgb {
+        r: blend(br, tr),
+        g: blend(bg, tg),
+        b: blend(bb, tb),
+    }
+}
+
+fn lighten_color(color: Color, ratio: f32) -> Color {
+    mix_colors(
+        color,
+        Color::Rgb {
+            r: 255,
+            g: 255,
+            b: 255,
+        },
+        ratio,
+    )
+}
+
+fn color_to_rgb_components(color: Color) -> (u8, u8, u8) {
+    match color {
+        Color::Black => (0, 0, 0),
+        Color::DarkGrey => (128, 128, 128),
+        Color::Grey => (192, 192, 192),
+        Color::White => (255, 255, 255),
+        Color::DarkRed => (128, 0, 0),
+        Color::Red => (255, 0, 0),
+        Color::DarkGreen => (0, 128, 0),
+        Color::Green => (0, 255, 0),
+        Color::DarkYellow => (128, 128, 0),
+        Color::Yellow => (255, 255, 0),
+        Color::DarkBlue => (0, 0, 128),
+        Color::Blue => (0, 0, 255),
+        Color::DarkMagenta => (128, 0, 128),
+        Color::Magenta => (255, 0, 255),
+        Color::DarkCyan => (0, 128, 128),
+        Color::Cyan => (0, 255, 255),
+        Color::AnsiValue(value) => ansi_value_to_rgb(value),
+        Color::Rgb { r, g, b } => (r, g, b),
+        Color::Reset => (255, 255, 255),
+    }
+}
+
+fn ansi_value_to_rgb(value: u8) -> (u8, u8, u8) {
+    match value {
+        0 => (0, 0, 0),
+        1 => (128, 0, 0),
+        2 => (0, 128, 0),
+        3 => (128, 128, 0),
+        4 => (0, 0, 128),
+        5 => (128, 0, 128),
+        6 => (0, 128, 128),
+        7 => (192, 192, 192),
+        8 => (128, 128, 128),
+        9 => (255, 0, 0),
+        10 => (0, 255, 0),
+        11 => (255, 255, 0),
+        12 => (0, 0, 255),
+        13 => (255, 0, 255),
+        14 => (0, 255, 255),
+        15 => (255, 255, 255),
+        16..=231 => {
+            let index = value - 16;
+            let r = index / 36;
+            let g = (index % 36) / 6;
+            let b = index % 6;
+            (
+                rgb_component_from_cube(r),
+                rgb_component_from_cube(g),
+                rgb_component_from_cube(b),
+            )
+        }
+        232..=255 => {
+            let shade = (value - 232) * 10 + 8;
+            (shade, shade, shade)
+        }
+    }
+}
+
+fn rgb_component_from_cube(value: u8) -> u8 {
+    match value {
+        0 => 0,
+        1 => 95,
+        2 => 135,
+        3 => 175,
+        4 => 215,
+        _ => 255,
     }
 }
 
@@ -544,5 +1222,6 @@ pub fn theme_from_styles(styles: &crate::ui::theme::ThemeStyles) -> IocraftTheme
         foreground: convert_style(styles.output).color,
         primary: convert_style(styles.primary).color,
         secondary: convert_style(styles.secondary).color,
+        alert: convert_style(styles.error).color,
     }
 }

@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::ui::iocraft::IocraftHandle;
 use crate::ui::theme;
 use crate::utils::ansi::{AnsiRenderer, MessageStyle};
 
@@ -379,7 +380,11 @@ impl ToolPolicyManager {
     }
 
     /// Check if tool should be executed based on policy
-    pub fn should_execute_tool(&mut self, tool_name: &str) -> Result<bool> {
+    pub async fn should_execute_tool(
+        &mut self,
+        tool_name: &str,
+        handle: Option<&IocraftHandle>,
+    ) -> Result<bool> {
         match self.get_policy(tool_name) {
             ToolPolicy::Allow => Ok(true),
             ToolPolicy::Deny => Ok(false),
@@ -388,14 +393,25 @@ impl ToolPolicyManager {
                     self.set_policy(tool_name, ToolPolicy::Allow)?;
                     return Ok(true);
                 }
-                let should_execute = self.prompt_user_for_tool(tool_name)?;
-                Ok(should_execute)
+                self.prompt_user_for_tool(tool_name, handle).await
             }
         }
     }
 
     /// Prompt user for tool execution permission
-    fn prompt_user_for_tool(&mut self, tool_name: &str) -> Result<bool> {
+    async fn prompt_user_for_tool(
+        &mut self,
+        tool_name: &str,
+        handle: Option<&IocraftHandle>,
+    ) -> Result<bool> {
+        if let Some(handle) = handle {
+            return self.prompt_with_iocraft(tool_name, handle).await;
+        }
+
+        self.prompt_user_for_tool_cli(tool_name)
+    }
+
+    fn prompt_user_for_tool_cli(&mut self, tool_name: &str) -> Result<bool> {
         let interactive = std::io::stdin().is_terminal() && std::io::stdout().is_terminal();
         let mut renderer = AnsiRenderer::stdout();
         let banner_style = theme::banner_style();
@@ -405,29 +421,48 @@ impl ToolPolicyManager {
                 "Non-interactive environment detected. Auto-approving '{}' tool.",
                 tool_name
             );
-            renderer.line_with_style(banner_style, &message)?;
+            renderer.line_with_style(MessageStyle::Info, banner_style, &message)?;
             return Ok(true);
         }
 
         let header = format!("Tool Permission Request: {}", tool_name);
-        renderer.line_with_style(banner_style, &header)?;
+        renderer.line_with_style(MessageStyle::Info, banner_style, &header)?;
         renderer.line_with_style(
+            MessageStyle::Info,
             banner_style,
             &format!("The agent wants to use the '{}' tool.", tool_name),
         )?;
-        renderer.line_with_style(banner_style, "")?;
+        renderer.line_with_style(MessageStyle::Info, banner_style, "")?;
         renderer.line_with_style(
+            MessageStyle::Info,
             banner_style,
             "This decision applies to the current request only.",
         )?;
         renderer.line_with_style(
+            MessageStyle::Info,
             banner_style,
             "Update the policy file or use CLI flags to change the default.",
         )?;
-        renderer.line_with_style(banner_style, "")?;
+        renderer.line_with_style(MessageStyle::Info, banner_style, "")?;
+        renderer.line_with_style(
+            MessageStyle::Info,
+            banner_style,
+            "┌──────────────┐   ┌──────────────┐",
+        )?;
+        renderer.line_with_style(
+            MessageStyle::Info,
+            banner_style,
+            "│   Approve    │   │     Deny     │",
+        )?;
+        renderer.line_with_style(
+            MessageStyle::Info,
+            banner_style,
+            "└──────────────┘   └──────────────┘",
+        )?;
 
         if AUTO_ALLOW_TOOLS.contains(&tool_name) {
             renderer.line_with_style(
+                MessageStyle::Info,
                 banner_style,
                 &format!(
                     "Auto-approving '{}' tool (default trusted tool).",
@@ -498,6 +533,50 @@ impl ToolPolicyManager {
                 Ok(false)
             }
         }
+    }
+
+    async fn prompt_with_iocraft(
+        &mut self,
+        tool_name: &str,
+        handle: &IocraftHandle,
+    ) -> Result<bool> {
+        let mut renderer = AnsiRenderer::with_iocraft(handle.clone());
+        let banner_style = theme::banner_style();
+        renderer.line_with_style(
+            MessageStyle::Info,
+            banner_style,
+            &format!("Tool Permission Request: {}", tool_name),
+        )?;
+        renderer.line_with_style(
+            MessageStyle::Info,
+            banner_style,
+            &format!("The agent wants to use the '{}' tool.", tool_name),
+        )?;
+        renderer.line_with_style(
+            MessageStyle::Info,
+            banner_style,
+            "Respond using the on-screen buttons or keyboard shortcuts.",
+        )?;
+
+        let approved = handle
+            .request_tool_permission(
+                tool_name.to_string(),
+                Some("Approve to let the agent continue.".to_string()),
+            )
+            .await;
+
+        let message = if approved {
+            format!("✓ Approved: '{}' tool will run now", tool_name)
+        } else {
+            format!("✗ Denied: '{}' tool will not run", tool_name)
+        };
+        let style = if approved {
+            MessageStyle::Tool
+        } else {
+            MessageStyle::Error
+        };
+        renderer.line(style, &message)?;
+        Ok(approved)
     }
 
     /// Set policy for a specific tool

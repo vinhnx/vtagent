@@ -20,7 +20,7 @@ enable_self_review = false
 max_review_passes = 1
 
 # UI theme applied to ANSI output (options: "ciapre-dark", "ciapre-blue")
-theme = "ciapre-dark"
+theme = "ciapre-blue"
 
 [agent.onboarding]
 enabled = true

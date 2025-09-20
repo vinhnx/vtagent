@@ -100,12 +100,8 @@ fn test_anthropic_tool_call_format() {
     let tool_msg = Message {
         role: MessageRole::Tool,
         content: "Sunny, 72°F".to_string(),
-        tool_calls: Some(vec![ToolCall::function(
-            "toolu_123".to_string(),
-            "get_weather".to_string(),
-            json!({}).to_string(),
-        )]),
-        tool_call_id: None,
+        tool_calls: None,
+        tool_call_id: Some("toolu_123".to_string()),
     };
 
     let request = LLMRequest {
@@ -163,12 +159,8 @@ fn test_gemini_tool_call_format() {
     let tool_msg = Message {
         role: MessageRole::Tool,
         content: "Sunny, 72°F".to_string(),
-        tool_calls: Some(vec![ToolCall::function(
-            "func_123".to_string(),
-            "get_weather".to_string(),
-            json!({"location": "New York"}).to_string(),
-        )]),
-        tool_call_id: None,
+        tool_calls: None,
+        tool_call_id: Some("func_123".to_string()),
     };
 
     let request = LLMRequest {
@@ -179,7 +171,7 @@ fn test_gemini_tool_call_format() {
         ],
         system_prompt: Some("You are a helpful assistant.".to_string()),
         tools: Some(vec![tool]),
-        model: "gemini-2.5-flash".to_string(),
+        model: "gemini-2.5-flash-preview-05-20".to_string(),
         max_tokens: Some(1000),
         temperature: Some(0.7),
         stream: false,
@@ -209,7 +201,7 @@ fn test_all_providers_tool_validation() {
         messages: vec![Message::user("test".to_string())],
         system_prompt: None,
         tools: Some(vec![tool.clone()]),
-        model: "gemini-2.5-flash".to_string(),
+        model: "gemini-2.5-flash-preview-05-20".to_string(),
         max_tokens: Some(1000),
         temperature: Some(0.7),
         stream: false,

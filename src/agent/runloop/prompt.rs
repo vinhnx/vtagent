@@ -82,7 +82,7 @@ mod tests {
         }
 
         let cfg = CoreAgentConfig {
-            model: vtcode_core::config::constants::models::google::GEMINI_2_5_FLASH_LITE
+            model: vtcode_core::config::constants::models::google::GEMINI_2_5_FLASH_PREVIEW
                 .to_string(),
             api_key: "test".to_string(),
             workspace: std::env::current_dir().unwrap(),

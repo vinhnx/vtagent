@@ -178,7 +178,7 @@ pub(crate) async fn run_single_agent_loop_gemini(
                                         &args,
                                         true,
                                     );
-                                    render_tool_output(&tool_output);
+                                    render_tool_output(Some(name.as_str()), &tool_output);
                                 }
                                 Err(err) => {
                                     tool_spinner.finish_and_clear();
@@ -203,7 +203,7 @@ pub(crate) async fn run_single_agent_loop_gemini(
                             )
                             .to_json_value();
                             traj.log_tool_call(conversation_history.len(), &name, &args, false);
-                            render_tool_output(&denial);
+                            render_tool_output(Some(name.as_str()), &denial);
                         }
                         Err(err) => {
                             traj.log_tool_call(conversation_history.len(), &name, &args, false);
@@ -534,7 +534,7 @@ pub(crate) async fn run_single_agent_loop_gemini(
                         match tool_registry.execute_tool(name, args.clone()).await {
                             Ok(tool_output) => {
                                 tool_spinner.finish_and_clear();
-                                render_tool_output(&tool_output);
+                                render_tool_output(Some(name), &tool_output);
                                 let modified_files: Vec<String> = if let Some(files) = tool_output
                                     .get("modified_files")
                                     .and_then(|value| value.as_array())
@@ -627,7 +627,7 @@ pub(crate) async fn run_single_agent_loop_gemini(
                         )
                         .to_json_value();
                         traj.log_tool_call(working_history.len(), name, &args, false);
-                        render_tool_output(&denial);
+                        render_tool_output(Some(name), &denial);
                         let fr = FunctionResponse {
                             name: call.name.clone(),
                             response: denial,

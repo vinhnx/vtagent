@@ -273,7 +273,13 @@ impl FromStr for ModelId {
         use crate::config::constants::models;
         match s {
             // Gemini models
-            s if s == "gemini-2.5-flash-preview-05-20" => Ok(ModelId::Gemini25FlashPreview),
+            s if s == models::google::GEMINI_2_5_FLASH_PREVIEW => {
+                Ok(ModelId::Gemini25FlashPreview)
+            }
+            s if s == models::GEMINI_2_5_FLASH => Ok(ModelId::Gemini25FlashPreview),
+            "gemini-2.5-flash" | "gemini-2.5-flash-lite" | "gemini-2.5-flash-lite-preview-06-17" => {
+                Ok(ModelId::Gemini25FlashPreview)
+            }
             s if s == models::GEMINI_2_5_PRO => Ok(ModelId::Gemini25Pro),
             // OpenAI models
             s if s == models::GPT_5 => Ok(ModelId::GPT5),
@@ -337,7 +343,7 @@ mod tests {
         // Gemini models
         assert_eq!(
             ModelId::Gemini25FlashPreview.as_str(),
-            "gemini-2.5-flash-preview"
+            "gemini-2.5-flash-preview-05-20"
         );
         assert_eq!(ModelId::Gemini25Pro.as_str(), "gemini-2.5-pro");
         // OpenAI models
@@ -354,7 +360,25 @@ mod tests {
     fn test_model_from_string() {
         // Gemini models
         assert_eq!(
-            "gemini-2.5-flash-preview"
+            "gemini-2.5-flash-preview-05-20"
+                .parse::<ModelId>()
+                .unwrap(),
+            ModelId::Gemini25FlashPreview
+        );
+        assert_eq!(
+            "gemini-2.5-flash"
+                .parse::<ModelId>()
+                .unwrap(),
+            ModelId::Gemini25FlashPreview
+        );
+        assert_eq!(
+            "gemini-2.5-flash-lite"
+                .parse::<ModelId>()
+                .unwrap(),
+            ModelId::Gemini25FlashPreview
+        );
+        assert_eq!(
+            "gemini-2.5-flash-lite-preview-06-17"
                 .parse::<ModelId>()
                 .unwrap(),
             ModelId::Gemini25FlashPreview

@@ -16,6 +16,7 @@ pub mod models {
 
         // Convenience constants for commonly used models
         pub const GEMINI_2_5_FLASH_PREVIEW: &str = "gemini-2.5-flash-preview-05-20";
+        pub const GEMINI_2_5_FLASH: &str = GEMINI_2_5_FLASH_PREVIEW;
         pub const GEMINI_2_5_PRO: &str = "gemini-2.5-pro";
     }
 
@@ -51,6 +52,7 @@ pub mod models {
 
     // Backwards compatibility - keep old constants working
     pub const GEMINI_2_5_FLASH_PREVIEW: &str = google::GEMINI_2_5_FLASH_PREVIEW;
+    pub const GEMINI_2_5_FLASH: &str = google::GEMINI_2_5_FLASH;
     pub const GEMINI_2_5_PRO: &str = google::GEMINI_2_5_PRO;
     pub const GPT_5: &str = openai::GPT_5;
     pub const GPT_5_MINI: &str = openai::GPT_5_MINI;

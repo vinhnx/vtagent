@@ -126,6 +126,67 @@ impl AnsiRenderer {
         Ok(())
     }
 
+    /// Returns whether this renderer will emit ANSI color sequences
+    pub fn supports_color(&self) -> bool {
+        self.color
+    }
+
+    /// Write a line composed of styled segments with an optional prefix
+    pub fn line_segments(
+        &mut self,
+        prefix: Option<(Style, &str)>,
+        segments: &[(Style, &str)],
+    ) -> Result<()> {
+        let mut plain = String::new();
+        if let Some((_, text)) = &prefix {
+            if !text.is_empty() {
+                plain.push_str(text);
+            }
+        }
+
+        if self.color {
+            if let Some((style, text)) = &prefix {
+                if !text.is_empty() {
+                    write!(self.writer, "{style}{text}{Reset}")?;
+                }
+            } else if let Some((_, text)) = &prefix {
+                if !text.is_empty() {
+                    write!(self.writer, "{text}")?;
+                }
+            }
+
+            for (style, segment) in segments {
+                if segment.is_empty() {
+                    continue;
+                }
+                write!(self.writer, "{style}{segment}{Reset}")?;
+                plain.push_str(segment);
+            }
+        } else {
+            if let Some((_, text)) = &prefix {
+                if !text.is_empty() {
+                    write!(self.writer, "{text}")?;
+                }
+            }
+            for (_, segment) in segments {
+                if segment.is_empty() {
+                    continue;
+                }
+                write!(self.writer, "{segment}")?;
+                plain.push_str(segment);
+            }
+        }
+
+        if !plain.ends_with('\n') {
+            write!(self.writer, "\n")?;
+            plain.push('\n');
+        }
+
+        self.writer.flush()?;
+        transcript::append(&plain);
+        Ok(())
+    }
+
     /// Write a line with an explicit style
     pub fn line_with_style(&mut self, style: Style, text: &str) -> Result<()> {
         if self.color {

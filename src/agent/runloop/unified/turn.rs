@@ -380,7 +380,7 @@ pub(crate) async fn run_single_agent_loop_unified(
                                         &args,
                                         true,
                                     );
-                                    render_tool_output(Some(name.as_str()), &tool_output);
+                                    render_tool_output(Some(name.as_str()), &tool_output, vt_cfg);
                                 }
                                 Err(err) => {
                                     tool_spinner.finish_and_clear();
@@ -406,7 +406,7 @@ pub(crate) async fn run_single_agent_loop_unified(
                             )
                             .to_json_value();
                             traj.log_tool_call(conversation_history.len(), &name, &args, false);
-                            render_tool_output(Some(name.as_str()), &denial);
+                            render_tool_output(Some(name.as_str()), &denial, vt_cfg);
                         }
                         Err(err) => {
                             traj.log_tool_call(conversation_history.len(), &name, &args, false);
@@ -741,7 +741,7 @@ pub(crate) async fn run_single_agent_loop_unified(
                                         &args_val,
                                         true,
                                     );
-                                    render_tool_output(Some(name), &tool_output);
+                                    render_tool_output(Some(name), &tool_output, vt_cfg);
                                     last_tool_stdout = tool_output
                                         .get("stdout")
                                         .and_then(|value| value.as_str())
@@ -860,7 +860,7 @@ pub(crate) async fn run_single_agent_loop_unified(
                             )
                             .to_json_value();
                             traj.log_tool_call(working_history.len(), name, &args_val, false);
-                            render_tool_output(Some(name), &denial);
+                            render_tool_output(Some(name), &denial, vt_cfg);
                             let content =
                                 serde_json::to_string(&denial).unwrap_or("{}".to_string());
                             working_history

@@ -52,10 +52,58 @@ impl LLMClient for OpenAIProvider {
             .await
             .map_err(|e| LLMError::ApiError(format!("Failed to parse response: {}", e)))?;
 
-        let content = response_json["choices"][0]["message"]["content"]
-            .as_str()
-            .unwrap_or("")
-            .to_string();
+        let message = response_json
+            .get("choices")
+            .and_then(|choices| choices.get(0))
+            .and_then(|choice| choice.get("message"))
+            .cloned()
+            .unwrap_or_else(|| json!({"content": ""}));
+
+        let (content, reasoning_from_content) = match message.get("content") {
+            Some(Value::String(text)) => {
+                let trimmed = text.trim();
+                let content = if trimmed.is_empty() {
+                    String::new()
+                } else {
+                    text.to_string()
+                };
+                (content, None)
+            }
+            Some(Value::Array(parts)) => {
+                let mut content_buffer = String::new();
+                let mut reasoning_segments = Vec::new();
+
+                for part in parts {
+                    let text = part.get("text").and_then(|t| t.as_str()).unwrap_or("");
+                    if text.trim().is_empty() {
+                        continue;
+                    }
+
+                    match part.get("type").and_then(|t| t.as_str()) {
+                        Some("reasoning") | Some("analysis") | Some("thought")
+                        | Some("chain_of_thought") => {
+                            reasoning_segments.push(text.trim().to_string());
+                        }
+                        _ => content_buffer.push_str(text),
+                    }
+                }
+
+                let reasoning = if reasoning_segments.is_empty() {
+                    None
+                } else {
+                    let joined = reasoning_segments.join("\n");
+                    let trimmed = joined.trim();
+                    if trimmed.is_empty() {
+                        None
+                    } else {
+                        Some(trimmed.to_string())
+                    }
+                };
+
+                (content_buffer, reasoning)
+            }
+            _ => (String::new(), None),
+        };
 
         let usage = response_json["usage"]
             .as_object()
@@ -69,6 +117,7 @@ impl LLMClient for OpenAIProvider {
             content,
             model: self.model.clone(),
             usage,
+            reasoning: reasoning_from_content,
         })
     }
 

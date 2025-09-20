@@ -10,6 +10,8 @@ use async_trait::async_trait;
 use reqwest::Client as HttpClient;
 use serde_json::{Value, json};
 
+use super::extract_reasoning_trace;
+
 pub struct OpenAIProvider {
     api_key: String,
     http_client: HttpClient,
@@ -434,17 +436,60 @@ impl OpenAIProvider {
             LLMError::Provider(formatted_error)
         })?;
 
-        let content = match message.get("content") {
-            Some(Value::String(text)) => Some(text.to_string()),
-            Some(Value::Array(parts)) => {
-                let text = parts
-                    .iter()
-                    .filter_map(|part| part.get("text").and_then(|t| t.as_str()))
-                    .collect::<Vec<_>>()
-                    .join("");
-                if text.is_empty() { None } else { Some(text) }
+        let (content, reasoning_from_content) = match message.get("content") {
+            Some(Value::String(text)) => {
+                let trimmed = text.trim();
+                let content = if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(text.to_string())
+                };
+                (content, None)
             }
-            _ => None,
+            Some(Value::Array(parts)) => {
+                let mut content_buffer = String::new();
+                let mut reasoning_segments = Vec::new();
+
+                for part in parts {
+                    let text = part.get("text").and_then(|t| t.as_str()).unwrap_or("");
+                    if text.trim().is_empty() {
+                        continue;
+                    }
+
+                    match part.get("type").and_then(|t| t.as_str()) {
+                        Some("reasoning")
+                        | Some("analysis")
+                        | Some("thought")
+                        | Some("chain_of_thought") => {
+                            reasoning_segments.push(text.trim().to_string());
+                        }
+                        _ => {
+                            content_buffer.push_str(text);
+                        }
+                    }
+                }
+
+                let content = if content_buffer.trim().is_empty() {
+                    None
+                } else {
+                    Some(content_buffer)
+                };
+
+                let reasoning = if reasoning_segments.is_empty() {
+                    None
+                } else {
+                    let joined = reasoning_segments.join("\n");
+                    let trimmed = joined.trim();
+                    if trimmed.is_empty() {
+                        None
+                    } else {
+                        Some(trimmed.to_string())
+                    }
+                };
+
+                (content, reasoning)
+            }
+            _ => (None, None),
         };
 
         let tool_calls = message
@@ -474,6 +519,10 @@ impl OpenAIProvider {
                     .collect::<Vec<_>>()
             })
             .filter(|calls| !calls.is_empty());
+
+        let reasoning = reasoning_from_content
+            .or_else(|| message.get("reasoning").and_then(extract_reasoning_trace))
+            .or_else(|| choice.get("reasoning").and_then(extract_reasoning_trace));
 
         let finish_reason = choice
             .get("finish_reason")
@@ -509,6 +558,7 @@ impl OpenAIProvider {
             tool_calls,
             usage,
             finish_reason,
+            reasoning,
         })
     }
 }
@@ -615,6 +665,7 @@ impl LLMClient for OpenAIProvider {
                 completion_tokens: u.completion_tokens as usize,
                 total_tokens: u.total_tokens as usize,
             }),
+            reasoning: response.reasoning,
         })
     }
 

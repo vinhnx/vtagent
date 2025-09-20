@@ -140,32 +140,8 @@ support more models and providers.
 
 ---
 
-support opensource provider integratation.
-
-docs:
-
-1. https://openrouter.ai/docs/api-reference/overview/llms.txt
-2. https://openrouter.ai/docs/api-reference/streaming/llms.txt
-3. https://openrouter.ai/docs/llms.txt
-
-models:
-
-x-ai/grok-code-fast-1
-qwen/qwen3-coder
-
-allow user to add custom model openrouter id to use in chat mode if openrouter provider is active, for example:
-
-model = "x-ai/grok-code-fast-1"
-
-can be set both in vtcode.toml or via `--provider openrouter --model {model}` command line argument.
-
-double check if --provider cli flag is implemented. if not, implement it and also support for all other providers.
-
-update docs and readme accordingly.
-
----
-
-support openrouter models
+Completed 2025-09-20: OpenRouter provider integration landed. CLI `--provider openrouter` and custom model overrides now
+supported; see [`docs/providers/openrouter.md`](../providers/openrouter.md) for details.
 
 ---
 
@@ -213,3 +189,23 @@ Nucleo also handles Unicode graphemes more correctly. Fzf and skim both operate 
 https://github.com/Stebalien/term
 
 A Rust library for terminfo parsing and terminal colors.
+
+--
+
+Ensure that the "Thinking" spinner and loading message appear asynchronously and immediately upon the end of the user's turn. Additionally, investigate and resolve any blocking mechanisms that may occur between user turns and agent turns to improve responsiveness. example for openrouter provider integration.
+
+---
+
+check async-stream for streaming https://crates.io/crates/async-stream?
+
+---
+
+https://github.com/openai/codex/blob/main/codex-rs/core/src/plan_tool.rs
+
+---
+
+https://github.com/openai/codex/blob/main/codex-rs/core/src/project_doc.rs
+
+---
+
+https://github.com/openai/codex/blob/main/codex-rs/core/src/terminal.rs

@@ -207,3 +207,9 @@ nucleo uses the exact same scoring system as fzf. That means you should get the 
 Compared to skim (and the fuzzy-matcher crate) nucleo has an even larger performance advantage and is often around six times faster (see benchmarks below). Furthermore, the bonus system used by nucleo and fzf is (in my opinion) more consistent/superior. nucleo also handles non-ascii text much better. (skims bonus system and even case insensitivity only work for ASCII).
 
 Nucleo also handles Unicode graphemes more correctly. Fzf and skim both operate on Unicode code points (chars). That means that multi codepoint graphemes can have weird effects (match multiple times, weirdly change the score, ...). nucleo will always use the first codepoint of the grapheme for matching instead (and reports grapheme indices, so they can be highlighted correctly).
+
+--
+
+https://github.com/Stebalien/term
+
+A Rust library for terminfo parsing and terminal colors.

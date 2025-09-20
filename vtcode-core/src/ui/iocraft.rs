@@ -621,6 +621,46 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
     let input_inner_surface = lighten_color(background, 0.14);
     let logo_background = mix_colors(primary, background, 0.55);
 
+    let root_padding_x = safe_padding(width, 2);
+    let root_padding_y = safe_padding(height, 1);
+    let interior_width = width.saturating_sub(root_padding_x.saturating_mul(2));
+    let header_padding_x = safe_padding(interior_width, 3);
+    let header_padding_y = safe_padding(height, 1);
+    let transcript_padding_x = safe_padding(interior_width, 2);
+    let transcript_padding_y = safe_padding(height, 1);
+    let transcript_inner_width =
+        interior_width.saturating_sub(transcript_padding_x.saturating_mul(2));
+    let bubble_padding_x = safe_padding(transcript_inner_width, 2);
+    let bubble_padding_y = safe_padding(height, 1);
+    let bubble_min_width_value = u32::from(bubble_padding_x) * 2 + 1;
+    let bubble_min_width = Size::Length(bubble_min_width_value);
+    let bubble_max_width =
+        if u32::from(transcript_inner_width) > bubble_min_width_value.saturating_mul(2) {
+            Size::Percent(90.0)
+        } else {
+            Size::Auto
+        };
+    let overlay_padding_x = safe_padding(interior_width, 4);
+    let overlay_min_width = Size::Length(u32::from(overlay_padding_x) * 2 + 1);
+    let prompt_card_padding_x = safe_padding(interior_width, 3);
+    let prompt_card_padding_y = safe_padding(height, 2);
+    let prompt_card_min_width_value = u32::from(prompt_card_padding_x) * 2 + 1;
+    let prompt_card_min_width = Size::Length(prompt_card_min_width_value);
+    let prompt_card_max_width =
+        if u32::from(interior_width) > prompt_card_min_width_value.saturating_mul(2) {
+            Size::Percent(70.0)
+        } else {
+            Size::Auto
+        };
+    let placeholder_padding = safe_padding(transcript_inner_width, 2);
+    let scroll_indicator_padding_x = safe_padding(transcript_inner_width, 2);
+    let scroll_indicator_padding_y = safe_padding(height, 1);
+    let footer_padding_x = safe_padding(interior_width, 2);
+    let footer_padding_y = safe_padding(height, 1);
+    let input_padding_x = safe_padding(transcript_inner_width, 2);
+    let input_padding_y = safe_padding(height, 1);
+    let input_inner_padding_x = safe_padding(transcript_inner_width, 1);
+
     let user_bubble_bg = mix_colors(primary, background, 0.3);
     let agent_bubble_bg = mix_colors(secondary, background, 0.35);
     let system_bubble_bg = lighten_color(background, 0.12);
@@ -705,12 +745,13 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                         background_color: Some(bubble_bg),
                         border_style: BorderStyle::Round,
                         border_color: Some(border_color),
-                        padding_left: 2u16,
-                        padding_right: 2u16,
-                        padding_top: 1u16,
-                        padding_bottom: 1u16,
+                        padding_left: bubble_padding_x,
+                        padding_right: bubble_padding_x,
+                        padding_top: bubble_padding_y,
+                        padding_bottom: bubble_padding_y,
                         gap: 0u16,
-                        max_width: 90pct,
+                        min_width: bubble_min_width,
+                        max_width: bubble_max_width,
                     ) {
                         #(message_segments)
                     }
@@ -726,7 +767,7 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                 View(
                     flex_direction: FlexDirection::Column,
                     align_items: AlignItems::Center,
-                    padding: 2u16,
+                    padding: placeholder_padding,
                 ) {
                     Text(
                         content: "Welcome! Start by typing a prompt or load a project.",
@@ -750,10 +791,10 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                     border_style: BorderStyle::Classic,
                     border_color: Some(frame_color),
                     background_color: Some(surface),
-                    padding_left: 2u16,
-                    padding_right: 2u16,
-                    padding_top: 1u16,
-                    padding_bottom: 1u16,
+                    padding_left: scroll_indicator_padding_x,
+                    padding_right: scroll_indicator_padding_x,
+                    padding_top: scroll_indicator_padding_y,
+                    padding_bottom: scroll_indicator_padding_y,
                 ) {
                     Text(
                         content: format!("Viewing history (offset {})", applied_offset),
@@ -790,8 +831,9 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                 background_color: Some(overlay_scrim),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
-                padding_left: 4u16,
-                padding_right: 4u16,
+                padding_left: overlay_padding_x,
+                padding_right: overlay_padding_x,
+                min_width: overlay_min_width,
             ) {
                 View(
                     flex_direction: FlexDirection::Column,
@@ -799,11 +841,12 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                     background_color: Some(prompt_card_bg),
                     border_style: BorderStyle::Round,
                     border_color: Some(prompt_card_border),
-                    padding_left: 3u16,
-                    padding_right: 3u16,
-                    padding_top: 2u16,
-                    padding_bottom: 2u16,
-                    max_width: 70pct,
+                    padding_left: prompt_card_padding_x,
+                    padding_right: prompt_card_padding_x,
+                    padding_top: prompt_card_padding_y,
+                    padding_bottom: prompt_card_padding_y,
+                    min_width: prompt_card_min_width,
+                    max_width: prompt_card_max_width,
                 ) {
                     Text(
                         content: "Tool permission required",
@@ -898,10 +941,10 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
             height,
             flex_direction: FlexDirection::Column,
             background_color: Some(background),
-            padding_top: 1u16,
-            padding_bottom: 1u16,
-            padding_left: 2u16,
-            padding_right: 2u16,
+            padding_top: root_padding_y,
+            padding_bottom: root_padding_y,
+            padding_left: root_padding_x,
+            padding_right: root_padding_x,
             gap: 1u16,
         ) {
             View(
@@ -911,10 +954,10 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                 border_style: BorderStyle::Round,
                 border_color: Some(header_border),
                 background_color: Some(header_background),
-                padding_left: 3u16,
-                padding_right: 3u16,
-                padding_top: 1u16,
-                padding_bottom: 1u16,
+                padding_left: header_padding_x,
+                padding_right: header_padding_x,
+                padding_top: header_padding_y,
+                padding_bottom: header_padding_y,
             ) {
                 View(
                     border_style: BorderStyle::Round,
@@ -956,10 +999,10 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                 border_style: BorderStyle::Round,
                 border_color: Some(frame_color),
                 background_color: Some(transcript_surface),
-                padding_left: 2u16,
-                padding_right: 2u16,
-                padding_top: 1u16,
-                padding_bottom: 1u16,
+                padding_left: transcript_padding_x,
+                padding_right: transcript_padding_x,
+                padding_top: transcript_padding_y,
+                padding_bottom: transcript_padding_y,
             ) {
                 View(
                     flex_direction: FlexDirection::Column,
@@ -974,10 +1017,10 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                     border_style: BorderStyle::Round,
                     border_color: Some(input_border),
                     background_color: Some(input_surface),
-                    padding_left: 2u16,
-                    padding_right: 2u16,
-                    padding_top: 1u16,
-                    padding_bottom: 1u16,
+                    padding_left: input_padding_x,
+                    padding_right: input_padding_x,
+                    padding_top: input_padding_y,
+                    padding_bottom: input_padding_y,
                 ) {
                     View(
                         flex_direction: FlexDirection::Row,
@@ -997,8 +1040,8 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                             border_style: BorderStyle::Classic,
                             border_color: Some(input_border),
                             background_color: Some(input_inner_surface),
-                            padding_left: 1u16,
-                            padding_right: 1u16,
+                            padding_left: input_inner_padding_x,
+                            padding_right: input_inner_padding_x,
                             padding_top: 0u16,
                             padding_bottom: 0u16,
                         ) {
@@ -1021,10 +1064,10 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                 border_style: BorderStyle::Classic,
                 border_color: Some(frame_color),
                 background_color: Some(footer_background),
-                padding_left: 2u16,
-                padding_right: 2u16,
-                padding_top: 1u16,
-                padding_bottom: 1u16,
+                padding_left: footer_padding_x,
+                padding_right: footer_padding_x,
+                padding_top: footer_padding_y,
+                padding_bottom: footer_padding_y,
             ) {
                 Text(
                     content: "Enter: send • Esc Esc: exit • Ctrl+C: interrupt • PgUp/PgDn: scroll • /help for commands",
@@ -1107,6 +1150,14 @@ fn message_label(kind: IocraftMessageKind) -> &'static str {
         IocraftMessageKind::Error => "Alert",
         IocraftMessageKind::Reasoning => "Thinking",
         IocraftMessageKind::System => "System",
+    }
+}
+
+fn safe_padding(available: u16, desired: u16) -> u16 {
+    if available <= desired.saturating_mul(2) {
+        available.saturating_sub(1) / 2
+    } else {
+        desired
     }
 }
 

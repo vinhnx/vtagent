@@ -72,6 +72,13 @@ OPENAI_API_KEY=your_openai_key_here
 ANTHROPIC_API_KEY=your_anthropic_key_here
 ```
 
+**Automatic API Key Inference**: VTCode automatically uses the correct environment variable based on your provider setting in `vtcode.toml`:
+
+-   `provider = "openai"` → `OPENAI_API_KEY`
+-   `provider = "anthropic"` → `ANTHROPIC_API_KEY`
+-   `provider = "gemini"` → `GEMINI_API_KEY`
+-   `provider = "deepseek"` → `DEEPSEEK_API_KEY`
+
 VT Code supports advanced configuration via `vtcode.toml`. See [Configuration](docs/project/) for details.
 
 ---

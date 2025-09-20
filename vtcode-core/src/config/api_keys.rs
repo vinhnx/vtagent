@@ -38,6 +38,29 @@ impl Default for ApiKeySources {
     }
 }
 
+impl ApiKeySources {
+    /// Create API key sources for a specific provider with automatic environment variable inference
+    pub fn for_provider(provider: &str) -> Self {
+        let (primary_env, fallback_envs) = match provider.to_lowercase().as_str() {
+            "gemini" => ("GEMINI_API_KEY", vec!["GOOGLE_API_KEY"]),
+            "anthropic" => ("ANTHROPIC_API_KEY", vec![]),
+            "openai" => ("OPENAI_API_KEY", vec![]),
+            "deepseek" => ("DEEPSEEK_API_KEY", vec![]),
+            _ => ("GEMINI_API_KEY", vec!["GOOGLE_API_KEY"]),
+        };
+
+        // For backward compatibility, we still set all env vars but prioritize the primary one
+        Self {
+            gemini_env: if provider == "gemini" { primary_env.to_string() } else { "GEMINI_API_KEY".to_string() },
+            anthropic_env: if provider == "anthropic" { primary_env.to_string() } else { "ANTHROPIC_API_KEY".to_string() },
+            openai_env: if provider == "openai" { primary_env.to_string() } else { "OPENAI_API_KEY".to_string() },
+            gemini_config: None,
+            anthropic_config: None,
+            openai_config: None,
+        }
+    }
+}
+
 /// Load environment variables from .env file
 ///
 /// This function attempts to load environment variables from a .env file
@@ -67,6 +90,7 @@ pub fn load_dotenv() -> Result<()> {
 /// 2. Then checks .env file values
 /// 3. Falls back to configuration file values if neither above is set
 /// 4. Supports all major providers: Gemini, Anthropic, and OpenAI
+/// 5. Automatically infers the correct environment variable based on provider
 ///
 /// # Arguments
 ///
@@ -78,6 +102,23 @@ pub fn load_dotenv() -> Result<()> {
 /// * `Ok(String)` - The API key if found
 /// * `Err` - If no API key could be found for the provider
 pub fn get_api_key(provider: &str, sources: &ApiKeySources) -> Result<String> {
+    // Automatically infer the correct environment variable based on provider
+    let inferred_env = match provider.to_lowercase().as_str() {
+        "gemini" => "GEMINI_API_KEY",
+        "anthropic" => "ANTHROPIC_API_KEY",
+        "openai" => "OPENAI_API_KEY",
+        "deepseek" => "DEEPSEEK_API_KEY",
+        _ => "GEMINI_API_KEY",
+    };
+
+    // Try the inferred environment variable first
+    if let Ok(key) = env::var(inferred_env) {
+        if !key.is_empty() {
+            return Ok(key);
+        }
+    }
+
+    // Fall back to the provider-specific sources
     match provider.to_lowercase().as_str() {
         "gemini" => get_gemini_api_key(sources),
         "anthropic" => get_anthropic_api_key(sources),

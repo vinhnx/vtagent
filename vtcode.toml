@@ -3,11 +3,11 @@
 
 [agent]
 # Provider to use: one of "gemini", "openai", "anthropic"
+# API key environment variable is automatically inferred from provider
 provider = "openai"
 # Default model for single-agent mode - using GPT-5 for Codex integration
 default_model = "gpt-5"
-# Environment variable for API key (important for proper key handling)
-api_key_env = "OPENAI_API_KEY"
+
 # Max conversation turns per session (prevents infinite loops)
 max_conversation_turns = 150
 # Reasoning effort for models that support it: "low" | "medium" | "high"

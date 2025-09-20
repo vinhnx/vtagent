@@ -110,13 +110,16 @@ async fn main() -> Result<()> {
     // Get API key using our new secure retrieval system
     let provider_name = model.provider_name(); // This would need to be implemented
 
-    let api_key = if !args.api_key_env.is_empty() && args.api_key_env != "GEMINI_API_KEY" {
+    let api_key = if !args.api_key_env.is_empty() && args.api_key_env != defaults::DEFAULT_API_KEY_ENV {
         // Use explicit API key environment variable from command line
         std::env::var(&args.api_key_env)
             .with_context(|| format!("Environment variable {} not set", args.api_key_env))?
     } else {
-        // Use our new secure API key retrieval system
-        get_api_key(&provider_name, &api_key_sources)?
+        // Use provider-specific API key environment variable
+        let provider = model.provider();
+        let inferred_env = provider.default_api_key_env();
+        std::env::var(inferred_env)
+            .with_context(|| format!("Environment variable {} not set (inferred from provider {:?})", inferred_env, provider))?
     };
 
     // Create agent configuration

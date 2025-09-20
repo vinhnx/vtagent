@@ -752,8 +752,26 @@ impl Cli {
     }
 
     /// Get the effective API key environment variable
+    ///
+    /// Automatically infers the API key environment variable based on the provider
+    /// when the current value matches the default or is not explicitly set.
     pub fn get_api_key_env(&self) -> String {
-        self.api_key_env.clone()
+        // If api_key_env is the default or empty, infer from provider
+        if self.api_key_env == crate::config::constants::defaults::DEFAULT_API_KEY_ENV || self.api_key_env.is_empty() {
+            if let Some(provider) = &self.provider {
+                match provider.to_lowercase().as_str() {
+                    "openai" => "OPENAI_API_KEY".to_string(),
+                    "anthropic" => "ANTHROPIC_API_KEY".to_string(),
+                    "gemini" => "GEMINI_API_KEY".to_string(),
+                    "deepseek" => "DEEPSEEK_API_KEY".to_string(),
+                    _ => "GEMINI_API_KEY".to_string(),
+                }
+            } else {
+                "GEMINI_API_KEY".to_string()
+            }
+        } else {
+            self.api_key_env.clone()
+        }
     }
 
     /// Check if verbose mode is enabled

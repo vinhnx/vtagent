@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot;
+use tokio::task::yield_now;
 
 const ESCAPE_DOUBLE_MS: u64 = 750;
 
@@ -296,14 +297,23 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
         let manual_scroll = manual_scroll_state;
         let mut tool_prompt_store = tool_prompt_for_commands;
         async move {
-            let receiver = {
-                let mut guard = command_slot
-                    .try_write()
-                    .expect("iocraft commands receiver missing");
-                guard.take()
+            let receiver = loop {
+                if let Some(mut guard) = command_slot.try_write() {
+                    let extracted = guard.take();
+                    drop(guard);
+                    break extracted;
+                }
+
+                if command_slot.try_read().is_none() {
+                    tracing::warn!("iocraft command receiver missing; terminating command loop");
+                    return;
+                }
+
+                yield_now().await;
             };
 
             let Some(mut rx) = receiver else {
+                tracing::warn!("iocraft command channel closed before loop start");
                 return;
             };
 
@@ -392,7 +402,36 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
         system.exit();
     }
 
-    let events_tx = props.events.clone().expect("iocraft events sender missing");
+    let events_tx = match props.events.clone() {
+        Some(tx) => tx,
+        None => {
+            tracing::warn!("iocraft events sender missing; rendering fallback view");
+            let theme_snapshot = theme_state.read().clone();
+            let fallback_background =
+                theme_snapshot
+                    .background
+                    .unwrap_or(Color::Rgb { r: 0, g: 0, b: 0 });
+            let fallback_foreground = theme_snapshot.foreground.unwrap_or(Color::White);
+
+            return element! {
+                View(
+                    width,
+                    height,
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    background_color: Some(fallback_background),
+                    padding_left: 2u16,
+                    padding_right: 2u16,
+                ) {
+                    Text(
+                        content: "Interactive controls unavailable: event channel not initialized.",
+                        color: Some(fallback_foreground),
+                        wrap: TextWrap::Wrap,
+                    )
+                }
+            };
+        }
+    };
     let mut last_escape = hooks.use_state(|| None::<Instant>);
     let mut placeholder_toggle = show_placeholder;
     let mut scroll_handle = scroll_offset_state;

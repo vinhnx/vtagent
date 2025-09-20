@@ -5,7 +5,7 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 
 /// Identifier for the default theme.
-pub const DEFAULT_THEME_ID: &str = "ciapre-dark";
+pub const DEFAULT_THEME_ID: &str = "ciapre-blue";
 
 const MIN_CONTRAST: f64 = 4.5;
 
@@ -135,11 +135,11 @@ static REGISTRY: Lazy<HashMap<&'static str, ThemeDefinition>> = Lazy::new(|| {
             id: "ciapre-dark",
             label: "Ciapre Dark",
             palette: ThemePalette {
-                primary_accent: RgbColor(0xBF, 0xB3, 0x8F),
+                primary_accent: RgbColor(0xD9, 0x48, 0x7D),
                 background: RgbColor(0x26, 0x26, 0x26),
                 foreground: RgbColor(0xBF, 0xB3, 0x8F),
                 secondary_accent: RgbColor(0xD9, 0x9A, 0x4E),
-                alert: RgbColor(0xFF, 0x8A, 0x8A),
+                alert: RgbColor(0xBF, 0x45, 0x45),
             },
         },
     );
@@ -149,11 +149,11 @@ static REGISTRY: Lazy<HashMap<&'static str, ThemeDefinition>> = Lazy::new(|| {
             id: "ciapre-blue",
             label: "Ciapre Blue",
             palette: ThemePalette {
-                primary_accent: RgbColor(0xBF, 0xB3, 0x8F),
+                primary_accent: RgbColor(0xD9, 0x48, 0x7D),
                 background: RgbColor(0x38, 0x3B, 0x73),
-                foreground: RgbColor(0xBF, 0xB3, 0x8F),
+                foreground: RgbColor(0x17, 0x1C, 0x26),
                 secondary_accent: RgbColor(0xBF, 0xB3, 0x8F),
-                alert: RgbColor(0xFF, 0x8A, 0x8A),
+                alert: RgbColor(0xA6, 0x33, 0x33),
             },
         },
     );

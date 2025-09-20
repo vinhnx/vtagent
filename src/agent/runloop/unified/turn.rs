@@ -258,12 +258,16 @@ async fn stream_and_render_response(
                 finish_spinner(&mut spinner_active);
                 if !display_started {
                     renderer
-                        .inline_with_style(response_style, RESPONSE_STREAM_INDENT)
+                        .inline_with_style(
+                            MessageStyle::Response,
+                            response_style,
+                            RESPONSE_STREAM_INDENT,
+                        )
                         .map_err(|err| map_render_error(provider_name, err))?;
                     display_started = true;
                 }
                 renderer
-                    .inline_with_style(response_style, &delta)
+                    .inline_with_style(MessageStyle::Response, response_style, &delta)
                     .map_err(|err| map_render_error(provider_name, err))?;
                 aggregated.push_str(&delta);
                 emitted_tokens = true;
@@ -276,7 +280,7 @@ async fn stream_and_render_response(
                 finish_spinner(&mut spinner_active);
                 if display_started {
                     renderer
-                        .inline_with_style(response_style, "\n")
+                        .inline_with_style(MessageStyle::Response, response_style, "\n")
                         .map_err(|render_err| map_render_error(provider_name, render_err))?;
                 }
                 return Err(err);
@@ -299,12 +303,16 @@ async fn stream_and_render_response(
             if !content.is_empty() {
                 if !display_started {
                     renderer
-                        .inline_with_style(response_style, RESPONSE_STREAM_INDENT)
+                        .inline_with_style(
+                            MessageStyle::Response,
+                            response_style,
+                            RESPONSE_STREAM_INDENT,
+                        )
                         .map_err(|err| map_render_error(provider_name, err))?;
                     display_started = true;
                 }
                 renderer
-                    .inline_with_style(response_style, &content)
+                    .inline_with_style(MessageStyle::Response, response_style, &content)
                     .map_err(|err| map_render_error(provider_name, err))?;
                 aggregated.push_str(&content);
             }
@@ -313,7 +321,7 @@ async fn stream_and_render_response(
 
     if display_started {
         renderer
-            .inline_with_style(response_style, "\n")
+            .inline_with_style(MessageStyle::Response, response_style, "\n")
             .map_err(|err| map_render_error(provider_name, err))?;
     }
 
@@ -476,6 +484,8 @@ pub(crate) async fn run_single_agent_loop_unified(
             _ => {}
         }
 
+        renderer.line(MessageStyle::User, &input_owned)?;
+
         if let Some(command_input) = input_owned.strip_prefix('/') {
             match handle_slash_command(command_input, &mut renderer)? {
                 SlashCommandOutcome::Handled => {
@@ -489,7 +499,10 @@ pub(crate) async fn run_single_agent_loop_unified(
                     continue;
                 }
                 SlashCommandOutcome::ExecuteTool { name, args } => {
-                    match tool_registry.preflight_tool_permission(&name) {
+                    match tool_registry
+                        .preflight_tool_permission(&name, Some(&handle))
+                        .await
+                    {
                         Ok(true) => {
                             let tool_spinner = PlaceholderSpinner::new(
                                 &handle,
@@ -858,7 +871,10 @@ pub(crate) async fn run_single_agent_loop_unified(
                         None,
                     );
 
-                    match tool_registry.preflight_tool_permission(name) {
+                    match tool_registry
+                        .preflight_tool_permission(name, Some(&handle))
+                        .await
+                    {
                         Ok(true) => {
                             let tool_spinner = PlaceholderSpinner::new(
                                 &handle,

@@ -3,7 +3,7 @@ use pathdiff::diff_paths;
 use vtcode_core::config::types::AgentConfig as CoreAgentConfig;
 use vtcode_core::tool_policy::{ToolPolicy, ToolPolicyManager};
 use vtcode_core::ui::theme;
-use vtcode_core::utils::ansi::AnsiRenderer;
+use vtcode_core::utils::ansi::{AnsiRenderer, MessageStyle};
 
 use super::welcome::SessionBootstrap;
 
@@ -13,7 +13,11 @@ pub(crate) fn render_session_banner(
     session_bootstrap: &SessionBootstrap,
 ) -> Result<()> {
     let banner_style = theme::banner_style();
-    renderer.line_with_style(banner_style, &format!("Welcome to VT Code!"))?;
+    renderer.line_with_style(
+        MessageStyle::Info,
+        banner_style,
+        &format!("Welcome to VT Code!"),
+    )?;
 
     let mut bullets = Vec::new();
     bullets.push(format!("* Model: {}", config.model));
@@ -50,10 +54,10 @@ pub(crate) fn render_session_banner(
     }
 
     for line in bullets {
-        renderer.line_with_style(banner_style, &line)?;
+        renderer.line_with_style(MessageStyle::Info, banner_style, &line)?;
     }
 
-    renderer.line_with_style(banner_style, "")?;
+    renderer.line_with_style(MessageStyle::Info, banner_style, "")?;
 
     Ok(())
 }

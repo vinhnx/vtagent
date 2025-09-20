@@ -17,7 +17,7 @@ pub(crate) fn render_tool_output(
         for line in stdout.lines() {
             let indented = format!("  {}", line);
             if let Some(style) = select_line_style(tool_name, line, &git_styles, &ls_styles) {
-                renderer.line_with_style(style, &indented)?;
+                renderer.line_with_style(MessageStyle::Tool, style, &indented)?;
             } else {
                 renderer.line(MessageStyle::Output, &indented)?;
             }

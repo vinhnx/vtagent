@@ -20,22 +20,22 @@ class ThemePalette:
 
 THEMES: Dict[str, ThemePalette] = {
     "ciapre-dark": ThemePalette(
-        primary_accent="#BFB38F",
+        primary_accent="#D9487D",
         background="#262626",
         foreground="#BFB38F",
         secondary_accent="#D99A4E",
-        alert="#FF8A8A",
+        alert="#BF4545",
     ),
     "ciapre-blue": ThemePalette(
-        primary_accent="#BFB38F",
+        primary_accent="#D9487D",
         background="#383B73",
-        foreground="#BFB38F",
+        foreground="#171C26",
         secondary_accent="#BFB38F",
-        alert="#FF8A8A",
+        alert="#A63333",
     ),
 }
 
-DEFAULT_THEME = "ciapre-dark"
+DEFAULT_THEME = "ciapre-blue"
 
 
 def available() -> Dict[str, ThemePalette]:

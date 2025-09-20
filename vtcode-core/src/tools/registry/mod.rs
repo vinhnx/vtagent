@@ -25,6 +25,7 @@ use crate::config::constants::tools;
 use crate::tool_policy::{ToolPolicy, ToolPolicyManager};
 use crate::tools::ast_grep::AstGrepEngine;
 use crate::tools::grep_search::GrepSearchManager;
+use crate::ui::iocraft::IocraftHandle;
 use anyhow::{Result, anyhow};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
@@ -212,7 +213,7 @@ impl ToolRegistry {
 
         if !skip_policy_prompt {
             if let Ok(policy_manager) = self.policy_manager_mut() {
-                if !policy_manager.should_execute_tool(name)? {
+                if !policy_manager.should_execute_tool(name, None).await? {
                     let error = ToolExecutionError::new(
                         name.to_string(),
                         ToolErrorType::PolicyViolation,
@@ -293,7 +294,11 @@ impl ToolRegistry {
 
 impl ToolRegistry {
     /// Prompt for permission before starting long-running tool executions to avoid spinner conflicts
-    pub fn preflight_tool_permission(&mut self, name: &str) -> Result<bool> {
+    pub async fn preflight_tool_permission(
+        &mut self,
+        name: &str,
+        handle: Option<&IocraftHandle>,
+    ) -> Result<bool> {
         if let Some(allowlist) = self.full_auto_allowlist.as_ref() {
             if !allowlist.contains(name) {
                 return Ok(false);
@@ -314,7 +319,7 @@ impl ToolRegistry {
         }
 
         if let Ok(policy_manager) = self.policy_manager_mut() {
-            let allowed = policy_manager.should_execute_tool(name)?;
+            let allowed = policy_manager.should_execute_tool(name, handle).await?;
             if allowed {
                 self.preapproved_tools.insert(name.to_string());
             }
@@ -397,8 +402,16 @@ mod tests {
 
         registry.enable_full_auto_mode(&vec![tools::READ_FILE.to_string()]);
 
-        assert!(registry.preflight_tool_permission(tools::READ_FILE)?);
-        assert!(!registry.preflight_tool_permission(tools::RUN_TERMINAL_CMD)?);
+        assert!(
+            registry
+                .preflight_tool_permission(tools::READ_FILE, None)
+                .await?
+        );
+        assert!(
+            !registry
+                .preflight_tool_permission(tools::RUN_TERMINAL_CMD, None)
+                .await?
+        );
 
         Ok(())
     }

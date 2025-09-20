@@ -1,15 +1,3 @@
---
-Please review the documentation file at `docs/guides/codex-cloud-setup.md` for detailed setup instructions. Using this as a primary reference, configure and deploy a Codex cloud environment tailored for the vtcode project. Ensure compliance with OpenAI's official guidelines available at https://developers.openai.com/codex/cloud/environments. Include the following steps in your process:
-
-1. Verify prerequisites such as API keys, dependencies, and system requirements from the local docs.
-2. Initialize the environment with vtcode-specific configurations (e.g., custom models, integrations, or variables).
-3. Test the setup by running a sample Codex query or integration relevant to vtcode.
-4. Document any deviations, issues, or additional configurations made during setup.
-
-If any ambiguities arise, cross-reference the OpenAI URL for the latest best practices. Confirm successful setup with a status report.
-
----
-
 use ratatui crate and integrate minimal Terminal User Interface (TUI) for vtagemt. using the Ratatui crate (reference: https://docs.rs/ratatui/latest/ratatui/). The goal is to port the core logic from an existing CLI-based implementation—including the chat runloop, context management, and agent core logic—to a fully functional TUI version. Ensure a 1-to-1 port of functionality, followed by end-to-end testing to verify seamless operation, such as sending user inputs, processing agent responses, maintaining chat history, and handling intermediate states like tool calls and reasoning.
 
 Key requirements:
@@ -40,33 +28,13 @@ Incorporate and adapt code from the following resources for implementation:
 
 --
 
-encourage the agent to use curl with caution and security in mind, it should always validate URLs and avoid downloading untrusted content.
+apply the agent to use curl with caution and security in mind, it should always validate URLs and avoid downloading untrusted content. -> add curl to tool policy with safe defaults and restrictions. note that curl can be dangerous if misused, so note about security implications in the usage and let user know when using curl tool.
 
 --
 
 encourage the agent to use /tmp to store temporary files and clean them up after use.
 
---
-
-✓ Allow the agent to use 'read_file'? · yes
-✓ Approved: 'read_file' tool will run now
-[TOOL] list_files {"path":"packages/ai"}
-
-tool call policy doesn't seem to work, it keeps asking for permission even I already approve it. Check and fix it.
-
 ---
-
-Summary of AMA with the Codex Team on Reddit on 2025-09-17
-
-Internal Usage & Team Workflow
-
--   Team members use Codex to build Codex itself, with designers directly merging PRs and one engineer using it for 99% of their changes to Codex specifically, with goal of not typing single line of code by hand next year
-
--   Product team members use Codex for languages they're not strong in like Rust, often starting tasks on mobile between meetings then using VS Code extension to pull down work
-
--   Engineers prototype large features with ~5 turns of prompting to build multiple versions quickly and understand scope, using mix of CLI and VS Code extension to parallelize work and review code snippets in real time
-
--   Team uses it for one-off internal tools, visualization, monitoring, training data generation, and designer splits time 70/30 between Codex and design tooling to reduce gap between idea and execution
 
 Platform Availability & Technical Limitations
 
@@ -118,8 +86,6 @@ Planning & Agent Development
 
 -   Conversation compacting for longer work coming soon and users able to ask Codex to create plans in markdown files for review and editing, with ability to prompt for multi-page documents where model will work for extended periods
 
-https://www.reddit.com/r/OpenAI/comments/1nhust6/ama_with_the_codex_team/
-
 ---
 
 keyboard navigation to scroll up and down the chat history, and move to cursor in chat message input e.g. using arrow keys or j/k for vim-style navigation. also allow ctrl+arrow to move by word, home/end to move to start/end of line, and page up/down to scroll by page in chat history.
@@ -162,12 +128,6 @@ if not found, search for other similar packages.
 
 ---
 
-read docs/guides/codex-cloud-setup.md
-then fetch https://developers.openai.com/codex/cloud/environments
-setup codex cloud environment for vtcode
-
----
-
 check git stash@{1}: On main: streaming. apply only streaming implementation
 
 ---
@@ -176,84 +136,32 @@ implement planning mode and TODO list (research)
 
 ---
 
-https://news.ycombinator.com/item?id=45289168
-
----
-
-Prompt structure
-
-    Task context
-    Tone context
-    Background data, documents, and images
-    Detailed task description & rules
-    Examples
-    Conversation history
-    Immediate task description or request
-    Thinking step by step / take a deep breath
-    Output formatting
-    Prefilled response (if any)
-
-content:
-
-User: You will be acting as an AI career coach named Joe created by the company AdAstra Careers. Your goal is to give career advice to users. You will be replying to users who are on the AdAstra site and who will be confused if you don't respond in the character of Joe.
-
-You should maintain a friendly customer service tone.
-
-Here is the career guidance document you should reference when giving the user guidance: [DOCUMENT] </guidance>
-
-Here are some important rules for the interaction:
-
-    Always stay in character as Joe, an AI from AdAstra careers.
-    If you are unsure how to respond, say "Sorry, I didn't understand that. Could you repeat the question?"
-    If someone asks something irrelevant, say "Sorry, I am Joe and I give career advice. Do you have a career question today I can help you with?"
-
-Here is an example of how to respond in a standard interaction:
-<example> User: Hi, how were you created and what do you do? Joe: Hello! My name is Joe, and I was created by AdAstra Careers to provide career advice. What can I help you with today? </example>
-
-Here is the conversation history [between the user and you] prior to the current question. It could be empty if there is no history: <history> [[HISTORY]] </history>
-
-Here is the user's question: <question> [[QUESTION]] </question>
-
-How do you respond to the user's question?
-
-Think about your answer first before you respond.
-
-Put your response in <response></response> tags.
-
-Assistant (prefix): <response>
-
-This image shows a well-structured prompt engineering framework with 10 key components for creating effective AI prompts. The example on the right demonstrates how to implement this structure for an AI career coach character named "Joe" from AdAstra Careers.
-
-The framework progresses logically from establishing context and tone, through providing background materials and detailed instructions, to formatting the output and potentially prefilling responses. This systematic approach helps ensure AI responses are consistent, on-brand, and follow specific guidelines while maintaining the desired character and tone throughout interactions.
-
-The career coach example effectively demonstrates several best practices:
-
-    Clear role definition and company context
-    Specific tone guidance (friendly customer service)
-    Fallback responses for unclear or off-topic questions
-    Concrete examples of proper responses
-    Structured input formatting with conversation history
-    Clear output formatting requirements
-
-This type of structured prompting is particularly valuable for customer-facing AI applications where consistency and brand alignment are crucial.
-
----
-
-refactor and extract and modular unified.rs into composable small modules.
-
----
-
-Task: Update and synchronize the core logic from `gemini.rs` to both `anthropic.rs` and `openai.rs`, ensuring that key functions (e.g., request handling, response parsing, error management, and authentication flows) are accurately mirrored across all three files for consistent API behavior and compatibility.
-
-After updates, thoroughly review and validate the integration logic in `unified.rs` to confirm it correctly abstracts and syncs the changes from the provider-specific files, including testing for edge cases, input/output consistency, and any shared utilities.
-
----
-
 support more models and providers.
 
 ---
 
-support opensource models
+support opensource provider integratation.
+
+docs:
+
+1. https://openrouter.ai/docs/api-reference/overview/llms.txt
+2. https://openrouter.ai/docs/api-reference/streaming/llms.txt
+3. https://openrouter.ai/docs/llms.txt
+
+models:
+
+x-ai/grok-code-fast-1
+qwen/qwen3-coder
+
+allow user to add custom model openrouter id to use in chat mode if openrouter provider is active, for example:
+
+model = "x-ai/grok-code-fast-1"
+
+can be set both in vtcode.toml or via `--provider openrouter --model {model}` command line argument.
+
+double check if --provider cli flag is implemented. if not, implement it and also support for all other providers.
+
+update docs and readme accordingly.
 
 ---
 
@@ -262,3 +170,11 @@ support openrouter models
 ---
 
 support huggingface models
+
+---
+
+https://agentclientprotocol.com/overview/introduction
+
+```
+
+```

@@ -186,3 +186,24 @@ Uses https://crates.io/crates/ignore under the hood (which is what ripgrep uses)
 ---
 
 update rustc and make vtcode use latest 1.90 rustc vversion
+
+---
+
+https://crates.io/crates/ignore
+ignore
+
+The ignore crate provides a fast recursive directory iterator that respects various filters such as globs, file types and .gitignore files. This crate also provides lower level direct access to gitignore and file type matchers.
+
+---
+
+https://crates.io/crates/nucleo-matcher
+
+nucleo is a highly performant fuzzy matcher written in rust. It aims to fill the same use case as fzf and skim. Compared to fzf nucleo has a significantly faster matching algorithm. This mainly makes a difference when matching patterns with low selectivity on many items. An (unscientific) comparison is shown in the benchmark section below.
+
+    Note: If you are looking for a replacement of the fuzzy-matcher crate and not a fully managed fuzzy picker, you should use the nucleo-matcher crate.
+
+nucleo uses the exact same scoring system as fzf. That means you should get the same ranking quality (or better) as you are used to from fzf. However, nucleo has a more faithful implementation of the Smith-Waterman algorithm which is normally used in DNA sequence alignment (see https://www.cs.cmu.edu/~ckingsf/bioinfo-lectures/gaps.pdf) with two separate matrices (instead of one like fzf). This means that nucleo finds the optimal match more often. For example if you match foo in xf foo nucleo will match x\_\_foo but fzf will match xf_oo (you can increase the word length the result will stay the same). The former is the more intuitive match and has a higher score according to the ranking system that both nucleo and fzf.
+
+Compared to skim (and the fuzzy-matcher crate) nucleo has an even larger performance advantage and is often around six times faster (see benchmarks below). Furthermore, the bonus system used by nucleo and fzf is (in my opinion) more consistent/superior. nucleo also handles non-ascii text much better. (skims bonus system and even case insensitivity only work for ASCII).
+
+Nucleo also handles Unicode graphemes more correctly. Fzf and skim both operate on Unicode code points (chars). That means that multi codepoint graphemes can have weird effects (match multiple times, weirdly change the score, ...). nucleo will always use the first codepoint of the grapheme for matching instead (and reports grapheme indices, so they can be highlighted correctly).

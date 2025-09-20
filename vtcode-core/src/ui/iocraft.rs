@@ -311,7 +311,7 @@ async fn run_iocraft(
             placeholder: placeholder,
         )
     }
-    .render_loop()
+    .fullscreen()
     .await
     .context("iocraft render loop failed")
 }
@@ -664,10 +664,10 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                     padding: TRANSCRIPT_PADDING,
                     gap: SECTION_GAP,
                     background_color: transcript_background.clone(),
-                    overflow: Overflow::Hidden,
                 ) {
                     View(
                         flex_direction: FlexDirection::Column,
+                        flex_grow: 1.0,
                         gap: SECTION_GAP,
                         overflow: Overflow::Hidden,
                     ) {

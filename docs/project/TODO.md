@@ -251,3 +251,7 @@ Examine the file src/agent/runloop/gemini.rs. Investigate why only Gemini is sup
 ---
 
 add x-ai/grok-4-fast:free to openrouter model support
+
+---
+
+implement profile (customizable vtcode.toml profile)

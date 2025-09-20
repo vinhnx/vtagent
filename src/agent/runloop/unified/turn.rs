@@ -16,8 +16,8 @@ use vtcode_core::llm::error_display;
 use vtcode_core::llm::provider::{self as uni, LLMStreamEvent, MessageRole};
 use vtcode_core::tools::registry::{ToolErrorType, ToolExecutionError};
 use vtcode_core::ui::iocraft::{
-    IocraftEvent, IocraftHandle, convert_style as convert_iocraft_style, spawn_session,
-    theme_from_styles,
+    IocraftEvent, IocraftHandle, IocraftSession, convert_style as convert_iocraft_style,
+    spawn_session, theme_from_styles,
 };
 use vtcode_core::ui::theme;
 use vtcode_core::utils::ansi::{AnsiRenderer, MessageStyle};
@@ -364,9 +364,14 @@ pub(crate) async fn run_single_agent_loop_unified(
     let active_styles = theme::active_styles();
     let theme_spec = theme_from_styles(&active_styles);
     let default_placeholder = session_bootstrap.placeholder.clone();
-    let session = spawn_session(theme_spec.clone(), default_placeholder.clone())
+    let IocraftSession {
+        handle: session_handle,
+        events,
+        shutdown,
+    } = spawn_session(theme_spec.clone(), default_placeholder.clone())
         .context("failed to launch iocraft session")?;
-    let handle = session.handle.clone();
+    let handle = session_handle.clone();
+    let mut events = events;
     let mut renderer = AnsiRenderer::with_iocraft(handle.clone());
 
     handle.set_theme(theme_spec);
@@ -419,7 +424,6 @@ pub(crate) async fn run_single_agent_loop_unified(
 
     let mut transcript_view = TranscriptView::new();
     let mut session_stats = SessionStats::default();
-    let mut events = session.events;
     loop {
         if ctrl_c_flag.swap(false, Ordering::SeqCst) {
             session_stats.render_summary(&mut renderer, &conversation_history)?;
@@ -1170,5 +1174,11 @@ pub(crate) async fn run_single_agent_loop_unified(
     }
 
     handle.shutdown();
+
+    match shutdown.await {
+        Ok(Ok(())) => {}
+        Ok(Err(err)) => return Err(err),
+        Err(_) => {}
+    }
     Ok(())
 }

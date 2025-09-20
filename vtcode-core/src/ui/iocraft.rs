@@ -1,7 +1,10 @@
 use anyhow::{Context, Result};
 use iocraft::prelude::*;
 use std::time::{Duration, Instant};
-use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use tokio::sync::{
+    mpsc::{self, UnboundedReceiver, UnboundedSender},
+    oneshot,
+};
 
 const ESCAPE_DOUBLE_MS: u64 = 750;
 const HEADER_BORDER_PADDING: u16 = 1;
@@ -279,21 +282,26 @@ impl IocraftHandle {
 pub struct IocraftSession {
     pub handle: IocraftHandle,
     pub events: UnboundedReceiver<IocraftEvent>,
+    pub shutdown: oneshot::Receiver<Result<()>>,
 }
 
 pub fn spawn_session(theme: IocraftTheme, placeholder: Option<String>) -> Result<IocraftSession> {
     let (command_tx, command_rx) = mpsc::unbounded_channel();
     let (event_tx, event_rx) = mpsc::unbounded_channel();
+    let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
     tokio::spawn(async move {
-        if let Err(err) = run_iocraft(command_rx, event_tx, theme, placeholder).await {
+        let result = run_iocraft(command_rx, event_tx, theme, placeholder).await;
+        if let Err(err) = &result {
             tracing::error!(error = ?err, "iocraft session terminated unexpectedly");
         }
+        let _ = shutdown_tx.send(result);
     });
 
     Ok(IocraftSession {
         handle: IocraftHandle { sender: command_tx },
         events: event_rx,
+        shutdown: shutdown_rx,
     })
 }
 

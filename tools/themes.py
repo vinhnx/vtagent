@@ -35,7 +35,7 @@ THEMES: Dict[str, ThemePalette] = {
     ),
 }
 
-DEFAULT_THEME = "ciapre-dark"
+DEFAULT_THEME = "ciapre-blue"
 
 
 def available() -> Dict[str, ThemePalette]:

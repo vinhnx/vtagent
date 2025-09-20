@@ -1,5 +1,6 @@
 use crate::ui::iocraft::{
-    IocraftHandle, IocraftSegment, convert_style as convert_to_iocraft_style, theme_from_styles,
+    IocraftHandle, IocraftLineKind, IocraftSegment, convert_style as convert_to_iocraft_style,
+    theme_from_styles,
 };
 use crate::ui::theme;
 use crate::utils::transcript;
@@ -39,6 +40,20 @@ impl MessageStyle {
         match self {
             Self::Response | Self::Tool | Self::Reasoning => "  ",
             _ => "",
+        }
+    }
+}
+
+impl From<MessageStyle> for IocraftLineKind {
+    fn from(value: MessageStyle) -> Self {
+        match value {
+            MessageStyle::Info => Self::Info,
+            MessageStyle::Error => Self::Error,
+            MessageStyle::Output => Self::Output,
+            MessageStyle::Response => Self::Response,
+            MessageStyle::Tool => Self::Tool,
+            MessageStyle::User => Self::User,
+            MessageStyle::Reasoning => Self::Reasoning,
         }
     }
 }
@@ -86,7 +101,7 @@ impl AnsiRenderer {
         if let Some(sink) = &mut self.sink {
             let indent = style.indent();
             let line = self.buffer.clone();
-            sink.write_line(style.style(), indent, &line)?;
+            sink.write_line(Some(style), style.style(), indent, &line)?;
             self.buffer.clear();
             return Ok(());
         }
@@ -107,7 +122,7 @@ impl AnsiRenderer {
         let indent = style.indent();
 
         if let Some(sink) = &mut self.sink {
-            sink.write_multiline(style.style(), indent, text)?;
+            sink.write_multiline(Some(style), style.style(), indent, text)?;
             return Ok(());
         }
 
@@ -140,9 +155,14 @@ impl AnsiRenderer {
     }
 
     /// Write styled text without a trailing newline
-    pub fn inline_with_style(&mut self, style: Style, text: &str) -> Result<()> {
+    pub fn inline_with_style(
+        &mut self,
+        message_style: MessageStyle,
+        style: Style,
+        text: &str,
+    ) -> Result<()> {
         if let Some(sink) = &mut self.sink {
-            sink.write_inline(style, text);
+            sink.write_inline(message_style, style, text);
             return Ok(());
         }
         if self.color {
@@ -157,7 +177,7 @@ impl AnsiRenderer {
     /// Write a line with an explicit style
     pub fn line_with_style(&mut self, style: Style, text: &str) -> Result<()> {
         if let Some(sink) = &mut self.sink {
-            sink.write_multiline(style, "", text)?;
+            sink.write_multiline(None, style, "", text)?;
             return Ok(());
         }
         if self.color {
@@ -172,6 +192,10 @@ impl AnsiRenderer {
 
     /// Write a raw line without styling
     pub fn raw_line(&mut self, text: &str) -> Result<()> {
+        if let Some(sink) = &mut self.sink {
+            sink.write_line(None, Style::new(), "", text)?;
+            return Ok(());
+        }
         writeln!(self.writer, "{}", text)?;
         self.writer.flush()?;
         transcript::append(text);
@@ -200,9 +224,16 @@ impl IocraftSink {
         }
     }
 
-    fn write_multiline(&mut self, style: Style, indent: &str, text: &str) -> Result<()> {
+    fn write_multiline(
+        &mut self,
+        message_style: Option<MessageStyle>,
+        style: Style,
+        indent: &str,
+        text: &str,
+    ) -> Result<()> {
+        let kind = message_style.map(IocraftLineKind::from).unwrap_or_default();
         if text.is_empty() {
-            self.handle.append_line(Vec::new());
+            self.handle.append_line(kind, Vec::new());
             crate::utils::transcript::append("");
             return Ok(());
         }
@@ -217,26 +248,33 @@ impl IocraftSink {
             }
             content.push_str(line);
             if content.is_empty() {
-                self.handle.append_line(Vec::new());
+                self.handle.append_line(kind, Vec::new());
                 crate::utils::transcript::append("");
             } else {
                 let segment = self.style_to_segment(style, &content);
-                self.handle.append_line(vec![segment]);
+                self.handle.append_line(kind, vec![segment]);
                 crate::utils::transcript::append(&content);
             }
         }
 
         if ends_with_newline {
-            self.handle.append_line(Vec::new());
+            self.handle.append_line(kind, Vec::new());
             crate::utils::transcript::append("");
         }
 
         Ok(())
     }
 
-    fn write_line(&mut self, style: Style, indent: &str, text: &str) -> Result<()> {
+    fn write_line(
+        &mut self,
+        message_style: Option<MessageStyle>,
+        style: Style,
+        indent: &str,
+        text: &str,
+    ) -> Result<()> {
+        let kind = message_style.map(IocraftLineKind::from).unwrap_or_default();
         if text.is_empty() {
-            self.handle.append_line(Vec::new());
+            self.handle.append_line(kind, Vec::new());
             crate::utils::transcript::append("");
             return Ok(());
         }
@@ -246,17 +284,18 @@ impl IocraftSink {
         }
         content.push_str(text);
         let segment = self.style_to_segment(style, &content);
-        self.handle.append_line(vec![segment]);
+        self.handle.append_line(kind, vec![segment]);
         crate::utils::transcript::append(&content);
         Ok(())
     }
 
-    fn write_inline(&mut self, style: Style, text: &str) {
+    fn write_inline(&mut self, message_style: MessageStyle, style: Style, text: &str) {
         if text.is_empty() {
             return;
         }
+        let kind = IocraftLineKind::from(message_style);
         let segment = self.style_to_segment(style, text);
-        self.handle.inline(segment);
+        self.handle.inline(kind, segment);
     }
 }
 

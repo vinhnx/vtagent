@@ -258,12 +258,16 @@ async fn stream_and_render_response(
                 finish_spinner(&mut spinner_active);
                 if !display_started {
                     renderer
-                        .inline_with_style(response_style, RESPONSE_STREAM_INDENT)
+                        .inline_with_style(
+                            MessageStyle::Response,
+                            response_style,
+                            RESPONSE_STREAM_INDENT,
+                        )
                         .map_err(|err| map_render_error(provider_name, err))?;
                     display_started = true;
                 }
                 renderer
-                    .inline_with_style(response_style, &delta)
+                    .inline_with_style(MessageStyle::Response, response_style, &delta)
                     .map_err(|err| map_render_error(provider_name, err))?;
                 aggregated.push_str(&delta);
                 emitted_tokens = true;
@@ -276,7 +280,7 @@ async fn stream_and_render_response(
                 finish_spinner(&mut spinner_active);
                 if display_started {
                     renderer
-                        .inline_with_style(response_style, "\n")
+                        .inline_with_style(MessageStyle::Response, response_style, "\n")
                         .map_err(|render_err| map_render_error(provider_name, render_err))?;
                 }
                 return Err(err);
@@ -299,12 +303,16 @@ async fn stream_and_render_response(
             if !content.is_empty() {
                 if !display_started {
                     renderer
-                        .inline_with_style(response_style, RESPONSE_STREAM_INDENT)
+                        .inline_with_style(
+                            MessageStyle::Response,
+                            response_style,
+                            RESPONSE_STREAM_INDENT,
+                        )
                         .map_err(|err| map_render_error(provider_name, err))?;
                     display_started = true;
                 }
                 renderer
-                    .inline_with_style(response_style, &content)
+                    .inline_with_style(MessageStyle::Response, response_style, &content)
                     .map_err(|err| map_render_error(provider_name, err))?;
                 aggregated.push_str(&content);
             }
@@ -313,7 +321,7 @@ async fn stream_and_render_response(
 
     if display_started {
         renderer
-            .inline_with_style(response_style, "\n")
+            .inline_with_style(MessageStyle::Response, response_style, "\n")
             .map_err(|err| map_render_error(provider_name, err))?;
     }
 
@@ -462,6 +470,8 @@ pub(crate) async fn run_single_agent_loop_unified(
         if input_owned.is_empty() {
             continue;
         }
+
+        renderer.line(MessageStyle::User, input_owned.as_str())?;
 
         match input_owned.as_str() {
             "" => continue,

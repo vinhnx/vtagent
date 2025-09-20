@@ -4,6 +4,141 @@ use std::time::{Duration, Instant};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 const ESCAPE_DOUBLE_MS: u64 = 750;
+const HEADER_BORDER_PADDING: u16 = 1;
+const HEADER_GAP: u16 = 1;
+const LAYOUT_PADDING: u16 = 1;
+const SECTION_GAP: u16 = 1;
+const TRANSCRIPT_PADDING: u16 = 1;
+const INPUT_PADDING: u16 = 1;
+const FOOTER_PADDING: u16 = 1;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum IocraftLineKind {
+    #[default]
+    Plain,
+    Info,
+    Error,
+    Output,
+    Response,
+    Tool,
+    User,
+    Reasoning,
+}
+
+#[derive(Clone, Copy)]
+enum UiText {
+    HeaderLogoTop,
+    HeaderLogoBottom,
+    HeaderTitle,
+    HeaderSubtitle,
+    FooterSend,
+    FooterCancel,
+    FooterExit,
+    FooterCommands,
+    FooterScroll,
+    LabelUser,
+    LabelAgent,
+    LabelTool,
+    LabelInfo,
+    LabelError,
+    LabelOutput,
+    LabelReasoning,
+}
+
+impl UiText {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::HeaderLogoTop => "██╗  ██╗████████╗     ██████╗ ██████╗ ██████╗ ███████╗",
+            Self::HeaderLogoBottom => "██║  ██║╚══██╔══╝    ██╔═══██╗██╔══██╗██╔══██╗██╔════╝",
+            Self::HeaderTitle => "VT Code",
+            Self::HeaderSubtitle => "Terminal-first AI pair programmer",
+            Self::FooterSend => "Enter: send",
+            Self::FooterCancel => "Esc: cancel (double Esc to exit)",
+            Self::FooterExit => "Ctrl+C: interrupt & exit",
+            Self::FooterCommands => "/help: command list",
+            Self::FooterScroll => "↑/↓ or PgUp/PgDn: scroll",
+            Self::LabelUser => "You",
+            Self::LabelAgent => "Agent",
+            Self::LabelTool => "Tool",
+            Self::LabelInfo => "Info",
+            Self::LabelError => "Error",
+            Self::LabelOutput => "Output",
+            Self::LabelReasoning => "Thinking",
+        }
+    }
+}
+
+#[derive(Clone)]
+struct MessagePalette {
+    label: Option<UiText>,
+    border: Color,
+    background: Color,
+    text: Color,
+}
+
+fn lighten_color(color: &Color, delta: u8) -> Color {
+    match color {
+        Color::Rgb { r, g, b } => {
+            let adjust = |component: &u8| -> u8 { component.saturating_add(delta) };
+            Color::Rgb {
+                r: adjust(r),
+                g: adjust(g),
+                b: adjust(b),
+            }
+        }
+        _ => color.clone(),
+    }
+}
+
+fn palette_for_kind(
+    kind: IocraftLineKind,
+    theme: &IocraftTheme,
+    fallback: &Color,
+) -> MessagePalette {
+    let background_base = theme.background.as_ref().unwrap_or(fallback);
+    let base_color = match kind {
+        IocraftLineKind::User => theme.primary.as_ref().unwrap_or(fallback),
+        IocraftLineKind::Response | IocraftLineKind::Reasoning => {
+            theme.secondary.as_ref().unwrap_or(fallback)
+        }
+        IocraftLineKind::Tool => theme.primary.as_ref().unwrap_or(fallback),
+        IocraftLineKind::Error => &Color::Red,
+        IocraftLineKind::Info => &Color::Grey,
+        IocraftLineKind::Output => fallback,
+        IocraftLineKind::Plain => background_base,
+    };
+
+    let border = base_color.clone();
+    let background = match kind {
+        IocraftLineKind::Plain => lighten_color(background_base, 6),
+        IocraftLineKind::Output => lighten_color(base_color, 12),
+        IocraftLineKind::Error => lighten_color(base_color, 8),
+        _ => lighten_color(base_color, 18),
+    };
+    let text = if matches!(kind, IocraftLineKind::Error) {
+        Color::White
+    } else {
+        fallback.clone()
+    };
+
+    let label = match kind {
+        IocraftLineKind::User => Some(UiText::LabelUser),
+        IocraftLineKind::Response => Some(UiText::LabelAgent),
+        IocraftLineKind::Reasoning => Some(UiText::LabelReasoning),
+        IocraftLineKind::Tool => Some(UiText::LabelTool),
+        IocraftLineKind::Info => Some(UiText::LabelInfo),
+        IocraftLineKind::Error => Some(UiText::LabelError),
+        IocraftLineKind::Output => Some(UiText::LabelOutput),
+        IocraftLineKind::Plain => None,
+    };
+
+    MessagePalette {
+        label,
+        border,
+        background,
+        text,
+    }
+}
 
 #[derive(Clone, Default)]
 pub struct IocraftTextStyle {
@@ -30,6 +165,7 @@ pub struct IocraftSegment {
 #[derive(Clone, Default)]
 struct StyledLine {
     segments: Vec<IocraftSegment>,
+    kind: IocraftLineKind,
 }
 
 impl StyledLine {
@@ -38,6 +174,10 @@ impl StyledLine {
             return;
         }
         self.segments.push(segment);
+    }
+
+    fn set_kind(&mut self, kind: IocraftLineKind) {
+        self.kind = kind;
     }
 }
 
@@ -62,9 +202,11 @@ impl Default for IocraftTheme {
 
 pub enum IocraftCommand {
     AppendLine {
+        kind: IocraftLineKind,
         segments: Vec<IocraftSegment>,
     },
     Inline {
+        kind: IocraftLineKind,
         segment: IocraftSegment,
     },
     SetPrompt {
@@ -98,18 +240,21 @@ pub struct IocraftHandle {
 }
 
 impl IocraftHandle {
-    pub fn append_line(&self, segments: Vec<IocraftSegment>) {
+    pub fn append_line(&self, kind: IocraftLineKind, segments: Vec<IocraftSegment>) {
         if segments.is_empty() {
             let _ = self.sender.send(IocraftCommand::AppendLine {
+                kind,
                 segments: vec![IocraftSegment::default()],
             });
         } else {
-            let _ = self.sender.send(IocraftCommand::AppendLine { segments });
+            let _ = self
+                .sender
+                .send(IocraftCommand::AppendLine { kind, segments });
         }
     }
 
-    pub fn inline(&self, segment: IocraftSegment) {
-        let _ = self.sender.send(IocraftCommand::Inline { segment });
+    pub fn inline(&self, kind: IocraftLineKind, segment: IocraftSegment) {
+        let _ = self.sender.send(IocraftCommand::Inline { kind, segment });
     }
 
     pub fn set_prompt(&self, prefix: String, style: IocraftTextStyle) {
@@ -166,7 +311,7 @@ async fn run_iocraft(
             placeholder: placeholder,
         )
     }
-    .render_loop()
+    .fullscreen()
     .await
     .context("iocraft render loop failed")
 }
@@ -181,6 +326,7 @@ struct SessionRootProps {
 
 #[component]
 fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    let (width, height) = hooks.use_terminal_size();
     let mut system = hooks.use_context_mut::<SystemContext>();
     let lines = hooks.use_state(Vec::<StyledLine>::default);
     let current_line = hooks.use_state(StyledLine::default);
@@ -218,7 +364,7 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
 
             while let Some(cmd) = rx.recv().await {
                 match cmd {
-                    IocraftCommand::AppendLine { segments } => {
+                    IocraftCommand::AppendLine { kind, segments } => {
                         let was_active = current_active_state.get();
                         flush_current_line(
                             &mut current_line_state,
@@ -227,14 +373,15 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                             was_active,
                         );
                         if let Some(mut lines) = lines_state.try_write() {
-                            lines.push(StyledLine { segments });
+                            lines.push(StyledLine { segments, kind });
                         }
                     }
-                    IocraftCommand::Inline { segment } => {
+                    IocraftCommand::Inline { kind, segment } => {
                         append_inline_segment(
                             &mut current_line_state,
                             &mut current_active_state,
                             &mut lines_state,
+                            kind,
                             segment,
                         );
                     }
@@ -349,83 +496,251 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
     let placeholder_text = placeholder_hint.to_string();
     let placeholder_visible = show_placeholder.get() && !placeholder_text.is_empty();
 
-    let transcript_rows = transcript_lines.into_iter().map(|line| {
-        element! {
-            View(flex_direction: FlexDirection::Row) {
-                #(line
-                    .segments
-                    .into_iter()
-                    .map(|segment| element! {
-                        Text(
-                            content: segment.text,
-                            color: segment.style.color,
-                            weight: segment.style.weight,
-                            italic: segment.style.italic,
-                            wrap: TextWrap::NoWrap,
-                        )
-                    }))
-            }
-        }
-    });
-
     let theme_value = theme_state.read().clone();
 
     let background = theme_value
         .background
+        .clone()
         .unwrap_or(Color::Rgb { r: 0, g: 0, b: 0 });
-    let foreground = theme_value.foreground.unwrap_or(Color::White);
+    let foreground = theme_value.foreground.clone().unwrap_or(Color::White);
 
-    let placeholder_color = theme_value.secondary.or(Some(foreground));
+    let transcript_rows = transcript_lines.into_iter().map(|line| {
+        let has_content = line
+            .segments
+            .iter()
+            .any(|segment| !segment.text.trim().is_empty());
+        if !has_content {
+            return element! { View(height: 1u16) {} };
+        }
+
+        let palette = palette_for_kind(line.kind, &theme_value, &foreground);
+        let MessagePalette {
+            label,
+            border,
+            background,
+            text,
+        } = palette;
+        let justification = if matches!(line.kind, IocraftLineKind::User) {
+            JustifyContent::FlexEnd
+        } else {
+            JustifyContent::FlexStart
+        };
+        let label_view = label.map(|label_text| {
+            let color = border.clone();
+            element! {
+                Text(
+                    content: label_text.as_str(),
+                    color: color,
+                    weight: Weight::Bold,
+                    wrap: TextWrap::NoWrap,
+                )
+            }
+        });
+        let fallback_color = text.clone();
+        let message_segments = line.segments.into_iter().map(move |segment| {
+            let text_color = segment
+                .style
+                .color
+                .unwrap_or_else(|| fallback_color.clone());
+            element! {
+                Text(
+                    content: segment.text,
+                    color: text_color,
+                    weight: segment.style.weight,
+                    italic: segment.style.italic,
+                    wrap: TextWrap::Wrap,
+                )
+            }
+        });
+
+        element! {
+            View(
+                flex_direction: FlexDirection::Row,
+                justify_content: justification,
+                flex_grow: 1.0,
+            ) {
+                View(
+                    flex_direction: FlexDirection::Column,
+                    background_color: background.clone(),
+                    border_style: BorderStyle::Round,
+                    border_color: border.clone(),
+                    padding: 1u16,
+                    gap: 1u16,
+                ) {
+                    #(label_view.into_iter())
+                    View(flex_direction: FlexDirection::Column, gap: 0u16) {
+                        #(message_segments)
+                    }
+                }
+            }
+        }
+    });
+
+    let placeholder_color = theme_value.secondary.clone().unwrap_or(foreground.clone());
     let placeholder_element = placeholder_visible.then(|| {
+        let color = placeholder_color.clone();
         element! {
             Text(
                 content: placeholder_text.clone(),
-                color: placeholder_color,
+                color: color,
                 italic: true,
+                wrap: TextWrap::Wrap,
             )
         }
     });
     let input_value_state = input_value;
+    let header_accent = theme_value.primary.clone().unwrap_or(foreground.clone());
+    let footer_items = [
+        UiText::FooterSend,
+        UiText::FooterCancel,
+        UiText::FooterExit,
+        UiText::FooterCommands,
+        UiText::FooterScroll,
+    ];
+    let footer_background = lighten_color(&background, 6);
+    let transcript_background = lighten_color(&background, 4);
+    let input_background = lighten_color(&background, 8);
 
     element! {
         View(
+            width,
+            height,
             flex_direction: FlexDirection::Column,
-            padding: 1u16,
-            gap: 1u16,
-            background_color: background,
+            background_color: background.clone(),
+            padding_left: LAYOUT_PADDING,
+            padding_right: LAYOUT_PADDING,
+            padding_top: LAYOUT_PADDING,
+            padding_bottom: LAYOUT_PADDING,
+            gap: SECTION_GAP,
         ) {
             View(
                 flex_direction: FlexDirection::Column,
-                flex_grow: 1.0,
-                gap: 0u16,
-                overflow: Overflow::Hidden,
+                border_style: BorderStyle::Round,
+                border_color: header_accent.clone(),
+                background_color: lighten_color(&header_accent, 10),
+                padding: HEADER_BORDER_PADDING,
+                gap: HEADER_GAP,
             ) {
-                #(transcript_rows)
+                Text(
+                    content: UiText::HeaderLogoTop.as_str(),
+                    color: header_accent.clone(),
+                    weight: Weight::Bold,
+                    wrap: TextWrap::NoWrap,
+                )
+                Text(
+                    content: UiText::HeaderLogoBottom.as_str(),
+                    color: header_accent.clone(),
+                    weight: Weight::Bold,
+                    wrap: TextWrap::NoWrap,
+                )
+                Text(
+                    content: UiText::HeaderTitle.as_str(),
+                    color: foreground.clone(),
+                    weight: Weight::Bold,
+                    wrap: TextWrap::NoWrap,
+                )
+                Text(
+                    content: UiText::HeaderSubtitle.as_str(),
+                    color: theme_value
+                        .secondary
+                        .clone()
+                        .unwrap_or(foreground.clone()),
+                    italic: true,
+                )
             }
-            View(flex_direction: FlexDirection::Column, gap: 1u16) {
+            View(
+                flex_direction: FlexDirection::Column,
+                flex_grow: 1.0,
+                gap: SECTION_GAP,
+            ) {
                 View(
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    gap: 1u16,
+                    flex_direction: FlexDirection::Column,
+                    flex_grow: 1.0,
+                    border_style: BorderStyle::Round,
+                    border_color: theme_value
+                        .secondary
+                        .clone()
+                        .unwrap_or(foreground.clone()),
+                    padding: TRANSCRIPT_PADDING,
+                    gap: SECTION_GAP,
+                    background_color: transcript_background.clone(),
+                    overflow: Overflow::Hidden,
                 ) {
-                    Text(
-                        content: prompt_prefix_value.clone(),
-                        color: prompt_style_value.color.or(theme_value.secondary),
-                        weight: prompt_style_value.weight,
-                        italic: prompt_style_value.italic,
-                        wrap: TextWrap::NoWrap,
-                    )
-                    TextInput(
-                        has_focus: true,
-                        value: input_value_string.clone(),
-                        on_change: move |value| {
-                            let mut handle = input_value_state;
-                            handle.set(value);
-                        },
-                        color: theme_value.foreground,
-                    )
+                    View(
+                        flex_direction: FlexDirection::Column,
+                        gap: SECTION_GAP,
+                        overflow: Overflow::Hidden,
+                    ) {
+                        #(transcript_rows)
+                    }
                 }
-                #(placeholder_element.into_iter())
+                View(
+                    flex_direction: FlexDirection::Column,
+                    border_style: BorderStyle::Round,
+                    border_color: theme_value
+                        .primary
+                        .clone()
+                        .unwrap_or(foreground.clone()),
+                    padding: INPUT_PADDING,
+                    gap: 1u16,
+                    background_color: input_background,
+                ) {
+                    View(
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        gap: 1u16,
+                    ) {
+                        Text(
+                            content: prompt_prefix_value.clone(),
+                            color: prompt_style_value
+                                .color
+                                .clone()
+                                .or(theme_value.secondary.clone())
+                                .unwrap_or(foreground.clone()),
+                            weight: prompt_style_value.weight,
+                            italic: prompt_style_value.italic,
+                            wrap: TextWrap::NoWrap,
+                        )
+                        TextInput(
+                            has_focus: true,
+                            value: input_value_string.clone(),
+                            on_change: move |value| {
+                                let mut handle = input_value_state;
+                                handle.set(value);
+                            },
+                            color: theme_value
+                                .foreground
+                                .clone()
+                                .unwrap_or(foreground.clone()),
+                        )
+                    }
+                    #(placeholder_element.into_iter())
+                }
+            }
+            View(
+                flex_direction: FlexDirection::Row,
+                gap: 2u16,
+                border_style: BorderStyle::Round,
+                border_color: theme_value
+                    .secondary
+                    .clone()
+                    .unwrap_or(foreground.clone()),
+                padding: FOOTER_PADDING,
+                background_color: footer_background,
+            ) {
+                #(footer_items.into_iter().map(|item| {
+                    let color = theme_value
+                        .secondary
+                        .clone()
+                        .unwrap_or(foreground.clone());
+                    element! {
+                        Text(
+                            content: item.as_str(),
+                            color: color,
+                            wrap: TextWrap::NoWrap,
+                        )
+                    }
+                }))
             }
         }
     }
@@ -451,6 +766,7 @@ fn flush_current_line(
 
     if let Some(mut cur) = current_line.try_write() {
         cur.segments.clear();
+        cur.kind = IocraftLineKind::Plain;
     }
     current_active.set(false);
 }
@@ -459,6 +775,7 @@ fn append_inline_segment(
     current_line: &mut State<StyledLine>,
     current_active: &mut State<bool>,
     lines_state: &mut State<Vec<StyledLine>>,
+    kind: IocraftLineKind,
     segment: IocraftSegment,
 ) {
     let text = segment.text;
@@ -474,6 +791,7 @@ fn append_inline_segment(
     while let Some(part) = parts.next() {
         if !part.is_empty() {
             if let Some(mut cur) = current_line.try_write() {
+                cur.set_kind(kind);
                 cur.push_segment(IocraftSegment {
                     text: part.to_string(),
                     style: style.clone(),

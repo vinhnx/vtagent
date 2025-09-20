@@ -5,7 +5,7 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 
 /// Identifier for the default theme.
-pub const DEFAULT_THEME_ID: &str = "ciapre-dark";
+pub const DEFAULT_THEME_ID: &str = "ciapre-blue";
 
 const MIN_CONTRAST: f64 = 4.5;
 

@@ -378,20 +378,33 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
     let placeholder_visible = show_placeholder.get() && !placeholder_text.is_empty();
 
     let transcript_rows = transcript_lines.into_iter().map(|line| {
-        element! {
-            View(flex_direction: FlexDirection::Row) {
-                #(line
-                    .segments
-                    .into_iter()
-                    .map(|segment| element! {
-                        Text(
-                            content: segment.text,
-                            color: segment.style.color,
-                            weight: segment.style.weight,
-                            italic: segment.style.italic,
-                            wrap: TextWrap::NoWrap,
-                        )
-                    }))
+        if line.segments.is_empty() {
+            element! {
+                View(height: 1u16) {}
+            }
+        } else {
+            let contents = line
+                .segments
+                .into_iter()
+                .map(|segment| {
+                    let mut content = MixedTextContent::new(segment.text);
+                    if let Some(color) = segment.style.color {
+                        content = content.color(color);
+                    }
+                    if segment.style.weight != Weight::Normal {
+                        content = content.weight(segment.style.weight);
+                    }
+                    if segment.style.italic {
+                        content = content.italic();
+                    }
+                    content
+                })
+                .collect::<Vec<_>>();
+
+            element! {
+                View(flex_direction: FlexDirection::Row, width: 100pct) {
+                    MixedText(contents: contents, wrap: TextWrap::NoWrap)
+                }
             }
         }
     });
@@ -403,12 +416,12 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
         .unwrap_or(Color::Rgb { r: 0, g: 0, b: 0 });
     let foreground = theme_value.foreground.unwrap_or(Color::White);
 
-    let placeholder_color = theme_value.secondary.or(Some(foreground));
+    let accent_color = theme_value.secondary.or(Some(foreground));
     let placeholder_element = placeholder_visible.then(|| {
         element! {
             Text(
                 content: placeholder_text.clone(),
-                color: placeholder_color,
+                color: accent_color,
                 italic: true,
             )
         }
@@ -417,6 +430,8 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
 
     element! {
         View(
+            width: 100pct,
+            height: 100pct,
             flex_direction: FlexDirection::Column,
             padding: 1u16,
             gap: 1u16,
@@ -443,15 +458,24 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                         italic: prompt_style_value.italic,
                         wrap: TextWrap::NoWrap,
                     )
-                    TextInput(
-                        has_focus: true,
-                        value: input_value_string.clone(),
-                        on_change: move |value| {
-                            let mut handle = input_value_state;
-                            handle.set(value);
-                        },
-                        color: theme_value.foreground,
-                    )
+                    View(
+                        flex_grow: 1.0,
+                        width: 100pct,
+                        border_style: BorderStyle::Round,
+                        border_color: accent_color,
+                        padding_left: 1u16,
+                        padding_right: 1u16,
+                    ) {
+                        TextInput(
+                            has_focus: true,
+                            value: input_value_string.clone(),
+                            on_change: move |value| {
+                                let mut handle = input_value_state;
+                                handle.set(value);
+                            },
+                            color: theme_value.foreground,
+                        )
+                    }
                 }
                 #(placeholder_element.into_iter())
             }
@@ -516,7 +540,7 @@ fn append_inline_segment(
     }
 
     if ends_with_newline {
-        flush_current_line(current_line, current_active, lines_state, true);
+        flush_current_line(current_line, current_active, lines_state, false);
     }
 }
 

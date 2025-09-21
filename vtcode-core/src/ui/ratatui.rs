@@ -391,6 +391,8 @@ struct RatatuiLoop {
     should_exit: bool,
     theme: RatatuiTheme,
     last_escape: Option<Instant>,
+    scroll_offset: u16,
+    needs_autoscroll: bool,
 }
 
 impl RatatuiLoop {
@@ -407,6 +409,8 @@ impl RatatuiLoop {
             should_exit: false,
             theme,
             last_escape: None,
+            scroll_offset: 0,
+            needs_autoscroll: true,
         }
     }
 
@@ -424,10 +428,12 @@ impl RatatuiLoop {
                 let was_active = self.current_active;
                 self.flush_current_line(was_active);
                 self.lines.push(StyledLine { segments });
+                self.needs_autoscroll = true;
                 true
             }
             RatatuiCommand::Inline { segment } => {
                 self.append_inline_segment(segment);
+                self.needs_autoscroll = true;
                 true
             }
             RatatuiCommand::ReplaceLast { count, lines } => {
@@ -440,6 +446,7 @@ impl RatatuiLoop {
                 for segments in lines {
                     self.lines.push(StyledLine { segments });
                 }
+                self.needs_autoscroll = true;
                 true
             }
             RatatuiCommand::SetPrompt { prefix, style } => {
@@ -512,7 +519,10 @@ impl RatatuiLoop {
     ) -> Result<bool> {
         match event {
             CrosstermEvent::Key(key) => self.handle_key_event(key, events),
-            CrosstermEvent::Resize(_, _) => Ok(true),
+            CrosstermEvent::Resize(_, _) => {
+                self.needs_autoscroll = true;
+                Ok(true)
+            }
             CrosstermEvent::FocusGained
             | CrosstermEvent::FocusLost
             | CrosstermEvent::Mouse(_)
@@ -634,60 +644,37 @@ impl RatatuiLoop {
         }
     }
 
-    fn draw(&self, frame: &mut Frame) {
+    fn draw(&mut self, frame: &mut Frame) {
         let area = frame.size();
         frame.render_widget(ClearWidget, area);
 
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
-            .constraints([Constraint::Min(1), Constraint::Length(2)])
+            .constraints([Constraint::Min(1), Constraint::Length(1)])
             .split(area);
 
+        let transcript_area = layout[0];
+        self.update_scroll_offset(transcript_area.height);
         let transcript_lines = self.collect_transcript_lines();
         let transcript_paragraph = Paragraph::new(transcript_lines)
             .wrap(Wrap { trim: false })
-            .style(self.base_style());
-        frame.render_widget(transcript_paragraph, layout[0]);
-
-        let bottom = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(1), Constraint::Length(1)])
-            .split(layout[1]);
+            .style(self.base_style())
+            .scroll((self.scroll_offset, 0));
+        frame.render_widget(transcript_paragraph, transcript_area);
 
         let input_line = self.build_input_line();
         let input_paragraph = Paragraph::new(Line::from(input_line)).style(self.base_style());
-        frame.render_widget(input_paragraph, bottom[0]);
+        let input_area = layout[1];
+        frame.render_widget(input_paragraph, input_area);
 
         let prompt_width = self.prompt_width() as u16;
         let input_width = self.input.width_before_cursor() as u16;
         let cursor_column = prompt_width.saturating_add(input_width);
-        let clamped_column = min(cursor_column, bottom[0].width.saturating_sub(1));
-        let cursor_x = bottom[0].x + clamped_column;
-        let cursor_y = bottom[0].y;
+        let clamped_column = min(cursor_column, input_area.width.saturating_sub(1));
+        let cursor_x = input_area.x + clamped_column;
+        let cursor_y = input_area.y;
         frame.set_cursor(cursor_x, cursor_y);
-
-        if self.show_placeholder {
-            if let Some(hint) = &self.placeholder_hint {
-                let placeholder_line = Line::from(vec![Span::styled(
-                    hint.clone(),
-                    Style::default()
-                        .fg(self
-                            .theme
-                            .secondary
-                            .or(self.theme.foreground)
-                            .unwrap_or(Color::White))
-                        .add_modifier(Modifier::ITALIC),
-                )]);
-                let placeholder_paragraph =
-                    Paragraph::new(placeholder_line).style(self.base_style());
-                frame.render_widget(placeholder_paragraph, bottom[1]);
-            } else {
-                frame.render_widget(ClearWidget, bottom[1]);
-            }
-        } else {
-            frame.render_widget(ClearWidget, bottom[1]);
-        }
     }
 
     fn base_style(&self) -> Style {
@@ -712,6 +699,30 @@ impl RatatuiLoop {
         lines
     }
 
+    fn total_visible_lines(&self) -> usize {
+        let mut total = self.lines.len();
+        if self.current_active && !self.current_line.segments.is_empty() {
+            total += 1;
+        }
+        total
+    }
+
+    fn update_scroll_offset(&mut self, viewport_height: u16) {
+        if !self.needs_autoscroll {
+            return;
+        }
+
+        let viewport = viewport_height.max(1) as usize;
+        let total = self.total_visible_lines();
+        if total <= viewport {
+            self.scroll_offset = 0;
+        } else {
+            let offset = total.saturating_sub(viewport);
+            self.scroll_offset = offset.min(u16::MAX as usize) as u16;
+        }
+        self.needs_autoscroll = false;
+    }
+
     fn convert_line(&self, line: &StyledLine) -> Line<'static> {
         let mut spans = Vec::with_capacity(line.segments.len());
         for segment in &line.segments {
@@ -729,10 +740,28 @@ impl RatatuiLoop {
                 .to_style(self.theme.secondary.or(self.theme.foreground));
             spans.push(Span::styled(self.prompt_prefix.clone(), style));
         }
+        let input_value = self.input.value().to_string();
         spans.push(Span::styled(
-            self.input.value().to_string(),
+            input_value.clone(),
             Style::default().fg(self.theme.foreground.unwrap_or(Color::White)),
         ));
+        if self.show_placeholder {
+            if let Some(hint) = &self.placeholder_hint {
+                if input_value.is_empty() {
+                    spans.push(Span::raw(" "));
+                    spans.push(Span::styled(
+                        hint.clone(),
+                        Style::default()
+                            .fg(self
+                                .theme
+                                .secondary
+                                .or(self.theme.foreground)
+                                .unwrap_or(Color::White))
+                            .add_modifier(Modifier::ITALIC),
+                    ));
+                }
+            }
+        }
         spans
     }
 

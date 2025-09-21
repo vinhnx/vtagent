@@ -4,6 +4,11 @@ use std::time::{Duration, Instant};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 const ESCAPE_DOUBLE_MS: u64 = 750;
+const ROOT_PADDING: u16 = 1;
+const ROOT_GAP: u16 = 1;
+const PROMPT_GAP: u16 = 1;
+const PROMPT_INPUT_HEIGHT: u16 = 1;
+const PROMPT_BORDER_THICKNESS: u16 = 2;
 
 #[derive(Clone, Default)]
 pub struct IocraftTextStyle {
@@ -176,7 +181,7 @@ async fn run_iocraft(
             placeholder: placeholder,
         )
     }
-    .render_loop()
+    .fullscreen()
     .await
     .context("iocraft render loop failed")
 }
@@ -203,6 +208,11 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
     let should_exit = hooks.use_state(|| false);
     let theme_state = hooks.use_state(|| props.theme.clone());
     let command_state = hooks.use_state(|| props.commands.take());
+    let mut scroll_offset = hooks.use_state(|| 0usize);
+    let mut auto_scroll = hooks.use_state(|| true);
+    let mut viewport_capacity = hooks.use_state(|| 0usize);
+    let mut total_line_count = hooks.use_state(|| 0usize);
+    let (_, terminal_height) = hooks.use_terminal_size();
 
     hooks.use_future({
         let mut command_slot = command_state;
@@ -293,7 +303,11 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
 
     let events_tx = props.events.clone().expect("iocraft events sender missing");
     let mut last_escape = hooks.use_state(|| None::<Instant>);
-    let mut placeholder_toggle = show_placeholder;
+    let mut placeholder_toggle = show_placeholder.clone();
+    let mut scroll_control = scroll_offset.clone();
+    let mut auto_scroll_control = auto_scroll.clone();
+    let viewport_for_events = viewport_capacity.clone();
+    let total_lines_for_events = total_line_count.clone();
 
     hooks.use_terminal_events(move |event| {
         if let TerminalEvent::Key(KeyEvent {
@@ -314,6 +328,11 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                     input_handle.set(String::new());
                     last_escape.set(None);
                     placeholder_toggle.set(false);
+                    auto_scroll_control.set(true);
+                    let viewport = viewport_for_events.get();
+                    let total = total_lines_for_events.get();
+                    let target = total.saturating_sub(viewport);
+                    scroll_control.set(target);
                     let _ = events_tx.send(IocraftEvent::Submit(text));
                 }
                 KeyCode::Esc => {
@@ -338,25 +357,110 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                     exit_flag.set(true);
                 }
                 KeyCode::Up => {
+                    let viewport = viewport_for_events.get();
+                    if viewport > 0 {
+                        let current = scroll_control.get();
+                        if current > 0 {
+                            scroll_control.set(current - 1);
+                            auto_scroll_control.set(false);
+                        }
+                    }
                     let _ = events_tx.send(IocraftEvent::ScrollLineUp);
                 }
                 KeyCode::Down => {
+                    let viewport = viewport_for_events.get();
+                    if viewport > 0 {
+                        let total = total_lines_for_events.get();
+                        let max_offset = total.saturating_sub(viewport);
+                        let current = scroll_control.get();
+                        if current < max_offset {
+                            let next = (current + 1).min(max_offset);
+                            scroll_control.set(next);
+                            if next == max_offset {
+                                auto_scroll_control.set(true);
+                            } else {
+                                auto_scroll_control.set(false);
+                            }
+                        } else {
+                            auto_scroll_control.set(true);
+                        }
+                    } else {
+                        auto_scroll_control.set(true);
+                    }
                     let _ = events_tx.send(IocraftEvent::ScrollLineDown);
                 }
                 KeyCode::PageUp => {
+                    let viewport = viewport_for_events.get();
+                    if viewport > 0 {
+                        let current = scroll_control.get();
+                        let delta = viewport.max(1);
+                        let next = current.saturating_sub(delta);
+                        if next != current {
+                            scroll_control.set(next);
+                            auto_scroll_control.set(false);
+                        }
+                    }
                     let _ = events_tx.send(IocraftEvent::ScrollPageUp);
                 }
                 KeyCode::PageDown => {
+                    let viewport = viewport_for_events.get();
+                    if viewport > 0 {
+                        let total = total_lines_for_events.get();
+                        let max_offset = total.saturating_sub(viewport);
+                        let current = scroll_control.get();
+                        let delta = viewport.max(1);
+                        let mut next = current.saturating_add(delta);
+                        if next > max_offset {
+                            next = max_offset;
+                        }
+                        if next != current {
+                            scroll_control.set(next);
+                        }
+                        if next == max_offset {
+                            auto_scroll_control.set(true);
+                        } else {
+                            auto_scroll_control.set(false);
+                        }
+                    } else {
+                        auto_scroll_control.set(true);
+                    }
                     let _ = events_tx.send(IocraftEvent::ScrollPageDown);
                 }
                 KeyCode::Char('k')
                     if modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
                 {
+                    let viewport = viewport_for_events.get();
+                    if viewport > 0 {
+                        let current = scroll_control.get();
+                        if current > 0 {
+                            scroll_control.set(current - 1);
+                            auto_scroll_control.set(false);
+                        }
+                    }
                     let _ = events_tx.send(IocraftEvent::ScrollLineUp);
                 }
                 KeyCode::Char('j')
                     if modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
                 {
+                    let viewport = viewport_for_events.get();
+                    if viewport > 0 {
+                        let total = total_lines_for_events.get();
+                        let max_offset = total.saturating_sub(viewport);
+                        let current = scroll_control.get();
+                        if current < max_offset {
+                            let next = (current + 1).min(max_offset);
+                            scroll_control.set(next);
+                            if next == max_offset {
+                                auto_scroll_control.set(true);
+                            } else {
+                                auto_scroll_control.set(false);
+                            }
+                        } else {
+                            auto_scroll_control.set(true);
+                        }
+                    } else {
+                        auto_scroll_control.set(true);
+                    }
                     let _ = events_tx.send(IocraftEvent::ScrollLineDown);
                 }
                 _ => {}
@@ -377,32 +481,81 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
     let placeholder_text = placeholder_hint.to_string();
     let placeholder_visible = show_placeholder.get() && !placeholder_text.is_empty();
 
-    let transcript_rows = transcript_lines.into_iter().map(|line| {
-        if line.segments.is_empty() {
-            element! {
-                View(width: 100pct) {
-                    Text(content: " ", wrap: TextWrap::NoWrap)
+    let transcript_elements: Vec<_> = transcript_lines
+        .into_iter()
+        .map(|line| {
+            if line.segments.is_empty() {
+                element! {
+                    View(width: 100pct) {
+                        Text(content: " ", wrap: TextWrap::NoWrap)
+                    }
+                }
+            } else {
+                element! {
+                    View(flex_direction: FlexDirection::Row, width: 100pct) {
+                        #(line
+                            .segments
+                            .into_iter()
+                            .map(|segment| element! {
+                                Text(
+                                    content: segment.text,
+                                    color: segment.style.color,
+                                    weight: segment.style.weight,
+                                    italic: segment.style.italic,
+                                    wrap: TextWrap::NoWrap,
+                                )
+                            }))
+                    }
                 }
             }
-        } else {
-            element! {
-                View(flex_direction: FlexDirection::Row, width: 100pct) {
-                    #(line
-                        .segments
-                        .into_iter()
-                        .map(|segment| element! {
-                            Text(
-                                content: segment.text,
-                                color: segment.style.color,
-                                weight: segment.style.weight,
-                                italic: segment.style.italic,
-                                wrap: TextWrap::NoWrap,
-                            )
-                        }))
-                }
-            }
-        }
-    });
+        })
+        .collect();
+
+    let total_rendered_lines = transcript_elements.len();
+    if total_line_count.get() != total_rendered_lines {
+        total_line_count.set(total_rendered_lines);
+    }
+
+    let prompt_rows = PROMPT_INPUT_HEIGHT + PROMPT_BORDER_THICKNESS;
+    let placeholder_rows = if placeholder_visible { 1u16 } else { 0u16 };
+    let placeholder_gap_rows = if placeholder_visible {
+        PROMPT_GAP
+    } else {
+        0u16
+    };
+    let reserved_rows = ROOT_PADDING
+        .saturating_mul(2)
+        .saturating_add(ROOT_GAP)
+        .saturating_add(prompt_rows)
+        .saturating_add(placeholder_rows)
+        .saturating_add(placeholder_gap_rows);
+    let viewport_rows = terminal_height.saturating_sub(reserved_rows) as usize;
+    if viewport_capacity.get() != viewport_rows {
+        viewport_capacity.set(viewport_rows);
+    }
+
+    let max_offset = total_rendered_lines.saturating_sub(viewport_rows);
+    let current_offset = scroll_offset.get();
+    let desired_offset = if viewport_rows == 0 {
+        0
+    } else if total_rendered_lines <= viewport_rows {
+        0
+    } else if auto_scroll.get() {
+        max_offset
+    } else {
+        current_offset.min(max_offset)
+    };
+
+    if desired_offset != current_offset {
+        scroll_offset.set(desired_offset);
+    }
+
+    let at_bottom = desired_offset == max_offset;
+    if auto_scroll.get() != at_bottom {
+        auto_scroll.set(at_bottom);
+    }
+
+    let scroll_offset_value = scroll_offset.get();
 
     let theme_value = theme_state.read().clone();
 
@@ -428,8 +581,8 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
             width: 100pct,
             height: 100pct,
             flex_direction: FlexDirection::Column,
-            padding: 1u16,
-            gap: 1u16,
+            padding: ROOT_PADDING,
+            gap: ROOT_GAP,
             background_color: background,
         ) {
             View(
@@ -437,14 +590,23 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                 flex_grow: 1.0,
                 gap: 0u16,
                 overflow: Overflow::Hidden,
+                position: Position::Relative,
             ) {
-                #(transcript_rows)
+                View(
+                    position: Position::Absolute,
+                    top: -(scroll_offset_value as i32),
+                    width: 100pct,
+                    flex_direction: FlexDirection::Column,
+                    gap: 0u16,
+                ) {
+                    #(transcript_elements)
+                }
             }
-            View(flex_direction: FlexDirection::Column, gap: 1u16) {
+            View(flex_direction: FlexDirection::Column, gap: PROMPT_GAP) {
                 View(
                     flex_direction: FlexDirection::Row,
                     align_items: AlignItems::Center,
-                    gap: 1u16,
+                    gap: PROMPT_GAP,
                 ) {
                     Text(
                         content: prompt_prefix_value.clone(),

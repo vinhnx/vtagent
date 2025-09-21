@@ -398,9 +398,6 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
 
     let theme_value = theme_state.read().clone();
 
-    let background = theme_value
-        .background
-        .unwrap_or(Color::Rgb { r: 0, g: 0, b: 0 });
     let foreground = theme_value.foreground.unwrap_or(Color::White);
 
     let placeholder_color = theme_value.secondary.or(Some(foreground));
@@ -420,7 +417,6 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
             flex_direction: FlexDirection::Column,
             padding: 1u16,
             gap: 1u16,
-            background_color: background,
         ) {
             View(
                 flex_direction: FlexDirection::Column,
@@ -429,31 +425,31 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                 overflow: Overflow::Hidden,
             ) {
                 #(transcript_rows)
-            }
-            View(flex_direction: FlexDirection::Column, gap: 1u16) {
-                View(
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    gap: 1u16,
-                ) {
-                    Text(
-                        content: prompt_prefix_value.clone(),
-                        color: prompt_style_value.color.or(theme_value.secondary),
-                        weight: prompt_style_value.weight,
-                        italic: prompt_style_value.italic,
-                        wrap: TextWrap::NoWrap,
-                    )
-                    TextInput(
-                        has_focus: true,
-                        value: input_value_string.clone(),
-                        on_change: move |value| {
-                            let mut handle = input_value_state;
-                            handle.set(value);
-                        },
-                        color: theme_value.foreground,
-                    )
+                View(flex_direction: FlexDirection::Column, gap: 1u16) {
+                    View(
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        gap: 1u16,
+                    ) {
+                        Text(
+                            content: prompt_prefix_value.clone(),
+                            color: prompt_style_value.color.or(theme_value.secondary),
+                            weight: prompt_style_value.weight,
+                            italic: prompt_style_value.italic,
+                            wrap: TextWrap::NoWrap,
+                        )
+                        TextInput(
+                            has_focus: true,
+                            value: input_value_string.clone(),
+                            on_change: move |value| {
+                                let mut handle = input_value_state;
+                                handle.set(value);
+                            },
+                            color: theme_value.foreground,
+                        )
+                    }
+                    #(placeholder_element.into_iter())
                 }
-                #(placeholder_element.into_iter())
             }
         }
     }

@@ -16,6 +16,7 @@ use ratatui::{
 use std::cmp::max;
 use std::io;
 use std::time::{Duration, Instant};
+use tokio::runtime::Builder as TokioRuntimeBuilder;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::time::{Interval, MissedTickBehavior, interval};
 use unicode_width::UnicodeWidthStr;
@@ -182,9 +183,18 @@ pub fn spawn_session(theme: RatatuiTheme, placeholder: Option<String>) -> Result
     let (command_tx, command_rx) = mpsc::unbounded_channel();
     let (event_tx, event_rx) = mpsc::unbounded_channel();
 
-    tokio::spawn(async move {
-        if let Err(err) = run_ratatui(command_rx, event_tx, theme, placeholder).await {
-            tracing::error!(error = ?err, "ratatui session terminated unexpectedly");
+    std::thread::spawn(move || {
+        match TokioRuntimeBuilder::new_current_thread().enable_all().build() {
+            Ok(runtime) => {
+                runtime.block_on(async move {
+                    if let Err(err) = run_ratatui(command_rx, event_tx, theme, placeholder).await {
+                        tracing::error!(error = ?err, "ratatui session terminated unexpectedly");
+                    }
+                });
+            }
+            Err(err) => {
+                tracing::error!(error = ?err, "failed to build ratatui runtime");
+            }
         }
     });
 

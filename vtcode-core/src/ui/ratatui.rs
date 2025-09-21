@@ -10,10 +10,11 @@ use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
+    terminal::{TerminalOptions, Viewport},
     text::{Line, Span},
-    widgets::{Clear as ClearWidget, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear as ClearWidget, Padding, Paragraph, Wrap},
 };
-use std::cmp::min;
+use std::cmp::{max, min};
 use std::io;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
@@ -202,7 +203,12 @@ async fn run_ratatui(
 ) -> Result<()> {
     let mut stdout = io::stdout();
     let backend = CrosstermBackend::new(&mut stdout);
-    let mut terminal = Terminal::new(backend).context("failed to initialize ratatui terminal")?;
+    let (_, rows) = crossterm::terminal::size().context("failed to query terminal size")?;
+    let options = TerminalOptions {
+        viewport: Viewport::Inline(rows),
+    };
+    let mut terminal = Terminal::with_options(backend, options)
+        .context("failed to initialize ratatui terminal")?;
     let _guard = TerminalGuard::new().context("failed to configure terminal for ratatui")?;
     terminal
         .clear()
@@ -234,6 +240,11 @@ async fn run_ratatui(
             event = event_stream.next() => {
                 match event {
                     Some(Ok(evt)) => {
+                        if matches!(evt, CrosstermEvent::Resize(_, _)) {
+                            terminal
+                                .autoresize()
+                                .context("failed to autoresize terminal viewport")?;
+                        }
                         if app.handle_event(evt, &events)? {
                             redraw = true;
                         }
@@ -651,11 +662,11 @@ impl RatatuiLoop {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
-            .constraints([Constraint::Min(1), Constraint::Length(1)])
+            .constraints([Constraint::Min(1), Constraint::Length(3)])
             .split(area);
 
         let transcript_area = layout[0];
-        self.update_scroll_offset(transcript_area.height);
+        self.update_scroll_offset(transcript_area.height, transcript_area.width);
         let transcript_lines = self.collect_transcript_lines();
         let transcript_paragraph = Paragraph::new(transcript_lines)
             .wrap(Wrap { trim: false })
@@ -664,16 +675,31 @@ impl RatatuiLoop {
         frame.render_widget(transcript_paragraph, transcript_area);
 
         let input_line = self.build_input_line();
-        let input_paragraph = Paragraph::new(Line::from(input_line)).style(self.base_style());
+        let border_style = self
+            .prompt_style
+            .to_style(self.theme.secondary.or(self.theme.foreground));
+        let input_block = Block::default()
+            .borders(Borders::ALL)
+            .style(self.base_style())
+            .border_style(border_style)
+            .padding(Padding::horizontal(1));
+        let input_paragraph = Paragraph::new(Line::from(input_line))
+            .style(self.base_style())
+            .block(input_block);
         let input_area = layout[1];
         frame.render_widget(input_paragraph, input_area);
 
         let prompt_width = self.prompt_width() as u16;
         let input_width = self.input.width_before_cursor() as u16;
         let cursor_column = prompt_width.saturating_add(input_width);
-        let clamped_column = min(cursor_column, input_area.width.saturating_sub(1));
-        let cursor_x = input_area.x + clamped_column;
-        let cursor_y = input_area.y;
+        let available_width = input_area.width.saturating_sub(2);
+        let clamped_column = if available_width == 0 {
+            0
+        } else {
+            min(cursor_column, available_width.saturating_sub(1))
+        };
+        let cursor_x = input_area.x + 1 + clamped_column;
+        let cursor_y = input_area.y + 1;
         frame.set_cursor(cursor_x, cursor_y);
     }
 
@@ -699,21 +725,13 @@ impl RatatuiLoop {
         lines
     }
 
-    fn total_visible_lines(&self) -> usize {
-        let mut total = self.lines.len();
-        if self.current_active && !self.current_line.segments.is_empty() {
-            total += 1;
-        }
-        total
-    }
-
-    fn update_scroll_offset(&mut self, viewport_height: u16) {
+    fn update_scroll_offset(&mut self, viewport_height: u16, viewport_width: u16) {
         if !self.needs_autoscroll {
             return;
         }
 
         let viewport = viewport_height.max(1) as usize;
-        let total = self.total_visible_lines();
+        let total = self.total_visual_rows(viewport_width);
         if total <= viewport {
             self.scroll_offset = 0;
         } else {
@@ -721,6 +739,40 @@ impl RatatuiLoop {
             self.scroll_offset = offset.min(u16::MAX as usize) as u16;
         }
         self.needs_autoscroll = false;
+    }
+
+    fn total_visual_rows(&self, viewport_width: u16) -> usize {
+        if viewport_width == 0 {
+            return 0;
+        }
+
+        let mut total = 0usize;
+        for line in &self.lines {
+            total = total.saturating_add(self.visual_height(line, viewport_width));
+        }
+        if self.current_active && !self.current_line.segments.is_empty() {
+            total = total.saturating_add(self.visual_height(&self.current_line, viewport_width));
+        }
+        total
+    }
+
+    fn visual_height(&self, line: &StyledLine, viewport_width: u16) -> usize {
+        if viewport_width == 0 {
+            return 0;
+        }
+
+        let width = viewport_width as usize;
+        let mut line_width = 0usize;
+        for segment in &line.segments {
+            line_width = line_width.saturating_add(UnicodeWidthStr::width(segment.text.as_str()));
+        }
+
+        if line_width == 0 {
+            return 1;
+        }
+
+        let rows = (line_width + width - 1) / width;
+        max(rows, 1)
     }
 
     fn convert_line(&self, line: &StyledLine) -> Line<'static> {

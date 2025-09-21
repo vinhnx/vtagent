@@ -403,12 +403,12 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
         .unwrap_or(Color::Rgb { r: 0, g: 0, b: 0 });
     let foreground = theme_value.foreground.unwrap_or(Color::White);
 
-    let placeholder_color = theme_value.secondary.or(Some(foreground));
+    let accent_color = theme_value.secondary.or(Some(foreground));
     let placeholder_element = placeholder_visible.then(|| {
         element! {
             Text(
                 content: placeholder_text.clone(),
-                color: placeholder_color,
+                color: accent_color,
                 italic: true,
             )
         }
@@ -443,15 +443,23 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                         italic: prompt_style_value.italic,
                         wrap: TextWrap::NoWrap,
                     )
-                    TextInput(
-                        has_focus: true,
-                        value: input_value_string.clone(),
-                        on_change: move |value| {
-                            let mut handle = input_value_state;
-                            handle.set(value);
-                        },
-                        color: theme_value.foreground,
-                    )
+                    View(
+                        flex_grow: 1.0,
+                        border_style: BorderStyle::Round,
+                        border_color: accent_color,
+                        padding_left: 1u16,
+                        padding_right: 1u16,
+                    ) {
+                        TextInput(
+                            has_focus: true,
+                            value: input_value_string.clone(),
+                            on_change: move |value| {
+                                let mut handle = input_value_state;
+                                handle.set(value);
+                            },
+                            color: theme_value.foreground,
+                        )
+                    }
                 }
                 #(placeholder_element.into_iter())
             }
@@ -516,7 +524,7 @@ fn append_inline_segment(
     }
 
     if ends_with_newline {
-        flush_current_line(current_line, current_active, lines_state, true);
+        flush_current_line(current_line, current_active, lines_state, false);
     }
 }
 

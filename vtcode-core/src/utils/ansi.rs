@@ -1,8 +1,8 @@
 use crate::config::loader::SyntaxHighlightingConfig;
-use crate::ui::iocraft::{
-    IocraftHandle, IocraftSegment, convert_style as convert_to_iocraft_style, theme_from_styles,
-};
 use crate::ui::markdown::{MarkdownLine, MarkdownSegment, render_markdown_to_lines};
+use crate::ui::ratatui::{
+    RatatuiHandle, RatatuiSegment, convert_style as convert_to_ratatui_style, theme_from_styles,
+};
 use crate::ui::theme;
 use crate::utils::transcript;
 use anstream::{AutoStream, ColorChoice};
@@ -50,7 +50,7 @@ pub struct AnsiRenderer {
     writer: AutoStream<io::Stdout>,
     buffer: String,
     color: bool,
-    sink: Option<IocraftSink>,
+    sink: Option<RatatuiSink>,
     last_line_was_empty: bool,
     highlight_config: SyntaxHighlightingConfig,
 }
@@ -75,11 +75,11 @@ impl AnsiRenderer {
         }
     }
 
-    /// Create a renderer that forwards output to an iocraft session handle
-    pub fn with_iocraft(handle: IocraftHandle, highlight_config: SyntaxHighlightingConfig) -> Self {
+    /// Create a renderer that forwards output to a ratatui session handle
+    pub fn with_ratatui(handle: RatatuiHandle, highlight_config: SyntaxHighlightingConfig) -> Self {
         let mut renderer = Self::stdout();
         renderer.highlight_config = highlight_config;
-        renderer.sink = Some(IocraftSink::new(handle));
+        renderer.sink = Some(RatatuiSink::new(handle));
         renderer.last_line_was_empty = false;
         renderer
     }
@@ -278,7 +278,7 @@ impl AnsiRenderer {
             return Ok(prepared.len());
         }
 
-        Err(anyhow!("stream_markdown_response requires an iocraft sink"))
+        Err(anyhow!("stream_markdown_response requires a ratatui sink"))
     }
 
     fn write_markdown_line(
@@ -324,22 +324,22 @@ impl AnsiRenderer {
     }
 }
 
-struct IocraftSink {
-    handle: IocraftHandle,
+struct RatatuiSink {
+    handle: RatatuiHandle,
 }
 
-impl IocraftSink {
-    fn new(handle: IocraftHandle) -> Self {
+impl RatatuiSink {
+    fn new(handle: RatatuiHandle) -> Self {
         Self { handle }
     }
 
-    fn style_to_segment(&self, style: Style, text: &str) -> IocraftSegment {
-        let mut text_style = convert_to_iocraft_style(style);
+    fn style_to_segment(&self, style: Style, text: &str) -> RatatuiSegment {
+        let mut text_style = convert_to_ratatui_style(style);
         if text_style.color.is_none() {
             let theme = theme_from_styles(&theme::active_styles());
             text_style = text_style.merge_color(theme.foreground);
         }
-        IocraftSegment {
+        RatatuiSegment {
             text: text.to_string(),
             style: text_style,
         }
@@ -415,7 +415,7 @@ impl IocraftSink {
         Ok(())
     }
 
-    fn convert_segments(&self, segments: &[MarkdownSegment]) -> Vec<IocraftSegment> {
+    fn convert_segments(&self, segments: &[MarkdownSegment]) -> Vec<RatatuiSegment> {
         if segments.is_empty() {
             return Vec::new();
         }

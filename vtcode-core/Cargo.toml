@@ -86,7 +86,9 @@ colorchoice-clap = "1.0"
 quick_cache = "0.6"
 roff = "0.2"
 syntect = "5.2"
-iocraft = "0.7.11"
+ratatui = { version = "0.26", default-features = false, features = ["crossterm"] }
+unicode-width = "0.1"
+crossterm = { version = "0.27", features = ["event-stream"] }
 cfonts = "1.1"
 ignore = "0.4"
 nucleo-matcher = "0.3"

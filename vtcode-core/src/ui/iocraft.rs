@@ -443,23 +443,15 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                         italic: prompt_style_value.italic,
                         wrap: TextWrap::NoWrap,
                     )
-                    View(
-                        flex_grow: 1.0,
-                        border_style: BorderStyle::Round,
-                        border_color: accent_color,
-                        padding_left: 1u16,
-                        padding_right: 1u16,
-                    ) {
-                        TextInput(
-                            has_focus: true,
-                            value: input_value_string.clone(),
-                            on_change: move |value| {
-                                let mut handle = input_value_state;
-                                handle.set(value);
-                            },
-                            color: theme_value.foreground,
-                        )
-                    }
+                    TextInput(
+                        has_focus: true,
+                        value: input_value_string.clone(),
+                        on_change: move |value| {
+                            let mut handle = input_value_state;
+                            handle.set(value);
+                        },
+                        color: theme_value.foreground,
+                    )
                 }
                 #(placeholder_element.into_iter())
             }

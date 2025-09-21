@@ -355,6 +355,7 @@ impl IocraftSink {
         let mut lines = text.split('\n').peekable();
         let ends_with_newline = text.ends_with('\n');
 
+        let mut appended_blank_line = false;
         while let Some(line) = lines.next() {
             let mut content = String::new();
             if !indent.is_empty() && !line.is_empty() {
@@ -364,14 +365,16 @@ impl IocraftSink {
             if content.is_empty() {
                 self.handle.append_line(Vec::new());
                 crate::utils::transcript::append("");
+                appended_blank_line = true;
             } else {
                 let segment = self.style_to_segment(style, &content);
                 self.handle.append_line(vec![segment]);
                 crate::utils::transcript::append(&content);
+                appended_blank_line = false;
             }
         }
 
-        if ends_with_newline {
+        if ends_with_newline && !appended_blank_line {
             self.handle.append_line(Vec::new());
             crate::utils::transcript::append("");
         }

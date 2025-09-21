@@ -6,11 +6,10 @@ use crossterm::{
 };
 use futures::StreamExt;
 use ratatui::{
-    Frame, Terminal,
+    Frame, Terminal, TerminalOptions, Viewport,
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    terminal::{TerminalOptions, Viewport},
     text::{Line, Span},
     widgets::{Block, Borders, Clear as ClearWidget, Padding, Paragraph, Wrap},
 };
@@ -656,7 +655,7 @@ impl RatatuiLoop {
     }
 
     fn draw(&mut self, frame: &mut Frame) {
-        let area = frame.size();
+        let area = frame.area();
         frame.render_widget(ClearWidget, area);
 
         let layout = Layout::default()
@@ -700,7 +699,7 @@ impl RatatuiLoop {
         };
         let cursor_x = input_area.x + 1 + clamped_column;
         let cursor_y = input_area.y + 1;
-        frame.set_cursor(cursor_x, cursor_y);
+        frame.set_cursor_position((cursor_x, cursor_y));
     }
 
     fn base_style(&self) -> Style {

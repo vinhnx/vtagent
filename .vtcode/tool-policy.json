@@ -12,8 +12,7 @@
     "simple_search",
     "bash",
     "apply_patch",
-    "srgn",
-    "curl"
+    "srgn"
   ],
   "policies": {
     "grep_search": "allow",

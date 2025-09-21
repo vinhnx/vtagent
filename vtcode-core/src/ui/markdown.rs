@@ -5,7 +5,7 @@ use crate::ui::theme::ThemeStyles;
 use anstyle::Style;
 use anstyle_syntect::to_anstyle;
 use once_cell::sync::Lazy;
-use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag};
+use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use std::cmp::max;
 use std::collections::HashMap;
 use syntect::easy::HighlightLines;
@@ -146,7 +146,7 @@ pub fn render_markdown_to_lines(
                     state.buffer.push_str(&text);
                     continue;
                 }
-                Event::End(Tag::CodeBlock(_)) => {
+                Event::End(TagEnd::CodeBlock) => {
                     flush_current_line(
                         &mut lines,
                         &mut current_line,
@@ -285,7 +285,7 @@ pub fn render_markdown_to_lines(
                 base_style,
             ),
             Event::FootnoteReference(reference) => append_text(
-                &format!("[^{}]", reference),
+                &format!("^{}]", reference),
                 &mut current_line,
                 &mut lines,
                 &style_stack,
@@ -295,6 +295,20 @@ pub fn render_markdown_to_lines(
                 theme_styles,
                 base_style,
             ),
+            // Handle new variants from pulldown-cmark 0.13
+            Event::InlineMath(text) | Event::DisplayMath(text) | Event::InlineHtml(text) => {
+                append_text(
+                    &text,
+                    &mut current_line,
+                    &mut lines,
+                    &style_stack,
+                    blockquote_depth,
+                    &list_stack,
+                    &mut pending_list_prefix,
+                    theme_styles,
+                    base_style,
+                );
+            }
         }
     }
 
@@ -340,10 +354,10 @@ fn handle_start_tag(
 ) {
     match tag {
         Tag::Paragraph => {}
-        Tag::Heading(level, ..) => {
+        Tag::Heading { level, .. } => {
             style_stack.push(heading_style(level, theme_styles, base_style));
         }
-        Tag::BlockQuote => {
+        Tag::BlockQuote(_) => {
             *blockquote_depth += 1;
         }
         Tag::List(start) => {
@@ -421,7 +435,7 @@ fn handle_start_tag(
 }
 
 fn handle_end_tag(
-    tag: Tag,
+    tag: TagEnd,
     style_stack: &mut Vec<Style>,
     blockquote_depth: &mut usize,
     list_stack: &mut Vec<ListState>,
@@ -430,25 +444,25 @@ fn handle_end_tag(
     current_line: &mut MarkdownLine,
 ) {
     match tag {
-        Tag::Paragraph => {
+        TagEnd::Paragraph => {
             if !current_line.segments.is_empty() {
                 lines.push(std::mem::take(current_line));
             }
             push_blank_line(lines);
         }
-        Tag::Heading(..) => {
+        TagEnd::Heading(_) => {
             if !current_line.segments.is_empty() {
                 lines.push(std::mem::take(current_line));
             }
             push_blank_line(lines);
             style_stack.pop();
         }
-        Tag::BlockQuote => {
+        TagEnd::BlockQuote(_) => {
             if *blockquote_depth > 0 {
                 *blockquote_depth -= 1;
             }
         }
-        Tag::List(_) => {
+        TagEnd::List(_) => {
             list_stack.pop();
             *pending_list_prefix = None;
             if !current_line.segments.is_empty() {
@@ -456,21 +470,35 @@ fn handle_end_tag(
             }
             push_blank_line(lines);
         }
-        Tag::Item => {
+        TagEnd::Item => {
             if !current_line.segments.is_empty() {
                 lines.push(std::mem::take(current_line));
             }
             *pending_list_prefix = None;
         }
-        Tag::Emphasis | Tag::Strong | Tag::Strikethrough | Tag::Link { .. } | Tag::Image { .. } => {
+        TagEnd::Emphasis => {
             style_stack.pop();
         }
-        Tag::CodeBlock(_) => {}
-        Tag::Table(_)
-        | Tag::TableHead
-        | Tag::TableRow
-        | Tag::TableCell
-        | Tag::FootnoteDefinition(_) => {}
+        TagEnd::Strong => {
+            style_stack.pop();
+        }
+        TagEnd::Strikethrough => {
+            style_stack.pop();
+        }
+        TagEnd::Link => {
+            style_stack.pop();
+        }
+        TagEnd::Image => {
+            style_stack.pop();
+        }
+        TagEnd::CodeBlock => {}
+        TagEnd::Table
+        | TagEnd::TableHead
+        | TagEnd::TableRow
+        | TagEnd::TableCell
+        | TagEnd::FootnoteDefinition => {}
+        // Handle new variants from pulldown-cmark 0.13
+        _ => {}
     }
 }
 

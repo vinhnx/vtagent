@@ -210,8 +210,8 @@ async fn run_ratatui(
         .context("failed to initialize ratatui terminal")?;
     let _guard = TerminalGuard::new().context("failed to configure terminal for ratatui")?;
     terminal
-        .clear()
-        .context("failed to clear terminal for ratatui")?;
+        .autoresize()
+        .context("failed to initialize terminal viewport for ratatui")?;
 
     let mut app = RatatuiLoop::new(theme, placeholder);
     let mut command_rx = commands;
@@ -271,8 +271,8 @@ async fn run_ratatui(
 
     terminal.show_cursor().ok();
     terminal
-        .clear()
-        .context("failed to clear terminal after ratatui session")?;
+        .autoresize()
+        .context("failed to reset terminal viewport after ratatui session")?;
 
     Ok(())
 }

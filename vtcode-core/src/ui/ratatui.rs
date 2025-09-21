@@ -8,12 +8,12 @@ use futures::StreamExt;
 use ratatui::{
     Frame, Terminal, TerminalOptions, Viewport,
     backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear as ClearWidget, Padding, Paragraph, Wrap},
+    widgets::{Paragraph, Wrap},
 };
-use std::cmp::{max, min};
+use std::cmp::max;
 use std::io;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
@@ -656,54 +656,22 @@ impl RatatuiLoop {
 
     fn draw(&mut self, frame: &mut Frame) {
         let area = frame.area();
-        frame.render_widget(ClearWidget, area);
-
-        let inner_width = area.width.saturating_sub(2);
-        let input_height = self.compute_input_height(inner_width);
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
-            .constraints([Constraint::Min(1), Constraint::Length(input_height)])
+            .constraints([Constraint::Min(1)])
             .split(area);
 
         let transcript_area = layout[0];
         self.update_scroll_offset(transcript_area.height, transcript_area.width);
-        let transcript_lines = self.collect_transcript_lines();
+        let transcript_lines = self.collect_display_lines();
         let transcript_paragraph = Paragraph::new(transcript_lines)
             .wrap(Wrap { trim: false })
             .style(self.base_style())
             .scroll((self.scroll_offset, 0));
         frame.render_widget(transcript_paragraph, transcript_area);
 
-        let input_line = self.build_input_line();
-        let border_style = self
-            .prompt_style
-            .to_style(self.theme.secondary.or(self.theme.foreground));
-        let input_block = Block::default()
-            .borders(Borders::ALL)
-            .style(self.base_style())
-            .border_style(border_style)
-            .padding(Padding::horizontal(1));
-        let input_paragraph = Paragraph::new(Line::from(input_line))
-            .style(self.base_style())
-            .wrap(Wrap { trim: false })
-            .block(input_block);
-        let input_area = layout[1];
-        frame.render_widget(input_paragraph, input_area);
-
-        let prompt_width = self.prompt_width();
-        let input_width = self.input.width_before_cursor();
-        let cursor_column = prompt_width.saturating_add(input_width);
-        let text_area_width = self.input_text_area_width(input_area.width).max(1usize);
-        let text_rows = usize::from(input_area.height.saturating_sub(2)).max(1);
-        let cursor_row = min(cursor_column / text_area_width, text_rows.saturating_sub(1));
-        let cursor_col = min(
-            cursor_column % text_area_width,
-            text_area_width.saturating_sub(1),
-        );
-        let cursor_x = input_area.x + 2 + cursor_col as u16;
-        let cursor_y = input_area.y + 1 + cursor_row as u16;
-        frame.set_cursor_position((cursor_x, cursor_y));
+        self.place_cursor(frame, transcript_area);
     }
 
     fn base_style(&self) -> Style {
@@ -717,6 +685,15 @@ impl RatatuiLoop {
         style
     }
 
+    fn collect_display_lines(&self) -> Vec<Line<'static>> {
+        let mut lines = self.collect_transcript_lines();
+        if self.has_transcript_content() {
+            lines.push(Line::default());
+        }
+        lines.push(Line::from(self.build_input_line()));
+        lines
+    }
+
     fn collect_transcript_lines(&self) -> Vec<Line<'static>> {
         let mut lines = Vec::new();
         for line in &self.lines {
@@ -728,13 +705,19 @@ impl RatatuiLoop {
         lines
     }
 
+    fn has_transcript_content(&self) -> bool {
+        !self.lines.is_empty() || (self.current_active && !self.current_line.segments.is_empty())
+    }
+
     fn update_scroll_offset(&mut self, viewport_height: u16, viewport_width: u16) {
         if !self.needs_autoscroll {
             return;
         }
 
         let viewport = viewport_height.max(1) as usize;
-        let total = self.total_visual_rows(viewport_width);
+        let transcript_rows = self.transcript_visual_rows(viewport_width);
+        let input_rows = self.input_visual_rows(viewport_width);
+        let total = transcript_rows.saturating_add(input_rows);
         if total <= viewport {
             self.scroll_offset = 0;
         } else {
@@ -744,7 +727,7 @@ impl RatatuiLoop {
         self.needs_autoscroll = false;
     }
 
-    fn total_visual_rows(&self, viewport_width: u16) -> usize {
+    fn transcript_visual_rows(&self, viewport_width: u16) -> usize {
         if viewport_width == 0 {
             return 0;
         }
@@ -757,6 +740,69 @@ impl RatatuiLoop {
             total = total.saturating_add(self.visual_height(&self.current_line, viewport_width));
         }
         total
+    }
+
+    fn input_visual_rows(&self, viewport_width: u16) -> usize {
+        if viewport_width == 0 {
+            return 0;
+        }
+
+        let text_width = self.input_text_area_width(viewport_width);
+        if text_width == 0 {
+            return 0;
+        }
+
+        let display_width = self.input_display_width();
+        let rows = (display_width + text_width - 1) / text_width;
+        let input_rows = max(rows, 1);
+        if self.has_transcript_content() {
+            input_rows.saturating_add(1)
+        } else {
+            input_rows
+        }
+    }
+
+    fn cursor_visual_position(&self, viewport_width: u16) -> Option<(usize, usize)> {
+        if viewport_width == 0 {
+            return None;
+        }
+
+        let text_width = self.input_text_area_width(viewport_width);
+        if text_width == 0 {
+            return None;
+        }
+
+        let prompt_width = self.prompt_width();
+        let input_width = self.input.width_before_cursor();
+        let cursor_column = prompt_width.saturating_add(input_width);
+        let input_row = cursor_column / text_width;
+        let input_col = cursor_column % text_width;
+        let base_rows = self.transcript_visual_rows(viewport_width);
+        let spacing = if self.has_transcript_content() { 1 } else { 0 };
+        Some((
+            base_rows.saturating_add(spacing).saturating_add(input_row),
+            input_col,
+        ))
+    }
+
+    fn place_cursor(&self, frame: &mut Frame, area: Rect) {
+        let Some((row, col)) = self.cursor_visual_position(area.width) else {
+            return;
+        };
+
+        let scroll = self.scroll_offset as usize;
+        if row < scroll {
+            return;
+        }
+
+        let visible_row = row - scroll;
+        if visible_row >= area.height as usize {
+            return;
+        }
+
+        let cursor_x = area.x + col as u16;
+        let cursor_y = area.y + visible_row as u16;
+        frame.set_cursor_position((cursor_x, cursor_y));
     }
 
     fn visual_height(&self, line: &StyledLine, viewport_width: u16) -> usize {
@@ -824,18 +870,8 @@ impl RatatuiLoop {
         UnicodeWidthStr::width(self.prompt_prefix.as_str())
     }
 
-    fn compute_input_height(&self, layout_width: u16) -> u16 {
-        let block_height: u16 = 2; // top and bottom borders
-        let text_width = self.input_text_area_width(layout_width).max(1usize);
-        let lines = self.input_display_width().saturating_add(text_width - 1) / text_width;
-        let total_lines = max(lines, 1usize) as u16;
-        total_lines.saturating_add(block_height)
-    }
-
     fn input_text_area_width(&self, layout_width: u16) -> usize {
-        let without_borders = layout_width.saturating_sub(2);
-        let without_padding = without_borders.saturating_sub(2);
-        usize::from(without_padding)
+        usize::from(layout_width)
     }
 
     fn input_display_width(&self) -> usize {

@@ -279,6 +279,8 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
     let tool_prompt_state = hooks.use_state(|| None::<ToolPermissionPrompt>);
 
     let estimated_view_capacity = cmp::max(height.saturating_sub(12) as usize, 8);
+    let fallback_padding_x = safe_padding(width, 2);
+    let fallback_padding_y = safe_padding(height, 1);
 
     let tool_prompt_for_commands = tool_prompt_state.clone();
     hooks.use_future({
@@ -420,8 +422,10 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                     justify_content: JustifyContent::Center,
                     align_items: AlignItems::Center,
                     background_color: Some(fallback_background),
-                    padding_left: 2u16,
-                    padding_right: 2u16,
+                    padding_left: fallback_padding_x,
+                    padding_right: fallback_padding_x,
+                    padding_top: fallback_padding_y,
+                    padding_bottom: fallback_padding_y,
                 ) {
                     Text(
                         content: "Interactive controls unavailable: event channel not initialized.",
@@ -630,6 +634,8 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
     let transcript_padding_y = safe_padding(height, 1);
     let transcript_inner_width =
         interior_width.saturating_sub(transcript_padding_x.saturating_mul(2));
+    let interior_height = height.saturating_sub(root_padding_y.saturating_mul(2));
+    let header_inner_width = interior_width.saturating_sub(header_padding_x.saturating_mul(2));
     let bubble_padding_x = safe_padding(transcript_inner_width, 2);
     let bubble_padding_y = safe_padding(height, 1);
     let bubble_min_width_value = u32::from(bubble_padding_x) * 2 + 1;
@@ -652,6 +658,14 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
         } else {
             Size::Auto
         };
+    let overlay_inner_width = interior_width.saturating_sub(overlay_padding_x.saturating_mul(2));
+    let prompt_card_inner_width =
+        overlay_inner_width.saturating_sub(prompt_card_padding_x.saturating_mul(2));
+    let prompt_card_inner_height =
+        interior_height.saturating_sub(prompt_card_padding_y.saturating_mul(2));
+    let logo_padding_x = safe_padding(header_inner_width, 2);
+    let prompt_button_padding_x = safe_padding(prompt_card_inner_width, 3);
+    let prompt_button_padding_y = safe_padding(prompt_card_inner_height, 1);
     let placeholder_padding = safe_padding(transcript_inner_width, 2);
     let scroll_indicator_padding_x = safe_padding(transcript_inner_width, 2);
     let scroll_indicator_padding_y = safe_padding(height, 1);
@@ -883,10 +897,10 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                                 border_style: BorderStyle::Round,
                                 border_color: Some(button_trim_color),
                                 background_color: Some(approve_button_color),
-                                padding_left: 3u16,
-                                padding_right: 3u16,
-                                padding_top: 1u16,
-                                padding_bottom: 1u16,
+                                padding_left: prompt_button_padding_x,
+                                padding_right: prompt_button_padding_x,
+                                padding_top: prompt_button_padding_y,
+                                padding_bottom: prompt_button_padding_y,
                             ) {
                                 Text(
                                     content: "Approve",
@@ -909,10 +923,10 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                                 border_style: BorderStyle::Round,
                                 border_color: Some(button_trim_color),
                                 background_color: Some(deny_button_color),
-                                padding_left: 3u16,
-                                padding_right: 3u16,
-                                padding_top: 1u16,
-                                padding_bottom: 1u16,
+                                padding_left: prompt_button_padding_x,
+                                padding_right: prompt_button_padding_x,
+                                padding_top: prompt_button_padding_y,
+                                padding_bottom: prompt_button_padding_y,
                             ) {
                                 Text(
                                     content: "Deny",
@@ -963,8 +977,8 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                     border_style: BorderStyle::Round,
                     border_color: Some(frame_color),
                     background_color: Some(logo_background),
-                    padding_left: 2u16,
-                    padding_right: 2u16,
+                    padding_left: logo_padding_x,
+                    padding_right: logo_padding_x,
                     padding_top: 0u16,
                     padding_bottom: 0u16,
                 ) {

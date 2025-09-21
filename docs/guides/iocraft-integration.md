@@ -7,8 +7,9 @@ React-like component system, flexbox layout via [`taffy`], rich styling, and hoo
 interactive experiences.
 
 > Key features highlighted by the upstream README include:
+>
 > - Defining UIs with the `element!` macro and flexbox layouts powered by `taffy`.
-> - Rendering styled output to any terminal, including fullscreen applications.
+> - Rendering styled output to any terminal.
 > - Creating interactive elements with async hooks and event handling.
 > - Passing props and context by reference to avoid unnecessary cloning.
 > - Supporting both Unix and Windows terminals for consistent visuals.

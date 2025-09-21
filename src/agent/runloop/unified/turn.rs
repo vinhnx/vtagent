@@ -23,6 +23,56 @@ use vtcode_core::ui::theme;
 use vtcode_core::utils::ansi::{AnsiRenderer, MessageStyle};
 use vtcode_core::utils::transcript;
 
+/// Check if workspace is trusted and prompt if needed
+async fn check_workspace_trust(
+    workspace_path: &std::path::Path,
+    config: &CoreAgentConfig,
+) -> Result<()> {
+    use vtcode_core::ui::iocraft::is_workspace_trusted;
+
+    let workspace_str = workspace_path.to_string_lossy();
+
+    // Check if workspace is already trusted
+    if is_workspace_trusted(&workspace_str) {
+        return Ok(());
+    }
+
+    // If not trusted, show trust prompt
+    println!("VT Code - Workspace Trust Check");
+    println!("=================================");
+    println!();
+    println!("Do you trust the files in this folder?");
+    println!();
+    println!("{}", workspace_str);
+    println!();
+    println!("VT Code may read, write, or execute files contained in this directory.");
+    println!("This can pose security risks, so only use files from trusted sources.");
+    println!();
+    println!("Learn more about security considerations.");
+    println!();
+    println!("❯ 1. Yes, proceed");
+    println!("  2. No, exit");
+    println!();
+
+    // Read user input
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input)?;
+
+    match input.trim() {
+        "1" | "y" | "Y" | "yes" | "Yes" => {
+            // Trust the workspace
+            vtcode_core::ui::iocraft::add_trusted_workspace(&workspace_str)
+                .context("Failed to save workspace trust setting")?;
+            println!("✅ Workspace trusted. You can now use VT Code in this directory.");
+            Ok(())
+        }
+        _ => {
+            println!("❌ Workspace not trusted. Exiting...");
+            std::process::exit(0);
+        }
+    }
+}
+
 use crate::agent::runloop::context::{
     apply_aggressive_trim_unified, enforce_unified_context_window, prune_unified_tool_responses,
 };
@@ -361,6 +411,9 @@ pub(crate) async fn run_single_agent_loop_unified(
         full_auto_allowlist,
     } = initialize_session(config, vt_cfg, full_auto).await?;
 
+    // Check workspace trust before starting UI
+    check_workspace_trust(&config.workspace, config).await?;
+
     let active_styles = theme::active_styles();
     let theme_spec = theme_from_styles(&active_styles);
     let default_placeholder = session_bootstrap.placeholder.clone();
@@ -419,7 +472,7 @@ pub(crate) async fn run_single_agent_loop_unified(
 
     let mut transcript_view = TranscriptView::new();
     let mut session_stats = SessionStats::default();
-    let mut events = session.events;
+    let (handle, mut events) = (session.handle, session.events);
     loop {
         if ctrl_c_flag.swap(false, Ordering::SeqCst) {
             session_stats.render_summary(&mut renderer, &conversation_history)?;

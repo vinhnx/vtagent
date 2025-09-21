@@ -1,14 +1,103 @@
 use anyhow::{Context, Result};
+// cfonts imports available for future use
+// use cfonts::{render, Options, Fonts, Colors, BgColors, Align};
 use iocraft::prelude::*;
 use parking_lot::Mutex;
 use std::cmp;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use terminal_size::{terminal_size, Height, Width};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::sync::oneshot;
 use tokio::task::yield_now;
 
+use std::path::PathBuf;
+
+/// Workspace trust configuration
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct WorkspaceTrustConfig {
+    pub trusted_paths: Vec<String>,
+    pub auto_trust: bool,
+}
+
+impl Default for WorkspaceTrustConfig {
+    fn default() -> Self {
+        Self {
+            trusted_paths: Vec::new(),
+            auto_trust: false,
+        }
+    }
+}
+
+/// Check if a workspace path is trusted
+pub fn is_workspace_trusted(workspace_path: &str) -> bool {
+    let config_path = std::env::var("HOME")
+        .map(|home| PathBuf::from(home).join(".config").join("vtcode").join("trust.toml"))
+        .unwrap_or_else(|_| {
+            PathBuf::from(".").join("vtcode-trust.toml")
+        });
+
+    if let Ok(contents) = std::fs::read_to_string(&config_path) {
+        if let Ok(config) = toml::from_str::<WorkspaceTrustConfig>(&contents) {
+            // Check if any trusted path is a parent of the current workspace
+            let current_path = std::path::Path::new(workspace_path);
+            for trusted_path in &config.trusted_paths {
+                let trusted_path = std::path::Path::new(trusted_path);
+                if current_path.starts_with(trusted_path) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
+}
+
+/// Add a workspace to trusted paths
+pub fn add_trusted_workspace(workspace_path: &str) -> anyhow::Result<()> {
+    let config_path = std::env::var("HOME")
+        .map(|home| PathBuf::from(home).join(".config").join("vtcode").join("trust.toml"))
+        .unwrap_or_else(|_| {
+            PathBuf::from(".").join("vtcode-trust.toml")
+        });
+
+    // Create config directory if it doesn't exist
+    if let Some(parent) = config_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let mut config = if config_path.exists() {
+        if let Ok(contents) = std::fs::read_to_string(&config_path) {
+            toml::from_str::<WorkspaceTrustConfig>(&contents)
+                .unwrap_or_default()
+        } else {
+            WorkspaceTrustConfig::default()
+        }
+    } else {
+        WorkspaceTrustConfig::default()
+    };
+
+    // Add workspace to trusted paths if not already present
+    if !config.trusted_paths.contains(&workspace_path.to_string()) {
+        config.trusted_paths.push(workspace_path.to_string());
+        let toml_content = toml::to_string_pretty(&config)?;
+        std::fs::write(&config_path, toml_content)?;
+    }
+
+    Ok(())
+}
+
+
 const ESCAPE_DOUBLE_MS: u64 = 750;
+
+/// Generate a VT Code logo using cfonts
+fn generate_vt_logo() -> String {
+    // Return an attractive ASCII art logo
+    String::from(r#"╭─╮
+│ │
+╰─╯
+"#)
+}
 
 #[derive(Clone, Default)]
 pub struct IocraftTextStyle {
@@ -210,11 +299,28 @@ pub struct IocraftSession {
 }
 
 pub fn spawn_session(theme: IocraftTheme, placeholder: Option<String>) -> Result<IocraftSession> {
+    // Get terminal size using the correct pattern from eminence/terminal-size
+    let (width, height) = if let Some((Width(w), Height(h))) = terminal_size() {
+        (w, h)
+    } else {
+        // Fallback for when terminal size can't be determined
+        (80, 24)
+    };
+
+    // Validate and ensure reasonable dimensions to prevent overflow
+    let width = if width == 0 { 80 } else { width }.max(40).min(80);
+    let height = if height == 0 { 24 } else { height }.max(10).min(30);
+
+    // Additional safety check - ensure values fit in u16 and are reasonable
+    let width = (width as u16).max(40).min(80);
+    let height = (height as u16).max(10).min(30);
+
+
     let (command_tx, command_rx) = mpsc::unbounded_channel();
     let (event_tx, event_rx) = mpsc::unbounded_channel();
 
     tokio::spawn(async move {
-        if let Err(err) = run_iocraft(command_rx, event_tx, theme, placeholder).await {
+        if let Err(err) = run_iocraft(command_rx, event_tx, theme, placeholder, width, height).await {
             tracing::error!(error = ?err, "iocraft session terminated unexpectedly");
         }
     });
@@ -230,6 +336,8 @@ async fn run_iocraft(
     events: UnboundedSender<IocraftEvent>,
     theme: IocraftTheme,
     placeholder: Option<String>,
+    width: u16,
+    height: u16,
 ) -> Result<()> {
     element! {
         SessionRoot(
@@ -237,6 +345,8 @@ async fn run_iocraft(
             events: events,
             theme: theme,
             placeholder: placeholder,
+            width: width,
+            height: height,
         )
     }
     .render_loop()
@@ -250,11 +360,324 @@ struct SessionRootProps {
     events: Option<UnboundedSender<IocraftEvent>>,
     theme: IocraftTheme,
     placeholder: Option<String>,
+    width: u16,
+    height: u16,
+}
+
+// Header component
+#[derive(Props)]
+struct HeaderProps {
+    width: u16,
+    foreground: Color,
+    primary: Color,
+    frame_color: Color,
+    logo_background: Option<Color>,
+    header_background: Option<Color>,
+    header_border: Color,
+    header_padding_x: u16,
+    header_padding_y: u16,
+    logo_padding_x: u16,
+}
+
+impl Default for HeaderProps {
+    fn default() -> Self {
+        Self {
+            width: 80,
+            foreground: Color::White,
+            primary: Color::White,
+            frame_color: Color::White,
+            logo_background: None,
+            header_background: None,
+            header_border: Color::White,
+            header_padding_x: 2,
+            header_padding_y: 1,
+            logo_padding_x: 2,
+        }
+    }
+}
+
+#[component]
+fn Header(props: &mut HeaderProps, _hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    element! {
+        View(
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            gap: 2u16,
+            border_style: BorderStyle::Round,
+            border_color: Some(props.header_border),
+            background_color: props.header_background,
+            padding_left: props.header_padding_x,
+            padding_right: props.header_padding_x,
+            padding_top: props.header_padding_y,
+            padding_bottom: props.header_padding_y,
+        ) {
+            View(
+                border_style: BorderStyle::Round,
+                border_color: Some(props.frame_color),
+                background_color: props.logo_background,
+                padding_left: props.logo_padding_x,
+                padding_right: props.logo_padding_x,
+                padding_top: 0u16,
+                padding_bottom: 0u16,
+            ) {
+                Text(
+                    content: generate_vt_logo(),
+                    color: Some(props.foreground),
+                    wrap: TextWrap::Wrap,
+                )
+            }
+            View(
+                flex_direction: FlexDirection::Column,
+                gap: 0u16,
+            ) {
+                Text(
+                    content: "VT Code",
+                    color: Some(props.foreground),
+                    weight: Weight::Bold,
+                    wrap: TextWrap::NoWrap,
+                )
+                Text(
+                    content: "Terminal workspace for building software",
+                    color: Some(lighten_color(props.foreground, 0.2)),
+                    wrap: TextWrap::Wrap,
+                )
+            }
+        }
+    }
+}
+
+// Transcript area component
+#[derive(Props)]
+struct TranscriptAreaProps {
+    width: u16,
+    height: u16,
+    transcript_padding_x: u16,
+    transcript_padding_y: u16,
+    frame_color: Color,
+    transcript_surface: Option<Color>,
+    manual_scroll_active: bool,
+    applied_offset: usize,
+    foreground: Color,
+    scroll_indicator_padding_x: u16,
+    scroll_indicator_padding_y: u16,
+    surface: Option<Color>,
+}
+
+impl Default for TranscriptAreaProps {
+    fn default() -> Self {
+        Self {
+            width: 80,
+            height: 24,
+            transcript_padding_x: 2,
+            transcript_padding_y: 1,
+            frame_color: Color::White,
+            transcript_surface: None,
+            manual_scroll_active: false,
+            applied_offset: 0,
+            foreground: Color::White,
+            scroll_indicator_padding_x: 2,
+            scroll_indicator_padding_y: 1,
+            surface: None,
+        }
+    }
+}
+
+#[component]
+fn TranscriptArea(props: &mut TranscriptAreaProps, _hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    element! {
+            View(
+                flex_direction: FlexDirection::Column,
+                flex_grow: 1.0,
+                gap: 1u16,
+                border_style: BorderStyle::Round,
+                border_color: Some(props.frame_color),
+                background_color: props.transcript_surface,
+                padding_left: props.transcript_padding_x,
+                padding_right: props.transcript_padding_x,
+                padding_top: props.transcript_padding_y,
+                padding_bottom: props.transcript_padding_y,
+            ) {
+            View(
+                flex_direction: FlexDirection::Column,
+                flex_grow: 1.0,
+                gap: 1u16,
+            ) {
+                // Build transcript rows from the global transcript buffer (limited to prevent overflow)
+                #(crate::utils::transcript::snapshot().into_iter().take(5).map(|line| {
+                    let text_color = props.foreground;
+
+                    element! {
+                        View(
+                            width: 100pct,
+                            padding_left: 1,
+                            padding_right: 1,
+                            padding_top: 0,
+                            padding_bottom: 0,
+                            gap: 0u16,
+                        ) {
+                            Text(
+                                content: line.clone().chars().take(80).collect::<String>(),
+                                color: Some(text_color),
+                                wrap: TextWrap::Wrap,
+                            )
+                        }
+                    }
+                }).collect::<Vec<_>>())
+            }
+        }
+    }
+}
+
+// Input area component
+#[derive(Props)]
+struct InputAreaProps {
+    prompt_prefix_value: String,
+    prompt_style_value: IocraftTextStyle,
+    input_value_string: String,
+    placeholder_text: String,
+    placeholder_visible: bool,
+    foreground: Color,
+    secondary: Color,
+    input_surface: Option<Color>,
+    input_border: Color,
+    input_inner_surface: Option<Color>,
+    input_padding_x: u16,
+    input_padding_y: u16,
+    input_inner_padding_x: u16,
+    prompt_active: bool,
+}
+
+impl Default for InputAreaProps {
+    fn default() -> Self {
+        Self {
+            prompt_prefix_value: "❯ ".to_string(),
+            prompt_style_value: IocraftTextStyle::default(),
+            input_value_string: String::new(),
+            placeholder_text: String::new(),
+            placeholder_visible: false,
+            foreground: Color::White,
+            secondary: Color::White,
+            input_surface: None,
+            input_border: Color::White,
+            input_inner_surface: None,
+            input_padding_x: 2,
+            input_padding_y: 1,
+            input_inner_padding_x: 1,
+            prompt_active: false,
+        }
+    }
+}
+
+#[component]
+fn InputArea(props: &mut InputAreaProps, _hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    let placeholder_element = props.placeholder_visible.then(|| {
+        element! {
+            Text(
+                content: props.placeholder_text.clone(),
+                color: Some(props.secondary),
+                italic: true,
+                wrap: TextWrap::Wrap,
+            )
+        }
+    });
+
+    element! {
+        View(
+            flex_direction: FlexDirection::Column,
+            gap: 1u16,
+            border_style: BorderStyle::Round,
+            border_color: Some(props.input_border),
+            background_color: props.input_surface,
+            padding_left: props.input_padding_x,
+            padding_right: props.input_padding_x,
+            padding_top: props.input_padding_y,
+            padding_bottom: props.input_padding_y,
+        ) {
+            View(
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                gap: 1u16,
+            ) {
+                Text(
+                    content: props.prompt_prefix_value.clone(),
+                    color: props.prompt_style_value.color.or(Some(props.secondary)),
+                    weight: props.prompt_style_value.weight,
+                    italic: props.prompt_style_value.italic,
+                    wrap: TextWrap::NoWrap,
+                )
+                View(
+                    flex_direction: FlexDirection::Column,
+                    flex_grow: 1.0,
+                    border_style: BorderStyle::Classic,
+                    border_color: Some(props.input_border),
+                    background_color: props.input_inner_surface,
+                    padding_left: props.input_inner_padding_x,
+                    padding_right: props.input_inner_padding_x,
+                    padding_top: 0u16,
+                    padding_bottom: 0u16,
+                ) {
+                    TextInput(
+                        has_focus: !props.prompt_active,
+                        value: props.input_value_string.clone(),
+                        color: Some(props.foreground),
+                    )
+                }
+            }
+            #(placeholder_element.into_iter())
+        }
+    }
+}
+
+// Footer component
+#[derive(Props)]
+struct FooterProps {
+    foreground: Color,
+    frame_color: Color,
+    footer_background: Option<Color>,
+    footer_padding_x: u16,
+    footer_padding_y: u16,
+}
+
+impl Default for FooterProps {
+    fn default() -> Self {
+        Self {
+            foreground: Color::White,
+            frame_color: Color::White,
+            footer_background: None,
+            footer_padding_x: 2,
+            footer_padding_y: 1,
+        }
+    }
+}
+
+#[component]
+fn Footer(props: &mut FooterProps, _hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    element! {
+        View(
+            flex_direction: FlexDirection::Row,
+            border_style: BorderStyle::Classic,
+            border_color: Some(props.frame_color),
+            background_color: props.footer_background,
+            padding_left: props.footer_padding_x,
+            padding_right: props.footer_padding_x,
+            padding_top: props.footer_padding_y,
+            padding_bottom: props.footer_padding_y,
+        ) {
+            Text(
+                content: "Enter: send • Esc Esc: exit • Ctrl+C: interrupt • PgUp/PgDn: scroll • /help for commands",
+                color: Some(props.foreground),
+                wrap: TextWrap::Wrap,
+            )
+        }
+    }
 }
 
 #[component]
 fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
-    let (width, height) = hooks.use_terminal_size();
+    // Use the validated terminal size passed from spawn_session
+    let width = props.width;
+    let height = props.height;
+
     let mut system = hooks.use_context_mut::<SystemContext>();
     let (stdout, _) = hooks.use_output();
 
@@ -262,23 +685,27 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
         let _ = stdout.println("VT Code terminal ready");
     });
 
+    // Initialize core state
     let lines = hooks.use_state(Vec::<StyledLine>::default);
     let current_line = hooks.use_state(StyledLine::default);
     let current_active = hooks.use_state(|| false);
     let prompt_prefix = hooks.use_state(|| "❯ ".to_string());
     let prompt_style = hooks.use_state(IocraftTextStyle::default);
     let mut input_value = hooks.use_state(String::new);
+    let mut cursor_pos = hooks.use_state(|| 0);
     let placeholder_hint = hooks.use_state(|| props.placeholder.clone().unwrap_or_default());
     let show_placeholder = hooks.use_state(|| props.placeholder.is_some());
     let mut should_exit = hooks.use_state(|| false);
     let theme_state = hooks.use_state(|| props.theme.clone());
     let command_state = hooks.use_state(|| props.commands.take());
+
+    // Layout and UI state
     let line_count_state = hooks.use_state(|| 0usize);
     let scroll_offset_state = hooks.use_state(|| 0usize);
     let manual_scroll_state = hooks.use_state(|| false);
     let tool_prompt_state = hooks.use_state(|| None::<ToolPermissionPrompt>);
 
-    let estimated_view_capacity = cmp::max(height.saturating_sub(12) as usize, 8);
+    let estimated_view_capacity = cmp::max(height.saturating_sub(12) as usize, 3);
     let fallback_padding_x = safe_padding(width, 2);
     let fallback_padding_y = safe_padding(height, 1);
 
@@ -500,6 +927,43 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                     let _ = events_tx.send(IocraftEvent::Interrupt);
                     should_exit.set(true);
                 }
+                KeyCode::Backspace => {
+                    // Handle backspace
+                    let current_text = input_value.to_string();
+                    let new_text = current_text.chars().take(current_text.chars().count().saturating_sub(1)).collect();
+                    input_value.set(new_text);
+                }
+                KeyCode::Char('k')
+                    if modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+                {
+                    manual_scroll_toggle.set(true);
+                    let total = line_count_snapshot.get();
+                    let next_offset = cmp::min(
+                        scroll_handle.get().saturating_add(1),
+                        total.saturating_sub(1),
+                    );
+                    scroll_handle.set(next_offset);
+                    let _ = events_tx.send(IocraftEvent::ScrollLineUp);
+                }
+                KeyCode::Char('j')
+                    if modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+                {
+                    let current = scroll_handle.get();
+                    if current > 0 {
+                        let new_offset = current.saturating_sub(1);
+                        scroll_handle.set(new_offset);
+                        if new_offset == 0 {
+                            manual_scroll_toggle.set(false);
+                        }
+                    }
+                    let _ = events_tx.send(IocraftEvent::ScrollLineDown);
+                }
+                KeyCode::Char(ch) => {
+                    // Handle regular character input
+                    let current_text = input_value.to_string();
+                    let new_text = current_text + &ch.to_string();
+                    input_value.set(new_text);
+                }
                 KeyCode::Up => {
                     manual_scroll_toggle.set(true);
                     let total = line_count_snapshot.get();
@@ -547,31 +1011,6 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                     manual_scroll_toggle.set(false);
                     scroll_handle.set(0);
                 }
-                KeyCode::Char('k')
-                    if modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
-                {
-                    manual_scroll_toggle.set(true);
-                    let total = line_count_snapshot.get();
-                    let next_offset = cmp::min(
-                        scroll_handle.get().saturating_add(1),
-                        total.saturating_sub(1),
-                    );
-                    scroll_handle.set(next_offset);
-                    let _ = events_tx.send(IocraftEvent::ScrollLineUp);
-                }
-                KeyCode::Char('j')
-                    if modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
-                {
-                    let current = scroll_handle.get();
-                    if current > 0 {
-                        let new_offset = current.saturating_sub(1);
-                        scroll_handle.set(new_offset);
-                        if new_offset == 0 {
-                            manual_scroll_toggle.set(false);
-                        }
-                    }
-                    let _ = events_tx.send(IocraftEvent::ScrollLineDown);
-                }
                 _ => {}
             }
         }
@@ -584,13 +1023,13 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
         }
     }
 
-    let prompt_prefix_value = prompt_prefix.to_string();
-    let prompt_style_value = prompt_style.read().clone();
-    let input_value_string = input_value.to_string();
+    let _prompt_prefix_value = prompt_prefix.to_string();
+    let _prompt_style_value = prompt_style.read().clone();
+    let _input_value_string = input_value.to_string();
     let placeholder_text = placeholder_hint.to_string();
     let placeholder_visible = show_placeholder.get() && !placeholder_text.is_empty();
     let prompt_snapshot = tool_prompt_state.read().clone();
-    let prompt_active = prompt_snapshot.is_some();
+    let _prompt_active = prompt_snapshot.is_some();
 
     let total_lines = transcript_lines.len();
     let manual_scroll_active = manual_scroll_state.get();
@@ -606,51 +1045,44 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
 
     let theme_value = theme_state.read().clone();
 
-    let background = theme_value
-        .background
-        .unwrap_or(Color::Rgb { r: 0, g: 0, b: 0 });
-    let foreground = theme_value.foreground.unwrap_or(Color::White);
-    let primary = theme_value.primary.unwrap_or(foreground);
-    let secondary = theme_value.secondary.unwrap_or(primary);
-    let alert = theme_value.alert.unwrap_or(Color::Red);
+    // Extract theme colors with ciapre-blue theme and custom background
+    let background = Color::Rgb { r: 56, g: 59, b: 115 }; // #383B73
+    let foreground = Color::Rgb { r: 139, g: 233, b: 253 }; // ciapre-blue
+    let primary = foreground;
+    let secondary = Color::Rgb { r: 100, g: 181, b: 246 }; // lighter blue
+    let alert = Color::Rgb { r: 243, g: 139, b: 168 }; // light pink
 
-    let surface = lighten_color(background, 0.06);
-    let transcript_surface = lighten_color(background, 0.04);
-    let header_background = mix_colors(primary, background, 0.35);
-    let header_border = mix_colors(primary, background, 0.6);
-    let footer_background = mix_colors(secondary, background, 0.3);
-    let frame_color = mix_colors(primary, background, 0.45);
-    let input_surface = lighten_color(background, 0.1);
-    let input_border = mix_colors(secondary, background, 0.4);
-    let input_inner_surface = lighten_color(background, 0.14);
-    let logo_background = mix_colors(primary, background, 0.55);
+    // Use minimal colors - no background colors
+    let surface: Option<Color> = None;
+    let _transcript_surface: Option<Color> = None;
+    let _header_background: Option<Color> = None;
+    let _header_border = primary;
+    let _footer_background: Option<Color> = None;
+    let frame_color = primary;
+    let _input_surface: Option<Color> = None;
+    let _input_border = primary;
+    let _input_inner_surface: Option<Color> = None;
+    let _logo_background: Option<Color> = None;
 
-    let root_padding_x = safe_padding(width, 2);
-    let root_padding_y = safe_padding(height, 1);
+    let root_padding_x = safe_padding(width, 1);
+    let root_padding_y = safe_padding(height, 0);
     let interior_width = width.saturating_sub(root_padding_x.saturating_mul(2));
-    let header_padding_x = safe_padding(interior_width, 3);
-    let header_padding_y = safe_padding(height, 1);
-    let transcript_padding_x = safe_padding(interior_width, 2);
-    let transcript_padding_y = safe_padding(height, 1);
+    let header_padding_x = safe_padding(interior_width, 1);
+    let _header_padding_y = safe_padding(height, 0);
+    let transcript_padding_x = safe_padding(interior_width, 1);
+    let _transcript_padding_y = safe_padding(height, 0);
     let transcript_inner_width =
         interior_width.saturating_sub(transcript_padding_x.saturating_mul(2));
     let interior_height = height.saturating_sub(root_padding_y.saturating_mul(2));
     let header_inner_width = interior_width.saturating_sub(header_padding_x.saturating_mul(2));
     let bubble_padding_x = safe_padding(transcript_inner_width, 2);
     let bubble_padding_y = safe_padding(height, 1);
-    let bubble_min_width_value = u32::from(bubble_padding_x) * 2 + 1;
-    let bubble_min_width = Size::Length(bubble_min_width_value);
-    let bubble_max_width =
-        if u32::from(transcript_inner_width) > bubble_min_width_value.saturating_mul(2) {
-            Size::Percent(90.0)
-        } else {
-            Size::Auto
-        };
+    let bubble_min_width = Size::Auto;
     let overlay_padding_x = safe_padding(interior_width, 4);
-    let overlay_min_width = Size::Length(u32::from(overlay_padding_x) * 2 + 1);
+    let overlay_min_width = Size::Length(u32::from(overlay_padding_x).saturating_mul(2).saturating_add(1).min(1000));
     let prompt_card_padding_x = safe_padding(interior_width, 3);
     let prompt_card_padding_y = safe_padding(height, 2);
-    let prompt_card_min_width_value = u32::from(prompt_card_padding_x) * 2 + 1;
+    let prompt_card_min_width_value = u32::from(prompt_card_padding_x).saturating_mul(2).saturating_add(1).min(1000);
     let prompt_card_min_width = Size::Length(prompt_card_min_width_value);
     let prompt_card_max_width =
         if u32::from(interior_width) > prompt_card_min_width_value.saturating_mul(2) {
@@ -663,17 +1095,17 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
         overlay_inner_width.saturating_sub(prompt_card_padding_x.saturating_mul(2));
     let prompt_card_inner_height =
         interior_height.saturating_sub(prompt_card_padding_y.saturating_mul(2));
-    let logo_padding_x = safe_padding(header_inner_width, 2);
+    let _logo_padding_x = safe_padding(header_inner_width, 2);
     let prompt_button_padding_x = safe_padding(prompt_card_inner_width, 3);
     let prompt_button_padding_y = safe_padding(prompt_card_inner_height, 1);
     let placeholder_padding = safe_padding(transcript_inner_width, 2);
     let scroll_indicator_padding_x = safe_padding(transcript_inner_width, 2);
     let scroll_indicator_padding_y = safe_padding(height, 1);
-    let footer_padding_x = safe_padding(interior_width, 2);
-    let footer_padding_y = safe_padding(height, 1);
-    let input_padding_x = safe_padding(transcript_inner_width, 2);
-    let input_padding_y = safe_padding(height, 1);
-    let input_inner_padding_x = safe_padding(transcript_inner_width, 1);
+    let _footer_padding_x = safe_padding(interior_width, 2);
+    let _footer_padding_y = safe_padding(height, 1);
+    let _input_padding_x = safe_padding(transcript_inner_width, 2);
+    let _input_padding_y = safe_padding(height, 1);
+    let _input_inner_padding_x = safe_padding(transcript_inner_width, 1);
 
     let user_bubble_bg = mix_colors(primary, background, 0.3);
     let agent_bubble_bg = mix_colors(secondary, background, 0.35);
@@ -689,7 +1121,7 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
     let button_trim_color = mix_colors(foreground, background, 0.3);
 
     let placeholder_color = theme_value.secondary.or(Some(foreground));
-    let placeholder_element = placeholder_visible.then(|| {
+    let _placeholder_element = placeholder_visible.then(|| {
         element! {
             Text(
                 content: placeholder_text.clone(),
@@ -765,7 +1197,6 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                         padding_bottom: bubble_padding_y,
                         gap: 0u16,
                         min_width: bubble_min_width,
-                        max_width: bubble_max_width,
                     ) {
                         #(message_segments)
                     }
@@ -804,7 +1235,7 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
                     justify_content: JustifyContent::Center,
                     border_style: BorderStyle::Classic,
                     border_color: Some(frame_color),
-                    background_color: Some(surface),
+                    background_color: surface,
                     padding_left: scroll_indicator_padding_x,
                     padding_right: scroll_indicator_padding_x,
                     padding_top: scroll_indicator_padding_y,
@@ -822,10 +1253,10 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
         );
     }
 
-    let input_value_state = input_value;
+    let _input_value_state = input_value;
     let prompt_state_for_buttons = tool_prompt_state.clone();
 
-    let prompt_overlay: Option<AnyElement<'static>> = prompt_snapshot.clone().map(|prompt| {
+    let _prompt_overlay: Option<AnyElement<'static>> = prompt_snapshot.clone().map(|prompt| {
         let tool_name = prompt.tool.clone();
         let description = prompt
             .description
@@ -949,150 +1380,120 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
         .into()
     });
 
-    element! {
-        View(
-            width,
-            height,
-            flex_direction: FlexDirection::Column,
-            background_color: Some(background),
-            padding_top: root_padding_y,
-            padding_bottom: root_padding_y,
-            padding_left: root_padding_x,
-            padding_right: root_padding_x,
-            gap: 1u16,
-        ) {
+        // Use minimal coding terminal for cleaner interface
+        element! {
             View(
-                flex_direction: FlexDirection::Row,
-                align_items: AlignItems::Center,
-                gap: 2u16,
-                border_style: BorderStyle::Round,
-                border_color: Some(header_border),
-                background_color: Some(header_background),
-                padding_left: header_padding_x,
-                padding_right: header_padding_x,
-                padding_top: header_padding_y,
-                padding_bottom: header_padding_y,
+                width: width,
+                height: height,
+                flex_direction: FlexDirection::Column,
+                background_color: None,
+                gap: 0u16,
             ) {
+                // Header area with VT Code branding
                 View(
                     border_style: BorderStyle::Round,
-                    border_color: Some(frame_color),
-                    background_color: Some(logo_background),
-                    padding_left: logo_padding_x,
-                    padding_right: logo_padding_x,
-                    padding_top: 0u16,
-                    padding_bottom: 0u16,
+                    border_color: Color::Cyan,
+                    margin: 1u16,
+                    padding: 1u16,
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    gap: 2u16,
                 ) {
                     Text(
-                        content: "VT",
-                        color: Some(foreground),
-                        weight: Weight::Bold,
-                        wrap: TextWrap::NoWrap,
-                    )
-                }
-                View(
-                    flex_direction: FlexDirection::Column,
-                    gap: 0u16,
-                ) {
-                    Text(
-                        content: "VT Code",
-                        color: Some(foreground),
-                        weight: Weight::Bold,
-                        wrap: TextWrap::NoWrap,
-                    )
-                    Text(
-                        content: "Terminal workspace for building software",
-                        color: Some(lighten_color(foreground, 0.2)),
+                        content: generate_vt_logo(),
+                        color: Color::Cyan,
                         wrap: TextWrap::Wrap,
                     )
+                    View(
+                        flex_direction: FlexDirection::Column,
+                        gap: 0u16,
+                    ) {
+                        Text(
+                            content: "VT Code",
+                            color: Color::White,
+                            weight: Weight::Bold,
+                            wrap: TextWrap::NoWrap,
+                        )
+                        Text(
+                            content: "Terminal workspace for building software",
+                            color: Color::Grey,
+                            wrap: TextWrap::Wrap,
+                        )
+                    }
                 }
-            }
-            View(
-                flex_direction: FlexDirection::Column,
-                flex_grow: 1.0,
-                gap: 1u16,
-                border_style: BorderStyle::Round,
-                border_color: Some(frame_color),
-                background_color: Some(transcript_surface),
-                padding_left: transcript_padding_x,
-                padding_right: transcript_padding_x,
-                padding_top: transcript_padding_y,
-                padding_bottom: transcript_padding_y,
-            ) {
+
+                // Output area - scrollable
                 View(
                     flex_direction: FlexDirection::Column,
                     flex_grow: 1.0,
-                    gap: 1u16,
-                ) {
-                    #(transcript_rows)
-                }
-                View(
-                    flex_direction: FlexDirection::Column,
-                    gap: 1u16,
                     border_style: BorderStyle::Round,
-                    border_color: Some(input_border),
-                    background_color: Some(input_surface),
-                    padding_left: input_padding_x,
-                    padding_right: input_padding_x,
-                    padding_top: input_padding_y,
-                    padding_bottom: input_padding_y,
+                    border_color: Color::Grey,
+                    margin: 1u16,
+                    overflow: Overflow::Hidden,
                 ) {
                     View(
-                        flex_direction: FlexDirection::Row,
-                        align_items: AlignItems::Center,
-                        gap: 1u16,
+                        padding: 1u16,
+                        flex_direction: FlexDirection::Column,
+                        gap: 0u16,
                     ) {
-                        Text(
-                            content: prompt_prefix_value.clone(),
-                            color: prompt_style_value.color.or(theme_value.secondary),
-                            weight: prompt_style_value.weight,
-                            italic: prompt_style_value.italic,
-                            wrap: TextWrap::NoWrap,
-                        )
-                        View(
-                            flex_direction: FlexDirection::Column,
-                            flex_grow: 1.0,
-                            border_style: BorderStyle::Classic,
-                            border_color: Some(input_border),
-                            background_color: Some(input_inner_surface),
-                            padding_left: input_inner_padding_x,
-                            padding_right: input_inner_padding_x,
-                            padding_top: 0u16,
-                            padding_bottom: 0u16,
-                        ) {
-                            TextInput(
-                                has_focus: !prompt_active,
-                                value: input_value_string.clone(),
-                                on_change: move |value| {
-                                    let mut handle = input_value_state;
-                                    handle.set(value);
-                                },
-                                color: Some(foreground),
-                            )
-                        }
+                        // Example commands in the output
+                        Text(content: "VT Code - Coding Terminal", color: Color::Cyan, weight: Weight::Bold)
+                        Text(content: "Type commands and see results here...", color: Color::Grey)
+                        Text(content: "")
+                        Text(content: "> echo 'Hello World'", color: Color::Green)
+                        Text(content: "Hello World", color: Color::White)
+                        Text(content: "")
+                        Text(content: "> ls -la", color: Color::Green)
+                        Text(content: "drwxr-xr-x  12 user  staff   4096 Jan 15 10:30 .", color: Color::White)
+                        Text(content: "drwxr-xr-x   3 user  staff    102 Jan 15 10:30 ..", color: Color::White)
+                        Text(content: "-rw-r--r--   1 user  staff   220 Jan 15 10:30 .bash_logout", color: Color::White)
                     }
-                    #(placeholder_element.into_iter())
+                }
+
+                // Input area
+                View(
+                    border_style: BorderStyle::Round,
+                    border_color: Color::Green,
+                    margin: 1u16,
+                    padding: 1u16,
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    gap: 1u16,
+                ) {
+                    Text(content: "❯", color: Color::Green, weight: Weight::Bold)
+                    View(
+                        background_color: Color::DarkGrey,
+                        flex_grow: 1.0,
+                        height: 1u16,
+                    ) {
+                        TextInput(
+                            has_focus: true,
+                            value: input_value.to_string(),
+                            on_change: move |new_value| {
+                                input_value.set(new_value);
+                                cursor_pos.set(cursor_pos.get().min(input_value.to_string().len()));
+                            },
+                        )
+                    }
+                }
+
+                // Compact status bar with spinner
+                View(
+                    border_style: BorderStyle::Classic,
+                    border_color: Color::Grey,
+                    padding: 0u16,
+                    margin: 0u16,
+                    height: 1u16,
+                ) {
+                    Text(
+                        content: "Ctrl+C:exit | Enter:submit | q:quit | ● Ready",
+                        color: Color::Grey,
+                        align: TextAlign::Center,
+                    )
                 }
             }
-            View(
-                flex_direction: FlexDirection::Row,
-                border_style: BorderStyle::Classic,
-                border_color: Some(frame_color),
-                background_color: Some(footer_background),
-                padding_left: footer_padding_x,
-                padding_right: footer_padding_x,
-                padding_top: footer_padding_y,
-                padding_bottom: footer_padding_y,
-            ) {
-                Text(
-                    content: "Enter: send • Esc Esc: exit • Ctrl+C: interrupt • PgUp/PgDn: scroll • /help for commands",
-                    color: Some(foreground),
-                    wrap: TextWrap::Wrap,
-                )
-            }
-            #(prompt_overlay.into_iter())
         }
     }
-}
 
 fn flush_current_line(
     current_line: &mut State<StyledLine>,

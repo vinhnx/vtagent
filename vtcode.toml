@@ -61,6 +61,12 @@ require_write_tool_for_claims = true
 # Auto-apply patches detected in responses (use with caution)
 auto_apply_detected_patches = false
 
+[workspace.trust]
+# Workspace trust settings
+# trusted_paths: list of trusted workspace paths
+# auto_trust: automatically trust known safe directories
+auto_trust = false
+
 [automation.full_auto]
 # Disable by default; must be enabled intentionally per workspace
 enabled = false

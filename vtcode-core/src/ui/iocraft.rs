@@ -380,30 +380,25 @@ fn SessionRoot(props: &mut SessionRootProps, mut hooks: Hooks) -> impl Into<AnyE
     let transcript_rows = transcript_lines.into_iter().map(|line| {
         if line.segments.is_empty() {
             element! {
-                View(height: 1u16) {}
+                View(width: 100pct) {
+                    Text(content: " ", wrap: TextWrap::NoWrap)
+                }
             }
         } else {
-            let contents = line
-                .segments
-                .into_iter()
-                .map(|segment| {
-                    let mut content = MixedTextContent::new(segment.text);
-                    if let Some(color) = segment.style.color {
-                        content = content.color(color);
-                    }
-                    if segment.style.weight != Weight::Normal {
-                        content = content.weight(segment.style.weight);
-                    }
-                    if segment.style.italic {
-                        content = content.italic();
-                    }
-                    content
-                })
-                .collect::<Vec<_>>();
-
             element! {
                 View(flex_direction: FlexDirection::Row, width: 100pct) {
-                    MixedText(contents: contents, wrap: TextWrap::NoWrap)
+                    #(line
+                        .segments
+                        .into_iter()
+                        .map(|segment| element! {
+                            Text(
+                                content: segment.text,
+                                color: segment.style.color,
+                                weight: segment.style.weight,
+                                italic: segment.style.italic,
+                                wrap: TextWrap::NoWrap,
+                            )
+                        }))
                 }
             }
         }

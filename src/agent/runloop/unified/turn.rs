@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
 use futures::StreamExt;
-use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -9,14 +8,13 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::task;
 use tokio::time::sleep;
 
-use tiktoken_rs::cl100k_base;
 use vtcode_core::config::constants::defaults;
 use vtcode_core::config::loader::VTCodeConfig;
 use vtcode_core::config::types::AgentConfig as CoreAgentConfig;
 use vtcode_core::core::decision_tracker::{Action as DTAction, DecisionOutcome};
 use vtcode_core::core::router::{Router, TaskClass};
 use vtcode_core::llm::error_display;
-use vtcode_core::llm::provider::{self as uni, LLMStreamEvent, MessageRole};
+use vtcode_core::llm::provider::{self as uni, LLMStreamEvent};
 use vtcode_core::tools::registry::{ToolErrorType, ToolExecutionError, ToolPermissionDecision};
 use vtcode_core::ui::ratatui::{
     RatatuiEvent, RatatuiHandle, convert_style as convert_ratatui_style, spawn_session,
@@ -39,76 +37,6 @@ use crate::agent::runloop::ui::render_session_banner;
 use super::display::{display_user_message, ensure_turn_bottom_gap, persist_theme_preference};
 use super::session_setup::{SessionState, initialize_session};
 use super::shell::{derive_recent_tool_output, should_short_circuit_shell};
-
-#[derive(Default)]
-struct SessionStats {
-    tools: BTreeMap<String, usize>,
-}
-
-impl SessionStats {
-    fn record_tool(&mut self, name: &str) {
-        let entry = self.tools.entry(name.to_string()).or_insert(0);
-        *entry += 1;
-    }
-
-    fn render_summary(&self, renderer: &mut AnsiRenderer, history: &[uni::Message]) -> Result<()> {
-        let tokenizer = cl100k_base().context("failed to initialize tokenizer for summary")?;
-        let token_total: usize = history
-            .iter()
-            .map(|msg| {
-                tokenizer
-                    .encode_with_special_tokens(msg.content.as_str())
-                    .len()
-            })
-            .sum();
-        let user_turns = history
-            .iter()
-            .filter(|msg| matches!(msg.role, MessageRole::User))
-            .count();
-        let assistant_turns = history
-            .iter()
-            .filter(|msg| matches!(msg.role, MessageRole::Assistant))
-            .count();
-
-        renderer.line_if_not_empty(MessageStyle::Info)?;
-        renderer.line(MessageStyle::Info, "──────── Session Summary ────────")?;
-        renderer.line(
-            MessageStyle::Output,
-            &format!(
-                "   • Turns: user {} · agent {}",
-                user_turns, assistant_turns
-            ),
-        )?;
-        renderer.line(
-            MessageStyle::Output,
-            &format!("   • Tokens used: {}", token_total),
-        )?;
-        let total_tool_calls: usize = self.tools.values().sum();
-        if self.tools.is_empty() {
-            renderer.line(MessageStyle::Output, "   • Tool calls: none")?;
-        } else {
-            let joined = self
-                .tools
-                .iter()
-                .map(|(name, count)| {
-                    if *count == 1 {
-                        name.clone()
-                    } else {
-                        format!("{} ×{}", name, count)
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(", ");
-            renderer.line(
-                MessageStyle::Output,
-                &format!("   • Tool calls ({}): {}", total_tool_calls, joined),
-            )?;
-        }
-        renderer.line(MessageStyle::Info, "Goodbye!")?;
-
-        Ok(())
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HitlDecision {
@@ -564,11 +492,9 @@ pub(crate) async fn run_single_agent_loop_unified(
         });
     }
 
-    let mut session_stats = SessionStats::default();
     let mut events = session.events;
     loop {
         if ctrl_c_flag.load(Ordering::SeqCst) {
-            session_stats.render_summary(&mut renderer, &conversation_history)?;
             break;
         }
 
@@ -580,9 +506,7 @@ pub(crate) async fn run_single_agent_loop_unified(
         };
 
         let Some(event) = maybe_event else {
-            if ctrl_c_flag.load(Ordering::SeqCst) {
-                session_stats.render_summary(&mut renderer, &conversation_history)?;
-            }
+            if ctrl_c_flag.load(Ordering::SeqCst) {}
             break;
         };
 
@@ -600,7 +524,6 @@ pub(crate) async fn run_single_agent_loop_unified(
                 break;
             }
             RatatuiEvent::Interrupt => {
-                session_stats.render_summary(&mut renderer, &conversation_history)?;
                 break;
             }
             RatatuiEvent::ScrollLineUp
@@ -662,7 +585,6 @@ pub(crate) async fn run_single_agent_loop_unified(
                             match tool_registry.execute_tool(&name, args.clone()).await {
                                 Ok(tool_output) => {
                                     tool_spinner.finish();
-                                    session_stats.record_tool(&name);
                                     traj.log_tool_call(
                                         conversation_history.len(),
                                         &name,
@@ -691,7 +613,6 @@ pub(crate) async fn run_single_agent_loop_unified(
                             }
                         }
                         Ok(ToolPermissionFlow::Denied) => {
-                            session_stats.record_tool(&name);
                             let denial = ToolExecutionError::new(
                                 name.clone(),
                                 ToolErrorType::PolicyViolation,
@@ -707,7 +628,6 @@ pub(crate) async fn run_single_agent_loop_unified(
                             break;
                         }
                         Ok(ToolPermissionFlow::Interrupted) => {
-                            session_stats.render_summary(&mut renderer, &conversation_history)?;
                             break;
                         }
                         Err(err) => {
@@ -1053,7 +973,6 @@ pub(crate) async fn run_single_agent_loop_unified(
                             match tool_registry.execute_tool(name, args_val.clone()).await {
                                 Ok(tool_output) => {
                                     tool_spinner.finish();
-                                    session_stats.record_tool(name);
                                     traj.log_tool_call(
                                         working_history.len(),
                                         name,
@@ -1137,7 +1056,6 @@ pub(crate) async fn run_single_agent_loop_unified(
                                 }
                                 Err(error) => {
                                     tool_spinner.finish();
-                                    session_stats.record_tool(name);
                                     renderer.line(
                                         MessageStyle::Tool,
                                         &format!("Tool {} failed.", name),
@@ -1171,7 +1089,6 @@ pub(crate) async fn run_single_agent_loop_unified(
                             }
                         }
                         Ok(ToolPermissionFlow::Denied) => {
-                            session_stats.record_tool(name);
                             let denial = ToolExecutionError::new(
                                 name.to_string(),
                                 ToolErrorType::PolicyViolation,
@@ -1305,7 +1222,6 @@ pub(crate) async fn run_single_agent_loop_unified(
 
         match turn_result {
             TurnLoopResult::Cancelled => {
-                session_stats.render_summary(&mut renderer, &conversation_history)?;
                 break;
             }
             TurnLoopResult::Aborted => {

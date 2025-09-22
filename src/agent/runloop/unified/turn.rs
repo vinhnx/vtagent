@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use futures::StreamExt;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
 use tokio::sync::Notify;
 use tokio::sync::mpsc::UnboundedReceiver;
@@ -204,6 +204,8 @@ fn apply_prompt_style(handle: &RatatuiHandle) {
 
 const PLACEHOLDER_SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
+static ACTIVE_PLACEHOLDER_SPINNERS: AtomicUsize = AtomicUsize::new(0);
+
 struct PlaceholderSpinner {
     handle: RatatuiHandle,
     restore_hint: Option<String>,
@@ -222,6 +224,10 @@ impl PlaceholderSpinner {
         let spinner_active = active.clone();
         let spinner_handle = handle.clone();
         let restore_on_stop = restore_hint.clone();
+
+        if ACTIVE_PLACEHOLDER_SPINNERS.fetch_add(1, Ordering::SeqCst) == 0 {
+            spinner_handle.set_cursor_visible(false);
+        }
 
         let task = task::spawn(async move {
             let mut index = 0usize;
@@ -245,6 +251,9 @@ impl PlaceholderSpinner {
 
     fn finish(&self) {
         if self.active.swap(false, Ordering::SeqCst) {
+            if ACTIVE_PLACEHOLDER_SPINNERS.fetch_sub(1, Ordering::SeqCst) == 1 {
+                self.handle.set_cursor_visible(true);
+            }
             self.handle.set_placeholder(self.restore_hint.clone());
         }
     }

@@ -150,6 +150,9 @@ pub enum RatatuiCommand {
         center: Option<String>,
         right: Option<String>,
     },
+    SetCursorVisibility {
+        visible: bool,
+    },
     Shutdown,
 }
 
@@ -207,6 +210,12 @@ impl RatatuiHandle {
 
     pub fn set_placeholder(&self, hint: Option<String>) {
         let _ = self.sender.send(RatatuiCommand::SetPlaceholder { hint });
+    }
+
+    pub fn set_cursor_visible(&self, visible: bool) {
+        let _ = self
+            .sender
+            .send(RatatuiCommand::SetCursorVisibility { visible });
     }
 
     pub fn set_theme(&self, theme: RatatuiTheme) {
@@ -267,6 +276,8 @@ async fn run_ratatui(
         .context("failed to clear terminal for ratatui")?;
 
     let mut app = RatatuiLoop::new(theme, placeholder);
+    app.set_mouse_capture(true)
+        .context("failed to enable mouse capture for ratatui session")?;
     let mut command_rx = commands;
     let mut event_stream = EventStream::new();
     let mut redraw = true;
@@ -631,6 +642,7 @@ struct RatatuiLoop {
     slash_suggestions: SlashSuggestionState,
     mouse_capture_enabled: bool,
     pending_pty_command: Option<String>,
+    cursor_visible: bool,
 }
 
 impl RatatuiLoop {
@@ -654,6 +666,7 @@ impl RatatuiLoop {
             slash_suggestions: SlashSuggestionState::default(),
             mouse_capture_enabled: false,
             pending_pty_command: None,
+            cursor_visible: true,
         }
     }
 
@@ -738,6 +751,11 @@ impl RatatuiLoop {
                 true
             }
             RatatuiCommand::UpdateStatusBar { .. } => false,
+            RatatuiCommand::SetCursorVisibility { visible } => {
+                let changed = self.cursor_visible != visible;
+                self.cursor_visible = visible;
+                changed
+            }
             RatatuiCommand::Shutdown => {
                 self.should_exit = true;
                 true
@@ -1336,13 +1354,15 @@ impl RatatuiLoop {
             }
         }
 
-        if let Some((row, col)) = display.cursor {
-            if row >= offset {
-                let visible_row = row - offset;
-                if visible_row < viewport_height {
-                    let cursor_x = text_area.x + col as u16;
-                    let cursor_y = text_area.y + visible_row as u16;
-                    frame.set_cursor_position((cursor_x, cursor_y));
+        if self.cursor_visible {
+            if let Some((row, col)) = display.cursor {
+                if row >= offset {
+                    let visible_row = row - offset;
+                    if visible_row < viewport_height {
+                        let cursor_x = text_area.x + col as u16;
+                        let cursor_y = text_area.y + visible_row as u16;
+                        frame.set_cursor_position((cursor_x, cursor_y));
+                    }
                 }
             }
         }

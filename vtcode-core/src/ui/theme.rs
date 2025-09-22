@@ -9,7 +9,8 @@ pub const DEFAULT_THEME_ID: &str = "ciapre-dark";
 
 const MIN_CONTRAST: f64 = 4.5;
 
-const WELCOME_TOOL_COLOR: RgbColor = RgbColor(0xBF, 0xB3, 0x8F);
+const ACCENT_TEAL: RgbColor = RgbColor(0x54, 0x8D, 0x8D);
+const WELCOME_TOOL_COLOR: RgbColor = ACCENT_TEAL;
 
 /// Palette describing UI colors for the terminal experience.
 #[derive(Clone, Debug)]
@@ -49,10 +50,15 @@ impl ThemePalette {
             ],
         );
         let info_color = ensure_contrast(
-            secondary,
+            primary,
             background,
             MIN_CONTRAST,
-            &[lighten(secondary, 0.2), text_color, fallback_light],
+            &[
+                lighten(primary, 0.2),
+                lighten(secondary, 0.1),
+                text_color,
+                fallback_light,
+            ],
         );
         let tool_color = WELCOME_TOOL_COLOR;
         let response_color = ensure_contrast(
@@ -136,12 +142,12 @@ static REGISTRY: Lazy<HashMap<&'static str, ThemeDefinition>> = Lazy::new(|| {
             id: "ciapre-dark",
             label: "Ciapre Dark",
             palette: ThemePalette {
-                primary_accent: RgbColor(0xBF, 0xB3, 0x8F),
+                primary_accent: ACCENT_TEAL,
                 background: RgbColor(0x26, 0x26, 0x26),
                 foreground: RgbColor(0xBF, 0xB3, 0x8F),
-                secondary_accent: RgbColor(0xD9, 0x9A, 0x4E),
+                secondary_accent: ACCENT_TEAL,
                 alert: RgbColor(0xFF, 0x8A, 0x8A),
-                logo_accent: RgbColor(0xBF, 0x45, 0x45),
+                logo_accent: ACCENT_TEAL,
             },
         },
     );
@@ -151,12 +157,12 @@ static REGISTRY: Lazy<HashMap<&'static str, ThemeDefinition>> = Lazy::new(|| {
             id: "ciapre-blue",
             label: "Ciapre Blue",
             palette: ThemePalette {
-                primary_accent: RgbColor(0xBF, 0xB3, 0x8F),
+                primary_accent: ACCENT_TEAL,
                 background: RgbColor(0x17, 0x1C, 0x26),
                 foreground: RgbColor(0xBF, 0xB3, 0x8F),
-                secondary_accent: RgbColor(0xBF, 0xB3, 0x8F),
+                secondary_accent: ACCENT_TEAL,
                 alert: RgbColor(0xFF, 0x8A, 0x8A),
-                logo_accent: RgbColor(0xA6, 0x33, 0x33),
+                logo_accent: ACCENT_TEAL,
             },
         },
     );

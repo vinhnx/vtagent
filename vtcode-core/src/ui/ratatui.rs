@@ -37,7 +37,8 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 const ESCAPE_DOUBLE_MS: u64 = 750;
 const REDRAW_INTERVAL_MS: u64 = 33;
 const MESSAGE_INDENT: usize = 2;
-const NAVIGATION_HINT_TEXT: &str = "Scroll ↑/↓ · PgUp/PgDn Page · Enter Submit · Esc Cancel";
+const NAVIGATION_HINT_TEXT: &str =
+    "Scroll ↑/↓ · PgUp/PgDn Page · Enter Submit · Esc Cancel · Ctrl+Shift+M Toggle Mouse";
 
 #[derive(Clone, Default)]
 pub struct RatatuiTextStyle {
@@ -348,9 +349,6 @@ impl TerminalGuard {
         stdout
             .execute(cursor::Hide)
             .context("failed to hide cursor")?;
-        stdout
-            .execute(EnableMouseCapture)
-            .context("failed to enable mouse capture")?;
         Ok(Self)
     }
 }
@@ -777,11 +775,12 @@ struct RatatuiLoop {
     slash_suggestions: SlashSuggestionState,
     pty_panel: Option<PtyPanel>,
     status_bar: StatusBarContent,
+    mouse_capture_enabled: bool,
 }
 
 impl RatatuiLoop {
     fn new(theme: RatatuiTheme, placeholder: Option<String>) -> Self {
-        Self {
+        let mut instance = Self {
             messages: Vec::new(),
             current_line: StyledLine::default(),
             current_kind: None,
@@ -800,7 +799,10 @@ impl RatatuiLoop {
             slash_suggestions: SlashSuggestionState::default(),
             pty_panel: None,
             status_bar: StatusBarContent::new(),
-        }
+            mouse_capture_enabled: false,
+        };
+        instance.status_bar.center = Self::mouse_capture_text(false);
+        instance
     }
 
     fn should_exit(&self) -> bool {
@@ -809,6 +811,39 @@ impl RatatuiLoop {
 
     fn needs_tick(&self) -> bool {
         false
+    }
+
+    fn mouse_capture_text(enabled: bool) -> String {
+        if enabled {
+            "Mouse capture on · scroll with mouse wheel".to_string()
+        } else {
+            "Mouse capture off · drag to select text".to_string()
+        }
+    }
+
+    fn set_mouse_capture(&mut self, enabled: bool) -> Result<()> {
+        if self.mouse_capture_enabled == enabled {
+            return Ok(());
+        }
+
+        let mut stdout = io::stdout();
+        if enabled {
+            stdout
+                .execute(EnableMouseCapture)
+                .context("failed to enable mouse capture")?;
+        } else {
+            stdout
+                .execute(DisableMouseCapture)
+                .context("failed to disable mouse capture")?;
+        }
+        self.mouse_capture_enabled = enabled;
+        self.status_bar.center = Self::mouse_capture_text(enabled);
+        Ok(())
+    }
+
+    fn toggle_mouse_capture(&mut self) -> Result<()> {
+        let enabled = !self.mouse_capture_enabled;
+        self.set_mouse_capture(enabled)
     }
 
     fn handle_command(&mut self, command: RatatuiCommand) -> bool {
@@ -866,6 +901,7 @@ impl RatatuiLoop {
             }
             RatatuiCommand::SetTheme { theme } => {
                 self.theme = theme;
+                self.status_bar.center = Self::mouse_capture_text(self.mouse_capture_enabled);
                 true
             }
             RatatuiCommand::UpdateStatusBar {
@@ -1299,6 +1335,14 @@ impl RatatuiLoop {
                 self.needs_autoscroll = true;
                 Ok(true)
             }
+            KeyCode::Char('m')
+                if key
+                    .modifiers
+                    .contains(KeyModifiers::CONTROL | KeyModifiers::SHIFT) =>
+            {
+                self.toggle_mouse_capture()?;
+                Ok(true)
+            }
             KeyCode::Esc => {
                 if self.input.value().is_empty() {
                     let now = Instant::now();
@@ -1459,6 +1503,10 @@ impl RatatuiLoop {
         mouse: MouseEvent,
         events: &UnboundedSender<RatatuiEvent>,
     ) -> Result<bool> {
+        if !self.mouse_capture_enabled {
+            return Ok(false);
+        }
+
         if !self.is_in_transcript_area(mouse.column, mouse.row) {
             return Ok(false);
         }
@@ -1542,12 +1590,17 @@ impl RatatuiLoop {
             paragraph = paragraph.scroll((offset as u16, 0));
         }
 
-        let style = self
+        let base_style = self
             .theme
             .foreground
             .map(|fg| Style::default().fg(fg))
-            .unwrap_or_default();
-        paragraph = paragraph.style(style);
+            .unwrap_or_else(Style::default);
+        let accent_style = self
+            .theme
+            .primary
+            .map(|color| Style::default().fg(color))
+            .unwrap_or_else(|| base_style.clone());
+        paragraph = paragraph.style(base_style.clone());
 
         let (text_area, scrollbar_area) = if reserve_scrollbar {
             let chunks = Layout::default()
@@ -1609,25 +1662,34 @@ impl RatatuiLoop {
 
                 if let Some(area) = sections.get(0) {
                     if area.width > 0 {
-                        let left = Paragraph::new(Line::from(left_text.clone()))
-                            .alignment(Alignment::Left)
-                            .style(style);
+                        let left = Paragraph::new(Line::from(vec![Span::styled(
+                            left_text.clone(),
+                            accent_style.clone(),
+                        )]))
+                        .alignment(Alignment::Left)
+                        .style(accent_style.clone());
                         frame.render_widget(left, *area);
                     }
                 }
                 if let Some(area) = sections.get(1) {
                     if area.width > 0 {
-                        let center = Paragraph::new(Line::from(center_text.clone()))
-                            .alignment(Alignment::Center)
-                            .style(style);
+                        let center = Paragraph::new(Line::from(vec![Span::styled(
+                            center_text.clone(),
+                            accent_style.clone(),
+                        )]))
+                        .alignment(Alignment::Center)
+                        .style(accent_style.clone());
                         frame.render_widget(center, *area);
                     }
                 }
                 if let Some(area) = sections.get(2) {
                     if area.width > 0 {
-                        let right = Paragraph::new(Line::from(right_text.clone()))
-                            .alignment(Alignment::Right)
-                            .style(style);
+                        let right = Paragraph::new(Line::from(vec![Span::styled(
+                            right_text.clone(),
+                            base_style.clone(),
+                        )]))
+                        .alignment(Alignment::Right)
+                        .style(base_style.clone());
                         frame.render_widget(right, *area);
                     }
                 }
@@ -1967,7 +2029,7 @@ impl RatatuiLoop {
             RatatuiMessageKind::User => self.theme.secondary.unwrap_or(Color::LightGreen),
             RatatuiMessageKind::Tool => Color::LightMagenta,
             RatatuiMessageKind::Pty => Color::LightCyan,
-            RatatuiMessageKind::Info => Color::Yellow,
+            RatatuiMessageKind::Info => self.theme.primary.unwrap_or(Color::LightCyan),
             RatatuiMessageKind::Policy => Color::LightYellow,
             RatatuiMessageKind::Error => Color::Red,
         }

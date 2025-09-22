@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use futures::StreamExt;
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -9,6 +9,7 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::task;
 use tokio::time::sleep;
 
+use tiktoken_rs::cl100k_base;
 use vtcode_core::config::constants::defaults;
 use vtcode_core::config::loader::VTCodeConfig;
 use vtcode_core::config::types::AgentConfig as CoreAgentConfig;
@@ -41,17 +42,25 @@ use super::shell::{derive_recent_tool_output, should_short_circuit_shell};
 
 #[derive(Default)]
 struct SessionStats {
-    tools: BTreeSet<String>,
+    tools: BTreeMap<String, usize>,
 }
 
 impl SessionStats {
     fn record_tool(&mut self, name: &str) {
-        self.tools.insert(name.to_string());
+        let entry = self.tools.entry(name.to_string()).or_insert(0);
+        *entry += 1;
     }
 
     fn render_summary(&self, renderer: &mut AnsiRenderer, history: &[uni::Message]) -> Result<()> {
-        let total_chars: usize = history.iter().map(|msg| msg.content.chars().count()).sum();
-        let approx_tokens = (total_chars + 3) / 4;
+        let tokenizer = cl100k_base().context("failed to initialize tokenizer for summary")?;
+        let token_total: usize = history
+            .iter()
+            .map(|msg| {
+                tokenizer
+                    .encode_with_special_tokens(msg.content.as_str())
+                    .len()
+            })
+            .sum();
         let user_turns = history
             .iter()
             .filter(|msg| matches!(msg.role, MessageRole::User))
@@ -62,21 +71,37 @@ impl SessionStats {
             .count();
 
         renderer.line_if_not_empty(MessageStyle::Info)?;
-        renderer.line(MessageStyle::Info, "Session summary")?;
+        renderer.line(MessageStyle::Info, "──────── Session Summary ────────")?;
         renderer.line(
             MessageStyle::Output,
             &format!(
-                "   * User turns: {} · Agent turns: {} · ~{} tokens",
-                user_turns, assistant_turns, approx_tokens
+                "   • Turns: user {} · agent {}",
+                user_turns, assistant_turns
             ),
         )?;
+        renderer.line(
+            MessageStyle::Output,
+            &format!("   • Tokens used: {}", token_total),
+        )?;
+        let total_tool_calls: usize = self.tools.values().sum();
         if self.tools.is_empty() {
-            renderer.line(MessageStyle::Output, "   * Tools used: none")?;
+            renderer.line(MessageStyle::Output, "   • Tool calls: none")?;
         } else {
-            let joined = self.tools.iter().cloned().collect::<Vec<_>>().join(", ");
+            let joined = self
+                .tools
+                .iter()
+                .map(|(name, count)| {
+                    if *count == 1 {
+                        name.clone()
+                    } else {
+                        format!("{} ×{}", name, count)
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
             renderer.line(
                 MessageStyle::Output,
-                &format!("   * Tools used: {}", joined),
+                &format!("   • Tool calls ({}): {}", total_tool_calls, joined),
             )?;
         }
         renderer.line(MessageStyle::Info, "Goodbye!")?;

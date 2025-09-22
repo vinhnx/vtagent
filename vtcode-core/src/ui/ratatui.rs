@@ -285,9 +285,20 @@ async fn run_ratatui(
     let mut event_stream = EventStream::new();
     let mut redraw = true;
     let mut ticker = create_ticker();
+    let minimum_rows = configured_rows.max(1);
 
     loop {
         if redraw {
+            let current_size = terminal
+                .size()
+                .context("failed to query current terminal viewport size")?;
+            let current_width = current_size.width.max(1);
+            let desired_height = app.desired_viewport_height(current_width, minimum_rows);
+            if desired_height != current_size.height {
+                terminal
+                    .resize(Rect::new(0, 0, current_width, desired_height))
+                    .context("failed to resize inline terminal viewport")?;
+            }
             terminal
                 .draw(|frame| app.draw(frame))
                 .context("failed to draw ratatui frame")?;
@@ -1296,6 +1307,34 @@ impl RatatuiLoop {
         } else {
             Ok(false)
         }
+    }
+
+    fn desired_viewport_height(&self, width: u16, minimum_rows: u16) -> u16 {
+        if width == 0 {
+            return minimum_rows;
+        }
+
+        let rendered = self.build_rendered_messages(width);
+        let mut messages_height = rendered.iter().fold(0u16, |total, message| {
+            total.saturating_add(message.height())
+        });
+        if messages_height > 0 {
+            messages_height = messages_height.saturating_add(1);
+        }
+
+        let prompt_inner_width = width.saturating_sub(2) as usize;
+        let prompt_lines = self.build_prompt_block(prompt_inner_width).0;
+        let mut prompt_height = prompt_lines.len() as u16;
+        if prompt_height == 0 {
+            prompt_height = 1;
+        }
+        prompt_height = prompt_height.saturating_add(2);
+
+        let status_height = 1u16;
+        let content_height = messages_height
+            .saturating_add(prompt_height)
+            .saturating_add(status_height);
+        content_height.max(minimum_rows)
     }
 
     fn draw(&mut self, frame: &mut Frame) {

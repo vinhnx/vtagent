@@ -7,24 +7,22 @@ use crossterm::{
     ExecutableCommand, cursor,
     event::{
         DisableMouseCapture, EnableMouseCapture, Event as CrosstermEvent, EventStream, KeyCode,
-        KeyEvent, KeyEventKind, KeyModifiers, MouseEvent, MouseEventKind,
+        KeyEvent, KeyEventKind, KeyModifiers, MouseEvent,
     },
-    terminal::{Clear, ClearType, disable_raw_mode, enable_raw_mode},
+    terminal::{Clear, ClearType, disable_raw_mode, enable_raw_mode, size},
 };
 use futures::StreamExt;
 use ratatui::{
-    Frame, Terminal,
+    Frame, Terminal, TerminalOptions, Viewport,
     backend::CrosstermBackend,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{
-        Block, Borders, Clear as ClearWidget, List, ListItem, ListState, Paragraph, Scrollbar,
-        ScrollbarOrientation, ScrollbarState, Wrap,
-    },
+    widgets::{Block, Borders, Clear as ClearWidget, List, ListItem, ListState, Paragraph, Wrap},
 };
 use serde_json::Value;
 use std::cmp;
+use std::env;
 use std::io;
 use std::mem;
 use std::time::{Duration, Instant};
@@ -35,6 +33,21 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 const ESCAPE_DOUBLE_MS: u64 = 750;
 const REDRAW_INTERVAL_MS: u64 = 33;
 const MESSAGE_INDENT: usize = 2;
+const INLINE_VIEWPORT_ENV_KEY: &str = "VTCODE_INLINE_VIEWPORT_ROWS";
+const DEFAULT_INLINE_VIEWPORT_ROWS: u16 = 8;
+
+fn inline_viewport_rows() -> u16 {
+    env::var(INLINE_VIEWPORT_ENV_KEY)
+        .ok()
+        .and_then(|value| value.parse::<u16>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(DEFAULT_INLINE_VIEWPORT_ROWS)
+}
+
+fn current_terminal_width() -> u16 {
+    let width = size().map(|(columns, _)| columns).unwrap_or(80);
+    width.max(1)
+}
 #[derive(Clone, Default)]
 pub struct RatatuiTextStyle {
     pub color: Option<Color>,
@@ -296,7 +309,11 @@ async fn run_ratatui(
 ) -> Result<()> {
     let mut stdout = io::stdout();
     let backend = CrosstermBackend::new(&mut stdout);
-    let mut terminal = Terminal::new(backend).context("failed to initialize ratatui terminal")?;
+    let options = TerminalOptions {
+        viewport: Viewport::Inline(inline_viewport_rows()),
+    };
+    let mut terminal = Terminal::with_options(backend, options)
+        .context("failed to initialize ratatui terminal")?;
     let _guard = TerminalGuard::new().context("failed to configure terminal for ratatui")?;
     terminal
         .clear()
@@ -311,6 +328,13 @@ async fn run_ratatui(
     let mut ticker = create_ticker();
     loop {
         if redraw {
+            let width = current_terminal_width();
+            app.prepare_display(width);
+            let height = app.prepared_display_height().max(1).min(u16::MAX as usize) as u16;
+            let viewport = Rect::new(0, 0, width, height);
+            terminal
+                .resize(viewport)
+                .context("failed to resize inline terminal viewport")?;
             terminal
                 .draw(|frame| app.draw(frame))
                 .context("failed to draw ratatui frame")?;
@@ -330,9 +354,7 @@ async fn run_ratatui(
                 match event {
                     Some(Ok(evt)) => {
                         if matches!(evt, CrosstermEvent::Resize(_, _)) {
-                            terminal
-                                .autoresize()
-                                .context("failed to autoresize terminal viewport")?;
+                            redraw = true;
                         }
                         if app.handle_event(evt, &events)? {
                             redraw = true;
@@ -489,105 +511,6 @@ struct MessageBlock {
     pty_command: Option<String>,
 }
 
-#[derive(Default)]
-struct TranscriptScrollState {
-    offset: usize,
-    viewport_height: usize,
-    content_height: usize,
-}
-
-impl TranscriptScrollState {
-    fn offset(&self) -> usize {
-        self.offset
-    }
-
-    fn is_at_bottom(&self) -> bool {
-        self.offset == self.max_offset()
-    }
-
-    fn update_bounds(&mut self, content_height: usize, viewport_height: usize) {
-        self.content_height = content_height;
-        self.viewport_height = viewport_height;
-        let max_offset = self.max_offset();
-        if self.offset > max_offset {
-            self.offset = max_offset;
-        }
-    }
-
-    fn scroll_to_bottom(&mut self) {
-        self.offset = self.max_offset();
-    }
-
-    fn scroll_up(&mut self) {
-        if self.offset > 0 {
-            self.offset -= 1;
-        }
-    }
-
-    fn scroll_down(&mut self) {
-        let max_offset = self.max_offset();
-        if self.offset < max_offset {
-            self.offset += 1;
-        }
-    }
-
-    fn scroll_page_up(&mut self) {
-        if self.offset == 0 {
-            return;
-        }
-        let step = self.viewport_height.max(1);
-        self.offset = self.offset.saturating_sub(step);
-    }
-
-    fn scroll_page_down(&mut self) {
-        let max_offset = self.max_offset();
-        if self.offset >= max_offset {
-            return;
-        }
-        let step = self.viewport_height.max(1);
-        self.offset = (self.offset + step).min(max_offset);
-    }
-
-    fn max_offset(&self) -> usize {
-        if self.content_height <= self.viewport_height {
-            0
-        } else {
-            self.content_height - self.viewport_height
-        }
-    }
-
-    fn has_overflow(&self) -> bool {
-        self.content_height > self.viewport_height
-    }
-
-    fn content_height(&self) -> usize {
-        self.content_height
-    }
-
-    fn viewport_height(&self) -> usize {
-        self.viewport_height
-    }
-
-    fn ensure_visible(&mut self, start: usize, height: usize) {
-        if height == 0 || self.viewport_height == 0 {
-            return;
-        }
-
-        let end = start.saturating_add(height);
-        if self.offset > start {
-            self.offset = start.min(self.max_offset());
-            return;
-        }
-
-        let viewport_end = self.offset + self.viewport_height;
-        if end > viewport_end {
-            let needed = end - viewport_end;
-            let new_offset = self.offset.saturating_add(needed).min(self.max_offset());
-            self.offset = new_offset;
-        }
-    }
-}
-
 struct TranscriptDisplay {
     lines: Vec<Line<'static>>,
     total_height: usize,
@@ -686,13 +609,11 @@ struct RatatuiLoop {
     should_exit: bool,
     theme: RatatuiTheme,
     last_escape: Option<Instant>,
-    scroll_state: TranscriptScrollState,
-    needs_autoscroll: bool,
-    transcript_area: Option<Rect>,
     slash_suggestions: SlashSuggestionState,
     mouse_capture_enabled: bool,
     pending_pty_command: Option<String>,
     cursor_visible: bool,
+    prepared_display: Option<TranscriptDisplay>,
 }
 
 impl RatatuiLoop {
@@ -710,13 +631,11 @@ impl RatatuiLoop {
             should_exit: false,
             theme,
             last_escape: None,
-            scroll_state: TranscriptScrollState::default(),
-            needs_autoscroll: true,
-            transcript_area: None,
             slash_suggestions: SlashSuggestionState::default(),
             mouse_capture_enabled: false,
             pending_pty_command: None,
             cursor_visible: true,
+            prepared_display: None,
         }
     }
 
@@ -760,12 +679,10 @@ impl RatatuiLoop {
                 let was_active = self.current_active;
                 self.flush_current_line(was_active);
                 self.push_line(kind, StyledLine { segments });
-                self.needs_autoscroll = true;
                 true
             }
             RatatuiCommand::Inline { kind, segment } => {
                 self.append_inline_segment(kind, segment);
-                self.needs_autoscroll = true;
                 true
             }
             RatatuiCommand::ReplaceLast { count, kind, lines } => {
@@ -781,19 +698,16 @@ impl RatatuiLoop {
                 for segments in lines {
                     self.push_line(kind, StyledLine { segments });
                 }
-                self.needs_autoscroll = true;
                 true
             }
             RatatuiCommand::SetPrompt { prefix, style } => {
                 self.prompt_prefix = prefix;
                 self.prompt_style = style;
-                self.needs_autoscroll = true;
                 true
             }
             RatatuiCommand::SetPlaceholder { hint } => {
                 self.placeholder_hint = hint.clone();
                 self.update_input_state();
-                self.needs_autoscroll = true;
                 true
             }
             RatatuiCommand::SetTheme { theme } => {
@@ -1102,10 +1016,7 @@ impl RatatuiLoop {
     ) -> Result<bool> {
         match event {
             CrosstermEvent::Key(key) => self.handle_key_event(key, events),
-            CrosstermEvent::Resize(_, _) => {
-                self.needs_autoscroll = true;
-                Ok(true)
-            }
+            CrosstermEvent::Resize(_, _) => Ok(true),
             CrosstermEvent::Mouse(mouse) => self.handle_mouse_event(mouse, events),
             CrosstermEvent::FocusGained | CrosstermEvent::FocusLost | CrosstermEvent::Paste(_) => {
                 Ok(false)
@@ -1158,7 +1069,6 @@ impl RatatuiLoop {
                 self.update_input_state();
                 self.last_escape = None;
                 let _ = events.send(RatatuiEvent::Submit(text));
-                self.needs_autoscroll = true;
                 Ok(true)
             }
             KeyCode::Char('m')
@@ -1211,46 +1121,35 @@ impl RatatuiLoop {
                 }
                 Ok(true)
             }
-            KeyCode::Char('l') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.scroll_state.scroll_to_bottom();
-                self.needs_autoscroll = true;
-                Ok(true)
-            }
+            KeyCode::Char('l') if key.modifiers.contains(KeyModifiers::CONTROL) => Ok(true),
             KeyCode::Char('?') if key.modifiers.is_empty() => {
                 self.set_input_text("/help".to_string());
-                self.needs_autoscroll = true;
                 Ok(true)
             }
             KeyCode::PageUp => {
-                let handled = self.scroll_page_up();
                 let _ = events.send(RatatuiEvent::ScrollPageUp);
-                Ok(handled)
+                Ok(true)
             }
             KeyCode::PageDown => {
-                let handled = self.scroll_page_down();
                 let _ = events.send(RatatuiEvent::ScrollPageDown);
-                Ok(handled)
+                Ok(true)
             }
             KeyCode::Up => {
-                let handled = self.scroll_line_up();
                 let _ = events.send(RatatuiEvent::ScrollLineUp);
-                Ok(handled)
+                Ok(true)
             }
             KeyCode::Down => {
-                let handled = self.scroll_line_down();
                 let _ = events.send(RatatuiEvent::ScrollLineDown);
-                Ok(handled)
+                Ok(true)
             }
             KeyCode::Backspace => {
                 self.input.backspace();
                 self.update_input_state();
-                self.needs_autoscroll = true;
                 Ok(true)
             }
             KeyCode::Delete => {
                 self.input.delete();
                 self.update_input_state();
-                self.needs_autoscroll = true;
                 Ok(true)
             }
             KeyCode::Left => {
@@ -1279,80 +1178,36 @@ impl RatatuiLoop {
                 self.input.insert(ch);
                 self.update_input_state();
                 self.last_escape = None;
-                self.needs_autoscroll = true;
                 Ok(true)
             }
             _ => Ok(false),
         }
     }
 
-    fn scroll_with<F>(&mut self, mut apply: F) -> bool
-    where
-        F: FnMut(&mut TranscriptScrollState),
-    {
-        let before = self.scroll_state.offset();
-        apply(&mut self.scroll_state);
-        let changed = self.scroll_state.offset() != before;
-        if changed {
-            self.needs_autoscroll = false;
-        }
-        changed
+    fn prepare_display(&mut self, width: u16) {
+        let computed = self.build_display(width);
+        self.prepared_display = Some(computed);
     }
 
-    fn scroll_line_up(&mut self) -> bool {
-        self.scroll_with(|state| state.scroll_up())
+    fn prepared_display_height(&self) -> usize {
+        self.prepared_display
+            .as_ref()
+            .map(|display| display.total_height)
+            .unwrap_or(0)
     }
 
-    fn scroll_line_down(&mut self) -> bool {
-        self.scroll_with(|state| state.scroll_down())
-    }
-
-    fn scroll_page_up(&mut self) -> bool {
-        self.scroll_with(|state| state.scroll_page_up())
-    }
-
-    fn scroll_page_down(&mut self) -> bool {
-        self.scroll_with(|state| state.scroll_page_down())
-    }
-
-    fn is_in_transcript_area(&self, column: u16, row: u16) -> bool {
-        self.transcript_area
-            .map(|area| {
-                let within_x = column >= area.x && column < area.x.saturating_add(area.width);
-                let within_y = row >= area.y && row < area.y.saturating_add(area.height);
-                within_x && within_y
-            })
-            .unwrap_or(false)
+    fn take_prepared_display(&mut self, width: u16) -> TranscriptDisplay {
+        self.prepared_display
+            .take()
+            .unwrap_or_else(|| self.build_display(width))
     }
 
     fn handle_mouse_event(
         &mut self,
-        mouse: MouseEvent,
-        events: &UnboundedSender<RatatuiEvent>,
+        _mouse: MouseEvent,
+        _events: &UnboundedSender<RatatuiEvent>,
     ) -> Result<bool> {
-        if !self.is_in_transcript_area(mouse.column, mouse.row) {
-            return Ok(false);
-        }
-
-        let handled = match mouse.kind {
-            MouseEventKind::ScrollUp => {
-                let scrolled = self.scroll_line_up();
-                if scrolled {
-                    let _ = events.send(RatatuiEvent::ScrollLineUp);
-                }
-                scrolled
-            }
-            MouseEventKind::ScrollDown => {
-                let scrolled = self.scroll_line_down();
-                if scrolled {
-                    let _ = events.send(RatatuiEvent::ScrollLineDown);
-                }
-                scrolled
-            }
-            _ => false,
-        };
-
-        Ok(handled)
+        Ok(false)
     }
 
     fn draw(&mut self, frame: &mut Frame) {
@@ -1361,10 +1216,7 @@ impl RatatuiLoop {
             return;
         }
 
-        let transcript_area = area;
-        self.transcript_area = Some(transcript_area);
-
-        frame.render_widget(ClearWidget, transcript_area);
+        frame.render_widget(ClearWidget, area);
 
         let mut base_style = Style::default();
         if let Some(fg) = self.theme.foreground {
@@ -1373,104 +1225,42 @@ impl RatatuiLoop {
         if let Some(bg) = self.theme.background {
             base_style = base_style.bg(bg);
             let background = Block::default().style(Style::default().bg(bg));
-            frame.render_widget(background, transcript_area);
+            frame.render_widget(background, area);
         }
 
-        let viewport_height = usize::from(transcript_area.height);
-        let mut reserve_scrollbar = false;
-        let mut text_width = transcript_area.width;
-        let mut display = self.build_display(text_width);
-
-        if transcript_area.width > 1 && display.total_height > viewport_height {
-            reserve_scrollbar = true;
-            text_width = transcript_area.width.saturating_sub(1);
-            display = self.build_display(text_width);
-        }
-        self.scroll_state
-            .update_bounds(display.total_height, viewport_height);
-        if self.needs_autoscroll {
-            self.scroll_state.scroll_to_bottom();
-        }
-
-        let keep_prompt_visible = self.needs_autoscroll || self.scroll_state.is_at_bottom();
-
-        if keep_prompt_visible {
-            self.scroll_state
-                .ensure_visible(display.prompt_start, display.prompt_height);
-        }
-        self.needs_autoscroll = false;
-
-        let offset = self.scroll_state.offset();
-        let mut paragraph = Paragraph::new(display.lines.clone()).alignment(Alignment::Left);
-        if offset > 0 {
-            paragraph = paragraph.scroll((offset as u16, 0));
-        }
-        paragraph = paragraph
+        let display = self.take_prepared_display(area.width);
+        let paragraph = Paragraph::new(display.lines.clone())
+            .alignment(Alignment::Left)
             .wrap(Wrap { trim: false })
             .style(base_style.clone());
 
-        let (text_area, scrollbar_area) = if reserve_scrollbar {
-            let chunks = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Length(text_width), Constraint::Length(1)])
-                .split(transcript_area);
-            (chunks[0], Some(chunks[1]))
-        } else {
-            (transcript_area, None)
-        };
-
-        frame.render_widget(paragraph, text_area);
-
-        if let Some(scroll_area) = scrollbar_area {
-            if self.scroll_state.has_overflow() && scroll_area.width > 0 {
-                let mut scrollbar_state = ScrollbarState::new(self.scroll_state.content_height())
-                    .viewport_content_length(self.scroll_state.viewport_height())
-                    .position(self.scroll_state.offset());
-                let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight);
-                frame.render_stateful_widget(scrollbar, scroll_area, &mut scrollbar_state);
-            }
-        }
+        frame.render_widget(paragraph, area);
 
         if self.cursor_visible {
             if let Some((row, col)) = display.cursor {
-                if row >= offset {
-                    let visible_row = row - offset;
-                    if visible_row < viewport_height {
-                        if text_area.width > 0 {
-                            let mut cursor_x = text_area.x + col as u16;
-                            let mut cursor_y = text_area.y + visible_row as u16;
-                            let max_x = text_area.x + text_area.width.saturating_sub(1);
-                            let max_y = text_area.y + text_area.height.saturating_sub(1);
-                            if cursor_x > max_x {
-                                cursor_x = max_x;
-                            }
-                            if cursor_y > max_y {
-                                cursor_y = max_y;
-                            }
-                            frame.set_cursor_position((cursor_x, cursor_y));
-                        }
-                    }
+                let mut cursor_x = area.x + col as u16;
+                let mut cursor_y = area.y + row as u16;
+                let max_x = area.x + area.width.saturating_sub(1);
+                let max_y = area.y + area.height.saturating_sub(1);
+                if cursor_x > max_x {
+                    cursor_x = max_x;
                 }
+                if cursor_y > max_y {
+                    cursor_y = max_y;
+                }
+                frame.set_cursor_position((cursor_x, cursor_y));
             }
         }
 
-        let mut suggestion_area = text_area;
         if display.prompt_height > 0 {
-            let prompt_end = display.prompt_start + display.prompt_height;
-            if prompt_end > offset {
-                let visible_start = display.prompt_start.saturating_sub(offset);
-                if visible_start < viewport_height {
-                    let visible_end = prompt_end.saturating_sub(offset).min(viewport_height);
-                    if visible_end > visible_start {
-                        let height = (visible_end - visible_start) as u16;
-                        let y = text_area.y + visible_start as u16;
-                        suggestion_area = Rect::new(text_area.x, y, text_area.width, height);
-                    }
-                }
-            }
+            let prompt_area = Rect::new(
+                area.x,
+                area.y + display.prompt_start as u16,
+                area.width,
+                display.prompt_height as u16,
+            );
+            self.render_slash_suggestions(frame, prompt_area);
         }
-
-        self.render_slash_suggestions(frame, suggestion_area);
     }
 
     fn build_display(&self, width: u16) -> TranscriptDisplay {

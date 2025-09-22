@@ -9,7 +9,8 @@ pub const DEFAULT_THEME_ID: &str = "ciapre-dark";
 
 const MIN_CONTRAST: f64 = 4.5;
 
-const WELCOME_TOOL_COLOR: RgbColor = RgbColor(0xBF, 0xB3, 0x8F);
+const ACCENT_TEAL: RgbColor = RgbColor(0x54, 0x8D, 0x8D);
+const WELCOME_TOOL_COLOR: RgbColor = ACCENT_TEAL;
 
 /// Palette describing UI colors for the terminal experience.
 #[derive(Clone, Debug)]
@@ -19,6 +20,7 @@ pub struct ThemePalette {
     pub foreground: RgbColor,
     pub secondary_accent: RgbColor,
     pub alert: RgbColor,
+    pub logo_accent: RgbColor,
 }
 
 impl ThemePalette {
@@ -135,11 +137,12 @@ static REGISTRY: Lazy<HashMap<&'static str, ThemeDefinition>> = Lazy::new(|| {
             id: "ciapre-dark",
             label: "Ciapre Dark",
             palette: ThemePalette {
-                primary_accent: RgbColor(0xBF, 0xB3, 0x8F),
+                primary_accent: ACCENT_TEAL,
                 background: RgbColor(0x26, 0x26, 0x26),
                 foreground: RgbColor(0xBF, 0xB3, 0x8F),
-                secondary_accent: RgbColor(0xD9, 0x9A, 0x4E),
+                secondary_accent: ACCENT_TEAL,
                 alert: RgbColor(0xFF, 0x8A, 0x8A),
+                logo_accent: ACCENT_TEAL,
             },
         },
     );
@@ -149,11 +152,12 @@ static REGISTRY: Lazy<HashMap<&'static str, ThemeDefinition>> = Lazy::new(|| {
             id: "ciapre-blue",
             label: "Ciapre Blue",
             palette: ThemePalette {
-                primary_accent: RgbColor(0xBF, 0xB3, 0x8F),
+                primary_accent: ACCENT_TEAL,
                 background: RgbColor(0x17, 0x1C, 0x26),
                 foreground: RgbColor(0xBF, 0xB3, 0x8F),
-                secondary_accent: RgbColor(0xBF, 0xB3, 0x8F),
+                secondary_accent: ACCENT_TEAL,
                 alert: RgbColor(0xFF, 0x8A, 0x8A),
+                logo_accent: ACCENT_TEAL,
             },
         },
     );
@@ -211,9 +215,27 @@ pub fn banner_color() -> RgbColor {
 
 /// Slightly darkened accent style for banner-like copy.
 pub fn banner_style() -> Style {
-    Style::new()
-        .fg_color(Some(Color::Rgb(WELCOME_TOOL_COLOR)))
-        .bold()
+    let accent = logo_accent_color();
+    Style::new().fg_color(Some(Color::Rgb(accent))).bold()
+}
+
+/// Accent color for the startup banner logo.
+pub fn logo_accent_color() -> RgbColor {
+    ACTIVE.read().palette.logo_accent
+}
+
+/// Primary accent colour for interactive elements.
+pub fn accent_color() -> RgbColor {
+    ACTIVE.read().palette.primary_accent
+}
+
+/// Style helper for accent-coloured widgets.
+pub fn accent_style(bold: bool) -> Style {
+    let mut style = Style::new().fg_color(Some(Color::Rgb(accent_color())));
+    if bold {
+        style = style.bold();
+    }
+    style
 }
 
 /// Enumerate available theme identifiers.

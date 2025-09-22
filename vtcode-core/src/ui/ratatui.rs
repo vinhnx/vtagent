@@ -1043,20 +1043,32 @@ impl RatatuiLoop {
             visible_height,
         );
         frame.render_widget(ClearWidget, suggestion_area);
+        if let Some(bg) = self.theme.background {
+            let fill = Block::default().style(Style::default().bg(bg));
+            frame.render_widget(fill, suggestion_area);
+        }
         let list_items: Vec<ListItem> = entries.into_iter().map(ListItem::new).collect();
-        let border_style = Style::default().fg(self.theme.primary.unwrap_or(Color::LightBlue));
+        let accent = self.theme.primary.unwrap_or(Color::LightBlue);
+        let mut list_style = Style::default();
+        if let Some(fg) = self.theme.foreground {
+            list_style = list_style.fg(fg);
+        }
+        if let Some(bg) = self.theme.background {
+            list_style = list_style.bg(bg);
+        }
+        let border_style = Style::default().fg(accent);
         let list = List::new(list_items)
             .block(
                 Block::default()
-                    .title(Line::from("? help · / commands"))
+                    .title(Line::from(vec![Span::styled(
+                        "? help · / commands",
+                        border_style.clone(),
+                    )]))
                     .borders(Borders::ALL)
                     .border_style(border_style),
             )
-            .highlight_style(
-                Style::default()
-                    .fg(self.theme.primary.unwrap_or(Color::LightBlue))
-                    .add_modifier(Modifier::BOLD),
-            );
+            .highlight_style(Style::default().fg(accent).add_modifier(Modifier::BOLD))
+            .style(list_style);
         frame.render_stateful_widget(list, suggestion_area, self.slash_suggestions.list_state());
     }
 
@@ -1329,20 +1341,28 @@ impl RatatuiLoop {
         let transcript_area = area;
         self.transcript_area = Some(transcript_area);
 
+        frame.render_widget(ClearWidget, transcript_area);
+
         let mut base_style = Style::default();
         if let Some(fg) = self.theme.foreground {
             base_style = base_style.fg(fg);
         }
+        if let Some(bg) = self.theme.background {
+            base_style = base_style.bg(bg);
+            let background = Block::default().style(Style::default().bg(bg));
+            frame.render_widget(background, transcript_area);
+        }
 
-        let reserve_scrollbar = transcript_area.width > 1;
-        let text_width = if reserve_scrollbar {
-            transcript_area.width.saturating_sub(1)
-        } else {
-            transcript_area.width
-        };
-
-        let display = self.build_display(text_width);
         let viewport_height = usize::from(transcript_area.height);
+        let mut reserve_scrollbar = false;
+        let mut text_width = transcript_area.width;
+        let mut display = self.build_display(text_width);
+
+        if transcript_area.width > 1 && display.total_height > viewport_height {
+            reserve_scrollbar = true;
+            text_width = transcript_area.width.saturating_sub(1);
+            display = self.build_display(text_width);
+        }
         self.scroll_state
             .update_bounds(display.total_height, viewport_height);
         if self.needs_autoscroll {

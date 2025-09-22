@@ -10,8 +10,7 @@ pub const DEFAULT_THEME_ID: &str = "ciapre-dark";
 const MIN_CONTRAST: f64 = 4.5;
 
 const ACCENT_TEAL: RgbColor = RgbColor(0x54, 0x8D, 0x8D);
-const LOGO_GOLD: RgbColor = RgbColor(0xD9, 0x9A, 0x4E);
-const WELCOME_LABEL_COLOR: RgbColor = RgbColor(0xBF, 0xB3, 0x8F);
+const WELCOME_LABEL_COLOR: RgbColor = ACCENT_TEAL;
 const WELCOME_TOOL_COLOR: RgbColor = ACCENT_TEAL;
 
 /// Palette describing UI colors for the terminal experience.
@@ -149,7 +148,7 @@ static REGISTRY: Lazy<HashMap<&'static str, ThemeDefinition>> = Lazy::new(|| {
                 foreground: RgbColor(0xBF, 0xB3, 0x8F),
                 secondary_accent: ACCENT_TEAL,
                 alert: RgbColor(0xFF, 0x8A, 0x8A),
-                logo_accent: LOGO_GOLD,
+                logo_accent: ACCENT_TEAL,
             },
         },
     );
@@ -164,7 +163,7 @@ static REGISTRY: Lazy<HashMap<&'static str, ThemeDefinition>> = Lazy::new(|| {
                 foreground: RgbColor(0xBF, 0xB3, 0x8F),
                 secondary_accent: ACCENT_TEAL,
                 alert: RgbColor(0xFF, 0x8A, 0x8A),
-                logo_accent: LOGO_GOLD,
+                logo_accent: ACCENT_TEAL,
             },
         },
     );
@@ -228,9 +227,7 @@ pub fn banner_style() -> Style {
 
 /// Muted welcome text style used for onboarding sections.
 pub fn welcome_text_style() -> Style {
-    Style::new()
-        .fg_color(Some(Color::Rgb(WELCOME_LABEL_COLOR)))
-        .effects(Effects::DIMMED)
+    Style::new().fg_color(Some(Color::Rgb(WELCOME_LABEL_COLOR)))
 }
 
 /// Emphasized welcome section headers.

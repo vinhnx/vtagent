@@ -8,6 +8,7 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::task;
 use tokio::time::sleep;
 
+use tiktoken_rs::{CoreBPE, cl100k_base, get_bpe_from_model};
 use vtcode_core::config::constants::defaults;
 use vtcode_core::config::loader::VTCodeConfig;
 use vtcode_core::config::types::AgentConfig as CoreAgentConfig;
@@ -257,6 +258,66 @@ impl Drop for PlaceholderSpinner {
     }
 }
 
+struct TokenCounter {
+    encoder: Option<CoreBPE>,
+}
+
+impl TokenCounter {
+    fn new(model: &str) -> Self {
+        let encoder = get_bpe_from_model(model).or_else(|_| cl100k_base()).ok();
+        Self { encoder }
+    }
+
+    fn count_text(&self, text: &str) -> usize {
+        if text.is_empty() {
+            return 0;
+        }
+        self.encoder
+            .as_ref()
+            .map(|encoder| encoder.encode_with_special_tokens(text).len())
+            .unwrap_or(0)
+    }
+}
+
+#[derive(Default)]
+struct SessionStats {
+    tool_calls: usize,
+    prompt_tokens: usize,
+    completion_tokens: usize,
+}
+
+impl SessionStats {
+    fn record_history(&mut self, history: &[uni::Message], counter: &TokenCounter) {
+        for message in history {
+            self.record_message(message, counter);
+        }
+    }
+
+    fn record_message(&mut self, message: &uni::Message, counter: &TokenCounter) {
+        let tokens = counter.count_text(&message.content);
+        match message.role {
+            uni::MessageRole::Assistant => self.completion_tokens += tokens,
+            _ => self.prompt_tokens += tokens,
+        }
+    }
+
+    fn record_prompt_text(&mut self, text: &str, counter: &TokenCounter) {
+        self.prompt_tokens += counter.count_text(text);
+    }
+
+    fn record_completion_text(&mut self, text: &str, counter: &TokenCounter) {
+        self.completion_tokens += counter.count_text(text);
+    }
+
+    fn record_tool_call(&mut self) {
+        self.tool_calls += 1;
+    }
+
+    fn total_tokens(&self) -> usize {
+        self.prompt_tokens + self.completion_tokens
+    }
+}
+
 fn map_render_error(provider_name: &str, err: anyhow::Error) -> uni::LLMError {
     let formatted_error = error_display::format_llm_error(
         provider_name,
@@ -402,6 +463,26 @@ enum TurnLoopResult {
     Cancelled,
 }
 
+fn render_session_summary(renderer: &mut AnsiRenderer, stats: &SessionStats) -> Result<()> {
+    renderer.line_if_not_empty(MessageStyle::Info)?;
+    renderer.line(MessageStyle::Info, "Session summary:")?;
+    renderer.line(
+        MessageStyle::Output,
+        &format!("  Tool calls: {}", stats.tool_calls),
+    )?;
+    renderer.line(
+        MessageStyle::Output,
+        &format!(
+            "  Tokens used: {} prompt · {} completion · {} total",
+            stats.prompt_tokens,
+            stats.completion_tokens,
+            stats.total_tokens()
+        ),
+    )?;
+    renderer.line_if_not_empty(MessageStyle::Output)?;
+    Ok(())
+}
+
 pub(crate) async fn run_single_agent_loop_unified(
     config: &CoreAgentConfig,
     vt_cfg: Option<&VTCodeConfig>,
@@ -420,6 +501,10 @@ pub(crate) async fn run_single_agent_loop_unified(
         base_system_prompt,
         full_auto_allowlist,
     } = initialize_session(config, vt_cfg, full_auto).await?;
+
+    let token_counter = TokenCounter::new(&config.model);
+    let mut session_stats = SessionStats::default();
+    session_stats.record_history(&conversation_history, &token_counter);
 
     let active_styles = theme::active_styles();
     let theme_spec = theme_from_styles(&active_styles);
@@ -652,6 +737,7 @@ pub(crate) async fn run_single_agent_loop_unified(
         let refined_user = refine_user_prompt_if_enabled(input, config, vt_cfg).await;
         // Display the user message with ratatui border decoration
         display_user_message(&mut renderer, &refined_user)?;
+        session_stats.record_prompt_text(&refined_user, &token_counter);
         conversation_history.push(uni::Message::user(refined_user));
         let _pruned_tools = prune_unified_tool_responses(
             &mut conversation_history,
@@ -698,6 +784,7 @@ pub(crate) async fn run_single_agent_loop_unified(
                 );
                 renderer.line(MessageStyle::Error, &notice)?;
                 ensure_turn_bottom_gap(&mut renderer, &mut bottom_gap_applied)?;
+                session_stats.record_completion_text(&notice, &token_counter);
                 working_history.push(uni::Message::assistant(notice));
                 break TurnLoopResult::Completed;
             }
@@ -779,11 +866,13 @@ pub(crate) async fn run_single_agent_loop_unified(
 
             let mut attempt_history = working_history.clone();
             let mut retry_attempts = 0usize;
+            let mut system_prompt_recorded = false;
             let (response, response_streamed) = loop {
                 retry_attempts += 1;
                 let _ = enforce_unified_context_window(&mut attempt_history, trim_config);
 
-                let use_streaming = provider_client.supports_streaming();
+                let use_streaming =
+                    provider_client.supports_streaming() && last_tool_stdout.is_none();
                 let reasoning_effort = vt_cfg.and_then(|cfg| {
                     if provider_client.supports_reasoning_effort(&active_model) {
                         Some(cfg.agent.reasoning_effort.as_str().to_string())
@@ -804,6 +893,11 @@ pub(crate) async fn run_single_agent_loop_unified(
                     parallel_tool_config: parallel_cfg_opt.clone(),
                     reasoning_effort,
                 };
+
+                if !system_prompt_recorded {
+                    session_stats.record_prompt_text(&system_prompt, &token_counter);
+                    system_prompt_recorded = true;
+                }
 
                 let thinking_spinner =
                     PlaceholderSpinner::new(&handle, default_placeholder.clone(), "Thinking...");
@@ -875,6 +969,7 @@ pub(crate) async fn run_single_agent_loop_unified(
                                 .unwrap_or_else(|| "Command completed successfully.".to_string());
                             renderer.line(MessageStyle::Response, &reply)?;
                             ensure_turn_bottom_gap(&mut renderer, &mut bottom_gap_applied)?;
+                            session_stats.record_completion_text(&reply, &token_counter);
                             working_history.push(uni::Message::assistant(reply));
                             let _ = last_tool_stdout.take();
                             break 'outer TurnLoopResult::Completed;
@@ -920,6 +1015,7 @@ pub(crate) async fn run_single_agent_loop_unified(
             if tool_calls.is_empty()
                 && let Some(text) = final_text.clone()
             {
+                session_stats.record_completion_text(&text, &token_counter);
                 working_history.push(uni::Message::assistant(text));
             } else {
                 let assistant_text = if interpreted_textual_call {
@@ -927,6 +1023,7 @@ pub(crate) async fn run_single_agent_loop_unified(
                 } else {
                     final_text.clone().unwrap_or_default()
                 };
+                session_stats.record_completion_text(&assistant_text, &token_counter);
                 working_history.push(uni::Message::assistant_with_tools(
                     assistant_text,
                     tool_calls.clone(),
@@ -970,6 +1067,7 @@ pub(crate) async fn run_single_agent_loop_unified(
                                 default_placeholder.clone(),
                                 format!("Running tool: {}", name),
                             );
+                            session_stats.record_tool_call();
                             match tool_registry.execute_tool(name, args_val.clone()).await {
                                 Ok(tool_output) => {
                                     tool_spinner.finish();
@@ -1028,6 +1126,7 @@ pub(crate) async fn run_single_agent_loop_unified(
 
                                     let content = serde_json::to_string(&tool_output)
                                         .unwrap_or("{}".to_string());
+                                    session_stats.record_prompt_text(&content, &token_counter);
                                     working_history.push(uni::Message::tool_response(
                                         call.id.clone(),
                                         content,
@@ -1049,6 +1148,8 @@ pub(crate) async fn run_single_agent_loop_unified(
                                             &mut renderer,
                                             &mut bottom_gap_applied,
                                         )?;
+                                        session_stats
+                                            .record_completion_text(&reply, &token_counter);
                                         working_history.push(uni::Message::assistant(reply));
                                         let _ = last_tool_stdout.take();
                                         break 'outer TurnLoopResult::Completed;
@@ -1072,6 +1173,7 @@ pub(crate) async fn run_single_agent_loop_unified(
                                     )?;
                                     let err = serde_json::json!({ "error": error.to_string() });
                                     let content = err.to_string();
+                                    session_stats.record_prompt_text(&content, &token_counter);
                                     working_history.push(uni::Message::tool_response(
                                         call.id.clone(),
                                         content,
@@ -1099,6 +1201,7 @@ pub(crate) async fn run_single_agent_loop_unified(
                             render_tool_output(&mut renderer, Some(name), &denial)?;
                             let content =
                                 serde_json::to_string(&denial).unwrap_or("{}".to_string());
+                            session_stats.record_prompt_text(&content, &token_counter);
                             working_history
                                 .push(uni::Message::tool_response(call.id.clone(), content));
                             ledger.record_outcome(
@@ -1130,10 +1233,10 @@ pub(crate) async fn run_single_agent_loop_unified(
                                     name, err
                                 )
                             });
-                            working_history.push(uni::Message::tool_response(
-                                call.id.clone(),
-                                err_json.to_string(),
-                            ));
+                            let content = err_json.to_string();
+                            session_stats.record_prompt_text(&content, &token_counter);
+                            working_history
+                                .push(uni::Message::tool_response(call.id.clone(), content));
                             let _ = last_tool_stdout.take();
                             ledger.record_outcome(
                                 &dec_id,
@@ -1164,11 +1267,12 @@ pub(crate) async fn run_single_agent_loop_unified(
                 if do_review {
                     let review_system = "You are the agent's critical code reviewer. Improve clarity, correctness, and add missing test or validation guidance. Return only the improved final answer (no meta commentary).".to_string();
                     for _ in 0..review_passes {
+                        let review_prompt = format!(
+                            "Please review and refine the following response. Return only the improved response.\n\n{}",
+                            text
+                        );
                         let review_req = uni::LLMRequest {
-                            messages: vec![uni::Message::user(format!(
-                                "Please review and refine the following response. Return only the improved response.\n\n{}",
-                                text
-                            ))],
+                            messages: vec![uni::Message::user(review_prompt.clone())],
                             system_prompt: Some(review_system.clone()),
                             tools: None,
                             model: config.model.clone(),
@@ -1186,10 +1290,13 @@ pub(crate) async fn run_single_agent_loop_unified(
                                 }
                             }),
                         };
+                        session_stats.record_prompt_text(&review_system, &token_counter);
+                        session_stats.record_prompt_text(&review_prompt, &token_counter);
                         let rr = provider_client.generate(review_req).await.ok();
                         if let Some(r) = rr.and_then(|result| result.content)
                             && !r.trim().is_empty()
                         {
+                            session_stats.record_completion_text(&r, &token_counter);
                             text = r;
                         }
                     }
@@ -1212,6 +1319,7 @@ pub(crate) async fn run_single_agent_loop_unified(
                     renderer.line(MessageStyle::Response, &text)?;
                 }
                 ensure_turn_bottom_gap(&mut renderer, &mut bottom_gap_applied)?;
+                session_stats.record_completion_text(&text, &token_counter);
                 working_history.push(uni::Message::assistant(text));
                 let _ = last_tool_stdout.take();
             } else {
@@ -1265,6 +1373,10 @@ pub(crate) async fn run_single_agent_loop_unified(
                 }
             }
         }
+    }
+
+    if ctrl_c_flag.load(Ordering::SeqCst) {
+        render_session_summary(&mut renderer, &session_stats)?;
     }
 
     handle.shutdown();

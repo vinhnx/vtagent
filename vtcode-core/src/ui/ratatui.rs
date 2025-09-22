@@ -36,7 +36,7 @@ const ESCAPE_DOUBLE_MS: u64 = 750;
 const REDRAW_INTERVAL_MS: u64 = 33;
 const MESSAGE_INDENT: usize = 2;
 const NAVIGATION_HINT_TEXT: &str =
-    "↑↓ scroll · PgUp PgDn page · ↵ submit · Esc cancel · Ctrl+Shift+M mouse";
+    "↑↓ scroll · PgUp/Dn page · ↵ send · Esc cancel · Ctrl+Shift+M mouse";
 
 #[derive(Clone, Default)]
 pub struct RatatuiTextStyle {
@@ -546,7 +546,7 @@ struct StatusBarContent {
 impl StatusBarContent {
     fn new() -> Self {
         Self {
-            left: "exit · help · /commands".to_string(),
+            left: "exit · /help · /theme".to_string(),
             center: String::new(),
             right: NAVIGATION_HINT_TEXT.to_string(),
         }
@@ -707,9 +707,9 @@ impl RatatuiLoop {
 
     fn mouse_capture_text(enabled: bool) -> String {
         if enabled {
-            "Mouse capture on · scroll with mouse wheel".to_string()
+            "Mouse capture on · wheel scroll".to_string()
         } else {
-            "Mouse capture off · drag to select text".to_string()
+            "Mouse capture off · drag to select".to_string()
         }
     }
 

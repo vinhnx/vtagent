@@ -25,6 +25,7 @@ use ratatui::{
 };
 use serde_json::Value;
 use std::cmp;
+use std::env;
 use std::io;
 use std::mem;
 use std::time::{Duration, Instant};
@@ -264,8 +265,15 @@ async fn run_ratatui(
     let mut stdout = io::stdout();
     let backend = CrosstermBackend::new(&mut stdout);
     let (_, rows) = crossterm::terminal::size().context("failed to query terminal size")?;
+    let default_rows = crate::config::constants::ui::INLINE_VIEWPORT_DEFAULT_ROWS.min(rows);
+    let configured_rows = env::var(crate::config::constants::ui::INLINE_VIEWPORT_ROWS_ENV)
+        .ok()
+        .and_then(|value| value.parse::<u16>().ok())
+        .filter(|value| *value > 0)
+        .map(|value| value.min(rows))
+        .unwrap_or(default_rows);
     let options = TerminalOptions {
-        viewport: Viewport::Inline(rows),
+        viewport: Viewport::Inline(configured_rows),
     };
     let mut terminal = Terminal::with_options(backend, options)
         .context("failed to initialize ratatui terminal")?;

@@ -12,6 +12,7 @@ const MIN_CONTRAST: f64 = 4.5;
 const WELCOME_LABEL_ALPHA: f32 = 0.5;
 
 const GOLD_ACCENT: RgbColor = RgbColor(0xD9, 0x9A, 0x4E);
+const CIAPRE_SHARED_ACCENT: RgbColor = RgbColor(0x54, 0x8D, 0x8D);
 
 const CIAPRE_DARK_BACKGROUND: RgbColor = RgbColor(0x26, 0x26, 0x26);
 const CIAPRE_DARK_FOREGROUND: RgbColor = RgbColor(0xBF, 0xB3, 0x8F);
@@ -19,7 +20,6 @@ const CIAPRE_DARK_SECONDARY: RgbColor = RgbColor(0xBF, 0xB3, 0x8F);
 const CIAPRE_DARK_ALERT: RgbColor = RgbColor(0xBF, 0x45, 0x45);
 
 const CIAPRE_BLUE_BACKGROUND: RgbColor = RgbColor(0x17, 0x1C, 0x26);
-const CIAPRE_BLUE_PRIMARY: RgbColor = RgbColor(0x38, 0x3B, 0x73);
 const CIAPRE_BLUE_FOREGROUND: RgbColor = RgbColor(0xBF, 0xB3, 0x8F);
 const CIAPRE_BLUE_SECONDARY: RgbColor = RgbColor(0xBF, 0xB3, 0x8F);
 const CIAPRE_BLUE_ALERT: RgbColor = RgbColor(0xA6, 0x33, 0x33);
@@ -163,7 +163,7 @@ static REGISTRY: Lazy<HashMap<&'static str, ThemeDefinition>> = Lazy::new(|| {
             id: "ciapre-dark",
             label: "Ciapre Dark",
             palette: ThemePalette {
-                primary_accent: GOLD_ACCENT,
+                primary_accent: CIAPRE_SHARED_ACCENT,
                 background: CIAPRE_DARK_BACKGROUND,
                 foreground: CIAPRE_DARK_FOREGROUND,
                 secondary_accent: CIAPRE_DARK_SECONDARY,
@@ -178,7 +178,7 @@ static REGISTRY: Lazy<HashMap<&'static str, ThemeDefinition>> = Lazy::new(|| {
             id: "ciapre-blue",
             label: "Ciapre Blue",
             palette: ThemePalette {
-                primary_accent: CIAPRE_BLUE_PRIMARY,
+                primary_accent: CIAPRE_SHARED_ACCENT,
                 background: CIAPRE_BLUE_BACKGROUND,
                 foreground: CIAPRE_BLUE_FOREGROUND,
                 secondary_accent: CIAPRE_BLUE_SECONDARY,

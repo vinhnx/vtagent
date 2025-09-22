@@ -20,14 +20,14 @@ class ThemePalette:
 
 THEMES: Dict[str, ThemePalette] = {
     "ciapre-dark": ThemePalette(
-        primary_accent="#D99A4E",
+        primary_accent="#548D8D",
         background="#262626",
         foreground="#BFB38F",
         secondary_accent="#BFB38F",
         alert="#BF4545",
     ),
     "ciapre-blue": ThemePalette(
-        primary_accent="#383B73",
+        primary_accent="#548D8D",
         background="#171C26",
         foreground="#BFB38F",
         secondary_accent="#BFB38F",

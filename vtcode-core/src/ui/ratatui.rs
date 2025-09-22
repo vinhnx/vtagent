@@ -501,6 +501,10 @@ impl TranscriptScrollState {
         self.offset
     }
 
+    fn is_at_bottom(&self) -> bool {
+        self.offset == self.max_offset()
+    }
+
     fn update_bounds(&mut self, content_height: usize, viewport_height: usize) {
         self.content_height = content_height;
         self.viewport_height = viewport_height;
@@ -1386,11 +1390,15 @@ impl RatatuiLoop {
             .update_bounds(display.total_height, viewport_height);
         if self.needs_autoscroll {
             self.scroll_state.scroll_to_bottom();
-            self.needs_autoscroll = false;
         }
 
-        self.scroll_state
-            .ensure_visible(display.prompt_start, display.prompt_height);
+        let keep_prompt_visible = self.needs_autoscroll || self.scroll_state.is_at_bottom();
+
+        if keep_prompt_visible {
+            self.scroll_state
+                .ensure_visible(display.prompt_start, display.prompt_height);
+        }
+        self.needs_autoscroll = false;
 
         let offset = self.scroll_state.offset();
         let mut paragraph = Paragraph::new(display.lines.clone()).alignment(Alignment::Left);

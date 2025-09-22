@@ -20,7 +20,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{
         Block, Borders, Clear as ClearWidget, List, ListItem, ListState, Paragraph, Scrollbar,
-        ScrollbarOrientation, ScrollbarState,
+        ScrollbarOrientation, ScrollbarState, Wrap,
     },
 };
 use serde_json::Value;
@@ -38,8 +38,13 @@ const MESSAGE_INDENT: usize = 2;
 #[derive(Clone, Default)]
 pub struct RatatuiTextStyle {
     pub color: Option<Color>,
+    pub bg_color: Option<Color>,
     pub bold: bool,
     pub italic: bool,
+    pub underline: bool,
+    pub strikethrough: bool,
+    pub dim: bool,
+    pub reversed: bool,
 }
 
 impl RatatuiTextStyle {
@@ -50,16 +55,38 @@ impl RatatuiTextStyle {
         self
     }
 
+    pub fn merge_background(mut self, fallback: Option<Color>) -> Self {
+        if self.bg_color.is_none() {
+            self.bg_color = fallback;
+        }
+        self
+    }
+
     fn to_style(&self, fallback: Option<Color>) -> Style {
         let mut style = Style::default();
         if let Some(color) = self.color.or(fallback) {
             style = style.fg(color);
+        }
+        if let Some(bg) = self.bg_color {
+            style = style.bg(bg);
         }
         if self.bold {
             style = style.add_modifier(Modifier::BOLD);
         }
         if self.italic {
             style = style.add_modifier(Modifier::ITALIC);
+        }
+        if self.underline {
+            style = style.add_modifier(Modifier::UNDERLINED);
+        }
+        if self.strikethrough {
+            style = style.add_modifier(Modifier::CROSSED_OUT);
+        }
+        if self.dim {
+            style = style.add_modifier(Modifier::DIM);
+        }
+        if self.reversed {
+            style = style.add_modifier(Modifier::REVERSED);
         }
         style
     }
@@ -1016,6 +1043,10 @@ impl RatatuiLoop {
             visible_height,
         );
         frame.render_widget(ClearWidget, suggestion_area);
+        if let Some(bg) = self.theme.background {
+            let background = Block::default().style(Style::default().bg(bg));
+            frame.render_widget(background, suggestion_area);
+        }
 
         let list_items: Vec<ListItem> = entries.into_iter().map(ListItem::new).collect();
         let border_style = Style::default().fg(self.theme.primary.unwrap_or(Color::LightBlue));
@@ -1300,14 +1331,21 @@ impl RatatuiLoop {
             return;
         }
 
+        if let Some(bg) = self.theme.background {
+            let background = Block::default().style(Style::default().bg(bg));
+            frame.render_widget(background, area);
+        }
+
         let transcript_area = area;
         self.transcript_area = Some(transcript_area);
 
-        let base_style = self
-            .theme
-            .foreground
-            .map(|fg| Style::default().fg(fg))
-            .unwrap_or_else(Style::default);
+        let mut base_style = Style::default();
+        if let Some(fg) = self.theme.foreground {
+            base_style = base_style.fg(fg);
+        }
+        if let Some(bg) = self.theme.background {
+            base_style = base_style.bg(bg);
+        }
 
         let reserve_scrollbar = transcript_area.width > 1;
         let text_width = if reserve_scrollbar {
@@ -1330,7 +1368,9 @@ impl RatatuiLoop {
         if offset > 0 {
             paragraph = paragraph.scroll((offset as u16, 0));
         }
-        paragraph = paragraph.style(base_style.clone());
+        paragraph = paragraph
+            .wrap(Wrap { trim: false })
+            .style(base_style.clone());
 
         let (text_area, scrollbar_area) = if reserve_scrollbar {
             let chunks = Layout::default()
@@ -1933,9 +1973,14 @@ fn convert_style_color(style: &AnsiStyle) -> Option<Color> {
 pub fn convert_style(style: AnsiStyle) -> RatatuiTextStyle {
     let mut converted = RatatuiTextStyle::default();
     converted.color = convert_style_color(&style);
+    converted.bg_color = style.get_bg_color().and_then(convert_ansi_color);
     let effects = style.get_effects();
     converted.bold = effects.contains(Effects::BOLD);
     converted.italic = effects.contains(Effects::ITALIC);
+    converted.underline = effects.contains(Effects::UNDERLINE);
+    converted.strikethrough = effects.contains(Effects::STRIKETHROUGH);
+    converted.dim = effects.contains(Effects::DIMMED);
+    converted.reversed = effects.contains(Effects::INVERT);
     converted
 }
 

@@ -9,10 +9,12 @@ pub const DEFAULT_THEME_ID: &str = "ciapre-dark";
 
 const MIN_CONTRAST: f64 = 4.5;
 
-const ACCENT_TEAL: RgbColor = RgbColor(0x54, 0x8D, 0x8D);
-const LOGO_GOLD: RgbColor = RgbColor(0xBF, 0xB3, 0x8F);
-const WELCOME_LABEL_COLOR: RgbColor = ACCENT_TEAL;
-const WELCOME_TOOL_COLOR: RgbColor = ACCENT_TEAL;
+const PRIMARY_ACCENT: RgbColor = RgbColor(0xD9, 0x9A, 0x4E);
+const SECONDARY_ACCENT: RgbColor = RgbColor(0xBF, 0xB3, 0x8F);
+const DARK_BACKGROUND: RgbColor = RgbColor(0x38, 0x3B, 0x73);
+const BLUE_BACKGROUND: RgbColor = RgbColor(0x17, 0x1C, 0x26);
+const ALERT_ACCENT: RgbColor = RgbColor(0xFF, 0x8A, 0x8A);
+const WELCOME_LABEL_ALPHA: f32 = 0.5;
 
 /// Palette describing UI colors for the terminal experience.
 #[derive(Clone, Debug)]
@@ -62,7 +64,7 @@ impl ThemePalette {
                 fallback_light,
             ],
         );
-        let tool_color = WELCOME_TOOL_COLOR;
+        let tool_color = self.primary_accent;
         let response_color = ensure_contrast(
             text_color,
             background,
@@ -144,12 +146,12 @@ static REGISTRY: Lazy<HashMap<&'static str, ThemeDefinition>> = Lazy::new(|| {
             id: "ciapre-dark",
             label: "Ciapre Dark",
             palette: ThemePalette {
-                primary_accent: ACCENT_TEAL,
-                background: RgbColor(0x26, 0x26, 0x26),
-                foreground: RgbColor(0xBF, 0xB3, 0x8F),
-                secondary_accent: ACCENT_TEAL,
-                alert: RgbColor(0xFF, 0x8A, 0x8A),
-                logo_accent: LOGO_GOLD,
+                primary_accent: PRIMARY_ACCENT,
+                background: DARK_BACKGROUND,
+                foreground: SECONDARY_ACCENT,
+                secondary_accent: SECONDARY_ACCENT,
+                alert: ALERT_ACCENT,
+                logo_accent: PRIMARY_ACCENT,
             },
         },
     );
@@ -159,12 +161,12 @@ static REGISTRY: Lazy<HashMap<&'static str, ThemeDefinition>> = Lazy::new(|| {
             id: "ciapre-blue",
             label: "Ciapre Blue",
             palette: ThemePalette {
-                primary_accent: ACCENT_TEAL,
-                background: RgbColor(0x17, 0x1C, 0x26),
-                foreground: RgbColor(0xBF, 0xB3, 0x8F),
-                secondary_accent: ACCENT_TEAL,
-                alert: RgbColor(0xFF, 0x8A, 0x8A),
-                logo_accent: LOGO_GOLD,
+                primary_accent: PRIMARY_ACCENT,
+                background: BLUE_BACKGROUND,
+                foreground: SECONDARY_ACCENT,
+                secondary_accent: SECONDARY_ACCENT,
+                alert: ALERT_ACCENT,
+                logo_accent: PRIMARY_ACCENT,
             },
         },
     );
@@ -217,7 +219,7 @@ pub fn active_styles() -> ThemeStyles {
 
 /// Slightly darkened accent color for banner-like copy.
 pub fn banner_color() -> RgbColor {
-    WELCOME_TOOL_COLOR
+    ACTIVE.read().palette.primary_accent
 }
 
 /// Slightly darkened accent style for banner-like copy.
@@ -228,7 +230,13 @@ pub fn banner_style() -> Style {
 
 /// Muted welcome text style used for onboarding sections.
 pub fn welcome_text_style() -> Style {
-    Style::new().fg_color(Some(Color::Rgb(WELCOME_LABEL_COLOR)))
+    let guard = ACTIVE.read();
+    let blended = mix(
+        guard.palette.background,
+        guard.palette.secondary_accent,
+        f64::from(WELCOME_LABEL_ALPHA),
+    );
+    Style::new().fg_color(Some(Color::Rgb(blended)))
 }
 
 /// Emphasized welcome section headers.

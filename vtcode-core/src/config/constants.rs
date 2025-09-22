@@ -173,12 +173,6 @@ pub mod defaults {
     pub const ANTHROPIC_DEFAULT_MAX_TOKENS: u32 = 4_096;
 }
 
-/// UI configuration constants
-pub mod ui {
-    pub const INLINE_VIEWPORT_ROWS_ENV: &str = "VTCODE_INLINE_VIEWPORT_ROWS";
-    pub const INLINE_VIEWPORT_DEFAULT_ROWS: u16 = 8;
-}
-
 /// Reasoning effort configuration constants
 pub mod reasoning {
     pub const LOW: &str = "low";

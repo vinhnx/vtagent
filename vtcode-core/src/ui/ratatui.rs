@@ -13,7 +13,7 @@ use crossterm::{
 };
 use futures::StreamExt;
 use ratatui::{
-    Frame, Terminal, TerminalOptions, Viewport,
+    Frame, Terminal,
     backend::CrosstermBackend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -24,7 +24,6 @@ use ratatui::{
 };
 use serde_json::Value;
 use std::cmp;
-use std::env;
 use std::io;
 use std::mem;
 use std::time::{Duration, Instant};
@@ -262,19 +261,7 @@ async fn run_ratatui(
 ) -> Result<()> {
     let mut stdout = io::stdout();
     let backend = CrosstermBackend::new(&mut stdout);
-    let (_, rows) = crossterm::terminal::size().context("failed to query terminal size")?;
-    let default_rows = crate::config::constants::ui::INLINE_VIEWPORT_DEFAULT_ROWS.min(rows);
-    let configured_rows = env::var(crate::config::constants::ui::INLINE_VIEWPORT_ROWS_ENV)
-        .ok()
-        .and_then(|value| value.parse::<u16>().ok())
-        .filter(|value| *value > 0)
-        .map(|value| value.min(rows))
-        .unwrap_or(default_rows);
-    let options = TerminalOptions {
-        viewport: Viewport::Inline(configured_rows),
-    };
-    let mut terminal = Terminal::with_options(backend, options)
-        .context("failed to initialize ratatui terminal")?;
+    let mut terminal = Terminal::new(backend).context("failed to initialize ratatui terminal")?;
     let _guard = TerminalGuard::new().context("failed to configure terminal for ratatui")?;
     terminal
         .clear()
@@ -285,20 +272,8 @@ async fn run_ratatui(
     let mut event_stream = EventStream::new();
     let mut redraw = true;
     let mut ticker = create_ticker();
-    let minimum_rows = configured_rows.max(1);
-
     loop {
         if redraw {
-            let current_size = terminal
-                .size()
-                .context("failed to query current terminal viewport size")?;
-            let current_width = current_size.width.max(1);
-            let desired_height = app.desired_viewport_height(current_width, minimum_rows);
-            if desired_height != current_size.height {
-                terminal
-                    .resize(Rect::new(0, 0, current_width, desired_height))
-                    .context("failed to resize inline terminal viewport")?;
-            }
             terminal
                 .draw(|frame| app.draw(frame))
                 .context("failed to draw ratatui frame")?;
@@ -1307,34 +1282,6 @@ impl RatatuiLoop {
         } else {
             Ok(false)
         }
-    }
-
-    fn desired_viewport_height(&self, width: u16, minimum_rows: u16) -> u16 {
-        if width == 0 {
-            return minimum_rows;
-        }
-
-        let rendered = self.build_rendered_messages(width);
-        let mut messages_height = rendered.iter().fold(0u16, |total, message| {
-            total.saturating_add(message.height())
-        });
-        if messages_height > 0 {
-            messages_height = messages_height.saturating_add(1);
-        }
-
-        let prompt_inner_width = width.saturating_sub(2) as usize;
-        let prompt_lines = self.build_prompt_block(prompt_inner_width).0;
-        let mut prompt_height = prompt_lines.len() as u16;
-        if prompt_height == 0 {
-            prompt_height = 1;
-        }
-        prompt_height = prompt_height.saturating_add(2);
-
-        let status_height = 1u16;
-        let content_height = messages_height
-            .saturating_add(prompt_height)
-            .saturating_add(status_height);
-        content_height.max(minimum_rows)
     }
 
     fn draw(&mut self, frame: &mut Frame) {

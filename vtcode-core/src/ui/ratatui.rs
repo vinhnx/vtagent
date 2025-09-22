@@ -1043,11 +1043,6 @@ impl RatatuiLoop {
             visible_height,
         );
         frame.render_widget(ClearWidget, suggestion_area);
-        if let Some(bg) = self.theme.background {
-            let background = Block::default().style(Style::default().bg(bg));
-            frame.render_widget(background, suggestion_area);
-        }
-
         let list_items: Vec<ListItem> = entries.into_iter().map(ListItem::new).collect();
         let border_style = Style::default().fg(self.theme.primary.unwrap_or(Color::LightBlue));
         let list = List::new(list_items)
@@ -1331,20 +1326,12 @@ impl RatatuiLoop {
             return;
         }
 
-        if let Some(bg) = self.theme.background {
-            let background = Block::default().style(Style::default().bg(bg));
-            frame.render_widget(background, area);
-        }
-
         let transcript_area = area;
         self.transcript_area = Some(transcript_area);
 
         let mut base_style = Style::default();
         if let Some(fg) = self.theme.foreground {
             base_style = base_style.fg(fg);
-        }
-        if let Some(bg) = self.theme.background {
-            base_style = base_style.bg(bg);
         }
 
         let reserve_scrollbar = transcript_area.width > 1;
@@ -1773,15 +1760,11 @@ impl RatatuiLoop {
         } else {
             self.input.width_before_cursor()
         };
-        let placeholder_width = if self.show_placeholder {
-            self.placeholder_hint
-                .as_deref()
-                .map(UnicodeWidthStr::width)
-                .unwrap_or(0)
+        let cursor_width = if self.show_placeholder {
+            prefix_width
         } else {
-            0
+            prefix_width + input_width
         };
-        let cursor_width = prefix_width + input_width + placeholder_width;
         if inner_width == 0 {
             return Some((0, horizontal_padding));
         }

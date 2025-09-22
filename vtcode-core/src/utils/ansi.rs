@@ -355,12 +355,10 @@ impl RatatuiSink {
     }
 
     fn resolve_fallback_style(&self, style: Style) -> RatatuiTextStyle {
-        let mut text_style = convert_to_ratatui_style(style);
-        if text_style.color.is_none() {
-            let theme = theme_from_styles(&theme::active_styles());
-            text_style = text_style.merge_color(theme.foreground);
-        }
-        text_style
+        let theme = theme_from_styles(&theme::active_styles());
+        convert_to_ratatui_style(style)
+            .merge_color(theme.foreground)
+            .merge_background(theme.background)
     }
 
     fn merge_with_fallback(
@@ -370,15 +368,31 @@ impl RatatuiSink {
     ) -> RatatuiTextStyle {
         let mut converted = RatatuiTextStyle {
             color: span_style.fg,
+            bg_color: span_style.bg,
             bold: span_style.add_modifier.contains(RatatuiModifier::BOLD),
             italic: span_style.add_modifier.contains(RatatuiModifier::ITALIC),
+            underline: span_style
+                .add_modifier
+                .contains(RatatuiModifier::UNDERLINED),
+            strikethrough: span_style
+                .add_modifier
+                .contains(RatatuiModifier::CROSSED_OUT),
+            dim: span_style.add_modifier.contains(RatatuiModifier::DIM),
+            reversed: span_style.add_modifier.contains(RatatuiModifier::REVERSED),
         };
 
         if converted.color.is_none() {
             converted.color = fallback.color;
         }
+        if converted.bg_color.is_none() {
+            converted.bg_color = fallback.bg_color;
+        }
         converted.bold |= fallback.bold;
         converted.italic |= fallback.italic;
+        converted.underline |= fallback.underline;
+        converted.strikethrough |= fallback.strikethrough;
+        converted.dim |= fallback.dim;
+        converted.reversed |= fallback.reversed;
         converted
     }
 

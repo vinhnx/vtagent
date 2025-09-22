@@ -1,8 +1,7 @@
 use anyhow::{Context, Result};
 use futures::StreamExt;
-use std::collections::BTreeSet;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
 use tokio::sync::Notify;
 use tokio::sync::mpsc::UnboundedReceiver;
@@ -15,7 +14,7 @@ use vtcode_core::config::types::AgentConfig as CoreAgentConfig;
 use vtcode_core::core::decision_tracker::{Action as DTAction, DecisionOutcome};
 use vtcode_core::core::router::{Router, TaskClass};
 use vtcode_core::llm::error_display;
-use vtcode_core::llm::provider::{self as uni, LLMStreamEvent, MessageRole};
+use vtcode_core::llm::provider::{self as uni, LLMStreamEvent};
 use vtcode_core::tools::registry::{ToolErrorType, ToolExecutionError, ToolPermissionDecision};
 use vtcode_core::ui::ratatui::{
     RatatuiEvent, RatatuiHandle, convert_style as convert_ratatui_style, spawn_session,
@@ -38,52 +37,6 @@ use crate::agent::runloop::ui::render_session_banner;
 use super::display::{display_user_message, ensure_turn_bottom_gap, persist_theme_preference};
 use super::session_setup::{SessionState, initialize_session};
 use super::shell::{derive_recent_tool_output, should_short_circuit_shell};
-
-#[derive(Default)]
-struct SessionStats {
-    tools: BTreeSet<String>,
-}
-
-impl SessionStats {
-    fn record_tool(&mut self, name: &str) {
-        self.tools.insert(name.to_string());
-    }
-
-    fn render_summary(&self, renderer: &mut AnsiRenderer, history: &[uni::Message]) -> Result<()> {
-        let total_chars: usize = history.iter().map(|msg| msg.content.chars().count()).sum();
-        let approx_tokens = (total_chars + 3) / 4;
-        let user_turns = history
-            .iter()
-            .filter(|msg| matches!(msg.role, MessageRole::User))
-            .count();
-        let assistant_turns = history
-            .iter()
-            .filter(|msg| matches!(msg.role, MessageRole::Assistant))
-            .count();
-
-        renderer.line_if_not_empty(MessageStyle::Info)?;
-        renderer.line(MessageStyle::Info, "Session summary")?;
-        renderer.line(
-            MessageStyle::Output,
-            &format!(
-                "   * User turns: {} · Agent turns: {} · ~{} tokens",
-                user_turns, assistant_turns, approx_tokens
-            ),
-        )?;
-        if self.tools.is_empty() {
-            renderer.line(MessageStyle::Output, "   * Tools used: none")?;
-        } else {
-            let joined = self.tools.iter().cloned().collect::<Vec<_>>().join(", ");
-            renderer.line(
-                MessageStyle::Output,
-                &format!("   * Tools used: {}", joined),
-            )?;
-        }
-        renderer.line(MessageStyle::Info, "Goodbye!")?;
-
-        Ok(())
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HitlDecision {
@@ -251,6 +204,8 @@ fn apply_prompt_style(handle: &RatatuiHandle) {
 
 const PLACEHOLDER_SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
+static ACTIVE_PLACEHOLDER_SPINNERS: AtomicUsize = AtomicUsize::new(0);
+
 struct PlaceholderSpinner {
     handle: RatatuiHandle,
     restore_hint: Option<String>,
@@ -269,6 +224,10 @@ impl PlaceholderSpinner {
         let spinner_active = active.clone();
         let spinner_handle = handle.clone();
         let restore_on_stop = restore_hint.clone();
+
+        if ACTIVE_PLACEHOLDER_SPINNERS.fetch_add(1, Ordering::SeqCst) == 0 {
+            spinner_handle.set_cursor_visible(false);
+        }
 
         let task = task::spawn(async move {
             let mut index = 0usize;
@@ -292,6 +251,9 @@ impl PlaceholderSpinner {
 
     fn finish(&self) {
         if self.active.swap(false, Ordering::SeqCst) {
+            if ACTIVE_PLACEHOLDER_SPINNERS.fetch_sub(1, Ordering::SeqCst) == 1 {
+                self.handle.set_cursor_visible(true);
+            }
             self.handle.set_placeholder(self.restore_hint.clone());
         }
     }
@@ -539,11 +501,9 @@ pub(crate) async fn run_single_agent_loop_unified(
         });
     }
 
-    let mut session_stats = SessionStats::default();
     let mut events = session.events;
     loop {
         if ctrl_c_flag.load(Ordering::SeqCst) {
-            session_stats.render_summary(&mut renderer, &conversation_history)?;
             break;
         }
 
@@ -555,9 +515,7 @@ pub(crate) async fn run_single_agent_loop_unified(
         };
 
         let Some(event) = maybe_event else {
-            if ctrl_c_flag.load(Ordering::SeqCst) {
-                session_stats.render_summary(&mut renderer, &conversation_history)?;
-            }
+            if ctrl_c_flag.load(Ordering::SeqCst) {}
             break;
         };
 
@@ -575,7 +533,6 @@ pub(crate) async fn run_single_agent_loop_unified(
                 break;
             }
             RatatuiEvent::Interrupt => {
-                session_stats.render_summary(&mut renderer, &conversation_history)?;
                 break;
             }
             RatatuiEvent::ScrollLineUp
@@ -637,7 +594,6 @@ pub(crate) async fn run_single_agent_loop_unified(
                             match tool_registry.execute_tool(&name, args.clone()).await {
                                 Ok(tool_output) => {
                                     tool_spinner.finish();
-                                    session_stats.record_tool(&name);
                                     traj.log_tool_call(
                                         conversation_history.len(),
                                         &name,
@@ -666,7 +622,6 @@ pub(crate) async fn run_single_agent_loop_unified(
                             }
                         }
                         Ok(ToolPermissionFlow::Denied) => {
-                            session_stats.record_tool(&name);
                             let denial = ToolExecutionError::new(
                                 name.clone(),
                                 ToolErrorType::PolicyViolation,
@@ -682,7 +637,6 @@ pub(crate) async fn run_single_agent_loop_unified(
                             break;
                         }
                         Ok(ToolPermissionFlow::Interrupted) => {
-                            session_stats.render_summary(&mut renderer, &conversation_history)?;
                             break;
                         }
                         Err(err) => {
@@ -838,7 +792,8 @@ pub(crate) async fn run_single_agent_loop_unified(
                 retry_attempts += 1;
                 let _ = enforce_unified_context_window(&mut attempt_history, trim_config);
 
-                let use_streaming = provider_client.supports_streaming();
+                let use_streaming =
+                    provider_client.supports_streaming() && last_tool_stdout.is_none();
                 let reasoning_effort = vt_cfg.and_then(|cfg| {
                     if provider_client.supports_reasoning_effort(&active_model) {
                         Some(cfg.agent.reasoning_effort.as_str().to_string())
@@ -1028,7 +983,6 @@ pub(crate) async fn run_single_agent_loop_unified(
                             match tool_registry.execute_tool(name, args_val.clone()).await {
                                 Ok(tool_output) => {
                                     tool_spinner.finish();
-                                    session_stats.record_tool(name);
                                     traj.log_tool_call(
                                         working_history.len(),
                                         name,
@@ -1097,22 +1051,39 @@ pub(crate) async fn run_single_agent_loop_unified(
                                     );
 
                                     if should_short_circuit_shell(input, name, &args_val) {
-                                        let reply = last_tool_stdout.clone().unwrap_or_else(|| {
-                                            "Command completed successfully.".to_string()
-                                        });
-                                        renderer.line(MessageStyle::Response, &reply)?;
+                                        let command_display = args_val
+                                            .get("command")
+                                            .and_then(|value| value.as_array())
+                                            .map(|entries| {
+                                                entries
+                                                    .iter()
+                                                    .filter_map(|entry| entry.as_str())
+                                                    .collect::<Vec<_>>()
+                                                    .join(" ")
+                                            })
+                                            .filter(|cmd| !cmd.is_empty());
+                                        let summary = command_display
+                                            .map(|cmd| {
+                                                format!(
+                                                    "Command `{}` completed. See Terminal output above.",
+                                                    cmd
+                                                )
+                                            })
+                                            .unwrap_or_else(|| {
+                                                "Command completed. See Terminal output above.".to_string()
+                                            });
+                                        renderer.line(MessageStyle::Response, &summary)?;
                                         ensure_turn_bottom_gap(
                                             &mut renderer,
                                             &mut bottom_gap_applied,
                                         )?;
-                                        working_history.push(uni::Message::assistant(reply));
+                                        working_history.push(uni::Message::assistant(summary));
                                         let _ = last_tool_stdout.take();
                                         break 'outer TurnLoopResult::Completed;
                                     }
                                 }
                                 Err(error) => {
                                     tool_spinner.finish();
-                                    session_stats.record_tool(name);
                                     renderer.line(
                                         MessageStyle::Tool,
                                         &format!("Tool {} failed.", name),
@@ -1146,7 +1117,6 @@ pub(crate) async fn run_single_agent_loop_unified(
                             }
                         }
                         Ok(ToolPermissionFlow::Denied) => {
-                            session_stats.record_tool(name);
                             let denial = ToolExecutionError::new(
                                 name.to_string(),
                                 ToolErrorType::PolicyViolation,
@@ -1188,10 +1158,9 @@ pub(crate) async fn run_single_agent_loop_unified(
                                     name, err
                                 )
                             });
-                            working_history.push(uni::Message::tool_response(
-                                call.id.clone(),
-                                err_json.to_string(),
-                            ));
+                            let content = err_json.to_string();
+                            working_history
+                                .push(uni::Message::tool_response(call.id.clone(), content));
                             let _ = last_tool_stdout.take();
                             ledger.record_outcome(
                                 &dec_id,
@@ -1222,11 +1191,12 @@ pub(crate) async fn run_single_agent_loop_unified(
                 if do_review {
                     let review_system = "You are the agent's critical code reviewer. Improve clarity, correctness, and add missing test or validation guidance. Return only the improved final answer (no meta commentary).".to_string();
                     for _ in 0..review_passes {
+                        let review_prompt = format!(
+                            "Please review and refine the following response. Return only the improved response.\n\n{}",
+                            text
+                        );
                         let review_req = uni::LLMRequest {
-                            messages: vec![uni::Message::user(format!(
-                                "Please review and refine the following response. Return only the improved response.\n\n{}",
-                                text
-                            ))],
+                            messages: vec![uni::Message::user(review_prompt.clone())],
                             system_prompt: Some(review_system.clone()),
                             tools: None,
                             model: config.model.clone(),
@@ -1280,7 +1250,6 @@ pub(crate) async fn run_single_agent_loop_unified(
 
         match turn_result {
             TurnLoopResult::Cancelled => {
-                session_stats.render_summary(&mut renderer, &conversation_history)?;
                 break;
             }
             TurnLoopResult::Aborted => {

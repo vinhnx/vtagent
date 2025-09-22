@@ -45,7 +45,7 @@ pub(crate) fn render_session_banner(
     }
 
     // Add a separator line
-    renderer.line_with_style(theme::banner_style(), "")?;
+    renderer.line_with_style(theme::welcome_text_style(), "")?;
 
     let mut bullets = Vec::new();
 
@@ -92,10 +92,10 @@ pub(crate) fn render_session_banner(
     }
 
     for line in bullets {
-        renderer.line_with_style(theme::banner_style(), &line)?;
+        renderer.line_with_style(theme::welcome_text_style(), &line)?;
     }
 
-    renderer.line_with_style(theme::banner_style(), "")?;
+    renderer.line_with_style(theme::welcome_text_style(), "")?;
 
     Ok(())
 }

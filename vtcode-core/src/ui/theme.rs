@@ -9,7 +9,20 @@ pub const DEFAULT_THEME_ID: &str = "ciapre-dark";
 
 const MIN_CONTRAST: f64 = 4.5;
 
-const WELCOME_TOOL_COLOR: RgbColor = RgbColor(0xBF, 0xB3, 0x8F);
+const WELCOME_LABEL_ALPHA: f32 = 0.5;
+
+const GOLD_ACCENT: RgbColor = RgbColor(0xD9, 0x9A, 0x4E);
+const CIAPRE_SHARED_ACCENT: RgbColor = RgbColor(0x54, 0x8D, 0x8D);
+
+const CIAPRE_DARK_BACKGROUND: RgbColor = RgbColor(0x26, 0x26, 0x26);
+const CIAPRE_DARK_FOREGROUND: RgbColor = RgbColor(0xBF, 0xB3, 0x8F);
+const CIAPRE_DARK_SECONDARY: RgbColor = RgbColor(0xBF, 0xB3, 0x8F);
+const CIAPRE_DARK_ALERT: RgbColor = RgbColor(0xBF, 0x45, 0x45);
+
+const CIAPRE_BLUE_BACKGROUND: RgbColor = RgbColor(0x17, 0x1C, 0x26);
+const CIAPRE_BLUE_FOREGROUND: RgbColor = RgbColor(0xBF, 0xB3, 0x8F);
+const CIAPRE_BLUE_SECONDARY: RgbColor = RgbColor(0xBF, 0xB3, 0x8F);
+const CIAPRE_BLUE_ALERT: RgbColor = RgbColor(0xA6, 0x33, 0x33);
 
 /// Palette describing UI colors for the terminal experience.
 #[derive(Clone, Debug)]
@@ -49,12 +62,26 @@ impl ThemePalette {
             ],
         );
         let info_color = ensure_contrast(
-            secondary,
+            primary,
             background,
             MIN_CONTRAST,
-            &[lighten(secondary, 0.2), text_color, fallback_light],
+            &[
+                lighten(primary, 0.2),
+                lighten(secondary, 0.1),
+                text_color,
+                fallback_light,
+            ],
         );
-        let tool_color = WELCOME_TOOL_COLOR;
+        let tool_color = ensure_contrast(
+            self.primary_accent,
+            background,
+            MIN_CONTRAST,
+            &[
+                lighten(self.primary_accent, 0.3),
+                lighten(secondary, 0.2),
+                fallback_light,
+            ],
+        );
         let response_color = ensure_contrast(
             text_color,
             background,
@@ -136,12 +163,12 @@ static REGISTRY: Lazy<HashMap<&'static str, ThemeDefinition>> = Lazy::new(|| {
             id: "ciapre-dark",
             label: "Ciapre Dark",
             palette: ThemePalette {
-                primary_accent: RgbColor(0xBF, 0xB3, 0x8F),
-                background: RgbColor(0x26, 0x26, 0x26),
-                foreground: RgbColor(0xBF, 0xB3, 0x8F),
-                secondary_accent: RgbColor(0xD9, 0x9A, 0x4E),
-                alert: RgbColor(0xFF, 0x8A, 0x8A),
-                logo_accent: RgbColor(0xBF, 0x45, 0x45),
+                primary_accent: CIAPRE_SHARED_ACCENT,
+                background: CIAPRE_DARK_BACKGROUND,
+                foreground: CIAPRE_DARK_FOREGROUND,
+                secondary_accent: CIAPRE_DARK_SECONDARY,
+                alert: CIAPRE_DARK_ALERT,
+                logo_accent: GOLD_ACCENT,
             },
         },
     );
@@ -151,12 +178,12 @@ static REGISTRY: Lazy<HashMap<&'static str, ThemeDefinition>> = Lazy::new(|| {
             id: "ciapre-blue",
             label: "Ciapre Blue",
             palette: ThemePalette {
-                primary_accent: RgbColor(0xBF, 0xB3, 0x8F),
-                background: RgbColor(0x17, 0x1C, 0x26),
-                foreground: RgbColor(0xBF, 0xB3, 0x8F),
-                secondary_accent: RgbColor(0xBF, 0xB3, 0x8F),
-                alert: RgbColor(0xFF, 0x8A, 0x8A),
-                logo_accent: RgbColor(0xA6, 0x33, 0x33),
+                primary_accent: CIAPRE_SHARED_ACCENT,
+                background: CIAPRE_BLUE_BACKGROUND,
+                foreground: CIAPRE_BLUE_FOREGROUND,
+                secondary_accent: CIAPRE_BLUE_SECONDARY,
+                alert: CIAPRE_BLUE_ALERT,
+                logo_accent: GOLD_ACCENT,
             },
         },
     );
@@ -209,13 +236,29 @@ pub fn active_styles() -> ThemeStyles {
 
 /// Slightly darkened accent color for banner-like copy.
 pub fn banner_color() -> RgbColor {
-    WELCOME_TOOL_COLOR
+    ACTIVE.read().palette.primary_accent
 }
 
 /// Slightly darkened accent style for banner-like copy.
 pub fn banner_style() -> Style {
     let accent = logo_accent_color();
     Style::new().fg_color(Some(Color::Rgb(accent))).bold()
+}
+
+/// Muted welcome text style used for onboarding sections.
+pub fn welcome_text_style() -> Style {
+    let guard = ACTIVE.read();
+    let blended = mix(
+        guard.palette.background,
+        guard.palette.secondary_accent,
+        f64::from(WELCOME_LABEL_ALPHA),
+    );
+    Style::new().fg_color(Some(Color::Rgb(blended)))
+}
+
+/// Emphasized welcome section headers.
+pub fn welcome_header_style() -> Style {
+    welcome_text_style().bold()
 }
 
 /// Accent color for the startup banner logo.

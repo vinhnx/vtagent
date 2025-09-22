@@ -51,9 +51,9 @@ impl Styles {
         theme::active_styles().secondary.bold()
     }
 
-    /// Header style (bold blue)
+    /// Header style matching the welcome accent
     pub fn header() -> Style {
-        theme::active_styles().response
+        theme::welcome_header_style()
     }
 
     /// Code style (magenta)

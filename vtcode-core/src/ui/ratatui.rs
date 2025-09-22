@@ -7,43 +7,57 @@ use crossterm::{
     ExecutableCommand, cursor,
     event::{
         DisableMouseCapture, EnableMouseCapture, Event as CrosstermEvent, EventStream, KeyCode,
-        KeyEvent, KeyEventKind, KeyModifiers, MouseEvent, MouseEventKind,
+        KeyEvent, KeyEventKind, KeyModifiers, MouseEvent,
     },
-    terminal::{Clear, ClearType, disable_raw_mode, enable_raw_mode},
+    terminal::{Clear, ClearType, disable_raw_mode, enable_raw_mode, size},
 };
 use futures::StreamExt;
 use ratatui::{
     Frame, Terminal, TerminalOptions, Viewport,
     backend::CrosstermBackend,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{
-        Block, Borders, Clear as ClearWidget, List, ListItem, ListState, Paragraph, Scrollbar,
-        ScrollbarOrientation, ScrollbarState,
-    },
+    widgets::{Block, Borders, Clear as ClearWidget, List, ListItem, ListState, Paragraph, Wrap},
 };
 use serde_json::Value;
 use std::cmp;
+use std::env;
 use std::io;
 use std::mem;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::time::{Interval, MissedTickBehavior, interval};
-use tui_term::vt100::Parser as VtParser;
-use tui_term::widget::{Cursor as TermCursor, PseudoTerminal};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 const ESCAPE_DOUBLE_MS: u64 = 750;
 const REDRAW_INTERVAL_MS: u64 = 33;
 const MESSAGE_INDENT: usize = 2;
-const NAVIGATION_HINT_TEXT: &str = "Scroll ↑/↓ · PgUp/PgDn Page · Enter Submit · Esc Cancel";
+const INLINE_VIEWPORT_ENV_KEY: &str = "VTCODE_INLINE_VIEWPORT_ROWS";
+const DEFAULT_INLINE_VIEWPORT_ROWS: u16 = 8;
 
+fn inline_viewport_rows() -> u16 {
+    env::var(INLINE_VIEWPORT_ENV_KEY)
+        .ok()
+        .and_then(|value| value.parse::<u16>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(DEFAULT_INLINE_VIEWPORT_ROWS)
+}
+
+fn current_terminal_width() -> u16 {
+    let width = size().map(|(columns, _)| columns).unwrap_or(80);
+    width.max(1)
+}
 #[derive(Clone, Default)]
 pub struct RatatuiTextStyle {
     pub color: Option<Color>,
+    pub bg_color: Option<Color>,
     pub bold: bool,
     pub italic: bool,
+    pub underline: bool,
+    pub strikethrough: bool,
+    pub dim: bool,
+    pub reversed: bool,
 }
 
 impl RatatuiTextStyle {
@@ -54,16 +68,38 @@ impl RatatuiTextStyle {
         self
     }
 
+    pub fn merge_background(mut self, fallback: Option<Color>) -> Self {
+        if self.bg_color.is_none() {
+            self.bg_color = fallback;
+        }
+        self
+    }
+
     fn to_style(&self, fallback: Option<Color>) -> Style {
         let mut style = Style::default();
         if let Some(color) = self.color.or(fallback) {
             style = style.fg(color);
+        }
+        if let Some(bg) = self.bg_color {
+            style = style.bg(bg);
         }
         if self.bold {
             style = style.add_modifier(Modifier::BOLD);
         }
         if self.italic {
             style = style.add_modifier(Modifier::ITALIC);
+        }
+        if self.underline {
+            style = style.add_modifier(Modifier::UNDERLINED);
+        }
+        if self.strikethrough {
+            style = style.add_modifier(Modifier::CROSSED_OUT);
+        }
+        if self.dim {
+            style = style.add_modifier(Modifier::DIM);
+        }
+        if self.reversed {
+            style = style.add_modifier(Modifier::REVERSED);
         }
         style
     }
@@ -154,6 +190,9 @@ pub enum RatatuiCommand {
         center: Option<String>,
         right: Option<String>,
     },
+    SetCursorVisibility {
+        visible: bool,
+    },
     Shutdown,
 }
 
@@ -213,6 +252,12 @@ impl RatatuiHandle {
         let _ = self.sender.send(RatatuiCommand::SetPlaceholder { hint });
     }
 
+    pub fn set_cursor_visible(&self, visible: bool) {
+        let _ = self
+            .sender
+            .send(RatatuiCommand::SetCursorVisibility { visible });
+    }
+
     pub fn set_theme(&self, theme: RatatuiTheme) {
         let _ = self.sender.send(RatatuiCommand::SetTheme { theme });
     }
@@ -264,9 +309,8 @@ async fn run_ratatui(
 ) -> Result<()> {
     let mut stdout = io::stdout();
     let backend = CrosstermBackend::new(&mut stdout);
-    let (_, rows) = crossterm::terminal::size().context("failed to query terminal size")?;
     let options = TerminalOptions {
-        viewport: Viewport::Inline(rows),
+        viewport: Viewport::Inline(inline_viewport_rows()),
     };
     let mut terminal = Terminal::with_options(backend, options)
         .context("failed to initialize ratatui terminal")?;
@@ -276,13 +320,21 @@ async fn run_ratatui(
         .context("failed to clear terminal for ratatui")?;
 
     let mut app = RatatuiLoop::new(theme, placeholder);
+    app.set_mouse_capture(true)
+        .context("failed to enable mouse capture for ratatui session")?;
     let mut command_rx = commands;
     let mut event_stream = EventStream::new();
     let mut redraw = true;
     let mut ticker = create_ticker();
-
     loop {
         if redraw {
+            let width = current_terminal_width();
+            app.prepare_display(width);
+            let height = app.prepared_display_height().max(1).min(u16::MAX as usize) as u16;
+            let viewport = Rect::new(0, 0, width, height);
+            terminal
+                .resize(viewport)
+                .context("failed to resize inline terminal viewport")?;
             terminal
                 .draw(|frame| app.draw(frame))
                 .context("failed to draw ratatui frame")?;
@@ -302,9 +354,7 @@ async fn run_ratatui(
                 match event {
                     Some(Ok(evt)) => {
                         if matches!(evt, CrosstermEvent::Resize(_, _)) {
-                            terminal
-                                .autoresize()
-                                .context("failed to autoresize terminal viewport")?;
+                            redraw = true;
                         }
                         if app.handle_event(evt, &events)? {
                             redraw = true;
@@ -348,9 +398,6 @@ impl TerminalGuard {
         stdout
             .execute(cursor::Hide)
             .context("failed to hide cursor")?;
-        stdout
-            .execute(EnableMouseCapture)
-            .context("failed to enable mouse capture")?;
         Ok(Self)
     }
 }
@@ -456,116 +503,20 @@ impl InputState {
     }
 }
 
-#[derive(Default)]
-struct TranscriptScrollState {
-    offset: usize,
-    viewport_height: usize,
-    content_height: usize,
-}
-
-impl TranscriptScrollState {
-    fn offset(&self) -> usize {
-        self.offset
-    }
-
-    fn update_bounds(&mut self, content_height: usize, viewport_height: usize) {
-        self.content_height = content_height;
-        self.viewport_height = viewport_height;
-        let max_offset = self.max_offset();
-        if self.offset > max_offset {
-            self.offset = max_offset;
-        }
-    }
-
-    fn scroll_to_bottom(&mut self) {
-        self.offset = self.max_offset();
-    }
-
-    fn scroll_up(&mut self) {
-        if self.offset > 0 {
-            self.offset -= 1;
-        }
-    }
-
-    fn scroll_down(&mut self) {
-        let max_offset = self.max_offset();
-        if self.offset < max_offset {
-            self.offset += 1;
-        }
-    }
-
-    fn scroll_page_up(&mut self) {
-        if self.offset == 0 {
-            return;
-        }
-        let step = self.viewport_height.max(1);
-        self.offset = self.offset.saturating_sub(step);
-    }
-
-    fn scroll_page_down(&mut self) {
-        let max_offset = self.max_offset();
-        if self.offset >= max_offset {
-            return;
-        }
-        let step = self.viewport_height.max(1);
-        self.offset = (self.offset + step).min(max_offset);
-    }
-
-    fn max_offset(&self) -> usize {
-        if self.content_height <= self.viewport_height {
-            0
-        } else {
-            self.content_height - self.viewport_height
-        }
-    }
-
-    fn content_height(&self) -> usize {
-        self.content_height
-    }
-
-    fn viewport_height(&self) -> usize {
-        self.viewport_height
-    }
-
-    fn has_overflow(&self) -> bool {
-        self.content_height > self.viewport_height
-    }
-}
-
 #[derive(Clone)]
 struct MessageBlock {
     kind: RatatuiMessageKind,
     lines: Vec<StyledLine>,
     timestamp: Option<String>,
+    pty_command: Option<String>,
 }
 
-#[derive(Clone, Default)]
-struct StatusBarContent {
-    left: String,
-    center: String,
-    right: String,
-}
-
-impl StatusBarContent {
-    fn new() -> Self {
-        Self {
-            left: "Type 'exit' to quit · '?' help · '/' commands".to_string(),
-            center: String::new(),
-            right: NAVIGATION_HINT_TEXT.to_string(),
-        }
-    }
-
-    fn update(&mut self, left: Option<String>, center: Option<String>, right: Option<String>) {
-        if let Some(value) = left {
-            self.left = value;
-        }
-        if let Some(value) = center {
-            self.center = value;
-        }
-        if let Some(value) = right {
-            self.right = value;
-        }
-    }
+struct TranscriptDisplay {
+    lines: Vec<Line<'static>>,
+    total_height: usize,
+    cursor: Option<(usize, usize)>,
+    prompt_start: usize,
+    prompt_height: usize,
 }
 
 #[derive(Default)]
@@ -645,119 +596,6 @@ impl SlashSuggestionState {
     }
 }
 
-struct PtyPanel {
-    parser: VtParser,
-    command: Option<Vec<String>>,
-    dirty: bool,
-}
-
-impl PtyPanel {
-    fn new() -> Self {
-        Self {
-            parser: VtParser::new(24, 80, 200),
-            command: None,
-            dirty: false,
-        }
-    }
-
-    fn reset_output(&mut self) {
-        self.parser = VtParser::new(24, 80, 200);
-        self.dirty = false;
-    }
-
-    fn clear(&mut self) {
-        self.reset_output();
-        self.command = None;
-    }
-
-    fn set_command(&mut self, command: Vec<String>) {
-        self.reset_output();
-        self.command = Some(command);
-    }
-
-    fn push_line(&mut self, text: &str) {
-        if text.is_empty() {
-            return;
-        }
-        let mut bytes = text.as_bytes().to_vec();
-        if !text.ends_with('\n') {
-            bytes.push(b'\n');
-        }
-        self.parser.process(&bytes);
-        self.dirty = true;
-    }
-
-    fn push_inline(&mut self, text: &str) {
-        if text.is_empty() {
-            return;
-        }
-        self.parser.process(text.as_bytes());
-        self.dirty = true;
-    }
-
-    fn has_content(&self) -> bool {
-        self.command.is_some() || self.dirty
-    }
-
-    fn ensure_size(&mut self, rows: u16, cols: u16) {
-        if rows == 0 || cols == 0 {
-            return;
-        }
-        if self.parser.screen().size() != (rows, cols) {
-            self.parser.set_size(rows, cols);
-        }
-    }
-
-    fn info_height(&self) -> u16 {
-        self.command
-            .as_ref()
-            .map(|cmd| if cmd.len() > 1 { 2 } else { 1 })
-            .unwrap_or(0)
-    }
-
-    fn desired_height(&self, total_height: u16) -> u16 {
-        if total_height <= 3 || !self.has_content() {
-            return 0;
-        }
-        let info = self.info_height();
-        let (rows, cols) = self.parser.screen().size();
-        let used = self
-            .parser
-            .screen()
-            .rows(0, cols)
-            .take(rows as usize)
-            .filter(|row| !row.trim().is_empty())
-            .count() as u16;
-        let base_rows = used.max(3).min(rows);
-        let mut desired = base_rows.saturating_add(info).saturating_add(2);
-        let max_allowed = total_height.saturating_sub(1);
-        if desired > max_allowed {
-            desired = cmp::max(info + 3, max_allowed);
-        }
-        desired
-    }
-
-    fn command_lines(&self) -> Option<(String, Option<String>)> {
-        let command = self.command.as_ref()?;
-        if command.is_empty() {
-            return None;
-        }
-        let program = command[0].clone();
-        let args = if command.len() > 1 {
-            Some(command[1..].join(" "))
-        } else {
-            None
-        };
-        Some((program, args))
-    }
-}
-
-struct TranscriptDisplay {
-    lines: Vec<Line<'static>>,
-    total_height: usize,
-    cursor: Option<(usize, usize)>,
-}
-
 struct RatatuiLoop {
     messages: Vec<MessageBlock>,
     current_line: StyledLine,
@@ -771,12 +609,11 @@ struct RatatuiLoop {
     should_exit: bool,
     theme: RatatuiTheme,
     last_escape: Option<Instant>,
-    scroll_state: TranscriptScrollState,
-    needs_autoscroll: bool,
-    transcript_area: Option<Rect>,
     slash_suggestions: SlashSuggestionState,
-    pty_panel: Option<PtyPanel>,
-    status_bar: StatusBarContent,
+    mouse_capture_enabled: bool,
+    pending_pty_command: Option<String>,
+    cursor_visible: bool,
+    prepared_display: Option<TranscriptDisplay>,
 }
 
 impl RatatuiLoop {
@@ -794,12 +631,11 @@ impl RatatuiLoop {
             should_exit: false,
             theme,
             last_escape: None,
-            scroll_state: TranscriptScrollState::default(),
-            needs_autoscroll: true,
-            transcript_area: None,
             slash_suggestions: SlashSuggestionState::default(),
-            pty_panel: None,
-            status_bar: StatusBarContent::new(),
+            mouse_capture_enabled: false,
+            pending_pty_command: None,
+            cursor_visible: true,
+            prepared_display: None,
         }
     }
 
@@ -811,6 +647,30 @@ impl RatatuiLoop {
         false
     }
 
+    fn set_mouse_capture(&mut self, enabled: bool) -> Result<()> {
+        if self.mouse_capture_enabled == enabled {
+            return Ok(());
+        }
+
+        let mut stdout = io::stdout();
+        if enabled {
+            stdout
+                .execute(EnableMouseCapture)
+                .context("failed to enable mouse capture")?;
+        } else {
+            stdout
+                .execute(DisableMouseCapture)
+                .context("failed to disable mouse capture")?;
+        }
+        self.mouse_capture_enabled = enabled;
+        Ok(())
+    }
+
+    fn toggle_mouse_capture(&mut self) -> Result<()> {
+        let enabled = !self.mouse_capture_enabled;
+        self.set_mouse_capture(enabled)
+    }
+
     fn handle_command(&mut self, command: RatatuiCommand) -> bool {
         match command {
             RatatuiCommand::AppendLine { kind, segments } => {
@@ -819,29 +679,16 @@ impl RatatuiLoop {
                 let was_active = self.current_active;
                 self.flush_current_line(was_active);
                 self.push_line(kind, StyledLine { segments });
-                self.forward_pty_line(kind, &plain);
-                self.needs_autoscroll = true;
                 true
             }
             RatatuiCommand::Inline { kind, segment } => {
-                let plain = segment.text.clone();
-                self.forward_pty_inline(kind, &plain);
                 self.append_inline_segment(kind, segment);
-                self.needs_autoscroll = true;
                 true
             }
             RatatuiCommand::ReplaceLast { count, kind, lines } => {
                 let was_active = self.current_active;
                 self.flush_current_line(was_active);
-                if kind == RatatuiMessageKind::Pty {
-                    if let Some(panel) = self.pty_panel.as_mut() {
-                        panel.reset_output();
-                        for segments in &lines {
-                            let plain = Self::collect_plain_text(segments);
-                            panel.push_line(&plain);
-                        }
-                    }
-                } else if kind == RatatuiMessageKind::Tool {
+                if kind == RatatuiMessageKind::Tool {
                     if let Some(first_line) = lines.first() {
                         let plain = Self::collect_plain_text(first_line);
                         self.track_pty_metadata(kind, &plain);
@@ -851,7 +698,6 @@ impl RatatuiLoop {
                 for segments in lines {
                     self.push_line(kind, StyledLine { segments });
                 }
-                self.needs_autoscroll = true;
                 true
             }
             RatatuiCommand::SetPrompt { prefix, style } => {
@@ -868,13 +714,11 @@ impl RatatuiLoop {
                 self.theme = theme;
                 true
             }
-            RatatuiCommand::UpdateStatusBar {
-                left,
-                center,
-                right,
-            } => {
-                self.status_bar.update(left, center, right);
-                true
+            RatatuiCommand::UpdateStatusBar { .. } => false,
+            RatatuiCommand::SetCursorVisibility { visible } => {
+                let changed = self.cursor_visible != visible;
+                self.cursor_visible = visible;
+                changed
             }
             RatatuiCommand::Shutdown => {
                 self.should_exit = true;
@@ -973,7 +817,6 @@ impl RatatuiLoop {
         self.input.value = value;
         self.input.cursor = self.input.value.len();
         self.update_input_state();
-        self.needs_autoscroll = true;
     }
 
     fn apply_selected_suggestion(&mut self) -> bool {
@@ -1004,6 +847,9 @@ impl RatatuiLoop {
     fn push_line(&mut self, kind: RatatuiMessageKind, line: StyledLine) {
         if let Some(block) = self.messages.last_mut() {
             if block.kind == kind {
+                if kind == RatatuiMessageKind::Pty && block.pty_command.is_none() {
+                    block.pty_command = self.pending_pty_command.clone();
+                }
                 block.lines.push(line);
                 return;
             }
@@ -1018,6 +864,11 @@ impl RatatuiLoop {
             kind,
             lines: vec![line],
             timestamp,
+            pty_command: if kind == RatatuiMessageKind::Pty {
+                self.pending_pty_command.clone()
+            } else {
+                None
+            },
         });
     }
 
@@ -1038,13 +889,6 @@ impl RatatuiLoop {
         }
     }
 
-    fn ensure_pty_panel(&mut self) -> &mut PtyPanel {
-        if self.pty_panel.is_none() {
-            self.pty_panel = Some(PtyPanel::new());
-        }
-        self.pty_panel.as_mut().expect("pty_panel must exist")
-    }
-
     fn track_pty_metadata(&mut self, kind: RatatuiMessageKind, plain: &str) {
         if kind != RatatuiMessageKind::Tool {
             return;
@@ -1054,13 +898,10 @@ impl RatatuiLoop {
             let command_text = rest.trim_start();
             if let Some(json_part) = command_text.strip_prefix("run_terminal_cmd") {
                 if let Some(command) = Self::parse_run_command(json_part.trim()) {
-                    let panel = self.ensure_pty_panel();
-                    panel.set_command(command);
+                    self.pending_pty_command = Some(command.join(" "));
                 }
-            } else if let Some(panel) = self.pty_panel.as_mut() {
-                if !command_text.starts_with('[') {
-                    panel.clear();
-                }
+            } else if !command_text.starts_with('[') {
+                self.pending_pty_command = None;
             }
         }
     }
@@ -1078,24 +919,6 @@ impl RatatuiLoop {
             None
         } else {
             Some(command)
-        }
-    }
-
-    fn forward_pty_line(&mut self, kind: RatatuiMessageKind, text: &str) {
-        if kind != RatatuiMessageKind::Pty {
-            return;
-        }
-        if let Some(panel) = self.pty_panel.as_mut() {
-            panel.push_line(text);
-        }
-    }
-
-    fn forward_pty_inline(&mut self, kind: RatatuiMessageKind, text: &str) {
-        if kind != RatatuiMessageKind::Pty {
-            return;
-        }
-        if let Some(panel) = self.pty_panel.as_mut() {
-            panel.push_inline(text);
         }
     }
 
@@ -1157,80 +980,33 @@ impl RatatuiLoop {
             visible_height,
         );
         frame.render_widget(ClearWidget, suggestion_area);
-
+        if let Some(bg) = self.theme.background {
+            let fill = Block::default().style(Style::default().bg(bg));
+            frame.render_widget(fill, suggestion_area);
+        }
         let list_items: Vec<ListItem> = entries.into_iter().map(ListItem::new).collect();
-        let border_style = Style::default().fg(self.theme.primary.unwrap_or(Color::LightBlue));
+        let accent = self.theme.primary.unwrap_or(Color::LightBlue);
+        let mut list_style = Style::default();
+        if let Some(fg) = self.theme.foreground {
+            list_style = list_style.fg(fg);
+        }
+        if let Some(bg) = self.theme.background {
+            list_style = list_style.bg(bg);
+        }
+        let border_style = Style::default().fg(accent);
         let list = List::new(list_items)
             .block(
                 Block::default()
-                    .title(Line::from("? help · / commands"))
+                    .title(Line::from(vec![Span::styled(
+                        "? help · / commands",
+                        border_style.clone(),
+                    )]))
                     .borders(Borders::ALL)
                     .border_style(border_style),
             )
-            .highlight_style(
-                Style::default()
-                    .fg(self.theme.primary.unwrap_or(Color::LightBlue))
-                    .add_modifier(Modifier::BOLD),
-            );
+            .highlight_style(Style::default().fg(accent).add_modifier(Modifier::BOLD))
+            .style(list_style);
         frame.render_stateful_widget(list, suggestion_area, self.slash_suggestions.list_state());
-    }
-
-    fn render_pty_panel(&mut self, frame: &mut Frame, area: Rect) {
-        let Some(panel) = self.pty_panel.as_mut() else {
-            return;
-        };
-        if !panel.has_content() {
-            return;
-        }
-        if area.height <= 2 || area.width <= 3 {
-            return;
-        }
-
-        frame.render_widget(ClearWidget, area);
-        let info_height = panel.info_height();
-        let (info_area, term_area) = if info_height > 0 && area.height > info_height {
-            let splits = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Length(info_height), Constraint::Min(2)])
-                .split(area);
-            (Some(splits[0]), splits[1])
-        } else {
-            (None, area)
-        };
-
-        if let Some(info_area) = info_area {
-            if let Some((program, args)) = panel.command_lines() {
-                let mut lines = vec![Line::from(format!("Command: {program}"))];
-                if let Some(args) = args {
-                    lines.push(Line::from(format!("Args: {args}")));
-                }
-                let info_style =
-                    Style::default().fg(self.theme.secondary.unwrap_or(Color::LightCyan));
-                let info = Paragraph::new(lines).style(info_style);
-                frame.render_widget(info, info_area);
-            }
-        }
-
-        if term_area.height <= 2 || term_area.width <= 3 {
-            return;
-        }
-        let inner_height = term_area.height.saturating_sub(2).max(1);
-        let inner_width = term_area.width.saturating_sub(2).max(1);
-        panel.ensure_size(inner_height, inner_width);
-
-        let border_style = Style::default().fg(self.theme.secondary.unwrap_or(Color::LightCyan));
-        let cursor = TermCursor::default().visibility(false);
-        let terminal_style = Style::default().fg(self.theme.foreground.unwrap_or(Color::Gray));
-        let widget = PseudoTerminal::new(panel.parser.screen())
-            .block(
-                Block::default()
-                    .title("PTY")
-                    .borders(Borders::ALL)
-                    .border_style(border_style),
-            )
-            .cursor(cursor)
-            .style(terminal_style);
-        frame.render_widget(widget, term_area);
     }
 
     fn handle_event(
@@ -1240,10 +1016,7 @@ impl RatatuiLoop {
     ) -> Result<bool> {
         match event {
             CrosstermEvent::Key(key) => self.handle_key_event(key, events),
-            CrosstermEvent::Resize(_, _) => {
-                self.needs_autoscroll = true;
-                Ok(true)
-            }
+            CrosstermEvent::Resize(_, _) => Ok(true),
             CrosstermEvent::Mouse(mouse) => self.handle_mouse_event(mouse, events),
             CrosstermEvent::FocusGained | CrosstermEvent::FocusLost | CrosstermEvent::Paste(_) => {
                 Ok(false)
@@ -1296,7 +1069,14 @@ impl RatatuiLoop {
                 self.update_input_state();
                 self.last_escape = None;
                 let _ = events.send(RatatuiEvent::Submit(text));
-                self.needs_autoscroll = true;
+                Ok(true)
+            }
+            KeyCode::Char('m')
+                if key
+                    .modifiers
+                    .contains(KeyModifiers::CONTROL | KeyModifiers::SHIFT) =>
+            {
+                self.toggle_mouse_capture()?;
                 Ok(true)
             }
             KeyCode::Esc => {
@@ -1341,45 +1121,35 @@ impl RatatuiLoop {
                 }
                 Ok(true)
             }
-            KeyCode::Char('l') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.scroll_state.scroll_to_bottom();
-                self.needs_autoscroll = true;
-                Ok(true)
-            }
+            KeyCode::Char('l') if key.modifiers.contains(KeyModifiers::CONTROL) => Ok(true),
             KeyCode::Char('?') if key.modifiers.is_empty() => {
                 self.set_input_text("/help".to_string());
                 Ok(true)
             }
             KeyCode::PageUp => {
-                let handled = self.scroll_page_up();
                 let _ = events.send(RatatuiEvent::ScrollPageUp);
-                Ok(handled)
+                Ok(true)
             }
             KeyCode::PageDown => {
-                let handled = self.scroll_page_down();
                 let _ = events.send(RatatuiEvent::ScrollPageDown);
-                Ok(handled)
+                Ok(true)
             }
             KeyCode::Up => {
-                let handled = self.scroll_line_up();
                 let _ = events.send(RatatuiEvent::ScrollLineUp);
-                Ok(handled)
+                Ok(true)
             }
             KeyCode::Down => {
-                let handled = self.scroll_line_down();
                 let _ = events.send(RatatuiEvent::ScrollLineDown);
-                Ok(handled)
+                Ok(true)
             }
             KeyCode::Backspace => {
                 self.input.backspace();
                 self.update_input_state();
-                self.needs_autoscroll = true;
                 Ok(true)
             }
             KeyCode::Delete => {
                 self.input.delete();
                 self.update_input_state();
-                self.needs_autoscroll = true;
                 Ok(true)
             }
             KeyCode::Left => {
@@ -1408,80 +1178,36 @@ impl RatatuiLoop {
                 self.input.insert(ch);
                 self.update_input_state();
                 self.last_escape = None;
-                self.needs_autoscroll = true;
                 Ok(true)
             }
             _ => Ok(false),
         }
     }
 
-    fn scroll_with<F>(&mut self, mut apply: F) -> bool
-    where
-        F: FnMut(&mut TranscriptScrollState),
-    {
-        let before = self.scroll_state.offset();
-        apply(&mut self.scroll_state);
-        let changed = self.scroll_state.offset() != before;
-        if changed {
-            self.needs_autoscroll = false;
-        }
-        changed
+    fn prepare_display(&mut self, width: u16) {
+        let computed = self.build_display(width);
+        self.prepared_display = Some(computed);
     }
 
-    fn scroll_line_up(&mut self) -> bool {
-        self.scroll_with(|state| state.scroll_up())
+    fn prepared_display_height(&self) -> usize {
+        self.prepared_display
+            .as_ref()
+            .map(|display| display.total_height)
+            .unwrap_or(0)
     }
 
-    fn scroll_line_down(&mut self) -> bool {
-        self.scroll_with(|state| state.scroll_down())
-    }
-
-    fn scroll_page_up(&mut self) -> bool {
-        self.scroll_with(|state| state.scroll_page_up())
-    }
-
-    fn scroll_page_down(&mut self) -> bool {
-        self.scroll_with(|state| state.scroll_page_down())
-    }
-
-    fn is_in_transcript_area(&self, column: u16, row: u16) -> bool {
-        self.transcript_area
-            .map(|area| {
-                let within_x = column >= area.x && column < area.x.saturating_add(area.width);
-                let within_y = row >= area.y && row < area.y.saturating_add(area.height);
-                within_x && within_y
-            })
-            .unwrap_or(false)
+    fn take_prepared_display(&mut self, width: u16) -> TranscriptDisplay {
+        self.prepared_display
+            .take()
+            .unwrap_or_else(|| self.build_display(width))
     }
 
     fn handle_mouse_event(
         &mut self,
-        mouse: MouseEvent,
-        events: &UnboundedSender<RatatuiEvent>,
+        _mouse: MouseEvent,
+        _events: &UnboundedSender<RatatuiEvent>,
     ) -> Result<bool> {
-        if !self.is_in_transcript_area(mouse.column, mouse.row) {
-            return Ok(false);
-        }
-
-        let handled = match mouse.kind {
-            MouseEventKind::ScrollUp => {
-                let scrolled = self.scroll_line_up();
-                if scrolled {
-                    let _ = events.send(RatatuiEvent::ScrollLineUp);
-                }
-                scrolled
-            }
-            MouseEventKind::ScrollDown => {
-                let scrolled = self.scroll_line_down();
-                if scrolled {
-                    let _ = events.send(RatatuiEvent::ScrollLineDown);
-                }
-                scrolled
-            }
-            _ => false,
-        };
-
-        Ok(handled)
+        Ok(false)
     }
 
     fn draw(&mut self, frame: &mut Frame) {
@@ -1490,155 +1216,51 @@ impl RatatuiLoop {
             return;
         }
 
-        let (body_area, status_area) = if area.height > 1 {
-            let segments = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Min(1), Constraint::Length(1)])
-                .split(area);
-            (segments[0], Some(segments[1]))
-        } else {
-            (area, None)
-        };
+        frame.render_widget(ClearWidget, area);
 
-        let (transcript_area, pty_area) = if let Some(panel) = self.pty_panel.as_ref() {
-            if panel.has_content() {
-                let desired = panel.desired_height(body_area.height);
-                if desired > 0 && body_area.height > desired {
-                    let segments = Layout::default()
-                        .direction(Direction::Vertical)
-                        .constraints([Constraint::Min(1), Constraint::Length(desired)])
-                        .split(body_area);
-                    (segments[0], Some(segments[1]))
-                } else {
-                    (body_area, None)
+        let mut base_style = Style::default();
+        if let Some(fg) = self.theme.foreground {
+            base_style = base_style.fg(fg);
+        }
+        if let Some(bg) = self.theme.background {
+            base_style = base_style.bg(bg);
+            let background = Block::default().style(Style::default().bg(bg));
+            frame.render_widget(background, area);
+        }
+
+        let display = self.take_prepared_display(area.width);
+        let paragraph = Paragraph::new(display.lines.clone())
+            .alignment(Alignment::Left)
+            .wrap(Wrap { trim: false })
+            .style(base_style.clone());
+
+        frame.render_widget(paragraph, area);
+
+        if self.cursor_visible {
+            if let Some((row, col)) = display.cursor {
+                let mut cursor_x = area.x + col as u16;
+                let mut cursor_y = area.y + row as u16;
+                let max_x = area.x + area.width.saturating_sub(1);
+                let max_y = area.y + area.height.saturating_sub(1);
+                if cursor_x > max_x {
+                    cursor_x = max_x;
                 }
-            } else {
-                (body_area, None)
-            }
-        } else {
-            (body_area, None)
-        };
-
-        self.transcript_area = Some(transcript_area);
-
-        let reserve_scrollbar = transcript_area.width > 1;
-        let text_width = if reserve_scrollbar {
-            transcript_area.width.saturating_sub(1)
-        } else {
-            transcript_area.width
-        };
-
-        let display = self.build_display(text_width);
-        let viewport_height = usize::from(transcript_area.height);
-        self.scroll_state
-            .update_bounds(display.total_height, viewport_height);
-        if self.needs_autoscroll {
-            self.scroll_state.scroll_to_bottom();
-        }
-
-        let offset = self.scroll_state.offset();
-        let mut paragraph = Paragraph::new(display.lines.clone()).alignment(Alignment::Left);
-        if offset > 0 {
-            paragraph = paragraph.scroll((offset as u16, 0));
-        }
-
-        let style = self
-            .theme
-            .foreground
-            .map(|fg| Style::default().fg(fg))
-            .unwrap_or_default();
-        paragraph = paragraph.style(style);
-
-        let (text_area, scrollbar_area) = if reserve_scrollbar {
-            let chunks = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Length(text_width), Constraint::Length(1)])
-                .split(transcript_area);
-            (chunks[0], Some(chunks[1]))
-        } else {
-            (transcript_area, None)
-        };
-
-        frame.render_widget(paragraph, text_area);
-        self.render_slash_suggestions(frame, text_area);
-
-        if let Some(scroll_area) = scrollbar_area {
-            if self.scroll_state.has_overflow() && scroll_area.width > 0 {
-                let mut scrollbar_state = ScrollbarState::new(self.scroll_state.content_height())
-                    .viewport_content_length(self.scroll_state.viewport_height())
-                    .position(self.scroll_state.offset());
-                let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight);
-                frame.render_stateful_widget(scrollbar, scroll_area, &mut scrollbar_state);
+                if cursor_y > max_y {
+                    cursor_y = max_y;
+                }
+                frame.set_cursor_position((cursor_x, cursor_y));
             }
         }
 
-        if let Some((row, col)) = display.cursor {
-            if row >= offset {
-                let visible_row = row - offset;
-                if visible_row < viewport_height {
-                    let cursor_x = text_area.x + col as u16;
-                    let cursor_y = text_area.y + visible_row as u16;
-                    frame.set_cursor_position((cursor_x, cursor_y));
-                }
-            }
+        if display.prompt_height > 0 {
+            let prompt_area = Rect::new(
+                area.x,
+                area.y + display.prompt_start as u16,
+                area.width,
+                display.prompt_height as u16,
+            );
+            self.render_slash_suggestions(frame, prompt_area);
         }
-
-        if let Some(status_area) = status_area {
-            if status_area.width > 0 {
-                let left_text = self.status_bar.left.clone();
-                let center_text = self.status_bar.center.clone();
-                let right_text = self.status_bar.right.clone();
-
-                let mut left_len = UnicodeWidthStr::width(left_text.as_str()) as u16;
-                let mut right_len = UnicodeWidthStr::width(right_text.as_str()) as u16;
-                if left_len > status_area.width {
-                    left_len = status_area.width;
-                }
-                if right_len > status_area.width.saturating_sub(left_len) {
-                    right_len = status_area.width.saturating_sub(left_len);
-                }
-                let center_len = status_area.width.saturating_sub(left_len + right_len);
-                let sections = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([
-                        Constraint::Length(left_len),
-                        Constraint::Length(center_len),
-                        Constraint::Length(right_len),
-                    ])
-                    .split(status_area);
-
-                if let Some(area) = sections.get(0) {
-                    if area.width > 0 {
-                        let left = Paragraph::new(Line::from(left_text.clone()))
-                            .alignment(Alignment::Left)
-                            .style(style);
-                        frame.render_widget(left, *area);
-                    }
-                }
-                if let Some(area) = sections.get(1) {
-                    if area.width > 0 {
-                        let center = Paragraph::new(Line::from(center_text.clone()))
-                            .alignment(Alignment::Center)
-                            .style(style);
-                        frame.render_widget(center, *area);
-                    }
-                }
-                if let Some(area) = sections.get(2) {
-                    if area.width > 0 {
-                        let right = Paragraph::new(Line::from(right_text.clone()))
-                            .alignment(Alignment::Right)
-                            .style(style);
-                        frame.render_widget(right, *area);
-                    }
-                }
-            }
-        }
-
-        if let Some(pty_area) = pty_area {
-            self.render_pty_panel(frame, pty_area);
-        }
-
-        self.needs_autoscroll = false;
     }
 
     fn build_display(&self, width: u16) -> TranscriptDisplay {
@@ -1647,6 +1269,8 @@ impl RatatuiLoop {
                 lines: Vec::new(),
                 total_height: 0,
                 cursor: None,
+                prompt_start: 0,
+                prompt_height: 0,
             };
         }
 
@@ -1654,7 +1278,6 @@ impl RatatuiLoop {
         let mut total_height = 0usize;
         let width_usize = width as usize;
         let indent_width = MESSAGE_INDENT.min(width_usize);
-        let mut cursor = None;
         let mut first_rendered = true;
 
         for block in &self.messages {
@@ -1667,28 +1290,14 @@ impl RatatuiLoop {
                 total_height += 1;
             }
 
-            if block.kind == RatatuiMessageKind::User {
-                let user_lines = self.build_user_block(block, width_usize);
-                total_height += user_lines.len();
-                lines.extend(user_lines);
-            } else {
-                if let Some(header) = self.message_header_line(block.kind) {
-                    lines.push(header);
-                    total_height += 1;
-                }
+            let block_lines = match block.kind {
+                RatatuiMessageKind::User => self.build_user_block(block, width_usize),
+                RatatuiMessageKind::Pty => self.build_pty_block(block, width_usize),
+                kind => self.build_standard_lines(block, width_usize, indent_width, kind),
+            };
 
-                for line in &block.lines {
-                    let wrapped = self.wrap_segments(
-                        &line.segments,
-                        width_usize,
-                        indent_width,
-                        Some(self.kind_color(block.kind)),
-                    );
-                    total_height += wrapped.len();
-                    lines.extend(wrapped);
-                }
-            }
-
+            total_height += block_lines.len();
+            lines.extend(block_lines);
             first_rendered = false;
         }
 
@@ -1697,55 +1306,43 @@ impl RatatuiLoop {
             total_height += 1;
         }
 
-        let prompt_segments = self.prompt_segments();
-        let prompt_lines = self.wrap_segments(
-            &prompt_segments,
-            width_usize,
-            indent_width,
-            self.theme.foreground,
-        );
+        let (prompt_lines, prompt_cursor) = self.build_prompt_block(width_usize);
         let prompt_start = total_height;
         total_height += prompt_lines.len();
-        lines.extend(prompt_lines.clone());
+        let prompt_height = prompt_lines.len();
+        lines.extend(prompt_lines);
 
-        let prefix_width = UnicodeWidthStr::width(self.prompt_prefix.as_str());
-        let input_width = if self.show_placeholder {
-            0
-        } else {
-            self.input.width_before_cursor()
-        };
-        let placeholder_width = if self.show_placeholder {
-            self.placeholder_hint
-                .as_deref()
-                .map(UnicodeWidthStr::width)
-                .unwrap_or(0)
-        } else {
-            0
-        };
-        let cursor_width = indent_width + prefix_width + input_width + placeholder_width;
-        if width_usize > 0 {
-            let line_width = width_usize.max(1);
-            let cursor_row = prompt_start + cursor_width / line_width;
-            let cursor_col = cursor_width % line_width;
-            cursor = Some((cursor_row, cursor_col));
-        }
+        let cursor = prompt_cursor.map(|(row, col)| (prompt_start + row, col));
 
         TranscriptDisplay {
             lines,
             total_height,
             cursor,
+            prompt_start,
+            prompt_height,
         }
     }
 
-    fn block_has_visible_content(&self, block: &MessageBlock) -> bool {
-        if !matches!(
-            block.kind,
-            RatatuiMessageKind::Pty | RatatuiMessageKind::Tool
-        ) {
-            return true;
+    fn build_standard_lines(
+        &self,
+        block: &MessageBlock,
+        width: usize,
+        indent: usize,
+        kind: RatatuiMessageKind,
+    ) -> Vec<Line<'static>> {
+        let mut lines = Vec::new();
+
+        if let Some(header) = self.message_header_line(kind) {
+            lines.push(header);
         }
 
-        block.lines.iter().any(StyledLine::has_visible_content)
+        for line in &block.lines {
+            let wrapped =
+                self.wrap_segments(&line.segments, width, indent, Some(self.kind_color(kind)));
+            lines.extend(wrapped);
+        }
+
+        lines
     }
 
     fn build_user_block(&self, block: &MessageBlock, width: usize) -> Vec<Line<'static>> {
@@ -1760,6 +1357,53 @@ impl RatatuiLoop {
             return fallback;
         }
 
+        let message_lines = self.user_message_lines(block, border_color);
+        let mut rendered = Vec::new();
+        let horizontal = "─".repeat(width.saturating_sub(2));
+        rendered.push(Line::from(vec![Span::styled(
+            format!("╭{}╮", horizontal),
+            border_style.clone(),
+        )]));
+
+        let content_width = width.saturating_sub(4);
+        let mut has_line = false;
+        for line in message_lines {
+            let wrapped = self.wrap_segments(&line.segments, content_width, 0, Some(border_color));
+            for wrapped_line in wrapped {
+                has_line = true;
+                let mut spans = Vec::new();
+                spans.push(Span::styled("│ ", border_style.clone()));
+                let mut content_spans = wrapped_line.spans.clone();
+                let mut occupied = 0usize;
+                for span in &content_spans {
+                    occupied += UnicodeWidthStr::width(span.content.as_ref());
+                }
+                if occupied < content_width {
+                    content_spans.push(Span::raw(" ".repeat(content_width - occupied)));
+                }
+                spans.extend(content_spans);
+                spans.push(Span::styled(" │", border_style.clone()));
+                rendered.push(Line::from(spans));
+            }
+        }
+
+        if !has_line {
+            let mut spans = Vec::new();
+            spans.push(Span::styled("│ ", border_style.clone()));
+            spans.push(Span::raw(" ".repeat(content_width)));
+            spans.push(Span::styled(" │", border_style.clone()));
+            rendered.push(Line::from(spans));
+        }
+
+        rendered.push(Line::from(vec![Span::styled(
+            format!("╰{}╯", horizontal),
+            border_style,
+        )]));
+
+        rendered
+    }
+
+    fn user_message_lines(&self, block: &MessageBlock, border_color: Color) -> Vec<StyledLine> {
         let timestamp = block
             .timestamp
             .clone()
@@ -1784,26 +1428,54 @@ impl RatatuiLoop {
             let mut first_line = StyledLine::default();
             first_line.segments.push(RatatuiSegment {
                 text: format!("❯ {} ", timestamp),
-                style: prefix_style.clone(),
+                style: prefix_style,
             });
             message_lines.push(first_line);
         }
+
+        message_lines
+    }
+
+    fn build_pty_block(&self, block: &MessageBlock, width: usize) -> Vec<Line<'static>> {
+        let border_color = self.kind_color(RatatuiMessageKind::Pty);
+        let border_style = Style::default().fg(border_color);
+        if width < 4 {
+            let mut fallback = Vec::new();
+            for line in &block.lines {
+                let wrapped = self.wrap_segments(&line.segments, width, 0, self.theme.foreground);
+                fallback.extend(wrapped);
+            }
+            return fallback;
+        }
+
+        let mut message_lines = Vec::new();
+        let mut title_line = StyledLine::default();
+        let mut title_style = RatatuiTextStyle::default();
+        title_style.color = Some(border_color);
+        title_style.bold = true;
+        title_line.push_segment(RatatuiSegment {
+            text: "Terminal".to_string(),
+            style: title_style,
+        });
+        message_lines.push(title_line);
+        message_lines.extend(self.pty_message_lines(block));
 
         let mut rendered = Vec::new();
         let horizontal = "─".repeat(width.saturating_sub(2));
         rendered.push(Line::from(vec![Span::styled(
             format!("╭{}╮", horizontal),
-            border_style,
+            border_style.clone(),
         )]));
 
         let content_width = width.saturating_sub(4);
         let mut has_line = false;
         for line in message_lines {
-            let wrapped = self.wrap_segments(&line.segments, content_width, 0, Some(border_color));
+            let wrapped =
+                self.wrap_segments(&line.segments, content_width, 0, self.theme.foreground);
             for wrapped_line in wrapped {
                 has_line = true;
                 let mut spans = Vec::new();
-                spans.push(Span::styled("│ ", border_style));
+                spans.push(Span::styled("│ ", border_style.clone()));
                 let mut content_spans = wrapped_line.spans.clone();
                 let mut occupied = 0usize;
                 for span in &content_spans {
@@ -1813,16 +1485,16 @@ impl RatatuiLoop {
                     content_spans.push(Span::raw(" ".repeat(content_width - occupied)));
                 }
                 spans.extend(content_spans);
-                spans.push(Span::styled(" │", border_style));
+                spans.push(Span::styled(" │", border_style.clone()));
                 rendered.push(Line::from(spans));
             }
         }
 
         if !has_line {
             let mut spans = Vec::new();
-            spans.push(Span::styled("│ ", border_style));
+            spans.push(Span::styled("│ ", border_style.clone()));
             spans.push(Span::raw(" ".repeat(content_width)));
-            spans.push(Span::styled(" │", border_style));
+            spans.push(Span::styled(" │", border_style.clone()));
             rendered.push(Line::from(spans));
         }
 
@@ -1832,6 +1504,134 @@ impl RatatuiLoop {
         )]));
 
         rendered
+    }
+
+    fn pty_message_lines(&self, block: &MessageBlock) -> Vec<StyledLine> {
+        let mut message_lines = Vec::new();
+        if let Some(command) = block.pty_command.as_ref() {
+            let mut prefix_style = RatatuiTextStyle::default();
+            prefix_style.color = Some(self.kind_color(RatatuiMessageKind::Pty));
+            prefix_style.bold = true;
+
+            let mut command_style = RatatuiTextStyle::default();
+            command_style.color = self.theme.primary.or(self.theme.foreground);
+
+            let mut command_line = StyledLine::default();
+            command_line.push_segment(RatatuiSegment {
+                text: "$ ".to_string(),
+                style: prefix_style,
+            });
+            command_line.push_segment(RatatuiSegment {
+                text: command.clone(),
+                style: command_style,
+            });
+            message_lines.push(command_line);
+        }
+
+        message_lines.extend(block.lines.clone());
+        message_lines
+    }
+
+    fn build_prompt_block(&self, width: usize) -> (Vec<Line<'static>>, Option<(usize, usize)>) {
+        if width == 0 {
+            return (vec![Line::default()], None);
+        }
+
+        let segments = self.prompt_segments();
+        if width < 4 {
+            let wrapped = self.wrap_segments(&segments, width, 0, self.theme.foreground);
+            let cursor = self.calculate_prompt_cursor(width, 0);
+            return (wrapped, cursor);
+        }
+
+        let inner_width = width.saturating_sub(4);
+        let wrapped = self.wrap_segments(&segments, inner_width, 0, self.theme.foreground);
+
+        let border_color = self
+            .theme
+            .primary
+            .or(self.theme.foreground)
+            .unwrap_or_else(|| self.kind_color(RatatuiMessageKind::User));
+        let border_style = Style::default().fg(border_color);
+
+        let mut rendered = Vec::new();
+        let horizontal = "─".repeat(width.saturating_sub(2));
+        rendered.push(Line::from(vec![Span::styled(
+            format!("╭{}╮", horizontal),
+            border_style.clone(),
+        )]));
+
+        let mut has_line = false;
+        for line in wrapped {
+            has_line = true;
+            let mut spans = Vec::new();
+            spans.push(Span::styled("│ ", border_style.clone()));
+            let mut content_spans = line.spans.clone();
+            let mut occupied = 0usize;
+            for span in &content_spans {
+                occupied += UnicodeWidthStr::width(span.content.as_ref());
+            }
+            if occupied < inner_width {
+                content_spans.push(Span::raw(" ".repeat(inner_width - occupied)));
+            }
+            spans.extend(content_spans);
+            spans.push(Span::styled(" │", border_style.clone()));
+            rendered.push(Line::from(spans));
+        }
+
+        if !has_line {
+            let mut spans = Vec::new();
+            spans.push(Span::styled("│ ", border_style.clone()));
+            spans.push(Span::raw(" ".repeat(inner_width)));
+            spans.push(Span::styled(" │", border_style.clone()));
+            rendered.push(Line::from(spans));
+        }
+
+        rendered.push(Line::from(vec![Span::styled(
+            format!("╰{}╯", horizontal),
+            border_style,
+        )]));
+
+        let cursor = self
+            .calculate_prompt_cursor(inner_width, 2)
+            .map(|(row, col)| (row + 1, col));
+
+        (rendered, cursor)
+    }
+
+    fn calculate_prompt_cursor(
+        &self,
+        inner_width: usize,
+        horizontal_padding: usize,
+    ) -> Option<(usize, usize)> {
+        let prefix_width = UnicodeWidthStr::width(self.prompt_prefix.as_str());
+        let input_width = if self.show_placeholder {
+            0
+        } else {
+            self.input.width_before_cursor()
+        };
+        let cursor_width = if self.show_placeholder {
+            prefix_width
+        } else {
+            prefix_width + input_width
+        };
+        if inner_width == 0 {
+            return Some((0, horizontal_padding));
+        }
+        let row = cursor_width / inner_width;
+        let col = cursor_width % inner_width;
+        Some((row, col + horizontal_padding))
+    }
+
+    fn block_has_visible_content(&self, block: &MessageBlock) -> bool {
+        if matches!(
+            block.kind,
+            RatatuiMessageKind::Pty | RatatuiMessageKind::Tool | RatatuiMessageKind::Agent
+        ) {
+            return block.lines.iter().any(StyledLine::has_visible_content);
+        }
+
+        true
     }
 
     fn prompt_segments(&self) -> Vec<RatatuiSegment> {
@@ -1951,7 +1751,7 @@ impl RatatuiLoop {
             RatatuiMessageKind::Error => "Error",
             RatatuiMessageKind::Info => return None,
             RatatuiMessageKind::Policy => "Policy",
-            RatatuiMessageKind::Pty => "PTY",
+            RatatuiMessageKind::Pty => return None,
             RatatuiMessageKind::Tool => "Tool",
             RatatuiMessageKind::User => return None,
         };
@@ -1966,8 +1766,8 @@ impl RatatuiLoop {
             RatatuiMessageKind::Agent => self.theme.primary.unwrap_or(Color::LightBlue),
             RatatuiMessageKind::User => self.theme.secondary.unwrap_or(Color::LightGreen),
             RatatuiMessageKind::Tool => Color::LightMagenta,
-            RatatuiMessageKind::Pty => Color::LightCyan,
-            RatatuiMessageKind::Info => Color::Yellow,
+            RatatuiMessageKind::Pty => self.theme.primary.unwrap_or(Color::LightCyan),
+            RatatuiMessageKind::Info => self.theme.primary.unwrap_or(Color::LightCyan),
             RatatuiMessageKind::Policy => Color::LightYellow,
             RatatuiMessageKind::Error => Color::Red,
         }
@@ -2006,9 +1806,14 @@ fn convert_style_color(style: &AnsiStyle) -> Option<Color> {
 pub fn convert_style(style: AnsiStyle) -> RatatuiTextStyle {
     let mut converted = RatatuiTextStyle::default();
     converted.color = convert_style_color(&style);
+    converted.bg_color = style.get_bg_color().and_then(convert_ansi_color);
     let effects = style.get_effects();
     converted.bold = effects.contains(Effects::BOLD);
     converted.italic = effects.contains(Effects::ITALIC);
+    converted.underline = effects.contains(Effects::UNDERLINE);
+    converted.strikethrough = effects.contains(Effects::STRIKETHROUGH);
+    converted.dim = effects.contains(Effects::DIMMED);
+    converted.reversed = effects.contains(Effects::INVERT);
     converted
 }
 

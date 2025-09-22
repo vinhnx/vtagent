@@ -563,6 +563,25 @@ impl TranscriptScrollState {
     fn viewport_height(&self) -> usize {
         self.viewport_height
     }
+
+    fn ensure_visible(&mut self, start: usize, height: usize) {
+        if height == 0 || self.viewport_height == 0 {
+            return;
+        }
+
+        let end = start.saturating_add(height);
+        if self.offset > start {
+            self.offset = start.min(self.max_offset());
+            return;
+        }
+
+        let viewport_end = self.offset + self.viewport_height;
+        if end > viewport_end {
+            let needed = end - viewport_end;
+            let new_offset = self.offset.saturating_add(needed).min(self.max_offset());
+            self.offset = new_offset;
+        }
+    }
 }
 
 struct TranscriptDisplay {
@@ -1370,6 +1389,9 @@ impl RatatuiLoop {
             self.needs_autoscroll = false;
         }
 
+        self.scroll_state
+            .ensure_visible(display.prompt_start, display.prompt_height);
+
         let offset = self.scroll_state.offset();
         let mut paragraph = Paragraph::new(display.lines.clone()).alignment(Alignment::Left);
         if offset > 0 {
@@ -1406,9 +1428,19 @@ impl RatatuiLoop {
                 if row >= offset {
                     let visible_row = row - offset;
                     if visible_row < viewport_height {
-                        let cursor_x = text_area.x + col as u16;
-                        let cursor_y = text_area.y + visible_row as u16;
-                        frame.set_cursor_position((cursor_x, cursor_y));
+                        if text_area.width > 0 {
+                            let mut cursor_x = text_area.x + col as u16;
+                            let mut cursor_y = text_area.y + visible_row as u16;
+                            let max_x = text_area.x + text_area.width.saturating_sub(1);
+                            let max_y = text_area.y + text_area.height.saturating_sub(1);
+                            if cursor_x > max_x {
+                                cursor_x = max_x;
+                            }
+                            if cursor_y > max_y {
+                                cursor_y = max_y;
+                            }
+                            frame.set_cursor_position((cursor_x, cursor_y));
+                        }
                     }
                 }
             }

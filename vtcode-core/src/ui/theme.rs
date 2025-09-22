@@ -10,6 +10,7 @@ pub const DEFAULT_THEME_ID: &str = "ciapre-dark";
 const MIN_CONTRAST: f64 = 4.5;
 
 const ACCENT_TEAL: RgbColor = RgbColor(0x54, 0x8D, 0x8D);
+const LOGO_GOLD: RgbColor = RgbColor(0xBF, 0xB3, 0x8F);
 const WELCOME_LABEL_COLOR: RgbColor = ACCENT_TEAL;
 const WELCOME_TOOL_COLOR: RgbColor = ACCENT_TEAL;
 
@@ -148,7 +149,7 @@ static REGISTRY: Lazy<HashMap<&'static str, ThemeDefinition>> = Lazy::new(|| {
                 foreground: RgbColor(0xBF, 0xB3, 0x8F),
                 secondary_accent: ACCENT_TEAL,
                 alert: RgbColor(0xFF, 0x8A, 0x8A),
-                logo_accent: ACCENT_TEAL,
+                logo_accent: LOGO_GOLD,
             },
         },
     );
@@ -163,7 +164,7 @@ static REGISTRY: Lazy<HashMap<&'static str, ThemeDefinition>> = Lazy::new(|| {
                 foreground: RgbColor(0xBF, 0xB3, 0x8F),
                 secondary_accent: ACCENT_TEAL,
                 alert: RgbColor(0xFF, 0x8A, 0x8A),
-                logo_accent: ACCENT_TEAL,
+                logo_accent: LOGO_GOLD,
             },
         },
     );

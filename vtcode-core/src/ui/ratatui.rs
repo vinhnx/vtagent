@@ -19,8 +19,8 @@ use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{
-        Block, Borders, Clear as ClearWidget, List, ListItem, ListState, Paragraph, Scrollbar,
-        ScrollbarOrientation, ScrollbarState,
+        Block, BorderType, Borders, Clear as ClearWidget, List, ListItem, ListState, Paragraph,
+        Scrollbar, ScrollbarOrientation, ScrollbarState,
     },
 };
 use serde_json::Value;
@@ -645,7 +645,6 @@ impl SlashSuggestionState {
 struct TranscriptDisplay {
     lines: Vec<Line<'static>>,
     total_height: usize,
-    cursor: Option<(usize, usize)>,
 }
 
 struct RatatuiLoop {
@@ -1351,30 +1350,39 @@ impl RatatuiLoop {
             (area, None)
         };
 
-        let transcript_area = body_area;
+        let prompt_inner_width = body_area.width.saturating_sub(2) as usize;
+        let (prompt_lines, prompt_cursor) = if body_area.width > 0 && body_area.height > 0 {
+            self.build_prompt_block(prompt_inner_width)
+        } else {
+            (vec![Line::default()], None)
+        };
+        let raw_prompt_height = prompt_lines.len() as u16 + 2;
+        let min_prompt_height = 3u16.min(body_area.height.max(1));
+        let prompt_height = raw_prompt_height
+            .max(min_prompt_height)
+            .min(body_area.height);
+        let transcript_height = body_area.height.saturating_sub(prompt_height);
+        let transcript_area =
+            Rect::new(body_area.x, body_area.y, body_area.width, transcript_height);
+        let input_area = if prompt_height > 0 {
+            Some(Rect::new(
+                body_area.x,
+                body_area.y + transcript_height,
+                body_area.width,
+                prompt_height,
+            ))
+        } else {
+            None
+        };
 
         self.transcript_area = Some(transcript_area);
 
-        let reserve_scrollbar = transcript_area.width > 1;
+        let reserve_scrollbar = transcript_area.width > 1 && transcript_area.height > 0;
         let text_width = if reserve_scrollbar {
             transcript_area.width.saturating_sub(1)
         } else {
             transcript_area.width
         };
-
-        let display = self.build_display(text_width);
-        let viewport_height = usize::from(transcript_area.height);
-        self.scroll_state
-            .update_bounds(display.total_height, viewport_height);
-        if self.needs_autoscroll {
-            self.scroll_state.scroll_to_bottom();
-        }
-
-        let offset = self.scroll_state.offset();
-        let mut paragraph = Paragraph::new(display.lines.clone()).alignment(Alignment::Left);
-        if offset > 0 {
-            paragraph = paragraph.scroll((offset as u16, 0));
-        }
 
         let base_style = self
             .theme
@@ -1386,38 +1394,73 @@ impl RatatuiLoop {
             .primary
             .map(|color| Style::default().fg(color))
             .unwrap_or_else(|| base_style.clone());
-        paragraph = paragraph.style(base_style.clone());
 
-        let (text_area, scrollbar_area) = if reserve_scrollbar {
-            let chunks = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Length(text_width), Constraint::Length(1)])
-                .split(transcript_area);
-            (chunks[0], Some(chunks[1]))
-        } else {
-            (transcript_area, None)
-        };
-
-        frame.render_widget(paragraph, text_area);
-        self.render_slash_suggestions(frame, text_area);
-
-        if let Some(scroll_area) = scrollbar_area {
-            if self.scroll_state.has_overflow() && scroll_area.width > 0 {
-                let mut scrollbar_state = ScrollbarState::new(self.scroll_state.content_height())
-                    .viewport_content_length(self.scroll_state.viewport_height())
-                    .position(self.scroll_state.offset());
-                let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight);
-                frame.render_stateful_widget(scrollbar, scroll_area, &mut scrollbar_state);
+        if transcript_area.width > 0 && transcript_area.height > 0 {
+            let display = self.build_display(text_width);
+            let viewport_height = usize::from(transcript_area.height);
+            self.scroll_state
+                .update_bounds(display.total_height, viewport_height);
+            if self.needs_autoscroll {
+                self.scroll_state.scroll_to_bottom();
             }
+
+            let offset = self.scroll_state.offset();
+            let mut paragraph = Paragraph::new(display.lines.clone()).alignment(Alignment::Left);
+            if offset > 0 {
+                paragraph = paragraph.scroll((offset as u16, 0));
+            }
+            paragraph = paragraph.style(base_style.clone());
+
+            let (text_area, scrollbar_area) = if reserve_scrollbar {
+                let chunks = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Length(text_width), Constraint::Length(1)])
+                    .split(transcript_area);
+                (chunks[0], Some(chunks[1]))
+            } else {
+                (transcript_area, None)
+            };
+
+            frame.render_widget(paragraph, text_area);
+            self.render_slash_suggestions(frame, text_area);
+
+            if let Some(scroll_area) = scrollbar_area {
+                if self.scroll_state.has_overflow() && scroll_area.width > 0 {
+                    let mut scrollbar_state =
+                        ScrollbarState::new(self.scroll_state.content_height())
+                            .viewport_content_length(self.scroll_state.viewport_height())
+                            .position(self.scroll_state.offset());
+                    let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight);
+                    frame.render_stateful_widget(scrollbar, scroll_area, &mut scrollbar_state);
+                }
+            }
+        } else {
+            self.scroll_state.update_bounds(0, 0);
         }
 
-        if let Some((row, col)) = display.cursor {
-            if row >= offset {
-                let visible_row = row - offset;
-                if visible_row < viewport_height {
-                    let cursor_x = text_area.x + col as u16;
-                    let cursor_y = text_area.y + visible_row as u16;
-                    frame.set_cursor_position((cursor_x, cursor_y));
+        if let Some(area) = input_area {
+            if area.height > 0 {
+                let border_style = self
+                    .theme
+                    .primary
+                    .map(|color| Style::default().fg(color))
+                    .unwrap_or_else(|| base_style.clone());
+                let prompt_block = Paragraph::new(prompt_lines.clone())
+                    .style(base_style.clone())
+                    .block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .border_type(BorderType::Rounded)
+                            .border_style(border_style.clone()),
+                    );
+                frame.render_widget(prompt_block, area);
+
+                if let Some((row, col)) = prompt_cursor {
+                    let cursor_x = area.x.saturating_add(1).saturating_add(col as u16);
+                    let cursor_y = area.y.saturating_add(1).saturating_add(row as u16);
+                    if cursor_x < area.x + area.width && cursor_y < area.y + area.height {
+                        frame.set_cursor_position((cursor_x, cursor_y));
+                    }
                 }
             }
         }
@@ -1490,7 +1533,6 @@ impl RatatuiLoop {
             return TranscriptDisplay {
                 lines: Vec::new(),
                 total_height: 0,
-                cursor: None,
             };
         }
 
@@ -1498,7 +1540,6 @@ impl RatatuiLoop {
         let mut total_height = 0usize;
         let width_usize = width as usize;
         let indent_width = MESSAGE_INDENT.min(width_usize);
-        let mut cursor = None;
         let mut first_rendered = true;
 
         for block in &self.messages {
@@ -1545,16 +1586,26 @@ impl RatatuiLoop {
             total_height += 1;
         }
 
-        let prompt_segments = self.prompt_segments();
-        let prompt_lines = self.wrap_segments(
-            &prompt_segments,
-            width_usize,
-            indent_width,
-            self.theme.foreground,
-        );
-        let prompt_start = total_height;
-        total_height += prompt_lines.len();
-        lines.extend(prompt_lines.clone());
+        TranscriptDisplay {
+            lines,
+            total_height,
+        }
+    }
+
+    fn build_prompt_block(
+        &self,
+        inner_width: usize,
+    ) -> (Vec<Line<'static>>, Option<(usize, usize)>) {
+        if inner_width == 0 {
+            return (vec![Line::default()], None);
+        }
+
+        let segments = self.prompt_segments();
+        let lines = self.wrap_segments(&segments, inner_width, 0, self.theme.foreground);
+
+        if lines.is_empty() {
+            return (vec![Line::default()], Some((0, 0)));
+        }
 
         let prefix_width = UnicodeWidthStr::width(self.prompt_prefix.as_str());
         let input_width = if self.show_placeholder {
@@ -1570,30 +1621,22 @@ impl RatatuiLoop {
         } else {
             0
         };
-        let cursor_width = indent_width + prefix_width + input_width + placeholder_width;
-        if width_usize > 0 {
-            let line_width = width_usize.max(1);
-            let cursor_row = prompt_start + cursor_width / line_width;
-            let cursor_col = cursor_width % line_width;
-            cursor = Some((cursor_row, cursor_col));
-        }
-
-        TranscriptDisplay {
-            lines,
-            total_height,
-            cursor,
-        }
+        let cursor_width = prefix_width + input_width + placeholder_width;
+        let line_width = inner_width.max(1);
+        let row = cursor_width / line_width;
+        let col = cursor_width % line_width;
+        (lines, Some((row, col)))
     }
 
     fn block_has_visible_content(&self, block: &MessageBlock) -> bool {
-        if !matches!(
+        if matches!(
             block.kind,
-            RatatuiMessageKind::Pty | RatatuiMessageKind::Tool
+            RatatuiMessageKind::Pty | RatatuiMessageKind::Tool | RatatuiMessageKind::Agent
         ) {
-            return true;
+            return block.lines.iter().any(StyledLine::has_visible_content);
         }
 
-        block.lines.iter().any(StyledLine::has_visible_content)
+        true
     }
 
     fn build_user_block(&self, block: &MessageBlock, width: usize) -> Vec<Line<'static>> {
@@ -1722,7 +1765,7 @@ impl RatatuiLoop {
         message_lines.extend(block.lines.clone());
 
         let mut rendered = Vec::new();
-        let mut top_label = "╭─ terminal ".to_string();
+        let mut top_label = "╭─ Terminal ".to_string();
         let mut label_width = UnicodeWidthStr::width(top_label.as_str());
         if width > label_width + 1 {
             top_label.push_str(&"─".repeat(width - label_width - 1));

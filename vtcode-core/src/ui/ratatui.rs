@@ -30,6 +30,7 @@ use std::collections::VecDeque;
 use std::io;
 use std::mem;
 use std::time::{Duration, Instant};
+use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::time::{Interval, MissedTickBehavior, interval};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
@@ -304,6 +305,10 @@ async fn run_ratatui(
     let mut ticker = create_ticker();
 
     loop {
+        if app.drain_command_queue(&mut command_rx) {
+            redraw = true;
+        }
+
         if redraw {
             terminal
                 .draw(|frame| app.draw(frame))
@@ -311,13 +316,19 @@ async fn run_ratatui(
             redraw = false;
         }
 
+        if app.should_exit() {
+            break;
+        }
+
         tokio::select! {
-            Some(cmd) = command_rx.recv() => {
-                if app.handle_command(cmd) {
-                    redraw = true;
-                }
-                if app.should_exit() {
-                    break;
+            biased;
+            cmd = command_rx.recv() => {
+                if let Some(command) = cmd {
+                    if app.handle_command(command) {
+                        redraw = true;
+                    }
+                } else {
+                    app.should_exit = true;
                 }
             }
             event = event_stream.next() => {
@@ -330,9 +341,6 @@ async fn run_ratatui(
                         }
                         if app.handle_event(evt, &events)? {
                             redraw = true;
-                        }
-                        if app.should_exit() {
-                            break;
                         }
                     }
                     Some(Err(_)) => {
@@ -961,6 +969,12 @@ struct InputLayout {
     display: InputDisplay,
 }
 
+struct AppLayout {
+    message: Rect,
+    input: Option<InputLayout>,
+    status: Option<Rect>,
+}
+
 struct RatatuiLoop {
     messages: Vec<MessageBlock>,
     current_line: StyledLine,
@@ -1523,7 +1537,7 @@ impl RatatuiLoop {
         key: KeyEvent,
         events: &UnboundedSender<RatatuiEvent>,
     ) -> Result<bool> {
-        if key.kind == KeyEventKind::Release {
+        if !matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat) {
             return Ok(false);
         }
 
@@ -2002,78 +2016,11 @@ impl RatatuiLoop {
             return;
         }
 
-        let (body_area, status_area) = if area.height > 1 {
-            let segments = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Min(1), Constraint::Length(1)])
-                .split(area);
-            (segments[0], Some(segments[1]))
-        } else {
-            (area, None)
-        };
-
-        let content_area = body_area;
-
-        let (message_area, input_layout) = if content_area.height == 0 {
-            (
-                Rect::new(content_area.x, content_area.y, content_area.width, 0),
-                None,
-            )
-        } else {
-            let inner_width = content_area.width.saturating_sub(2);
-            let display = self.build_input_display(inner_width);
-            let mut block_height = display.height.saturating_add(2);
-            if block_height < 3 {
-                block_height = 3;
-            }
-            let available_for_suggestions = content_area.height.saturating_sub(block_height);
-            let suggestion_height = self
-                .slash_suggestions
-                .visible_height(available_for_suggestions);
-            let input_total_height = block_height
-                .saturating_add(suggestion_height)
-                .min(content_area.height);
-            let message_height = content_area.height.saturating_sub(input_total_height);
-            let message_area = Rect::new(
-                content_area.x,
-                content_area.y,
-                content_area.width,
-                message_height,
-            );
-            let input_y = content_area.y.saturating_add(message_height);
-            let input_container = Rect::new(
-                content_area.x,
-                input_y,
-                content_area.width,
-                input_total_height,
-            );
-            let block_area_height = block_height.min(input_container.height);
-            let block_area = Rect::new(
-                input_container.x,
-                input_container.y,
-                input_container.width,
-                block_area_height,
-            );
-            let suggestion_area =
-                if suggestion_height > 0 && input_container.height > block_area_height {
-                    Some(Rect::new(
-                        input_container.x,
-                        input_container.y + block_area_height,
-                        input_container.width,
-                        input_container.height.saturating_sub(block_area_height),
-                    ))
-                } else {
-                    None
-                };
-            (
-                message_area,
-                Some(InputLayout {
-                    block_area,
-                    suggestion_area,
-                    display,
-                }),
-            )
-        };
+        let AppLayout {
+            message: message_area,
+            input: input_layout,
+            status: status_area,
+        } = self.build_app_layout(area);
 
         let foreground_style = self
             .theme
@@ -2275,6 +2222,108 @@ impl RatatuiLoop {
             self.pty_area = None;
             self.pty_scroll.update_bounds(0, 0);
         }
+    }
+
+    fn build_app_layout(&self, area: Rect) -> AppLayout {
+        if area.width == 0 || area.height == 0 {
+            return AppLayout {
+                message: Rect::new(area.x, area.y, area.width, 0),
+                input: None,
+                status: None,
+            };
+        }
+
+        let (body_area, status_area) = if area.height > 1 {
+            let segments = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(1), Constraint::Length(1)])
+                .split(area);
+            (segments[0], Some(segments[1]))
+        } else {
+            (area, None)
+        };
+
+        if body_area.height == 0 {
+            return AppLayout {
+                message: Rect::new(body_area.x, body_area.y, body_area.width, 0),
+                input: None,
+                status: status_area,
+            };
+        }
+
+        let inner_width = body_area.width.saturating_sub(2);
+        let display = self.build_input_display(inner_width);
+        let block_height = cmp::max(display.height.saturating_add(2), 3);
+        let available_for_suggestions = body_area.height.saturating_sub(block_height);
+        let suggestion_height = self
+            .slash_suggestions
+            .visible_height(available_for_suggestions);
+        let input_total_height = block_height
+            .saturating_add(suggestion_height)
+            .min(body_area.height);
+        let message_height = body_area.height.saturating_sub(input_total_height);
+        let message_area = Rect::new(body_area.x, body_area.y, body_area.width, message_height);
+
+        if input_total_height == 0 {
+            return AppLayout {
+                message: message_area,
+                input: None,
+                status: status_area,
+            };
+        }
+
+        let input_y = body_area.y.saturating_add(message_height);
+        let input_container = Rect::new(body_area.x, input_y, body_area.width, input_total_height);
+        let block_area_height = block_height.min(input_container.height);
+        let block_area = Rect::new(
+            input_container.x,
+            input_container.y,
+            input_container.width,
+            block_area_height,
+        );
+        let suggestion_area = if suggestion_height > 0 && input_container.height > block_area_height
+        {
+            Some(Rect::new(
+                input_container.x,
+                input_container.y + block_area_height,
+                input_container.width,
+                input_container.height.saturating_sub(block_area_height),
+            ))
+        } else {
+            None
+        };
+
+        AppLayout {
+            message: message_area,
+            input: Some(InputLayout {
+                block_area,
+                suggestion_area,
+                display,
+            }),
+            status: status_area,
+        }
+    }
+
+    fn drain_command_queue(&mut self, commands: &mut UnboundedReceiver<RatatuiCommand>) -> bool {
+        let mut needs_redraw = false;
+        loop {
+            match commands.try_recv() {
+                Ok(command) => {
+                    if self.handle_command(command) {
+                        needs_redraw = true;
+                    }
+                    if self.should_exit() {
+                        break;
+                    }
+                }
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => {
+                    self.should_exit = true;
+                    break;
+                }
+            }
+        }
+        needs_redraw
     }
 
     fn build_display(&mut self, width: u16) -> TranscriptDisplay {

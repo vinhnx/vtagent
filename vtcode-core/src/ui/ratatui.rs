@@ -39,6 +39,7 @@ const REDRAW_INTERVAL_MS: u64 = 33;
 const MESSAGE_INDENT: usize = 2;
 const NAVIGATION_HINT_TEXT: &str = "↵ send · esc exit";
 const MAX_SLASH_SUGGESTIONS: usize = 6;
+const SELECTION_TEXT_RGB: (u8, u8, u8) = (0x26, 0x26, 0x26);
 
 #[derive(Clone, Default, PartialEq)]
 pub struct RatatuiTextStyle {
@@ -286,9 +287,8 @@ async fn run_ratatui(
 ) -> Result<()> {
     let mut stdout = io::stdout();
     let backend = CrosstermBackend::new(&mut stdout);
-    let (_, rows) = crossterm::terminal::size().context("failed to query terminal size")?;
     let options = TerminalOptions {
-        viewport: Viewport::Inline(rows),
+        viewport: Viewport::Inline(0),
     };
     let mut terminal = Terminal::with_options(backend, options)
         .context("failed to initialize ratatui terminal")?;
@@ -1255,7 +1255,6 @@ impl RatatuiLoop {
         self.input.value = value;
         self.input.cursor = self.input.value.len();
         self.update_input_state();
-        self.transcript_autoscroll = true;
     }
 
     fn apply_selected_suggestion(&mut self) -> bool {
@@ -1506,11 +1505,7 @@ impl RatatuiLoop {
     ) -> Result<bool> {
         match event {
             CrosstermEvent::Key(key) => self.handle_key_event(key, events),
-            CrosstermEvent::Resize(_, _) => {
-                self.transcript_autoscroll = true;
-                self.pty_autoscroll = true;
-                Ok(true)
-            }
+            CrosstermEvent::Resize(_, _) => Ok(true),
             CrosstermEvent::Mouse(mouse) => self.handle_mouse_event(mouse, events),
             CrosstermEvent::FocusGained | CrosstermEvent::FocusLost | CrosstermEvent::Paste(_) => {
                 Ok(false)
@@ -1566,7 +1561,6 @@ impl RatatuiLoop {
                 self.update_input_state();
                 self.last_escape = None;
                 let _ = events.send(RatatuiEvent::Submit(text));
-                self.transcript_autoscroll = true;
                 Ok(true)
             }
             KeyCode::Esc => {
@@ -1677,7 +1671,6 @@ impl RatatuiLoop {
                 }
                 self.input.backspace();
                 self.update_input_state();
-                self.transcript_autoscroll = true;
                 Ok(true)
             }
             KeyCode::Delete => {
@@ -1686,7 +1679,6 @@ impl RatatuiLoop {
                 }
                 self.input.delete();
                 self.update_input_state();
-                self.transcript_autoscroll = true;
                 Ok(true)
             }
             KeyCode::Left => {
@@ -1730,7 +1722,6 @@ impl RatatuiLoop {
                 self.input.insert(ch);
                 self.update_input_state();
                 self.last_escape = None;
-                self.transcript_autoscroll = true;
                 Ok(true)
             }
             _ => Ok(false),
@@ -1811,10 +1802,15 @@ impl RatatuiLoop {
         };
         let highlight_color = self
             .theme
-            .secondary
-            .or(self.theme.primary)
+            .primary
+            .or(self.theme.secondary)
             .unwrap_or(Color::DarkGray);
-        let highlight_style = Style::default().bg(highlight_color);
+        let text_color = Color::Rgb(
+            SELECTION_TEXT_RGB.0,
+            SELECTION_TEXT_RGB.1,
+            SELECTION_TEXT_RGB.2,
+        );
+        let highlight_style = Style::default().bg(highlight_color).fg(text_color);
 
         lines
             .into_iter()

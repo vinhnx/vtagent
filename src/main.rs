@@ -5,10 +5,17 @@
 use anyhow::{Context, Result, anyhow, bail};
 use clap::Parser;
 use colorchoice::ColorChoice as GlobalColorChoice;
-use std::path::PathBuf;
+use is_terminal::IsTerminal;
+use rpassword::read_password;
+use std::{
+    env,
+    io::{self, Write},
+    path::PathBuf,
+};
 use vtcode_core::cli::args::{Cli, Commands};
 use vtcode_core::config::api_keys::{ApiKeySources, get_api_key, load_dotenv};
 use vtcode_core::config::loader::ConfigManager;
+use vtcode_core::config::models::Provider as ModelProvider;
 use vtcode_core::config::types::AgentConfig as CoreAgentConfig;
 use vtcode_core::ui::theme::{self as ui_theme, DEFAULT_THEME_ID};
 use vtcode_core::{initialize_dot_folder, load_user_config, update_theme_preference};
@@ -131,8 +138,19 @@ async fn main() -> Result<()> {
     update_theme_preference(&theme_selection).ok();
 
     // Resolve API key for chosen provider
-    let api_key = get_api_key(&provider, &ApiKeySources::default())
-        .with_context(|| format!("API key not found for provider '{}'", provider))?;
+    let sources = ApiKeySources::default();
+    let api_key = match get_api_key(&provider, &sources) {
+        Ok(key) => key,
+        Err(error) => match prompt_for_api_key(&provider)? {
+            Some(key) => {
+                persist_api_key_env(&provider, &key);
+                key
+            }
+            None => {
+                return Err(error.context(format!("API key not found for provider '{}'", provider)));
+            }
+        },
+    };
 
     // Bridge to local CLI modules
     let core_cfg = CoreAgentConfig {
@@ -234,4 +252,52 @@ fn resolve_workspace_path(workspace_arg: Option<PathBuf>) -> Result<PathBuf> {
     }
 
     Ok(resolved)
+}
+
+fn prompt_for_api_key(provider: &str) -> Result<Option<String>> {
+    let stdin = io::stdin();
+    let mut stdout = io::stdout();
+
+    if !stdin.is_terminal() || !stdout.is_terminal() {
+        return Ok(None);
+    }
+
+    let env_hint = provider
+        .parse::<ModelProvider>()
+        .ok()
+        .map(|p| p.default_api_key_env().to_string());
+
+    println!(
+        "No API key found for provider '{}'. Enter it now to continue or press Enter to cancel.",
+        provider
+    );
+    if let Some(env_name) = env_hint {
+        println!(
+            "Tip: set the {} environment variable or add it to your .env file to skip this prompt.",
+            env_name
+        );
+    }
+    print!("API key: ");
+    stdout
+        .flush()
+        .context("Failed to flush stdout before reading API key")?;
+
+    let input = read_password().context("Failed to read API key input")?;
+    println!();
+    let trimmed = input.trim();
+
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+
+    Ok(Some(trimmed.to_string()))
+}
+
+fn persist_api_key_env(provider: &str, key: &str) {
+    if let Ok(provider_enum) = provider.parse::<ModelProvider>() {
+        // SAFETY: setting environment variables is safe for this single-process CLI runtime.
+        unsafe {
+            env::set_var(provider_enum.default_api_key_env(), key);
+        }
+    }
 }

@@ -30,7 +30,7 @@ pub(crate) const ESCAPE_DOUBLE_MS: u64 = 750;
 pub(crate) const REDRAW_INTERVAL_MS: u64 = 33;
 pub(crate) const MESSAGE_INDENT: usize = 2;
 pub(crate) const NAVIGATION_HINT_TEXT: &str =
-    "↵ send · esc cancel · alt+Pg↑/Pg↓ history · alt+↑/↓ history · j/k history";
+    "↵ send/edit · esc focus/cancel · alt+Pg↑/Pg↓ history · alt+↑/↓ history · j/k history";
 pub(crate) const MAX_SLASH_SUGGESTIONS: usize = 6;
 const SURFACE_ENV_KEY: &str = "VT_RATATUI_SURFACE";
 const INLINE_FALLBACK_ROWS: u16 = 24;
@@ -454,6 +454,116 @@ impl InputState {
             .unwrap_or(0);
         let end = self.cursor + len;
         self.value.replace_range(self.cursor..end, "");
+    }
+
+    fn prev_word_boundary(&self) -> usize {
+        if self.cursor == 0 {
+            return 0;
+        }
+
+        let slice = &self.value[..self.cursor];
+        let mut chars: Vec<(usize, char)> = slice.char_indices().collect();
+        if chars.is_empty() {
+            return 0;
+        }
+
+        let mut index = self.cursor;
+
+        while let Some((position, ch)) = chars.pop() {
+            if ch.is_whitespace() {
+                index = position;
+            } else {
+                chars.push((position, ch));
+                break;
+            }
+        }
+
+        while let Some((position, ch)) = chars.pop() {
+            if ch.is_whitespace() {
+                index = position + ch.len_utf8();
+                break;
+            }
+            index = position;
+        }
+
+        index
+    }
+
+    fn next_word_boundary(&self) -> usize {
+        if self.cursor >= self.value.len() {
+            return self.value.len();
+        }
+
+        let slice = &self.value[self.cursor..];
+        let chars: Vec<(usize, char)> = slice.char_indices().collect();
+        if chars.is_empty() {
+            return self.value.len();
+        }
+
+        let mut index = self.cursor;
+        let mut current = 0usize;
+
+        while current < chars.len() {
+            let (offset, ch) = chars[current];
+            if ch.is_whitespace() {
+                index = self.cursor + offset + ch.len_utf8();
+                current += 1;
+            } else {
+                break;
+            }
+        }
+
+        while current < chars.len() {
+            let (offset, ch) = chars[current];
+            if ch.is_whitespace() {
+                index = self.cursor + offset;
+                break;
+            }
+            index = self.cursor + offset + ch.len_utf8();
+            current += 1;
+        }
+
+        index
+    }
+
+    pub(crate) fn move_word_left(&mut self) {
+        let boundary = self.prev_word_boundary();
+        self.cursor = boundary;
+    }
+
+    pub(crate) fn move_word_right(&mut self) {
+        let boundary = self.next_word_boundary();
+        self.cursor = boundary;
+    }
+
+    pub(crate) fn delete_word_left(&mut self) {
+        let boundary = self.prev_word_boundary();
+        if boundary < self.cursor {
+            self.value.replace_range(boundary..self.cursor, "");
+            self.cursor = boundary;
+        }
+    }
+
+    pub(crate) fn delete_word_right(&mut self) {
+        let boundary = self.next_word_boundary();
+        if boundary > self.cursor {
+            self.value.replace_range(self.cursor..boundary, "");
+        }
+    }
+
+    pub(crate) fn delete_to_start(&mut self) {
+        if self.cursor == 0 {
+            return;
+        }
+        self.value.replace_range(..self.cursor, "");
+        self.cursor = 0;
+    }
+
+    pub(crate) fn delete_to_end(&mut self) {
+        if self.cursor >= self.value.len() {
+            return;
+        }
+        self.value.truncate(self.cursor);
     }
 
     pub(crate) fn move_left(&mut self) {
@@ -1199,8 +1309,10 @@ impl RatatuiLoop {
                 self.input_enabled = enabled;
                 if !enabled {
                     self.slash_suggestions.clear();
+                    self.transcript_focused = true;
                 } else {
                     self.update_input_state();
+                    self.transcript_focused = false;
                 }
                 true
             }

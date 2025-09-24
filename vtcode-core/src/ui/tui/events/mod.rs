@@ -71,6 +71,13 @@ impl RatatuiLoop {
 
         match key.code {
             KeyCode::Enter => {
+                if self.transcript_focused {
+                    if self.input_enabled {
+                        self.transcript_focused = false;
+                        self.last_escape = None;
+                    }
+                    return Ok(true);
+                }
                 if !self.input_enabled {
                     return Ok(true);
                 }
@@ -83,29 +90,30 @@ impl RatatuiLoop {
                 Ok(true)
             }
             KeyCode::Esc => {
-                if self.input.value().is_empty() {
-                    self.transcript_focused = true;
-                    let now = Instant::now();
-                    let double_escape = self
-                        .last_escape
-                        .map(|last| {
-                            now.duration_since(last).as_millis() <= u128::from(ESCAPE_DOUBLE_MS)
-                        })
-                        .unwrap_or(false);
-                    self.last_escape = Some(now);
-                    if double_escape {
-                        let _ = events.send(RatatuiEvent::Exit);
-                        self.should_exit = true;
+                if self.transcript_focused || !self.input_enabled {
+                    if !self.input_enabled || self.input.value().is_empty() {
+                        self.transcript_focused = true;
+                        let now = Instant::now();
+                        let double_escape = self
+                            .last_escape
+                            .map(|last| {
+                                now.duration_since(last).as_millis() <= u128::from(ESCAPE_DOUBLE_MS)
+                            })
+                            .unwrap_or(false);
+                        self.last_escape = Some(now);
+                        if double_escape {
+                            let _ = events.send(RatatuiEvent::Exit);
+                            self.should_exit = true;
+                        } else {
+                            let _ = events.send(RatatuiEvent::Cancel);
+                        }
                     } else {
-                        let _ = events.send(RatatuiEvent::Cancel);
+                        self.last_escape = None;
                     }
-                } else {
-                    if self.input_enabled {
-                        self.input.clear();
-                        self.update_input_state();
-                    }
-                    self.transcript_focused = false;
+                    return Ok(true);
                 }
+                self.transcript_focused = true;
+                self.last_escape = None;
                 Ok(true)
             }
             KeyCode::Char('c') | KeyCode::Char('d') | KeyCode::Char('z')
@@ -220,27 +228,56 @@ impl RatatuiLoop {
                 if !self.input_enabled {
                     return Ok(true);
                 }
-                self.input.backspace();
+                if self.transcript_focused {
+                    return Ok(true);
+                }
+                if key.modifiers.contains(KeyModifiers::SUPER) {
+                    self.input.delete_to_start();
+                } else if key.modifiers.contains(KeyModifiers::ALT) {
+                    self.input.delete_word_left();
+                } else {
+                    self.input.backspace();
+                }
                 self.update_input_state();
                 self.transcript_autoscroll = true;
                 self.transcript_focused = false;
+                self.last_escape = None;
                 Ok(true)
             }
             KeyCode::Delete => {
                 if !self.input_enabled {
                     return Ok(true);
                 }
-                self.input.delete();
+                if self.transcript_focused {
+                    return Ok(true);
+                }
+                if key.modifiers.contains(KeyModifiers::SUPER) {
+                    self.input.delete_to_end();
+                } else if key.modifiers.contains(KeyModifiers::ALT) {
+                    self.input.delete_word_right();
+                } else {
+                    self.input.delete();
+                }
                 self.update_input_state();
                 self.transcript_autoscroll = true;
                 self.transcript_focused = false;
+                self.last_escape = None;
                 Ok(true)
             }
             KeyCode::Left => {
                 if !self.input_enabled {
                     return Ok(true);
                 }
-                self.input.move_left();
+                if self.transcript_focused {
+                    return Ok(true);
+                }
+                if key.modifiers.contains(KeyModifiers::ALT) {
+                    self.input.move_word_left();
+                } else if key.modifiers.contains(KeyModifiers::SUPER) {
+                    self.input.move_home();
+                } else {
+                    self.input.move_left();
+                }
                 self.transcript_focused = false;
                 Ok(true)
             }
@@ -248,12 +285,24 @@ impl RatatuiLoop {
                 if !self.input_enabled {
                     return Ok(true);
                 }
-                self.input.move_right();
+                if self.transcript_focused {
+                    return Ok(true);
+                }
+                if key.modifiers.contains(KeyModifiers::ALT) {
+                    self.input.move_word_right();
+                } else if key.modifiers.contains(KeyModifiers::SUPER) {
+                    self.input.move_end();
+                } else {
+                    self.input.move_right();
+                }
                 self.transcript_focused = false;
                 Ok(true)
             }
             KeyCode::Home => {
                 if !self.input_enabled {
+                    return Ok(true);
+                }
+                if self.transcript_focused {
                     return Ok(true);
                 }
                 self.input.move_home();
@@ -262,6 +311,9 @@ impl RatatuiLoop {
             }
             KeyCode::End => {
                 if !self.input_enabled {
+                    return Ok(true);
+                }
+                if self.transcript_focused {
                     return Ok(true);
                 }
                 self.input.move_end();
@@ -303,8 +355,33 @@ impl RatatuiLoop {
                     {
                         return Ok(true);
                     }
+                    if self.transcript_focused {
+                        if !self.input_enabled {
+                            return Ok(true);
+                        }
+                        match ch {
+                            'a' => {
+                                self.input.move_end();
+                                self.transcript_focused = false;
+                                self.last_escape = None;
+                                return Ok(true);
+                            }
+                            'i' => {
+                                self.input.move_home();
+                                self.transcript_focused = false;
+                                self.last_escape = None;
+                                return Ok(true);
+                            }
+                            _ => {
+                                return Ok(false);
+                            }
+                        }
+                    }
                 }
                 if !self.input_enabled {
+                    return Ok(true);
+                }
+                if self.transcript_focused {
                     return Ok(true);
                 }
                 self.input.insert(ch);

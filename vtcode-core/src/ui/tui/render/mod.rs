@@ -624,11 +624,35 @@ impl RatatuiLoop {
         }
     }
 
+    fn stylize_user_block(&self, block: &MessageBlock, accent: Color) -> MessageBlock {
+        let mut lines = Vec::with_capacity(block.lines.len());
+        for line in &block.lines {
+            let mut segments = Vec::with_capacity(line.segments.len());
+            for segment in &line.segments {
+                let mut styled_segment = segment.clone();
+                let mut style = styled_segment.style.clone();
+                if style.color.is_none() {
+                    style.color = Some(accent);
+                }
+                style.bold = true;
+                styled_segment.style = style;
+                segments.push(styled_segment);
+            }
+            lines.push(StyledLine { segments });
+        }
+        MessageBlock {
+            kind: block.kind,
+            lines,
+        }
+    }
+
     fn build_user_block(&self, block: &MessageBlock, width: usize) -> Vec<Line<'static>> {
+        let accent = self.kind_color(RatatuiMessageKind::User);
         let mut prefix_style = RatatuiTextStyle::default();
-        prefix_style.color = Some(self.kind_color(RatatuiMessageKind::User));
+        prefix_style.color = Some(accent);
         prefix_style.bold = true;
-        self.build_prefixed_block(block, width, "❯ ", prefix_style, self.theme.foreground)
+        let decorated = self.stylize_user_block(block, accent);
+        self.build_prefixed_block(&decorated, width, "❯ ", prefix_style, Some(accent))
     }
 
     fn build_response_block(

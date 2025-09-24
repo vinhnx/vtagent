@@ -160,7 +160,11 @@ Model identifiers should always reference `vtcode-core/src/config/constants.rs` 
     ./run-debug.sh
     ```
 
-CLI options are discoverable via `vtcode --help` or `/help` inside the REPL. All defaults live in `vtcode.toml`, including provider fallbacks, tool allowlists, streaming options, and safety policies.
+CLI options are discoverable via `vtcode --help` or `/help` inside the REPL. All defaults live in
+`vtcode.toml`, including provider fallbacks, tool allowlists, streaming options, and safety
+policies. A Markdown snapshot of the full command tree lives in
+[`docs/CommandLineHelp.md`](docs/CommandLineHelp.md); regenerate it with
+`cargo run -- --markdown-help > docs/CommandLineHelp.md`.
 
 ---
 
@@ -255,6 +259,7 @@ Refer to the guides under `docs/project/` for deep dives on providers, tools, an
 - [**Configuration**](docs/project/) - Advanced configuration options
 - [**Architecture**](docs/ARCHITECTURE.md) - Technical architecture details
 - [**Advanced Features**](docs/ADVANCED_FEATURES_IMPLEMENTATION.md) - Safety controls and debug mode
+- [**CLI Reference**](docs/CommandLineHelp.md) - Generated help text for every command and option
 - [**API Reference**](https://docs.rs/vtcode) - Complete API documentation
 - [**Contributing**](CONTRIBUTING.md) - Development guidelines
 

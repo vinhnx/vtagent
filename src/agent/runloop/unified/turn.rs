@@ -20,7 +20,7 @@ use vtcode_core::tools::registry::{ToolErrorType, ToolExecutionError, ToolPermis
 use vtcode_core::ui::theme;
 use vtcode_core::ui::tui::{
     RatatuiEvent, RatatuiHandle, RatatuiTextStyle, convert_style as convert_ratatui_style,
-    parse_tui_color, spawn_session, theme_from_styles,
+    spawn_session, theme_from_styles,
 };
 use vtcode_core::utils::ansi::{AnsiRenderer, MessageStyle};
 
@@ -64,6 +64,64 @@ enum ToolPermissionFlow {
     Denied,
     Exit,
     Interrupted,
+}
+
+#[derive(Debug)]
+enum ActiveToolResult {
+    Finished(Result<serde_json::Value>),
+    Cancelled,
+    ExitRequested,
+    Interrupted,
+}
+
+async fn wait_for_tool_execution<F>(
+    future: F,
+    events: &mut UnboundedReceiver<RatatuiEvent>,
+    ctrl_c_flag: &Arc<AtomicBool>,
+    ctrl_c_notify: &Arc<Notify>,
+) -> ActiveToolResult
+where
+    F: std::future::Future<Output = Result<serde_json::Value>> + Send,
+{
+    tokio::pin!(future);
+
+    loop {
+        tokio::select! {
+            result = &mut future => {
+                return ActiveToolResult::Finished(result);
+            }
+            _ = ctrl_c_notify.notified() => {
+                if ctrl_c_flag.load(Ordering::SeqCst) {
+                    return ActiveToolResult::Interrupted;
+                }
+            }
+            maybe_event = events.recv() => {
+                match maybe_event {
+                    Some(RatatuiEvent::Cancel) => {
+                        return ActiveToolResult::Cancelled;
+                    }
+                    Some(RatatuiEvent::Exit) => {
+                        return ActiveToolResult::ExitRequested;
+                    }
+                    Some(RatatuiEvent::Interrupt) => {
+                        ctrl_c_flag.store(true, Ordering::SeqCst);
+                        ctrl_c_notify.notify_waiters();
+                        return ActiveToolResult::Interrupted;
+                    }
+                    Some(RatatuiEvent::ScrollLineUp
+                        | RatatuiEvent::ScrollLineDown
+                        | RatatuiEvent::ScrollPageUp
+                        | RatatuiEvent::ScrollPageDown) => {}
+                    Some(RatatuiEvent::Submit(_)) => {
+                        return ActiveToolResult::Cancelled;
+                    }
+                    None => {
+                        return ActiveToolResult::ExitRequested;
+                    }
+                }
+            }
+        }
+    }
 }
 
 struct PlaceholderGuard {
@@ -215,7 +273,6 @@ fn apply_prompt_style(handle: &RatatuiHandle) {
 }
 
 const PLACEHOLDER_SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-const THINKING_SPINNER_COLOR: &str = "#548D8D";
 
 struct PlaceholderSpinner {
     handle: RatatuiHandle,
@@ -225,10 +282,27 @@ struct PlaceholderSpinner {
 }
 
 fn spinner_placeholder_style() -> RatatuiTextStyle {
-    let mut style = RatatuiTextStyle::default();
-    style.bold = true;
-    style.color = parse_tui_color(THINKING_SPINNER_COLOR);
-    style
+    let styles = theme::active_styles();
+    let reasoning = convert_ratatui_style(styles.reasoning);
+
+    let mut candidate = convert_ratatui_style(styles.primary);
+    candidate.bold = true;
+    candidate.italic = false;
+
+    if candidate.color == reasoning.color {
+        let mut fallback = convert_ratatui_style(styles.secondary);
+        fallback.bold = true;
+        fallback.italic = false;
+        if fallback.color == reasoning.color {
+            let mut alt = convert_ratatui_style(styles.output);
+            alt.bold = true;
+            alt.italic = false;
+            return alt;
+        }
+        return fallback;
+    }
+
+    candidate
 }
 
 impl PlaceholderSpinner {
@@ -827,8 +901,11 @@ pub(crate) async fn run_single_agent_loop_unified(
                     reasoning_effort,
                 };
 
-                let thinking_spinner =
-                    PlaceholderSpinner::new(&handle, default_placeholder.clone(), "Thinking...");
+                let thinking_spinner = PlaceholderSpinner::new(
+                    &handle,
+                    default_placeholder.clone(),
+                    "Thinking… · Esc to cancel",
+                );
                 let mut spinner_active = true;
                 task::yield_now().await;
                 let result = if use_streaming {
@@ -992,9 +1069,16 @@ pub(crate) async fn run_single_agent_loop_unified(
                                 default_placeholder.clone(),
                                 format!("Running tool: {}", name),
                             );
-                            match tool_registry.execute_tool(name, args_val.clone()).await {
-                                Ok(tool_output) => {
-                                    tool_spinner.finish();
+                            let execution = wait_for_tool_execution(
+                                tool_registry.execute_tool(name, args_val.clone()),
+                                &mut events,
+                                &ctrl_c_flag,
+                                &ctrl_c_notify,
+                            )
+                            .await;
+                            tool_spinner.finish();
+                            match execution {
+                                ActiveToolResult::Finished(Ok(tool_output)) => {
                                     session_stats.record_tool(name);
                                     traj.log_tool_call(
                                         working_history.len(),
@@ -1077,8 +1161,7 @@ pub(crate) async fn run_single_agent_loop_unified(
                                         break 'outer TurnLoopResult::Completed;
                                     }
                                 }
-                                Err(error) => {
-                                    tool_spinner.finish();
+                                ActiveToolResult::Finished(Err(error)) => {
                                     session_stats.record_tool(name);
                                     renderer.line(
                                         MessageStyle::Tool,
@@ -1109,6 +1192,52 @@ pub(crate) async fn run_single_agent_loop_unified(
                                             context_preserved: true,
                                         },
                                     );
+                                }
+                                ActiveToolResult::Cancelled => {
+                                    session_stats.record_tool(name);
+                                    traj.log_tool_call(
+                                        working_history.len(),
+                                        name,
+                                        &args_val,
+                                        false,
+                                    );
+                                    let cancel_payload = serde_json::json!({
+                                        "error": "Tool execution cancelled by user"
+                                    });
+                                    working_history.push(uni::Message::tool_response(
+                                        call.id.clone(),
+                                        cancel_payload.to_string(),
+                                    ));
+                                    ledger.record_outcome(
+                                        &dec_id,
+                                        DecisionOutcome::Failure {
+                                            error: "tool_cancelled_by_user".to_string(),
+                                            recovery_attempts: 0,
+                                            context_preserved: true,
+                                        },
+                                    );
+                                    renderer.line(
+                                        MessageStyle::Info,
+                                        "Tool execution cancelled by user.",
+                                    )?;
+                                    let acknowledgement =
+                                        "Cancelled the command as requested.".to_string();
+                                    renderer.line(MessageStyle::Response, &acknowledgement)?;
+                                    ensure_turn_bottom_gap(&mut renderer, &mut bottom_gap_applied)?;
+                                    working_history.push(uni::Message::assistant(acknowledgement));
+                                    let _ = last_tool_stdout.take();
+                                    break 'outer TurnLoopResult::Completed;
+                                }
+                                ActiveToolResult::ExitRequested => {
+                                    renderer.line(MessageStyle::Info, "Goodbye!")?;
+                                    break 'outer TurnLoopResult::Cancelled;
+                                }
+                                ActiveToolResult::Interrupted => {
+                                    renderer.line(
+                                        MessageStyle::Info,
+                                        "Stopping current run per interrupt.",
+                                    )?;
+                                    break 'outer TurnLoopResult::Cancelled;
                                 }
                             }
                         }

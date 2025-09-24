@@ -71,38 +71,49 @@ impl RatatuiLoop {
 
         match key.code {
             KeyCode::Enter => {
+                if self.transcript_focused {
+                    if self.input_enabled {
+                        self.transcript_focused = false;
+                        self.last_escape = None;
+                    }
+                    return Ok(true);
+                }
                 if !self.input_enabled {
                     return Ok(true);
                 }
                 let text = self.input.take();
                 self.update_input_state();
                 self.last_escape = None;
+                self.transcript_focused = false;
                 let _ = events.send(RatatuiEvent::Submit(text));
                 self.transcript_autoscroll = true;
                 Ok(true)
             }
             KeyCode::Esc => {
-                if self.input.value().is_empty() {
-                    let now = Instant::now();
-                    let double_escape = self
-                        .last_escape
-                        .map(|last| {
-                            now.duration_since(last).as_millis() <= u128::from(ESCAPE_DOUBLE_MS)
-                        })
-                        .unwrap_or(false);
-                    self.last_escape = Some(now);
-                    if double_escape {
-                        let _ = events.send(RatatuiEvent::Exit);
-                        self.should_exit = true;
+                if self.transcript_focused || !self.input_enabled {
+                    if !self.input_enabled || self.input.value().is_empty() {
+                        self.transcript_focused = true;
+                        let now = Instant::now();
+                        let double_escape = self
+                            .last_escape
+                            .map(|last| {
+                                now.duration_since(last).as_millis() <= u128::from(ESCAPE_DOUBLE_MS)
+                            })
+                            .unwrap_or(false);
+                        self.last_escape = Some(now);
+                        if double_escape {
+                            let _ = events.send(RatatuiEvent::Exit);
+                            self.should_exit = true;
+                        } else {
+                            let _ = events.send(RatatuiEvent::Cancel);
+                        }
                     } else {
-                        let _ = events.send(RatatuiEvent::Cancel);
+                        self.last_escape = None;
                     }
-                } else {
-                    if self.input_enabled {
-                        self.input.clear();
-                        self.update_input_state();
-                    }
+                    return Ok(true);
                 }
+                self.transcript_focused = true;
+                self.last_escape = None;
                 Ok(true)
             }
             KeyCode::Char('c') | KeyCode::Char('d') | KeyCode::Char('z')
@@ -131,12 +142,14 @@ impl RatatuiLoop {
                 self.transcript_scroll.scroll_to_bottom();
                 self.transcript_autoscroll = true;
                 self.scroll_focus = ScrollFocus::Transcript;
+                self.transcript_focused = true;
                 Ok(true)
             }
             KeyCode::Char('?') if key.modifiers.is_empty() => {
                 if self.input_enabled {
                     self.set_input_text("/help".to_string());
                 }
+                self.transcript_focused = false;
                 Ok(true)
             }
             KeyCode::PageUp if key.modifiers.contains(KeyModifiers::ALT) => {
@@ -159,6 +172,7 @@ impl RatatuiLoop {
                 };
                 let handled = self.scroll_page_up_with_focus(focus);
                 self.scroll_focus = focus;
+                self.transcript_focused = matches!(self.scroll_focus, ScrollFocus::Transcript);
                 let _ = events.send(RatatuiEvent::ScrollPageUp);
                 Ok(handled)
             }
@@ -170,8 +184,21 @@ impl RatatuiLoop {
                 };
                 let handled = self.scroll_page_down_with_focus(focus);
                 self.scroll_focus = focus;
+                self.transcript_focused = matches!(self.scroll_focus, ScrollFocus::Transcript);
                 let _ = events.send(RatatuiEvent::ScrollPageDown);
                 Ok(handled)
+            }
+            KeyCode::Up if key.modifiers.contains(KeyModifiers::ALT) => {
+                if self.view_previous_conversation() {
+                    return Ok(true);
+                }
+                Ok(false)
+            }
+            KeyCode::Down if key.modifiers.contains(KeyModifiers::ALT) => {
+                if self.view_next_conversation() {
+                    return Ok(true);
+                }
+                Ok(false)
             }
             KeyCode::Up => {
                 let focus = if key.modifiers.contains(KeyModifiers::SHIFT) {
@@ -181,6 +208,7 @@ impl RatatuiLoop {
                 };
                 let handled = self.scroll_line_up_with_focus(focus);
                 self.scroll_focus = focus;
+                self.transcript_focused = matches!(self.scroll_focus, ScrollFocus::Transcript);
                 let _ = events.send(RatatuiEvent::ScrollLineUp);
                 Ok(handled)
             }
@@ -192,6 +220,7 @@ impl RatatuiLoop {
                 };
                 let handled = self.scroll_line_down_with_focus(focus);
                 self.scroll_focus = focus;
+                self.transcript_focused = matches!(self.scroll_focus, ScrollFocus::Transcript);
                 let _ = events.send(RatatuiEvent::ScrollLineDown);
                 Ok(handled)
             }
@@ -199,62 +228,167 @@ impl RatatuiLoop {
                 if !self.input_enabled {
                     return Ok(true);
                 }
-                self.input.backspace();
+                if self.transcript_focused {
+                    return Ok(true);
+                }
+                if key.modifiers.contains(KeyModifiers::SUPER) {
+                    self.input.delete_to_start();
+                } else if key.modifiers.contains(KeyModifiers::ALT) {
+                    self.input.delete_word_left();
+                } else {
+                    self.input.backspace();
+                }
                 self.update_input_state();
                 self.transcript_autoscroll = true;
+                self.transcript_focused = false;
+                self.last_escape = None;
                 Ok(true)
             }
             KeyCode::Delete => {
                 if !self.input_enabled {
                     return Ok(true);
                 }
-                self.input.delete();
+                if self.transcript_focused {
+                    return Ok(true);
+                }
+                if key.modifiers.contains(KeyModifiers::SUPER) {
+                    self.input.delete_to_end();
+                } else if key.modifiers.contains(KeyModifiers::ALT) {
+                    self.input.delete_word_right();
+                } else {
+                    self.input.delete();
+                }
                 self.update_input_state();
                 self.transcript_autoscroll = true;
+                self.transcript_focused = false;
+                self.last_escape = None;
                 Ok(true)
             }
             KeyCode::Left => {
                 if !self.input_enabled {
                     return Ok(true);
                 }
-                self.input.move_left();
+                if self.transcript_focused {
+                    return Ok(true);
+                }
+                if key.modifiers.contains(KeyModifiers::ALT) {
+                    self.input.move_word_left();
+                } else if key.modifiers.contains(KeyModifiers::SUPER) {
+                    self.input.move_home();
+                } else {
+                    self.input.move_left();
+                }
+                self.transcript_focused = false;
                 Ok(true)
             }
             KeyCode::Right => {
                 if !self.input_enabled {
                     return Ok(true);
                 }
-                self.input.move_right();
+                if self.transcript_focused {
+                    return Ok(true);
+                }
+                if key.modifiers.contains(KeyModifiers::ALT) {
+                    self.input.move_word_right();
+                } else if key.modifiers.contains(KeyModifiers::SUPER) {
+                    self.input.move_end();
+                } else {
+                    self.input.move_right();
+                }
+                self.transcript_focused = false;
                 Ok(true)
             }
             KeyCode::Home => {
                 if !self.input_enabled {
                     return Ok(true);
                 }
+                if self.transcript_focused {
+                    return Ok(true);
+                }
                 self.input.move_home();
+                self.transcript_focused = false;
                 Ok(true)
             }
             KeyCode::End => {
                 if !self.input_enabled {
                     return Ok(true);
                 }
+                if self.transcript_focused {
+                    return Ok(true);
+                }
                 self.input.move_end();
+                self.transcript_focused = false;
                 Ok(true)
             }
             KeyCode::Char(ch) => {
-                if key
-                    .modifiers
-                    .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
-                {
+                if key.modifiers.contains(KeyModifiers::ALT) {
+                    if matches!(ch, 'k') {
+                        if self.view_previous_conversation() {
+                            return Ok(true);
+                        }
+                        return Ok(true);
+                    }
+                    if matches!(ch, 'j') {
+                        if self.view_next_conversation() {
+                            return Ok(true);
+                        }
+                        return Ok(true);
+                    }
                     return Ok(false);
                 }
+
+                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                    return Ok(false);
+                }
+                if key.modifiers.is_empty() {
+                    let history_focus_active = self.transcript_focused || !self.input_enabled;
+                    let allow_from_input = self.input.value().is_empty();
+                    if matches!(ch, 'k')
+                        && (history_focus_active || allow_from_input)
+                        && self.view_previous_conversation()
+                    {
+                        return Ok(true);
+                    }
+                    if matches!(ch, 'j')
+                        && (history_focus_active || allow_from_input)
+                        && self.view_next_conversation()
+                    {
+                        return Ok(true);
+                    }
+                    if self.transcript_focused {
+                        if !self.input_enabled {
+                            return Ok(true);
+                        }
+                        match ch {
+                            'a' => {
+                                self.input.move_end();
+                                self.transcript_focused = false;
+                                self.last_escape = None;
+                                return Ok(true);
+                            }
+                            'i' => {
+                                self.input.move_home();
+                                self.transcript_focused = false;
+                                self.last_escape = None;
+                                return Ok(true);
+                            }
+                            _ => {
+                                return Ok(false);
+                            }
+                        }
+                    }
+                }
                 if !self.input_enabled {
+                    return Ok(true);
+                }
+                if self.transcript_focused {
                     return Ok(true);
                 }
                 self.input.insert(ch);
                 self.update_input_state();
                 self.last_escape = None;
                 self.transcript_autoscroll = true;
+                self.transcript_focused = false;
                 Ok(true)
             }
             _ => Ok(false),
@@ -390,10 +524,14 @@ impl RatatuiLoop {
                     }
                     if let Some(target) = focus {
                         self.scroll_focus = target;
+                        self.transcript_focused = matches!(target, ScrollFocus::Transcript);
                     }
                     return Ok(true);
                 } else {
                     self.selection.clear();
+                    if !in_transcript {
+                        self.transcript_focused = false;
+                    }
                 }
             }
             MouseEventKind::Drag(MouseButton::Left) => {
@@ -414,10 +552,14 @@ impl RatatuiLoop {
         }
 
         let Some(target) = focus else {
+            if !in_transcript {
+                self.transcript_focused = false;
+            }
             return Ok(false);
         };
 
         self.scroll_focus = target;
+        self.transcript_focused = matches!(target, ScrollFocus::Transcript);
 
         let handled = match mouse.kind {
             MouseEventKind::ScrollUp => {

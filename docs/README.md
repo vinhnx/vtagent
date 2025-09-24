@@ -53,6 +53,7 @@ New to VT Code? Start with installation and basic usage:
 -   **[Getting Started](./user-guide/getting-started.md)** - Installation, configuration, and first steps
 -   [Decision Ledger](./context/DECISION_LEDGER.md) - How decisions are tracked and injected
 -   **[Configuration Guide](./CONFIGURATION.md)** - Comprehensive configuration options
+-   **[CLI Reference](./CommandLineHelp.md)** - Generated Markdown help for every command
 
 ### For Developers
 

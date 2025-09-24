@@ -180,6 +180,18 @@ impl RatatuiLoop {
                 let _ = events.send(RatatuiEvent::ScrollPageDown);
                 Ok(handled)
             }
+            KeyCode::Up if key.modifiers.contains(KeyModifiers::ALT) => {
+                if self.view_previous_conversation() {
+                    return Ok(true);
+                }
+                Ok(false)
+            }
+            KeyCode::Down if key.modifiers.contains(KeyModifiers::ALT) => {
+                if self.view_next_conversation() {
+                    return Ok(true);
+                }
+                Ok(false)
+            }
             KeyCode::Up => {
                 let focus = if key.modifiers.contains(KeyModifiers::SHIFT) {
                     ScrollFocus::Pty
@@ -257,21 +269,39 @@ impl RatatuiLoop {
                 Ok(true)
             }
             KeyCode::Char(ch) => {
-                if key
-                    .modifiers
-                    .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
-                {
+                if key.modifiers.contains(KeyModifiers::ALT) {
+                    if matches!(ch, 'k') {
+                        if self.view_previous_conversation() {
+                            return Ok(true);
+                        }
+                        return Ok(true);
+                    }
+                    if matches!(ch, 'j') {
+                        if self.view_next_conversation() {
+                            return Ok(true);
+                        }
+                        return Ok(true);
+                    }
+                    return Ok(false);
+                }
+
+                if key.modifiers.contains(KeyModifiers::CONTROL) {
                     return Ok(false);
                 }
                 if key.modifiers.is_empty() {
                     let history_focus_active = self.transcript_focused || !self.input_enabled;
-                    if history_focus_active {
-                        if matches!(ch, 'k') && self.view_previous_conversation() {
-                            return Ok(true);
-                        }
-                        if matches!(ch, 'j') && self.view_next_conversation() {
-                            return Ok(true);
-                        }
+                    let allow_from_input = self.input.value().is_empty();
+                    if matches!(ch, 'k')
+                        && (history_focus_active || allow_from_input)
+                        && self.view_previous_conversation()
+                    {
+                        return Ok(true);
+                    }
+                    if matches!(ch, 'j')
+                        && (history_focus_active || allow_from_input)
+                        && self.view_next_conversation()
+                    {
+                        return Ok(true);
                     }
                 }
                 if !self.input_enabled {

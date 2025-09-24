@@ -248,6 +248,14 @@ impl RatatuiLoop {
                 {
                     return Ok(false);
                 }
+                if key.modifiers.is_empty() {
+                    if matches!(ch, 'k') && self.view_previous_conversation() {
+                        return Ok(true);
+                    }
+                    if matches!(ch, 'j') && self.view_next_conversation() {
+                        return Ok(true);
+                    }
+                }
                 if !self.input_enabled {
                     return Ok(true);
                 }

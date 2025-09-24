@@ -28,7 +28,7 @@ use unicode_width::UnicodeWidthStr;
 pub(crate) const ESCAPE_DOUBLE_MS: u64 = 750;
 pub(crate) const REDRAW_INTERVAL_MS: u64 = 33;
 pub(crate) const MESSAGE_INDENT: usize = 2;
-pub(crate) const NAVIGATION_HINT_TEXT: &str = "↵ send · esc exit · alt+Pg↑/Pg↓ history";
+pub(crate) const NAVIGATION_HINT_TEXT: &str = "↵ send · esc exit · alt+Pg↑/Pg↓ · j/k history";
 pub(crate) const MAX_SLASH_SUGGESTIONS: usize = 6;
 const SURFACE_ENV_KEY: &str = "VT_RATATUI_SURFACE";
 const INLINE_FALLBACK_ROWS: u16 = 24;

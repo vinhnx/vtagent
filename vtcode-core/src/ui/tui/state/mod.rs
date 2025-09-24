@@ -14,7 +14,7 @@ use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
-    widgets::ListState,
+    widgets::ListState as RatatuiListState,
 };
 use serde_json::Value;
 use std::collections::{HashSet, VecDeque};
@@ -24,6 +24,7 @@ use std::mem;
 use std::time::Instant;
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tui_widget_list::ListState as WidgetListState;
 use unicode_width::UnicodeWidthStr;
 
 pub(crate) const ESCAPE_DOUBLE_MS: u64 = 750;
@@ -639,6 +640,11 @@ impl TranscriptScrollState {
         self.offset = self.max_offset();
     }
 
+    pub(crate) fn set_offset(&mut self, offset: usize) {
+        let max_offset = self.max_offset();
+        self.offset = offset.min(max_offset);
+    }
+
     pub(crate) fn scroll_to_top(&mut self) {
         self.offset = 0;
     }
@@ -807,7 +813,7 @@ impl SelectionState {
 #[derive(Default)]
 pub(crate) struct SlashSuggestionState {
     pub(crate) items: Vec<&'static SlashCommandInfo>,
-    pub(crate) list_state: ListState,
+    pub(crate) list_state: RatatuiListState,
 }
 
 impl SlashSuggestionState {
@@ -851,7 +857,7 @@ impl SlashSuggestionState {
         &self.items
     }
 
-    pub(crate) fn list_state(&mut self) -> &mut ListState {
+    pub(crate) fn list_state(&mut self) -> &mut RatatuiListState {
         &mut self.list_state
     }
 
@@ -1128,6 +1134,7 @@ pub(crate) struct RatatuiLoop {
     pub(crate) theme: RatatuiTheme,
     pub(crate) last_escape: Option<Instant>,
     pub(crate) transcript_scroll: TranscriptScrollState,
+    pub(crate) transcript_list_state: WidgetListState,
     pub(crate) transcript_autoscroll: bool,
     pub(crate) pty_scroll: TranscriptScrollState,
     pub(crate) pty_autoscroll: bool,
@@ -1182,6 +1189,7 @@ impl RatatuiLoop {
             theme,
             last_escape: None,
             transcript_scroll: TranscriptScrollState::default(),
+            transcript_list_state: WidgetListState::default(),
             transcript_autoscroll: true,
             pty_scroll: TranscriptScrollState::default(),
             pty_autoscroll: true,

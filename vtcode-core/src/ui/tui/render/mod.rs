@@ -1,11 +1,12 @@
 use ratatui::{
     Frame,
+    buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
     widgets::{
-        Block, Borders, Clear as ClearWidget, List, ListItem, Paragraph, Scrollbar,
-        ScrollbarOrientation, ScrollbarState, Wrap,
+        Block, Borders, Clear as ClearWidget, List as RatatuiList, ListItem, Paragraph, Scrollbar,
+        ScrollbarOrientation, ScrollbarState, Widget, Wrap,
     },
 };
 use std::cmp;
@@ -19,8 +20,54 @@ use super::state::{
     RatatuiTextStyle, StyledLine, TranscriptDisplay,
 };
 use super::ui::PtyBlockBuilder;
+use tui_widget_list::{ListBuilder, ListView, ScrollAxis};
+
+#[derive(Clone)]
+struct TranscriptListItem {
+    line: Line<'static>,
+}
+
+impl TranscriptListItem {
+    fn new(line: Line<'static>) -> Self {
+        Self { line }
+    }
+}
+
+impl Widget for TranscriptListItem {
+    fn render(self, area: Rect, buf: &mut Buffer)
+    where
+        Self: Sized,
+    {
+        self.line.render(area, buf);
+    }
+}
 
 impl RatatuiLoop {
+    fn cursor_symbol(&self, display: &InputDisplay, row: u16, col: u16) -> String {
+        let row_index = usize::from(row);
+        if row_index >= display.lines.len() {
+            return " ".to_string();
+        }
+        let target = usize::from(col);
+        let mut current = 0usize;
+        for span in &display.lines[row_index].spans {
+            for ch in span.content.chars() {
+                let width = UnicodeWidthChar::width(ch).unwrap_or(0);
+                if width == 0 {
+                    continue;
+                }
+                if current == target {
+                    return ch.to_string();
+                }
+                current = current.saturating_add(width);
+                if current > target {
+                    return ch.to_string();
+                }
+            }
+        }
+        " ".to_string()
+    }
+
     fn render_slash_suggestions(&mut self, frame: &mut Frame, area: Rect) {
         if !self.slash_suggestions.is_visible() {
             return;
@@ -79,7 +126,7 @@ impl RatatuiLoop {
 
         let list_items: Vec<ListItem> = entries.into_iter().map(ListItem::new).collect();
         let border_style = Style::default().fg(self.theme.primary.unwrap_or(Color::LightBlue));
-        let list = List::new(list_items)
+        let list = RatatuiList::new(list_items)
             .block(
                 Block::default()
                     .title(Line::from("? help · / commands"))
@@ -213,12 +260,27 @@ impl RatatuiLoop {
 
             let offset = self.transcript_scroll.offset();
             let highlighted = self.highlight_transcript(display.lines.clone(), offset);
-            let mut paragraph = Paragraph::new(highlighted).alignment(Alignment::Left);
-            if offset > 0 {
-                paragraph = paragraph.scroll((offset as u16, 0));
+            let item_count = highlighted.len();
+            if item_count == 0 {
+                self.transcript_list_state.select(None);
+            } else {
+                let desired = self
+                    .transcript_scroll
+                    .offset()
+                    .min(item_count.saturating_sub(1));
+                self.transcript_list_state.select(Some(desired));
             }
-            paragraph = paragraph.style(foreground_style);
-            frame.render_widget(paragraph, text_area);
+            let builder_lines = highlighted;
+            let builder = ListBuilder::new(move |context| {
+                let line = builder_lines[context.index].clone();
+                (TranscriptListItem::new(line), 1)
+            });
+            let list = ListView::new(builder, item_count)
+                .style(foreground_style)
+                .scroll_axis(ScrollAxis::Vertical);
+            frame.render_stateful_widget(list, text_area, &mut self.transcript_list_state);
+            let actual_offset = self.transcript_list_state.scroll_offset_index();
+            self.transcript_scroll.set_offset(actual_offset);
             self.update_pty_area(text_area);
 
             if let Some(scroll_area) = scrollbar_area {
@@ -284,14 +346,35 @@ impl RatatuiLoop {
                         self.render_slash_suggestions(frame, input_area);
                     }
 
-                    if self.cursor_visible {
-                        if let Some((row, col)) = display.cursor {
-                            if row < input_area.height && col < input_area.width {
-                                let cursor_x = input_area.x + col;
-                                let cursor_y = input_area.y + row;
-                                frame.set_cursor_position((cursor_x, cursor_y));
-                            }
-                        }
+                    if let Some((row, col)) = display.cursor.filter(|(row, col)| {
+                        self.cursor_visible && *row < input_area.height && *col < input_area.width
+                    }) {
+                        let cursor_x = input_area.x + col;
+                        let cursor_y = input_area.y + row;
+                        let fill_color = self
+                            .theme
+                            .primary
+                            .or(self.theme.foreground)
+                            .unwrap_or(Color::White);
+                        let text_color = self
+                            .theme
+                            .background
+                            .or(self.theme.foreground)
+                            .unwrap_or(Color::Black);
+                        let glyph = if self.show_placeholder {
+                            " ".to_string()
+                        } else {
+                            self.cursor_symbol(&display, row, col)
+                        };
+                        let cursor_style = Style::default()
+                            .bg(fill_color)
+                            .fg(text_color)
+                            .add_modifier(Modifier::BOLD);
+                        let overlay =
+                            Paragraph::new(Line::from(vec![Span::styled(glyph, cursor_style)]));
+                        let cursor_area = Rect::new(cursor_x, cursor_y, 1, 1);
+                        frame.render_widget(overlay, cursor_area);
+                        frame.set_cursor_position((cursor_x, cursor_y));
                     }
                 }
             }

@@ -20,7 +20,7 @@ use vtcode_core::tools::registry::{ToolErrorType, ToolExecutionError, ToolPermis
 use vtcode_core::ui::theme;
 use vtcode_core::ui::tui::{
     RatatuiEvent, RatatuiHandle, RatatuiTextStyle, convert_style as convert_ratatui_style,
-    parse_tui_color, spawn_session, theme_from_styles,
+    spawn_session, theme_from_styles,
 };
 use vtcode_core::utils::ansi::{AnsiRenderer, MessageStyle};
 
@@ -215,7 +215,6 @@ fn apply_prompt_style(handle: &RatatuiHandle) {
 }
 
 const PLACEHOLDER_SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-const THINKING_SPINNER_COLOR: &str = "#548D8D";
 
 struct PlaceholderSpinner {
     handle: RatatuiHandle,
@@ -225,10 +224,27 @@ struct PlaceholderSpinner {
 }
 
 fn spinner_placeholder_style() -> RatatuiTextStyle {
-    let mut style = RatatuiTextStyle::default();
-    style.bold = true;
-    style.color = parse_tui_color(THINKING_SPINNER_COLOR);
-    style
+    let styles = theme::active_styles();
+    let reasoning = convert_ratatui_style(styles.reasoning);
+
+    let mut candidate = convert_ratatui_style(styles.primary);
+    candidate.bold = true;
+    candidate.italic = false;
+
+    if candidate.color == reasoning.color {
+        let mut fallback = convert_ratatui_style(styles.secondary);
+        fallback.bold = true;
+        fallback.italic = false;
+        if fallback.color == reasoning.color {
+            let mut alt = convert_ratatui_style(styles.output);
+            alt.bold = true;
+            alt.italic = false;
+            return alt;
+        }
+        return fallback;
+    }
+
+    candidate
 }
 
 impl PlaceholderSpinner {
@@ -827,8 +843,11 @@ pub(crate) async fn run_single_agent_loop_unified(
                     reasoning_effort,
                 };
 
-                let thinking_spinner =
-                    PlaceholderSpinner::new(&handle, default_placeholder.clone(), "Thinking...");
+                let thinking_spinner = PlaceholderSpinner::new(
+                    &handle,
+                    default_placeholder.clone(),
+                    "Thinking… · Esc to cancel",
+                );
                 let mut spinner_active = true;
                 task::yield_now().await;
                 let result = if use_streaming {

@@ -3,7 +3,7 @@ use ansi_to_tui::IntoText;
 use anyhow::{Context, Result};
 use crossterm::{
     ExecutableCommand, cursor,
-    event::{EnableMouseCapture, DisableMouseCapture},
+    event::{DisableMouseCapture, EnableMouseCapture},
     terminal::{
         Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode,
         enable_raw_mode,
@@ -1019,6 +1019,7 @@ pub(crate) struct RatatuiLoop {
     pub(crate) pty_scroll: TranscriptScrollState,
     pub(crate) pty_autoscroll: bool,
     pub(crate) scroll_focus: ScrollFocus,
+    pub(crate) transcript_focused: bool,
     pub(crate) transcript_area: Option<Rect>,
     pub(crate) pty_area: Option<Rect>,
     pub(crate) pty_block: Option<PtyPlacement>,
@@ -1072,6 +1073,7 @@ impl RatatuiLoop {
             pty_scroll: TranscriptScrollState::default(),
             pty_autoscroll: true,
             scroll_focus: ScrollFocus::Transcript,
+            transcript_focused: false,
             transcript_area: None,
             pty_area: None,
             pty_block: None,
@@ -1489,6 +1491,7 @@ impl RatatuiLoop {
         }
         self.active_conversation -= 1;
         self.transcript_autoscroll = false;
+        self.transcript_focused = true;
         if let Some(&offset) = self.conversation_line_offsets.get(self.active_conversation) {
             self.transcript_scroll.jump_to(offset);
         } else {
@@ -1514,6 +1517,7 @@ impl RatatuiLoop {
                 self.transcript_scroll.scroll_to_top();
             }
         }
+        self.transcript_focused = true;
         self.scroll_focus = ScrollFocus::Transcript;
         true
     }

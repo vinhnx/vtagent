@@ -77,12 +77,14 @@ impl RatatuiLoop {
                 let text = self.input.take();
                 self.update_input_state();
                 self.last_escape = None;
+                self.transcript_focused = false;
                 let _ = events.send(RatatuiEvent::Submit(text));
                 self.transcript_autoscroll = true;
                 Ok(true)
             }
             KeyCode::Esc => {
                 if self.input.value().is_empty() {
+                    self.transcript_focused = true;
                     let now = Instant::now();
                     let double_escape = self
                         .last_escape
@@ -102,6 +104,7 @@ impl RatatuiLoop {
                         self.input.clear();
                         self.update_input_state();
                     }
+                    self.transcript_focused = false;
                 }
                 Ok(true)
             }
@@ -131,12 +134,14 @@ impl RatatuiLoop {
                 self.transcript_scroll.scroll_to_bottom();
                 self.transcript_autoscroll = true;
                 self.scroll_focus = ScrollFocus::Transcript;
+                self.transcript_focused = true;
                 Ok(true)
             }
             KeyCode::Char('?') if key.modifiers.is_empty() => {
                 if self.input_enabled {
                     self.set_input_text("/help".to_string());
                 }
+                self.transcript_focused = false;
                 Ok(true)
             }
             KeyCode::PageUp if key.modifiers.contains(KeyModifiers::ALT) => {
@@ -159,6 +164,7 @@ impl RatatuiLoop {
                 };
                 let handled = self.scroll_page_up_with_focus(focus);
                 self.scroll_focus = focus;
+                self.transcript_focused = matches!(self.scroll_focus, ScrollFocus::Transcript);
                 let _ = events.send(RatatuiEvent::ScrollPageUp);
                 Ok(handled)
             }
@@ -170,6 +176,7 @@ impl RatatuiLoop {
                 };
                 let handled = self.scroll_page_down_with_focus(focus);
                 self.scroll_focus = focus;
+                self.transcript_focused = matches!(self.scroll_focus, ScrollFocus::Transcript);
                 let _ = events.send(RatatuiEvent::ScrollPageDown);
                 Ok(handled)
             }
@@ -181,6 +188,7 @@ impl RatatuiLoop {
                 };
                 let handled = self.scroll_line_up_with_focus(focus);
                 self.scroll_focus = focus;
+                self.transcript_focused = matches!(self.scroll_focus, ScrollFocus::Transcript);
                 let _ = events.send(RatatuiEvent::ScrollLineUp);
                 Ok(handled)
             }
@@ -192,6 +200,7 @@ impl RatatuiLoop {
                 };
                 let handled = self.scroll_line_down_with_focus(focus);
                 self.scroll_focus = focus;
+                self.transcript_focused = matches!(self.scroll_focus, ScrollFocus::Transcript);
                 let _ = events.send(RatatuiEvent::ScrollLineDown);
                 Ok(handled)
             }
@@ -202,6 +211,7 @@ impl RatatuiLoop {
                 self.input.backspace();
                 self.update_input_state();
                 self.transcript_autoscroll = true;
+                self.transcript_focused = false;
                 Ok(true)
             }
             KeyCode::Delete => {
@@ -211,6 +221,7 @@ impl RatatuiLoop {
                 self.input.delete();
                 self.update_input_state();
                 self.transcript_autoscroll = true;
+                self.transcript_focused = false;
                 Ok(true)
             }
             KeyCode::Left => {
@@ -218,6 +229,7 @@ impl RatatuiLoop {
                     return Ok(true);
                 }
                 self.input.move_left();
+                self.transcript_focused = false;
                 Ok(true)
             }
             KeyCode::Right => {
@@ -225,6 +237,7 @@ impl RatatuiLoop {
                     return Ok(true);
                 }
                 self.input.move_right();
+                self.transcript_focused = false;
                 Ok(true)
             }
             KeyCode::Home => {
@@ -232,6 +245,7 @@ impl RatatuiLoop {
                     return Ok(true);
                 }
                 self.input.move_home();
+                self.transcript_focused = false;
                 Ok(true)
             }
             KeyCode::End => {
@@ -239,6 +253,7 @@ impl RatatuiLoop {
                     return Ok(true);
                 }
                 self.input.move_end();
+                self.transcript_focused = false;
                 Ok(true)
             }
             KeyCode::Char(ch) => {
@@ -249,11 +264,14 @@ impl RatatuiLoop {
                     return Ok(false);
                 }
                 if key.modifiers.is_empty() {
-                    if matches!(ch, 'k') && self.view_previous_conversation() {
-                        return Ok(true);
-                    }
-                    if matches!(ch, 'j') && self.view_next_conversation() {
-                        return Ok(true);
+                    let history_focus_active = self.transcript_focused || !self.input_enabled;
+                    if history_focus_active {
+                        if matches!(ch, 'k') && self.view_previous_conversation() {
+                            return Ok(true);
+                        }
+                        if matches!(ch, 'j') && self.view_next_conversation() {
+                            return Ok(true);
+                        }
                     }
                 }
                 if !self.input_enabled {
@@ -263,6 +281,7 @@ impl RatatuiLoop {
                 self.update_input_state();
                 self.last_escape = None;
                 self.transcript_autoscroll = true;
+                self.transcript_focused = false;
                 Ok(true)
             }
             _ => Ok(false),
@@ -398,10 +417,14 @@ impl RatatuiLoop {
                     }
                     if let Some(target) = focus {
                         self.scroll_focus = target;
+                        self.transcript_focused = matches!(target, ScrollFocus::Transcript);
                     }
                     return Ok(true);
                 } else {
                     self.selection.clear();
+                    if !in_transcript {
+                        self.transcript_focused = false;
+                    }
                 }
             }
             MouseEventKind::Drag(MouseButton::Left) => {
@@ -422,10 +445,14 @@ impl RatatuiLoop {
         }
 
         let Some(target) = focus else {
+            if !in_transcript {
+                self.transcript_focused = false;
+            }
             return Ok(false);
         };
 
         self.scroll_focus = target;
+        self.transcript_focused = matches!(target, ScrollFocus::Transcript);
 
         let handled = match mouse.kind {
             MouseEventKind::ScrollUp => {

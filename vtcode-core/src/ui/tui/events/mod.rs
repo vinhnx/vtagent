@@ -342,17 +342,13 @@ impl RatatuiLoop {
                 }
                 if key.modifiers.is_empty() {
                     let history_focus_active = self.transcript_focused || !self.input_enabled;
-                    let allow_from_input = self.input.value().is_empty();
                     if matches!(ch, 'k')
-                        && (history_focus_active || allow_from_input)
+                        && history_focus_active
                         && self.view_previous_conversation()
                     {
                         return Ok(true);
                     }
-                    if matches!(ch, 'j')
-                        && (history_focus_active || allow_from_input)
-                        && self.view_next_conversation()
-                    {
+                    if matches!(ch, 'j') && history_focus_active && self.view_next_conversation() {
                         return Ok(true);
                     }
                     if self.transcript_focused {

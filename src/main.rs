@@ -4,6 +4,7 @@
 
 use anyhow::{Context, Result, anyhow, bail};
 use clap::Parser;
+use clap_markdown::print_help_markdown;
 use colorchoice::ColorChoice as GlobalColorChoice;
 use std::path::PathBuf;
 use vtcode_core::cli::args::{Cli, Commands};
@@ -23,6 +24,10 @@ async fn main() -> Result<()> {
     load_dotenv().ok();
 
     let args = Cli::parse();
+    if args.markdown_help {
+        print_help_markdown::<Cli>();
+        return Ok(());
+    }
     args.color.write_global();
     if args.no_color {
         GlobalColorChoice::Never.write_global();

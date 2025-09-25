@@ -18,6 +18,10 @@ pub struct Cli {
     #[command(flatten)]
     pub color: ColorSelection,
 
+    /// Emit Markdown documentation for the CLI (hidden helper)
+    #[arg(long, hide = true)]
+    pub markdown_help: bool,
+
     /// Optional positional path to run vtcode against a different workspace
     #[arg(
         value_name = "WORKSPACE",
@@ -602,6 +606,7 @@ impl Default for Cli {
             color: ColorSelection {
                 color: ColorChoice::Auto,
             },
+            markdown_help: false,
             workspace_path: None,
             model: Some(ModelId::default().as_str().to_string()),
             provider: Some("gemini".to_string()),

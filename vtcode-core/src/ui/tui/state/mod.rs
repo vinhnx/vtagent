@@ -1,9 +1,10 @@
+use crate::config::constants::tools;
 use crate::ui::slash::{SlashCommandInfo, suggestions_for};
 use ansi_to_tui::IntoText;
 use anyhow::{Context, Result};
 use crossterm::{
     ExecutableCommand, cursor,
-    event::{EnableMouseCapture, DisableMouseCapture},
+    event::{DisableMouseCapture, EnableMouseCapture},
     terminal::{
         Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode,
         enable_raw_mode,
@@ -13,25 +14,28 @@ use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
-    widgets::ListState,
+    widgets::ListState as RatatuiListState,
 };
 use serde_json::Value;
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::env;
 use std::io::{self, IsTerminal};
 use std::mem;
 use std::time::Instant;
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tui_widget_list::ListState as WidgetListState;
 use unicode_width::UnicodeWidthStr;
 
 pub(crate) const ESCAPE_DOUBLE_MS: u64 = 750;
 pub(crate) const REDRAW_INTERVAL_MS: u64 = 33;
 pub(crate) const MESSAGE_INDENT: usize = 2;
-pub(crate) const NAVIGATION_HINT_TEXT: &str = "↵ send · esc exit · alt+Pg↑/Pg↓ history";
+pub(crate) const NAVIGATION_HINT_TEXT: &str =
+    "↵ send/edit · esc focus/cancel · alt+Pg↑/Pg↓ history · alt+↑/↓ history · j/k history";
 pub(crate) const MAX_SLASH_SUGGESTIONS: usize = 6;
 const SURFACE_ENV_KEY: &str = "VT_RATATUI_SURFACE";
 const INLINE_FALLBACK_ROWS: u16 = 24;
+const TOOL_SUMMARY_SNIPPET_LIMIT: usize = 48;
 
 #[derive(Clone, Default, PartialEq)]
 pub struct RatatuiTextStyle {
@@ -453,6 +457,116 @@ impl InputState {
         self.value.replace_range(self.cursor..end, "");
     }
 
+    fn prev_word_boundary(&self) -> usize {
+        if self.cursor == 0 {
+            return 0;
+        }
+
+        let slice = &self.value[..self.cursor];
+        let mut chars: Vec<(usize, char)> = slice.char_indices().collect();
+        if chars.is_empty() {
+            return 0;
+        }
+
+        let mut index = self.cursor;
+
+        while let Some((position, ch)) = chars.pop() {
+            if ch.is_whitespace() {
+                index = position;
+            } else {
+                chars.push((position, ch));
+                break;
+            }
+        }
+
+        while let Some((position, ch)) = chars.pop() {
+            if ch.is_whitespace() {
+                index = position + ch.len_utf8();
+                break;
+            }
+            index = position;
+        }
+
+        index
+    }
+
+    fn next_word_boundary(&self) -> usize {
+        if self.cursor >= self.value.len() {
+            return self.value.len();
+        }
+
+        let slice = &self.value[self.cursor..];
+        let chars: Vec<(usize, char)> = slice.char_indices().collect();
+        if chars.is_empty() {
+            return self.value.len();
+        }
+
+        let mut index = self.cursor;
+        let mut current = 0usize;
+
+        while current < chars.len() {
+            let (offset, ch) = chars[current];
+            if ch.is_whitespace() {
+                index = self.cursor + offset + ch.len_utf8();
+                current += 1;
+            } else {
+                break;
+            }
+        }
+
+        while current < chars.len() {
+            let (offset, ch) = chars[current];
+            if ch.is_whitespace() {
+                index = self.cursor + offset;
+                break;
+            }
+            index = self.cursor + offset + ch.len_utf8();
+            current += 1;
+        }
+
+        index
+    }
+
+    pub(crate) fn move_word_left(&mut self) {
+        let boundary = self.prev_word_boundary();
+        self.cursor = boundary;
+    }
+
+    pub(crate) fn move_word_right(&mut self) {
+        let boundary = self.next_word_boundary();
+        self.cursor = boundary;
+    }
+
+    pub(crate) fn delete_word_left(&mut self) {
+        let boundary = self.prev_word_boundary();
+        if boundary < self.cursor {
+            self.value.replace_range(boundary..self.cursor, "");
+            self.cursor = boundary;
+        }
+    }
+
+    pub(crate) fn delete_word_right(&mut self) {
+        let boundary = self.next_word_boundary();
+        if boundary > self.cursor {
+            self.value.replace_range(self.cursor..boundary, "");
+        }
+    }
+
+    pub(crate) fn delete_to_start(&mut self) {
+        if self.cursor == 0 {
+            return;
+        }
+        self.value.replace_range(..self.cursor, "");
+        self.cursor = 0;
+    }
+
+    pub(crate) fn delete_to_end(&mut self) {
+        if self.cursor >= self.value.len() {
+            return;
+        }
+        self.value.truncate(self.cursor);
+    }
+
     pub(crate) fn move_left(&mut self) {
         if self.cursor == 0 {
             return;
@@ -524,6 +638,11 @@ impl TranscriptScrollState {
 
     pub(crate) fn scroll_to_bottom(&mut self) {
         self.offset = self.max_offset();
+    }
+
+    pub(crate) fn set_offset(&mut self, offset: usize) {
+        let max_offset = self.max_offset();
+        self.offset = offset.min(max_offset);
     }
 
     pub(crate) fn scroll_to_top(&mut self) {
@@ -694,7 +813,7 @@ impl SelectionState {
 #[derive(Default)]
 pub(crate) struct SlashSuggestionState {
     pub(crate) items: Vec<&'static SlashCommandInfo>,
-    pub(crate) list_state: ListState,
+    pub(crate) list_state: RatatuiListState,
 }
 
 impl SlashSuggestionState {
@@ -738,7 +857,7 @@ impl SlashSuggestionState {
         &self.items
     }
 
-    pub(crate) fn list_state(&mut self) -> &mut ListState {
+    pub(crate) fn list_state(&mut self) -> &mut RatatuiListState {
         &mut self.list_state
     }
 
@@ -1015,10 +1134,12 @@ pub(crate) struct RatatuiLoop {
     pub(crate) theme: RatatuiTheme,
     pub(crate) last_escape: Option<Instant>,
     pub(crate) transcript_scroll: TranscriptScrollState,
+    pub(crate) transcript_list_state: WidgetListState,
     pub(crate) transcript_autoscroll: bool,
     pub(crate) pty_scroll: TranscriptScrollState,
     pub(crate) pty_autoscroll: bool,
     pub(crate) scroll_focus: ScrollFocus,
+    pub(crate) transcript_focused: bool,
     pub(crate) transcript_area: Option<Rect>,
     pub(crate) pty_area: Option<Rect>,
     pub(crate) pty_block: Option<PtyPlacement>,
@@ -1068,10 +1189,12 @@ impl RatatuiLoop {
             theme,
             last_escape: None,
             transcript_scroll: TranscriptScrollState::default(),
+            transcript_list_state: WidgetListState::default(),
             transcript_autoscroll: true,
             pty_scroll: TranscriptScrollState::default(),
             pty_autoscroll: true,
             scroll_focus: ScrollFocus::Transcript,
+            transcript_focused: false,
             transcript_area: None,
             pty_area: None,
             pty_block: None,
@@ -1194,8 +1317,10 @@ impl RatatuiLoop {
                 self.input_enabled = enabled;
                 if !enabled {
                     self.slash_suggestions.clear();
+                    self.transcript_focused = true;
                 } else {
                     self.update_input_state();
+                    self.transcript_focused = false;
                 }
                 true
             }
@@ -1383,54 +1508,348 @@ impl RatatuiLoop {
     }
 
     pub(crate) fn build_tool_summary_lines(&self, summary: &ToolCallSummary) -> Vec<StyledLine> {
-        let mut entries: Vec<(String, String)> = Vec::new();
-        entries.push(("Tool".to_string(), summary.name.clone()));
-        if summary.fields.is_empty() {
-            entries.push(("Arguments".to_string(), "—".to_string()));
-        } else {
-            for (key, value) in &summary.fields {
-                let label = Self::format_tool_field_key(key);
-                let cleaned = if value.trim().is_empty() {
-                    "—".to_string()
-                } else {
-                    value.clone()
-                };
-                entries.push((label, cleaned));
-            }
-        }
+        let (heading, used_fields) = Self::tool_heading(summary);
+        let mut lines = Vec::new();
 
-        let max_width = entries
-            .iter()
-            .map(|(label, _)| UnicodeWidthStr::width(label.as_str()))
-            .max()
-            .unwrap_or(0);
+        if !heading.is_empty() {
+            let mut line = StyledLine::default();
+            line.push_segment(RatatuiSegment {
+                text: heading,
+                style: self.tool_heading_style(),
+            });
+            lines.push(line);
+        }
 
         let label_style = self.tool_label_style();
         let value_style = self.tool_value_style();
 
-        entries
-            .into_iter()
-            .map(|(mut label, value)| {
-                let width = UnicodeWidthStr::width(label.as_str());
-                if width < max_width {
-                    label.push_str(&" ".repeat(max_width - width));
+        for (key, value) in &summary.fields {
+            if used_fields.contains(key) {
+                continue;
+            }
+            let snippet = Self::format_tool_snippet(value);
+            if snippet.is_empty() {
+                continue;
+            }
+            let mut line = StyledLine::default();
+            line.push_segment(RatatuiSegment {
+                text: "• ".to_string(),
+                style: label_style.clone(),
+            });
+            line.push_segment(RatatuiSegment {
+                text: format!("{}: ", Self::format_tool_field_key(key)),
+                style: label_style.clone(),
+            });
+            line.push_segment(RatatuiSegment {
+                text: snippet,
+                style: value_style.clone(),
+            });
+            lines.push(line);
+        }
+
+        if lines.is_empty() {
+            let fallback = Self::format_tool_field_key(&summary.name);
+            let mut line = StyledLine::default();
+            line.push_segment(RatatuiSegment {
+                text: fallback,
+                style: label_style,
+            });
+            lines.push(line);
+        }
+
+        lines
+    }
+
+    fn tool_heading(summary: &ToolCallSummary) -> (String, HashSet<String>) {
+        let mut used = HashSet::new();
+        let heading = match summary.name.as_str() {
+            tools::RUN_TERMINAL_CMD => {
+                if let Some(command) =
+                    Self::pick_tool_field(&summary.fields, &mut used, &["command"])
+                {
+                    format!("Run command {}", Self::format_tool_snippet(&command))
+                } else {
+                    "Run terminal command".to_string()
                 }
-                let mut line = StyledLine::default();
-                line.push_segment(RatatuiSegment {
-                    text: label,
-                    style: label_style.clone(),
-                });
-                line.push_segment(RatatuiSegment {
-                    text: ": ".to_string(),
-                    style: label_style.clone(),
-                });
-                line.push_segment(RatatuiSegment {
-                    text: value,
-                    style: value_style.clone(),
-                });
-                line
+            }
+            tools::BASH => {
+                let command =
+                    Self::pick_tool_field(&summary.fields, &mut used, &["bash_command", "command"]);
+                let path = Self::pick_tool_field(&summary.fields, &mut used, &["path"]);
+                match (command, path) {
+                    (Some(command), Some(path)) => format!(
+                        "Run bash {} in {}",
+                        Self::format_tool_snippet(&command),
+                        Self::format_tool_snippet(&path)
+                    ),
+                    (Some(command), None) => {
+                        format!("Run bash {}", Self::format_tool_snippet(&command))
+                    }
+                    (None, Some(path)) => {
+                        format!("Run bash in {}", Self::format_tool_snippet(&path))
+                    }
+                    (None, None) => "Run bash command".to_string(),
+                }
+            }
+            tools::LIST_FILES => {
+                if let Some(path) = Self::pick_tool_field(&summary.fields, &mut used, &["path"]) {
+                    format!("List files in {}", Self::format_tool_snippet(&path))
+                } else {
+                    "List files".to_string()
+                }
+            }
+            tools::GREP_SEARCH => {
+                let pattern =
+                    Self::pick_tool_field(&summary.fields, &mut used, &["pattern", "query"]);
+                let path = Self::pick_tool_field(&summary.fields, &mut used, &["path"]);
+                match (pattern, path) {
+                    (Some(pattern), Some(path)) => format!(
+                        "Grep {} in {}",
+                        Self::format_tool_snippet(&pattern),
+                        Self::format_tool_snippet(&path)
+                    ),
+                    (Some(pattern), None) => {
+                        format!("Grep {}", Self::format_tool_snippet(&pattern))
+                    }
+                    (None, Some(path)) => {
+                        format!("Search in {}", Self::format_tool_snippet(&path))
+                    }
+                    (None, None) => "Search with ripgrep".to_string(),
+                }
+            }
+            tools::SIMPLE_SEARCH => {
+                let command = Self::pick_tool_field(&summary.fields, &mut used, &["command"]);
+                let command_lower = command.as_ref().map(|value| value.to_ascii_lowercase());
+                let pattern = Self::pick_tool_field(&summary.fields, &mut used, &["pattern"]);
+                let path =
+                    Self::pick_tool_field(&summary.fields, &mut used, &["path", "file_path"]);
+
+                if let Some(command_lower) = command_lower.as_deref() {
+                    match command_lower {
+                        "ls" => {
+                            if let Some(path) = path.as_ref() {
+                                format!("List files in {}", Self::format_tool_snippet(path))
+                            } else {
+                                "List files".to_string()
+                            }
+                        }
+                        "grep" => {
+                            if let Some(pattern) = pattern.as_ref() {
+                                if let Some(path) = path.as_ref() {
+                                    format!(
+                                        "Grep {} in {}",
+                                        Self::format_tool_snippet(pattern),
+                                        Self::format_tool_snippet(path)
+                                    )
+                                } else {
+                                    format!("Grep {}", Self::format_tool_snippet(pattern))
+                                }
+                            } else {
+                                "Grep search".to_string()
+                            }
+                        }
+                        "find" => {
+                            if let Some(pattern) = pattern.as_ref() {
+                                if let Some(path) = path.as_ref() {
+                                    format!(
+                                        "Find {} under {}",
+                                        Self::format_tool_snippet(pattern),
+                                        Self::format_tool_snippet(path)
+                                    )
+                                } else {
+                                    format!("Find {}", Self::format_tool_snippet(pattern))
+                                }
+                            } else if let Some(path) = path.as_ref() {
+                                format!("Find files in {}", Self::format_tool_snippet(path))
+                            } else {
+                                "Find files".to_string()
+                            }
+                        }
+                        "cat" => {
+                            if let Some(path) = path.as_ref() {
+                                format!("View file {}", Self::format_tool_snippet(path))
+                            } else {
+                                "View file".to_string()
+                            }
+                        }
+                        "head" => {
+                            if let Some(path) = path.as_ref() {
+                                format!("Head of {}", Self::format_tool_snippet(path))
+                            } else {
+                                "Head command".to_string()
+                            }
+                        }
+                        "tail" => {
+                            if let Some(path) = path.as_ref() {
+                                format!("Tail of {}", Self::format_tool_snippet(path))
+                            } else {
+                                "Tail command".to_string()
+                            }
+                        }
+                        other => {
+                            if let Some(command) = command.as_ref() {
+                                format!("Simple search {}", Self::format_tool_snippet(command))
+                            } else {
+                                format!("Simple search {}", Self::format_tool_snippet(other))
+                            }
+                        }
+                    }
+                } else {
+                    "Simple search".to_string()
+                }
+            }
+            tools::READ_FILE => {
+                if let Some(path) = Self::pick_tool_field(&summary.fields, &mut used, &["path"]) {
+                    format!("Read file {}", Self::format_tool_snippet(&path))
+                } else {
+                    "Read file".to_string()
+                }
+            }
+            tools::WRITE_FILE => {
+                if let Some(path) = Self::pick_tool_field(&summary.fields, &mut used, &["path"]) {
+                    format!("Write file {}", Self::format_tool_snippet(&path))
+                } else {
+                    "Write file".to_string()
+                }
+            }
+            tools::EDIT_FILE => {
+                if let Some(path) = Self::pick_tool_field(&summary.fields, &mut used, &["path"]) {
+                    format!("Edit file {}", Self::format_tool_snippet(&path))
+                } else {
+                    "Edit file".to_string()
+                }
+            }
+            tools::CREATE_FILE => {
+                if let Some(path) = Self::pick_tool_field(&summary.fields, &mut used, &["path"]) {
+                    format!("Create file {}", Self::format_tool_snippet(&path))
+                } else {
+                    "Create file".to_string()
+                }
+            }
+            tools::DELETE_FILE => {
+                if let Some(path) = Self::pick_tool_field(&summary.fields, &mut used, &["path"]) {
+                    format!("Delete file {}", Self::format_tool_snippet(&path))
+                } else {
+                    "Delete file".to_string()
+                }
+            }
+            tools::AST_GREP_SEARCH => {
+                let pattern = Self::pick_tool_field(&summary.fields, &mut used, &["pattern"]);
+                let path = Self::pick_tool_field(&summary.fields, &mut used, &["path"]);
+                match (pattern, path) {
+                    (Some(pattern), Some(path)) => format!(
+                        "AST grep {} in {}",
+                        Self::format_tool_snippet(&pattern),
+                        Self::format_tool_snippet(&path)
+                    ),
+                    (Some(pattern), None) => {
+                        format!("AST grep {}", Self::format_tool_snippet(&pattern))
+                    }
+                    (None, Some(path)) => {
+                        format!("AST grep in {}", Self::format_tool_snippet(&path))
+                    }
+                    (None, None) => "AST grep search".to_string(),
+                }
+            }
+            tools::APPLY_PATCH => {
+                if let Some(path) = Self::pick_tool_field(&summary.fields, &mut used, &["path"]) {
+                    format!("Apply patch to {}", Self::format_tool_snippet(&path))
+                } else {
+                    "Apply patch".to_string()
+                }
+            }
+            tools::SRGN => {
+                let pattern =
+                    Self::pick_tool_field(&summary.fields, &mut used, &["pattern", "query"]);
+                let path = Self::pick_tool_field(&summary.fields, &mut used, &["path"]);
+                match (pattern, path) {
+                    (Some(pattern), Some(path)) => format!(
+                        "Structural replace {} in {}",
+                        Self::format_tool_snippet(&pattern),
+                        Self::format_tool_snippet(&path)
+                    ),
+                    (Some(pattern), None) => {
+                        format!("Structural replace {}", Self::format_tool_snippet(&pattern))
+                    }
+                    (None, Some(path)) => {
+                        format!("Structural replace in {}", Self::format_tool_snippet(&path))
+                    }
+                    (None, None) => "Structural replace".to_string(),
+                }
+            }
+            tools::CURL => {
+                if let Some(url) = Self::pick_tool_field(&summary.fields, &mut used, &["url"]) {
+                    format!("Fetch {}", Self::format_tool_snippet(&url))
+                } else {
+                    "Fetch URL".to_string()
+                }
+            }
+            tools::UPDATE_PLAN => "Update plan".to_string(),
+            _ => format!("Use {}", Self::format_tool_field_key(&summary.name)),
+        };
+
+        (heading, used)
+    }
+
+    fn pick_tool_field(
+        fields: &[(String, String)],
+        used: &mut HashSet<String>,
+        keys: &[&str],
+    ) -> Option<String> {
+        for key in keys {
+            if let Some((_, value)) = fields.iter().find(|(candidate, _)| candidate == key) {
+                let trimmed = value.trim();
+                if trimmed.is_empty() {
+                    continue;
+                }
+                used.insert((*key).to_string());
+                return Some(trimmed.to_string());
+            }
+        }
+        None
+    }
+
+    fn format_tool_snippet(value: &str) -> String {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return String::new();
+        }
+        let sanitized: String = trimmed
+            .chars()
+            .map(|ch| {
+                if ch.is_control() && ch != '\t' {
+                    ' '
+                } else {
+                    ch
+                }
             })
-            .collect()
+            .collect();
+        let mut snippet = String::new();
+        let mut count = 0usize;
+        for ch in sanitized.chars() {
+            if count >= TOOL_SUMMARY_SNIPPET_LIMIT {
+                snippet.push('…');
+                break;
+            }
+            snippet.push(ch);
+            count += 1;
+        }
+        if snippet.chars().any(char::is_whitespace) {
+            format!("“{}”", snippet)
+        } else {
+            snippet
+        }
+    }
+
+    pub(crate) fn tool_heading_style(&self) -> RatatuiTextStyle {
+        let mut style = RatatuiTextStyle::default();
+        style.bold = true;
+        style.color = self
+            .theme
+            .primary
+            .or(self.theme.secondary)
+            .or(self.theme.foreground);
+        style
     }
 
     pub(crate) fn tool_label_style(&self) -> RatatuiTextStyle {
@@ -1489,6 +1908,7 @@ impl RatatuiLoop {
         }
         self.active_conversation -= 1;
         self.transcript_autoscroll = false;
+        self.transcript_focused = true;
         if let Some(&offset) = self.conversation_line_offsets.get(self.active_conversation) {
             self.transcript_scroll.jump_to(offset);
         } else {
@@ -1514,6 +1934,7 @@ impl RatatuiLoop {
                 self.transcript_scroll.scroll_to_top();
             }
         }
+        self.transcript_focused = true;
         self.scroll_focus = ScrollFocus::Transcript;
         true
     }

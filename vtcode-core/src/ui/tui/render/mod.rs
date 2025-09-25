@@ -153,6 +153,29 @@ impl RatatuiLoop {
         lines
     }
 
+    fn sync_transcript_list_state(&mut self, item_count: usize) {
+        if item_count == 0 {
+            self.transcript_list_state.select(None);
+            return;
+        }
+
+        let viewport_height = self.transcript_scroll.viewport_height().max(1);
+        let max_offset = item_count.saturating_sub(viewport_height);
+        let desired_offset = self.transcript_scroll.offset().min(max_offset);
+        self.transcript_scroll.set_offset(desired_offset);
+        widget_list_state_ext::set_viewport_offset(&mut self.transcript_list_state, desired_offset);
+
+        let max_index = item_count.saturating_sub(1);
+        let last_visible = if viewport_height <= 1 {
+            desired_offset
+        } else {
+            desired_offset
+                .saturating_add(viewport_height.saturating_sub(1))
+                .min(max_index)
+        };
+        self.transcript_list_state.select(Some(last_visible));
+    }
+
     fn update_transcript_selection(&mut self, item_count: usize) {
         if item_count == 0 {
             self.transcript_list_state.select(None);
@@ -280,7 +303,7 @@ impl RatatuiLoop {
             let offset = self.transcript_scroll.offset();
             let highlighted = self.highlight_transcript(display.lines.clone(), offset);
             let item_count = highlighted.len();
-            self.update_transcript_selection(item_count);
+            self.sync_transcript_list_state(item_count);
             let builder_lines = highlighted;
             let builder = ListBuilder::new(move |context| {
                 let line = builder_lines[context.index].clone();
@@ -1184,6 +1207,46 @@ impl RatatuiLoop {
             RatatuiMessageKind::Info => self.theme.foreground.unwrap_or(Color::Yellow),
             RatatuiMessageKind::Policy => self.theme.secondary.unwrap_or(Color::LightYellow),
             RatatuiMessageKind::Error => Color::LightRed,
+        }
+    }
+}
+
+mod widget_list_state_ext {
+    use std::mem::{align_of, size_of};
+    use std::sync::Once;
+
+    use tui_widget_list::ListState;
+
+    #[repr(C)]
+    struct ViewStateRepr {
+        offset: usize,
+        first_truncated: u16,
+    }
+
+    #[repr(C)]
+    struct ListStateRepr {
+        selected: Option<usize>,
+        num_elements: usize,
+        infinite_scrolling: bool,
+        _padding: [u8; 0],
+        view_state: ViewStateRepr,
+    }
+
+    static CHECK_LAYOUT: Once = Once::new();
+
+    fn ensure_layout() {
+        CHECK_LAYOUT.call_once(|| {
+            assert_eq!(size_of::<ListStateRepr>(), size_of::<ListState>());
+            assert_eq!(align_of::<ListStateRepr>(), align_of::<ListState>());
+        });
+    }
+
+    pub(crate) fn set_viewport_offset(state: &mut ListState, offset: usize) {
+        ensure_layout();
+        unsafe {
+            let repr = state as *mut ListState as *mut ListStateRepr;
+            (*repr).view_state.offset = offset;
+            (*repr).view_state.first_truncated = 0;
         }
     }
 }
